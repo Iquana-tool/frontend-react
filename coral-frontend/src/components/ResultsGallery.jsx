@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { ChevronDown, ChevronUp, ImageOff, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ImageOff, Loader2, Search } from "lucide-react";
+import { getSegmentationResults, searchSimilarImages } from "../api";
 
 export default function ResultsGallery() {
   const [results, setResults] = useState({
@@ -14,15 +15,17 @@ export default function ResultsGallery() {
     fine_tune: false
   });
 
+  // State for searching similar images
+  const [searchFile, setSearchFile] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Fetch segmentation results on component mount
   useEffect(() => {
     const fetchResults = async () => {
       setLoading(true);
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/results");
-        if (!res.ok) {
-          throw new Error(`Server error: ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await getSegmentationResults();
         setResults(data);
       } catch (err) {
         console.error("Error fetching results:", err);
@@ -39,6 +42,23 @@ export default function ResultsGallery() {
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    setSearchFile(file);
+
+    if (file) {
+      setSearchLoading(true);
+      try {
+        const data = await searchSimilarImages(file);
+        setSearchResults(data.similar_images);
+      } catch (error) {
+        console.error("Error searching similar images:", error);
+      } finally {
+        setSearchLoading(false);
+      }
+    }
   };
 
   const renderImageGrid = (images, section, maxVisible = 4) => {
@@ -113,25 +133,64 @@ export default function ResultsGallery() {
         Previously Generated Results
       </h2>
 
+      {/* Selected Mask Results */}
       <div className="space-y-4">
-        <h3 className="text-base font-semibold text-white/80">
-          Selected Mask(s)
-        </h3>
-        {renderImageGrid(results.selected, 'selected')}
+        <h3 className="text-base font-semibold text-white/80">Selected Mask(s)</h3>
+        {renderImageGrid(results.selected, "selected")}
       </div>
 
+      {/* Polyps Mask Results */}
       <div className="space-y-4">
-        <h3 className="text-base font-semibold text-white/80">
-          Polyps Masks
-        </h3>
-        {renderImageGrid(results.polyps, 'polyps')}
+        <h3 className="text-base font-semibold text-white/80">Polyps Masks</h3>
+        {renderImageGrid(results.polyps, "polyps")}
       </div>
 
+      {/* Fine-Tuned Mask Results */}
       <div className="space-y-4">
-        <h3 className="text-base font-semibold text-white/80">
-          Fine-Tuned Masks
+        <h3 className="text-base font-semibold text-white/80">Fine-Tuned Masks</h3>
+        {renderImageGrid(results.fine_tune, "fine_tune")}
+      </div>
+
+      {/* Search Similar Images Section */}
+      <div className="mt-6 p-4 bg-[#272C3B] rounded-lg shadow-md">
+        <h3 className="text-lg font-semibold text-white/80 mb-3 flex items-center">
+          <Search className="mr-2" /> Search Similar Images
         </h3>
-        {renderImageGrid(results.fine_tune, 'fine_tune')}
+        <input 
+          type="file" 
+          onChange={handleFileChange} 
+          className="mb-3 text-white"
+        />
+        
+        {searchLoading ? (
+          <div className="flex justify-center items-center">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          </div>
+        ) : searchResults.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
+            {searchResults.map((url, index) => (
+              <div 
+                key={index} 
+                className="relative group overflow-hidden rounded-lg shadow-lg transform transition-transform duration-300 hover:scale-105"
+              >
+                <img
+                  src={`http://127.0.0.1:8000/${url}`}
+                  alt={`Similar Image ${index + 1}`}
+                  className="w-full h-32 object-cover"
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                  <p className="text-white opacity-0 group-hover:opacity-100 text-xs font-medium transition-opacity">
+                    Similar Image {index + 1}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          searchFile && (
+            <p className="text-gray-400 text-center">No similar images found.</p>
+          )
+        )}
       </div>
     </div>
   );
