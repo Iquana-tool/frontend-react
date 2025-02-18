@@ -117,7 +117,7 @@ const ImageSelector = ({ onImageSelect }) => {
           </button>
           
           {isOpen && !isLoading && (
-            <div className="absolute w-full mt-2 bg-gray-800/95 border border-gray-700/50 rounded-xl shadow-2xl z-10 backdrop-blur-sm overflow-hidden">
+            <div className="absolute w-full mt-2 bg-gray-900 border border-gray-700/50 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[300px] overflow-y-auto">
               {databaseImages.map((image) => (
                 <button
                   key={image.id}
