@@ -94,84 +94,80 @@ const ImageSelector = ({ onImageSelect }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 rounded-2xl p-6 backdrop-blur-md border border-gray-700/50 shadow-2xl">
-      <div className="space-y-4">
-        <div className="flex items-center gap-3">
-          <ImageIcon className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-medium text-white">Select Sample Image</h3>
-          {error && (
-            <span className="text-sm text-red-400 ml-auto">{error}</span>
-          )}
-        </div>
+    <div className="space-y-4">
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          disabled={isLoading || isProcessing}
+          className="w-full bg-[#252533] text-white px-4 py-3 rounded-xl border border-purple-500/20 flex items-center justify-between hover:bg-[#2a2a3a] transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500/50 shadow-lg disabled:opacity-50"
+        >
+          <span className={`${selectedImage ? 'text-white' : 'text-gray-400'}`}>
+            {selectedImage ? selectedImage.name : 'Choose a sample image'}
+          </span>
+          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
         
-        <div className="relative">
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            disabled={isLoading || isProcessing}
-            className="w-full bg-gray-800/80 text-white px-4 py-3 rounded-xl border border-gray-700/50 flex items-center justify-between hover:bg-gray-700/50 transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-lg disabled:opacity-50"
-          >
-            <span className={`${selectedImage ? 'text-white' : 'text-gray-400'}`}>
-              {selectedImage ? selectedImage.name : 'Choose a sample image'}
-            </span>
-            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {isOpen && !isLoading && (
-            <div className="absolute w-full mt-2 bg-gray-900 border border-gray-700/50 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[300px] overflow-y-auto">
-              {databaseImages.map((image) => (
-                <button
-                  key={image.id}
-                  onClick={() => handleImageSelect(image)}
-                  className="w-full px-4 py-3 text-left text-white hover:bg-gray-700/50 transition-colors duration-200 flex items-center gap-3"
-                >
-                  <ImageIcon className="w-4 h-4 text-blue-400" />
-                  {image.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {selectedImage && (
-          <div className="mt-6 space-y-4">
-            {/* Preview Image */}
-            <div className="relative rounded-xl overflow-hidden group">
-              <img 
-                src={`${API_BASE_URL}${selectedImage.path}`}
-                alt="Selected sample"
-                className="w-full h-56 object-cover rounded-xl transform transition-transform duration-300 group-hover:scale-105"
-                onError={(e) => {
-                  console.error('Image failed to load:', e);
-                  setError('Failed to load image');
-                  setSelectedImage(null);
-                }}
-              />
-              
-              {/* Processing Overlay */}
-              {isProcessing && (
-                <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm flex flex-col items-center justify-center rounded-xl">
-                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-2" />
-                  <p className="text-white text-sm">Processing segmentation...</p>
-                </div>
-              )}
-            </div>
-
-            {/* Start Segmentation Button */}
-            <button
-              onClick={handleStartSegmentation}
-              disabled={isProcessing || isLoading || !selectedImageFile}
-              className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-500/50 text-white py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors duration-200"
-            >
-              {isProcessing ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Play className="w-5 h-5" />
-              )}
-              {isProcessing ? 'Processing...' : 'Start Segmentation'}
-            </button>
+        {isOpen && !isLoading && (
+          <div className="absolute w-full mt-2 bg-[#252533] border border-purple-500/20 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[300px] overflow-y-auto">
+            {databaseImages.map((image) => (
+              <button
+                key={image.id}
+                onClick={() => handleImageSelect(image)}
+                className="w-full px-4 py-3 text-left text-white hover:bg-[#363650] transition-colors duration-200 flex items-center gap-3"
+              >
+                <ImageIcon className="w-4 h-4 text-purple-400" />
+                {image.name}
+              </button>
+            ))}
           </div>
         )}
       </div>
+      
+      {selectedImage && (
+        <div className="mt-6 space-y-4">
+          {/* Preview Image */}
+          <div className="relative rounded-xl overflow-hidden group">
+            <img 
+              src={`${API_BASE_URL}${selectedImage.path}`}
+              alt="Selected sample"
+              className="w-full h-56 object-cover rounded-xl transform transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                console.error('Image failed to load:', e);
+                setError('Failed to load image');
+                setSelectedImage(null);
+              }}
+            />
+            
+            {/* Processing Overlay */}
+            {isProcessing && (
+              <div className="absolute inset-0 bg-[#1e1e2d]/70 flex flex-col items-center justify-center rounded-xl">
+                <Loader2 className="w-8 h-8 text-purple-400 animate-spin mb-2" />
+                <p className="text-white text-sm">Processing segmentation...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Start Segmentation Button */}
+          <button
+            onClick={handleStartSegmentation}
+            disabled={isProcessing || isLoading || !selectedImageFile}
+            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:opacity-90 disabled:opacity-50 text-white py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200"
+          >
+            {isProcessing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Play className="w-5 h-5" />
+            )}
+            {isProcessing ? 'Processing...' : 'Start Segmentation'}
+          </button>
+        </div>
+      )}
+      
+      {error && (
+        <div className="mt-2 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
     </div>
   );
 };

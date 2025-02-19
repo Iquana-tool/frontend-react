@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Upload, Image as ImageIcon } from 'lucide-react';
+import { Activity, Upload, Image as ImageIcon, Play } from 'lucide-react';
 import ImageUpload from './components/ImageUpload';
 import ImageSelector from './components/ImageSelector';
 import MaskCanvas from './components/MaskCanvas';
@@ -15,7 +15,6 @@ function App() {
   const handleImageSelect = async (image) => {
     setIsLoading(true);
     
-    // Create URL for the selected/uploaded image
     if (image) {
       // Revoke previous URLs to prevent memory leaks
       if (imageUrl) {
@@ -65,36 +64,43 @@ function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900/50 to-gray-900 text-white antialiased">
-      <div className="min-h-screen backdrop-blur-3xl px-6 py-12">
+    <div className="min-h-screen bg-[#1e1e2d] text-white antialiased">
+      <div className="min-h-screen px-6 py-12">
         <div className="container mx-auto max-w-7xl">
           <header className="mb-16 text-center">
-            <h1 className="text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500 animate-gradient">
+            <h1 className="text-6xl font-black mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-violet-500">
               Coral Segmentation
             </h1>
-            <p className="text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-300 max-w-2xl mx-auto">
               AI-powered tool for detailed coral image analysis
             </p>
           </header>
 
           <div className="grid lg:grid-cols-2 gap-8">
             <div className="space-y-8">
-              <div className="relative z-50 transform transition-transform hover:scale-[1.01]">
+              {/* Image Selector */}
+              <div className="bg-[#2d2d3a] rounded-2xl p-6 border border-gray-700/30 shadow-xl">
+                <div className="flex items-center gap-3 mb-6">
+                  <ImageIcon className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-lg font-medium text-white">Select Sample Image</h3>
+                </div>
                 <ImageSelector onImageSelect={handleImageSelect} />
               </div>
               
-              <div className="relative z-40 bg-gradient-to-br from-gray-900/50 to-gray-800/50 rounded-2xl p-8 backdrop-blur-md border border-gray-700/50 shadow-2xl hover:border-blue-500/30 transition-all duration-300">
+              {/* Optional Upload */}
+              <div className="bg-[#2d2d3a] rounded-2xl p-6 border border-gray-700/30 shadow-xl">
                 <div className="flex items-center gap-3 mb-6">
-                  <Upload className="w-5 h-5 text-blue-400 animate-pulse" />
+                  <Upload className="w-5 h-5 text-purple-400" />
                   <h3 className="text-lg font-medium text-white">Upload Your Own Image</h3>
                 </div>
                 <ImageUpload onImageUpload={handleImageSelect} />
               </div>
 
-              <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 rounded-2xl p-8 backdrop-blur-md border border-gray-700/50 shadow-2xl hover:border-blue-500/30 transition-all duration-300">
+              {/* Canvas Section */}
+              <div className="bg-[#2d2d3a] rounded-2xl p-6 border border-gray-700/30 shadow-xl">
                 {isLoading ? (
                   <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mb-4"></div>
                     <p className="text-lg">Processing image...</p>
                   </div>
                 ) : imageUrl ? (
@@ -104,30 +110,28 @@ function App() {
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                    <Activity className="w-16 h-16 mb-4 text-blue-500/60 animate-pulse" />
+                    <Activity className="w-16 h-16 mb-4 text-purple-500/60" />
                     <p className="text-lg text-center">Select or upload an image to begin segmentation</p>
-                    <p className="text-sm text-gray-500 mt-2">Supports JPG, PNG formats</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-gray-900/50 to-gray-800/50 rounded-2xl p-8 backdrop-blur-md border border-gray-700/50 shadow-2xl hover:border-blue-500/30 transition-all duration-300">
+            {/* Results Panel */}
+            <div className="bg-[#2d2d3a] rounded-2xl p-6 border border-gray-700/30 shadow-xl">
               <ResultsGallery />
             </div>
           </div>
 
           {segmentedImage && (
-            <div className="mt-8 transform transition-all duration-300 hover:scale-[1.01]">
+            <div className="mt-8">
               <ToolsPanel segmentedImage={segmentedImage} />
             </div>
           )}
 
-          <footer className="mt-16 text-center text-gray-400 border-t border-gray-800/50 pt-8">
-            <p className="mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-              © {new Date().getFullYear()} Coral Segmentation AI
-            </p>
-            <p className="text-sm text-gray-500 hover:text-gray-400 transition-colors">
+          <footer className="mt-16 text-center text-gray-400 border-t border-gray-800/30 pt-8">
+            <p className="mb-2">© {new Date().getFullYear()} Coral Segmentation AI</p>
+            <p className="text-sm text-gray-500">
               Powered by advanced artificial intelligence
             </p>
           </footer>
