@@ -171,3 +171,84 @@ export const getPromptTypeDescription = (type) => {
       return "";
   }
 };
+
+/**
+ * Creates a visual preview of a mask cutout
+ * @param {HTMLImageElement} originalImage - Original image
+ * @param {string} maskBase64 - Base64 encoded mask
+ * @param {Object} options - Options for visualization
+ * @returns {HTMLCanvasElement} Canvas with the visualization
+ */
+export const createMaskCutoutPreview = (originalImage, maskBase64, options = {}) => {
+  const {
+    darkenOutside = true,
+    darkeningFactor = 0.7,
+    padding = 0.1 // Padding around the mask as a fraction of image size
+  } = options;
+  
+  // Create a canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = originalImage.width;
+  canvas.height = originalImage.height;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw the original image
+  ctx.drawImage(originalImage, 0, 0);
+  
+  // Create a temporary image for the mask
+  const maskImg = new Image();
+  maskImg.src = `data:image/png;base64,${maskBase64}`;
+  
+  // Function to process after mask loads
+  maskImg.onload = () => {
+    // Find the bounding box of the mask
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = maskImg.width;
+    maskCanvas.height = maskImg.height;
+    const maskCtx = maskCanvas.getContext('2d');
+    maskCtx.drawImage(maskImg, 0, 0);
+    
+    const maskData = maskCtx.getImageData(0, 0, maskImg.width, maskImg.height).data;
+    
+    // Find bounds
+    let minX = maskImg.width, minY = maskImg.height, maxX = 0, maxY = 0;
+    for (let y = 0; y < maskImg.height; y++) {
+      for (let x = 0; x < maskImg.width; x++) {
+        const idx = (y * maskImg.width + x) * 4;
+        if (maskData[idx + 3] > 0) { // If not transparent
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    
+    // Add padding
+    const paddingX = Math.floor(padding * maskImg.width);
+    const paddingY = Math.floor(padding * maskImg.height);
+    
+    minX = Math.max(0, minX - paddingX);
+    minY = Math.max(0, minY - paddingY);
+    maxX = Math.min(maskImg.width, maxX + paddingX);
+    maxY = Math.min(maskImg.height, maxY + paddingY);
+    
+    if (darkenOutside) {
+      // Create a darken layer
+      ctx.fillStyle = `rgba(0, 0, 0, ${1 - darkeningFactor})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Clear the mask area
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(maskImg, 0, 0);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    
+    // Draw a bounding box
+    ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+  };
+  
+  return canvas;
+};

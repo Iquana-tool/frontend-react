@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 // This allows users to add different types of prompts to an image for segmentation tasks.
-const PromptingCanvas = ({ image, onPromptingComplete }) => {
+const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false }) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -690,6 +690,7 @@ const PromptingCanvas = ({ image, onPromptingComplete }) => {
         height: image.height,
       },
       prompts: getFormattedPrompts(),
+      isRefinement: isRefinementMode,
       timestamp: new Date().toISOString(),
     };
 
@@ -818,6 +819,13 @@ const PromptingCanvas = ({ image, onPromptingComplete }) => {
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-30">
             <div className="w-10 h-10 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
+
+        {/* Refinement Mode indicator */}
+        {isRefinementMode && (
+          <div className="absolute top-0 left-0 right-0 bg-yellow-400 bg-opacity-90 text-black px-2 py-1 text-xs font-medium z-20">
+            Refinement Mode - Working on a portion of the image
           </div>
         )}
 
