@@ -689,39 +689,74 @@ const ImageViewerWithPrompting = () => {
                           <div className="absolute inset-0">
                             <canvas
                               ref={(canvas) => {
-                                if (canvas && imageObject) {
+                                if (canvas && imageObject && mask.base64) {
+                                  // Get canvas dimensions based on its display size
+                                  const canvasWidth = canvas.offsetWidth;
+                                  const canvasHeight = canvas.offsetHeight;
+                                  
+                                  // Set actual canvas dimensions for proper rendering
+                                  canvas.width = canvasWidth;
+                                  canvas.height = canvasHeight;
+                                  
                                   const ctx = canvas.getContext("2d");
-                                  canvas.width = canvas.offsetWidth;
-                                  canvas.height = canvas.offsetHeight;
+                                  
+                                  // First draw the original image as background
                                   ctx.drawImage(
                                     imageObject,
                                     0,
                                     0,
-                                    canvas.width,
-                                    canvas.height
+                                    canvasWidth,
+                                    canvasHeight
                                   );
-
-                                  // Draw mask overlay
+                                  
+                                  // Create the mask image
                                   const maskImg = new Image();
+                                  
                                   maskImg.onload = () => {
-                                    ctx.drawImage(
-                                      maskImg,
-                                      0,
-                                      0,
-                                      canvas.width,
-                                      canvas.height
-                                    );
-                                    ctx.globalCompositeOperation = "source-in";
-                                    ctx.fillStyle = getMaskColor(index);
-                                    ctx.fillRect(
-                                      0,
-                                      0,
-                                      canvas.width,
-                                      canvas.height
-                                    );
-                                    ctx.globalCompositeOperation =
-                                      "source-over";
+                                    // Create a temporary canvas for mask processing
+                                    const tempCanvas = document.createElement('canvas');
+                                    tempCanvas.width = canvasWidth;
+                                    tempCanvas.height = canvasHeight;
+                                    const tempCtx = tempCanvas.getContext('2d');
+                                    
+                                    // Draw mask on temporary canvas
+                                    tempCtx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
+                                    
+                                    // Get mask pixel data
+                                    const imageData = tempCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+                                    const data = imageData.data;
+                                    
+                                    // Get original image data from main canvas
+                                    const originalImageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+                                    const originalData = originalImageData.data;
+                                    
+                                    // Combine the mask and original image
+                                    // For each pixel where mask is non-transparent, show the original image
+                                    // with a color overlay
+                                    const color = getMaskColor(index);
+                                    const colorMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
+                                    
+                                    if (colorMatch) {
+                                      const r = parseInt(colorMatch[1], 10);
+                                      const g = parseInt(colorMatch[2], 10);
+                                      const b = parseInt(colorMatch[3], 10);
+                                      const a = colorMatch[4] ? parseFloat(colorMatch[4]) : 1;
+                                      
+                                      for (let i = 0; i < data.length; i += 4) {
+                                        if (data[i + 3] > 0) { // If mask pixel is not fully transparent
+                                          // Apply a semi-transparent color overlay on the original image
+                                          originalData[i] = (originalData[i] * (1 - a) + r * a);
+                                          originalData[i + 1] = (originalData[i + 1] * (1 - a) + g * a);
+                                          originalData[i + 2] = (originalData[i + 2] * (1 - a) + b * a);
+                                        }
+                                      }
+                                    }
+                                    
+                                    // Put the modified image data back to the main canvas
+                                    ctx.putImageData(originalImageData, 0, 0);
                                   };
+                                  
+                                  // Set source and load the mask image
                                   maskImg.src = `data:image/png;base64,${mask.base64}`;
                                 }
                               }}
