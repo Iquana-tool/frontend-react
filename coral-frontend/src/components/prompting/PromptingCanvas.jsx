@@ -771,28 +771,31 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
           </button>
         </div>
 
-        <div className="flex space-x-2">
-          <button
-            className={`p-2 rounded-md ${
-              currentLabel === 1
-                ? "bg-green-500 text-white"
-                : "bg-white border border-green-500 text-green-500"
-            }`}
-            onClick={() => setCurrentLabel(1)}
-          >
-            Foreground (1)
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              currentLabel === 0
-                ? "bg-red-500 text-white"
-                : "bg-white border border-red-500 text-red-500"
-            }`}
-            onClick={() => setCurrentLabel(0)}
-          >
-            Background (0)
-          </button>
-        </div>
+        {/* Only show foreground/background toggle for point prompts */}
+        {promptType === "point" && (
+          <div className="flex space-x-2">
+            <button
+              className={`p-2 rounded-md ${
+                currentLabel === 1
+                  ? "bg-green-500 text-white"
+                  : "bg-white border border-green-500 text-green-500"
+              }`}
+              onClick={() => setCurrentLabel(1)}
+            >
+              Foreground (1)
+            </button>
+            <button
+              className={`p-2 rounded-md ${
+                currentLabel === 0
+                  ? "bg-red-500 text-white"
+                  : "bg-white border border-red-500 text-red-500"
+              }`}
+              onClick={() => setCurrentLabel(0)}
+            >
+              Background (0)
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Canvas Container */}
