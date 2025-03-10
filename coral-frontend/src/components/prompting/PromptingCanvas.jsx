@@ -14,8 +14,12 @@ import {
   Trash2,
 } from "lucide-react";
 
-// This allows users to add different types of prompts to an image for segmentation tasks.
-const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false }) => {
+// This component allows users to add different types of prompts to an image for segmentation tasks.
+const PromptingCanvas = ({
+  image,
+  onPromptingComplete,
+  isRefinementMode = false,
+}) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -197,7 +201,7 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
     ctx.scale(pixelRatio, pixelRatio);
 
     // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
 
     // Apply view transformations
     ctx.save();
@@ -527,31 +531,13 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
     if (!image) return;
     e.preventDefault();
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const canvasX = e.clientX - rect.left;
-    const canvasY = e.clientY - rect.top;
-
-    // Get image coordinates before zoom
-    const beforeZoom = canvasToImageCoords(canvasX, canvasY);
-
     // Calculate new zoom level
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.5, Math.min(5, zoomLevel * zoomFactor));
 
     // Apply new zoom
     setZoomLevel(newZoom);
-
-    // We'll adjust pan offset on the next render to keep the point under cursor fixed
-    // This is handled in a useEffect that runs after zoom changes
   };
-
-  // Adjust pan offset after zoom to keep the point under cursor fixed
-  useEffect(() => {
-    if (!canvasRef.current || !image) return;
-
-    // This runs after zoom changes to adjust the pan offset
-    redrawCanvas();
-  }, [zoomLevel]);
 
   // Canvas control functions
   const handleZoomIn = () => {
@@ -632,7 +618,7 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
     document.body.removeChild(link);
   };
 
-  // Format prompts for export
+  // Format prompts for export - converting to normalized coordinates [0-1]
   const getFormattedPrompts = () => {
     return prompts.map((prompt) => {
       let formattedPrompt = {
@@ -678,37 +664,9 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
     });
   };
 
-  // Save prompt data
+  // Save prompt data and trigger segmentation
   const handleSavePrompts = () => {
     if (prompts.length === 0 || !image) return;
-
-    // Prepare data for export
-    const exportData = {
-      image: {
-        name: image.src.split("/").pop(),
-        width: image.width,
-        height: image.height,
-      },
-      prompts: getFormattedPrompts(),
-      isRefinement: isRefinementMode,
-      timestamp: new Date().toISOString(),
-    };
-
-    // In a real app, you would send this to your API
-    console.log("Saving prompts:", exportData);
-
-    // For demo purposes, trigger download as JSON
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(dataBlob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "coral_segmentation_prompts.json";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
 
     // Notify parent component if needed
     if (onPromptingComplete) {
@@ -771,31 +729,29 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
           </button>
         </div>
 
-        {/* Only show foreground/background toggle for point prompts */}
-        {promptType === "point" && (
-          <div className="flex space-x-2">
-            <button
-              className={`p-2 rounded-md ${
-                currentLabel === 1
-                  ? "bg-green-500 text-white"
-                  : "bg-white border border-green-500 text-green-500"
-              }`}
-              onClick={() => setCurrentLabel(1)}
-            >
-              Foreground (1)
-            </button>
-            <button
-              className={`p-2 rounded-md ${
-                currentLabel === 0
-                  ? "bg-red-500 text-white"
-                  : "bg-white border border-red-500 text-red-500"
-              }`}
-              onClick={() => setCurrentLabel(0)}
-            >
-              Background (0)
-            </button>
-          </div>
-        )}
+        {/* Foreground/background toggle */}
+        <div className="flex space-x-2">
+          <button
+            className={`p-2 rounded-md ${
+              currentLabel === 1
+                ? "bg-green-500 text-white"
+                : "bg-white border border-green-500 text-green-500"
+            }`}
+            onClick={() => setCurrentLabel(1)}
+          >
+            Foreground (1)
+          </button>
+          <button
+            className={`p-2 rounded-md ${
+              currentLabel === 0
+                ? "bg-red-500 text-white"
+                : "bg-white border border-red-500 text-red-500"
+            }`}
+            onClick={() => setCurrentLabel(0)}
+          >
+            Background (0)
+          </button>
+        </div>
       </div>
 
       {/* Canvas Container */}
@@ -930,7 +886,7 @@ const PromptingCanvas = ({ image, onPromptingComplete, isRefinementMode = false 
             disabled={prompts.length === 0}
           >
             <Save size={18} />
-            <span>Save Prompts</span>
+            <span>Start Segmentation</span>
           </button>
         </div>
       )}

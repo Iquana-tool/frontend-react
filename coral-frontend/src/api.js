@@ -47,121 +47,158 @@ export const getImageById = async (imageId) => {
   }
 };
 
-// Segment an image
-export const segmentImage = async (imageId, prompts = null) => {
-    try {
-      const requestData = {
-        image_id: imageId,
-        use_prompts: !!prompts,
-        point_prompts: [],
-        box_prompts: [],
-      };
-  
-      if (prompts) {
-        // Convert prompts to the format expected by the API
-        prompts.forEach(prompt => {
-          if (prompt.type === 'point') {
-            requestData.point_prompts.push({
-              x: prompt.coordinates.x,
-              y: prompt.coordinates.y,
-              label: prompt.label,
-            });
-          } else if (prompt.type === 'box') {
-            requestData.box_prompts.push({
-              min_x: prompt.coordinates.startX,
-              min_y: prompt.coordinates.startY,
-              max_x: prompt.coordinates.endX,
-              max_y: prompt.coordinates.endY,
-            });
-          }
-        });
-      }
-  
-      /*
-      const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-      return handleApiError(response);
-      */
-      
-      // Mock response - will be replaced by actual API call in production
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          // Create a few random "mask" strings (these would be base64 encoded PNGs in production)
-          const mockBase64Masks = [
-            // These would be actual base64 encoded PNGs in production
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwADBwIAMCbHYQAAAABJRU5ErkJggg=="
-          ];
-          
-          const mockQuality = [0.92, 0.85, 0.78];
-          
-          resolve({
-            base64_masks: mockBase64Masks,
-            quality: mockQuality
+// Delete image
+export const deleteImage = async (imageId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/images/delete_image/${imageId}`, {
+      method: 'DELETE',
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    throw error;
+  }
+};
+
+// Segment an image using the segmentation endpoint
+export const segmentImage = async (imageId, model = "SAM2Tiny", prompts = null) => {
+  try {
+    const requestData = {
+      image_id: imageId,
+      model: model,
+      use_prompts: !!prompts && prompts.length > 0,
+      point_prompts: [],
+      box_prompts: [],
+    };
+
+    if (prompts && prompts.length > 0) {
+      // Convert prompts to the format expected by the API
+      prompts.forEach(prompt => {
+        if (prompt.type === 'point') {
+          requestData.point_prompts.push({
+            x: prompt.coordinates.x,
+            y: prompt.coordinates.y,
+            label: prompt.label ? 1 : 0, // Convert boolean to 1/0
           });
-        }, 1000);
+        } else if (prompt.type === 'box') {
+          requestData.box_prompts.push({
+            min_x: prompt.coordinates.startX,
+            min_y: prompt.coordinates.startY,
+            max_x: prompt.coordinates.endX,
+            max_y: prompt.coordinates.endY,
+          });
+        }
       });
-    } catch (error) {
-      console.error('Error segmenting image:', error);
-      throw error;
     }
-  };
+
+    const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error segmenting image:', error);
+    throw error;
+  }
+};
+
+// Save a mask
+export const saveMask = async (imageId, label, base64Mask) => {
+  try {
+    const requestData = {
+      image_id: imageId,
+      label: label,
+      base64_mask: base64Mask
+    };
+
+    const response = await fetch(`${API_BASE_URL}/masks/save_mask`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error saving mask:', error);
+    throw error;
+  }
+};
+
+// Get all masks for an image
+export const getMasksForImage = async (imageId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/masks/get_masks_for_image/${imageId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error getting masks for image:', error);
+    throw error;
+  }
+};
+
+// Get a specific mask
+export const getMask = async (maskId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error getting mask:', error);
+    throw error;
+  }
+};
+
+// Delete a mask
+export const deleteMask = async (maskId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/masks/delete_mask/${maskId}`, {
+      method: 'DELETE',
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error deleting mask:', error);
+    throw error;
+  }
+};
 
 // Create cutouts from a mask
 export const createCutouts = async (imageId, base64Mask, options = {}) => {
-    try {
-      const requestData = {
-        image_id: imageId,
-        base64_mask: base64Mask,
-        resize_factor: options.resizeFactor || 1.0,
-        darken_outside_contours: options.darkenOutsideContours || true,
-        darkening_factor: options.darkeningFactor || 0.6,
-      };
-  
-      // For the purpose of this implementation, we'll mock the API response
-      // In production, we have to uncomment the fetch code below
-      
-      /*
-      const response = await fetch(`${API_BASE_URL}/cutouts/get_cutouts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-      return handleApiError(response);
-      */
-      
-      // Mock response - will be replaced by actual API call in production
-      // In this mock, we're just returning the mask as the cutout image
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            success: true,
-            cutout_image: base64Mask, // In real implementation, this would be the cutout image
-            position: {
-              x: 0,
-              y: 0
-            }
-          });
-        }, 500);
-      });
-    } catch (error) {
-      console.error('Error creating cutouts:', error);
-      throw error;
-    }
-  };
+  try {
+    const requestData = {
+      image_id: imageId,
+      base64_mask: base64Mask,
+      resize_factor: options.resizeFactor || 1.0,
+      darken_outside_contours: options.darkenOutsideContours || true,
+      darkening_factor: options.darkeningFactor || 0.6,
+    };
 
-export default {
+    const response = await fetch(`${API_BASE_URL}/cutouts/get_cutouts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error('Error creating cutouts:', error);
+    throw error;
+  }
+};
+
+const API = {
   fetchImages,
   uploadImage,
   getImageById,
+  deleteImage,
   segmentImage,
+  saveMask,
+  getMasksForImage,
+  getMask,
+  deleteMask,
   createCutouts,
 };
+
+export default API;

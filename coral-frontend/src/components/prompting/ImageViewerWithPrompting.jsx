@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import PromptingCanvas from "./PromptingCanvas";
-import sampleImages from "../../sampleImages";
-import { segmentImage, createCutouts } from "../../api";
+import { sampleImages } from "../../sampleImages";
+import * as api from "../../api";
+import {getMaskColor } from "./utils";
 
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageObject, setImageObject] = useState(null);
-  const [availableImages, setAvailableImages] = useState(sampleImages);
+  const [availableImages, setAvailableImages] = useState([]);
   const [promptingResult, setPromptingResult] = useState(null);
   const [segmentationMasks, setSegmentationMasks] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,39 +17,93 @@ const ImageViewerWithPrompting = () => {
   const [originalImage, setOriginalImage] = useState(null);
   const [cutoutImage, setCutoutImage] = useState(null);
   const [cutoutPosition, setCutoutPosition] = useState(null);
+  const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
+
+  // Fetch images when component mounts
+  useEffect(() => {
+    fetchImagesFromAPI();
+  }, []);
+
+  const fetchImagesFromAPI = async () => {
+    try {
+      setLoading(true);
+      const response = await api.fetchImages();
+      if (response.success) {
+        // Transform API response to the format our component expects
+        const apiImages = response.images.map((img) => ({
+          id: img.id,
+          name: img.filename,
+          width: img.width,
+          height: img.height,
+          hash: img.hash_code,
+          // We'll load the actual image when selected
+          url: `data:image/jpeg;base64,placeholder`,
+          isFromAPI: true,
+        }));
+
+        // Combine API images with sample images for easier development/testing
+        setAvailableImages([...apiImages, ...sampleImages]);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to fetch images:", error);
+      setError("Failed to load images from server. Using sample images only.");
+      setAvailableImages(sampleImages);
+      setLoading(false);
+    }
+  };
 
   // Handle image selection
-  const handleImageSelect = (image) => {
+  const handleImageSelect = async (image) => {
     // Reset refinement mode when selecting a new image
     setIsRefinementMode(false);
     setSelectedMask(null);
     setCutoutImage(null);
+    setSegmentationMasks([]);
+    setPromptingResult(null);
 
     setSelectedImage(image);
     setLoading(true);
     setError(null);
-    setPromptingResult(null);
-    setSegmentationMasks([]);
 
-    // Load the image object for the canvas
-    const img = new Image();
-    img.src = image.url;
+    try {
+      let imageUrl;
 
-    img.onload = () => {
-      setImageObject(img);
-      setOriginalImage(img);
-      setLoading(false);
-    };
+      // If the image is from our API, we need to fetch the actual image data
+      if (image.isFromAPI) {
+        const imageData = await api.getImageById(image.id);
+        // The API returns a mapping of image ID to base64 data
+        const base64Data = imageData[image.id];
+        imageUrl = `data:image/jpeg;base64,${base64Data}`;
+      } else {
+        // For sample images, just use the provided URL
+        imageUrl = image.url;
+      }
 
-    img.onerror = () => {
-      setError("Failed to load image. Please try another one.");
+      // Load the image object for the canvas
+      const img = new Image();
+      img.src = imageUrl;
+
+      img.onload = () => {
+        setImageObject(img);
+        setOriginalImage(img);
+        setLoading(false);
+      };
+
+      img.onerror = () => {
+        setError("Failed to load image. Please try another one.");
+        setLoading(false);
+        setSelectedImage(null);
+      };
+    } catch (error) {
+      setError(`Failed to load image: ${error.message}`);
       setLoading(false);
       setSelectedImage(null);
-    };
+    }
   };
 
   // Handle file upload
-  const handleFileUpload = (e) => {
+  const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -65,25 +120,32 @@ const ImageViewerWithPrompting = () => {
     setSelectedMask(null);
     setCutoutImage(null);
 
-    // Create a URL for the selected file
-    const imageUrl = URL.createObjectURL(file);
+    try {
+      // Upload to the API
+      const response = await api.uploadImage(file);
 
-    // Create a new image object
-    const newImage = {
-      id: Date.now(),
-      name: file.name,
-      url: imageUrl,
-      isUploaded: true,
-    };
+      if (response.success) {
+        // Refresh the image list to include the new upload
+        await fetchImagesFromAPI();
 
-    // Add to available images
-    setAvailableImages((prevImages) => [newImage, ...prevImages]);
+        // Find the uploaded image in the list
+        const uploadedImage = {
+          id: response.image_id,
+          name: file.name,
+          isFromAPI: true,
+        };
 
-    // Select the uploaded image
-    handleImageSelect(newImage);
+        handleImageSelect(uploadedImage);
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (error) {
+      setError(`Failed to upload image: ${error.message}`);
+      setLoading(false);
+    }
   };
 
-  // Handle prompting complete
+  // Handle prompting
   const handlePromptingComplete = async (prompts) => {
     setPromptingResult(prompts);
     console.log("Prompting complete:", prompts);
@@ -131,34 +193,45 @@ const ImageViewerWithPrompting = () => {
                   originalImage.height,
               };
               break;
-            // Handle other prompt types similarly
+            case "circle":
+              newPrompt.coordinates = {
+                centerX:
+                  (prompt.coordinates.centerX * cutoutImage.width +
+                    cutoutPosition.x) /
+                  originalImage.width,
+                centerY:
+                  (prompt.coordinates.centerY * cutoutImage.height +
+                    cutoutPosition.y) /
+                  originalImage.height,
+                // Scale the radius proportionally to the original image's dimensions
+                radius:
+                  (prompt.coordinates.radius *
+                    Math.max(cutoutImage.width, cutoutImage.height)) /
+                  Math.max(originalImage.width, originalImage.height),
+              };
+              break;
+            case "polygon":
+              // For polygons, we need to transform each point in the polygon
+              newPrompt.coordinates = prompt.coordinates.map((point) => ({
+                x:
+                  (point.x * cutoutImage.width + cutoutPosition.x) /
+                  originalImage.width,
+                y:
+                  (point.y * cutoutImage.height + cutoutPosition.y) /
+                  originalImage.height,
+              }));
+              break;
           }
 
           return newPrompt;
         });
 
-        // Send refined prompts to the backend
-        console.log("Refined prompts:", adjustedPrompts);
-
-        // Simulate API response
-        setTimeout(() => {
-          // Return to full image view after refinement
-          handleCancelRefinement();
-          setLoading(false);
-
-          // You would typically update the segmentation masks here with the new result
-        }, 1000);
-      } else {
-        // Regular segmentation (existing code)
-        // For now, we'll simulate a response
-        const segmentationResponse = {
-          base64_masks: [
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPj/HwADBwIAMCbHYQAAAABJRU5ErkJggg==",
-          ],
-          quality: [0.92, 0.85, 0.78],
-        };
+        // Send to API with the refined prompts
+        const segmentationResponse = await api.segmentImage(
+          selectedImage.id,
+          selectedModel,
+          adjustedPrompts
+        );
 
         // Update segmentation masks
         setSegmentationMasks(
@@ -169,13 +242,33 @@ const ImageViewerWithPrompting = () => {
           }))
         );
 
-        setLoading(false);
+        // Return to full image view after refinement
+        handleCancelRefinement();
+      } else {
+        // Regular segmentation
+        const segmentationResponse = await api.segmentImage(
+          selectedImage.id,
+          selectedModel,
+          prompts
+        );
+
+        // Update segmentation masks
+        setSegmentationMasks(
+          segmentationResponse.base64_masks.map((mask, index) => ({
+            id: index,
+            base64: mask,
+            quality: segmentationResponse.quality[index],
+          }))
+        );
       }
+
+      setLoading(false);
     } catch (error) {
       setError("Failed to generate segmentation: " + error.message);
       setLoading(false);
     }
   };
+
   // Handle selecting a segmentation mask for refinement
   const handleMaskSelect = (mask) => {
     setSelectedMask(mask);
@@ -187,9 +280,6 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
-
-      // Instead of waiting for an API response, we'll generate the cutout locally
-      // using our utility function
 
       // Create a temporary canvas to render the cutout preview
       const cutoutPreviewCanvas = document.createElement("canvas");
@@ -304,6 +394,29 @@ const ImageViewerWithPrompting = () => {
     setImageObject(originalImage);
   };
 
+  // Save a mask to the database
+  const handleSaveMask = async (maskIndex) => {
+    if (!selectedImage || maskIndex >= segmentationMasks.length) return;
+
+    const mask = segmentationMasks[maskIndex];
+
+    try {
+      setLoading(true);
+      await api.saveMask(selectedImage.id, `segment_${maskIndex}`, mask.base64);
+      setLoading(false);
+      return true;
+    } catch (error) {
+      setError(`Failed to save mask: ${error.message}`);
+      setLoading(false);
+      return false;
+    }
+  };
+
+  // Handle model selection change
+  const handleModelChange = (e) => {
+    setSelectedModel(e.target.value);
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">
@@ -332,7 +445,7 @@ const ImageViewerWithPrompting = () => {
                 accept="image/*"
                 className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
                 onChange={handleFileUpload}
-                disabled={isRefinementMode}
+                disabled={isRefinementMode || loading}
               />
               <div className="text-center">
                 <div className="text-sm text-gray-600">
@@ -347,37 +460,86 @@ const ImageViewerWithPrompting = () => {
             </div>
           </div>
 
+          {/* Model Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium mb-2">
+              Segmentation Model:
+            </label>
+            <select
+              className="w-full border border-gray-300 rounded-md p-2"
+              value={selectedModel}
+              onChange={handleModelChange}
+              disabled={isRefinementMode || loading}
+            >
+              <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
+              <option value="SAM2Small">SAM2 Small</option>
+              <option value="SAM2Large">SAM2 Large</option>
+              <option value="SAM2BasePlus">SAM2 Base Plus</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Larger models may be more accurate but will take longer to
+              process.
+            </p>
+          </div>
+
           <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-            <h3 className="font-medium text-sm mb-3">Sample Images:</h3>
-            {availableImages.map((image) => (
-              <div
-                key={image.id}
-                className={`mb-3 border-2 rounded-md overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-                  selectedImage && selectedImage.id === image.id
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-transparent"
-                } ${isRefinementMode ? "opacity-50 pointer-events-none" : ""}`}
-                onClick={() => !isRefinementMode && handleImageSelect(image)}
-              >
-                <div className="flex items-center space-x-3 p-2">
-                  <div className="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
-                    {image.url && (
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{image.name}</p>
-                    {image.isUploaded && (
-                      <p className="text-xs text-blue-600">Uploaded</p>
-                    )}
+            <h3 className="font-medium text-sm mb-3">Available Images:</h3>
+            {loading && !selectedImage ? (
+              <div className="flex justify-center py-4">
+                <div className="w-8 h-8 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : availableImages.length === 0 ? (
+              <p className="text-gray-500 text-sm">No images available</p>
+            ) : (
+              availableImages.map((image) => (
+                <div
+                  key={image.id}
+                  className={`mb-3 border-2 rounded-md overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
+                    selectedImage && selectedImage.id === image.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-transparent"
+                  } ${
+                    isRefinementMode || loading
+                      ? "opacity-50 pointer-events-none"
+                      : ""
+                  }`}
+                  onClick={() =>
+                    !isRefinementMode && !loading && handleImageSelect(image)
+                  }
+                >
+                  <div className="flex items-center space-x-3 p-2">
+                    <div className="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
+                      {image.url && !image.isFromAPI ? (
+                        <img
+                          src={image.url}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          {image.id}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {image.name}
+                      </p>
+                      {image.isFromAPI ? (
+                        <p className="text-xs text-blue-600">From Server</p>
+                      ) : (
+                        <p className="text-xs text-orange-600">Sample</p>
+                      )}
+                      {image.width && image.height && (
+                        <p className="text-xs text-gray-500">
+                          {image.width} × {image.height}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -424,7 +586,7 @@ const ImageViewerWithPrompting = () => {
           )}
 
           {/* Help text */}
-          {!selectedImage && (
+          {!selectedImage && !loading && (
             <div className="mt-4 p-4 bg-blue-50 text-blue-700 rounded-md">
               <h3 className="font-medium mb-2">How to use:</h3>
               <ol className="list-decimal list-inside text-sm">
@@ -448,6 +610,16 @@ const ImageViewerWithPrompting = () => {
             </div>
           )}
 
+          {/* Loading indicator */}
+          {loading && (
+            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+              <div className="bg-white p-5 rounded-lg shadow-lg flex flex-col items-center">
+                <div className="w-12 h-12 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-gray-700">Processing...</p>
+              </div>
+            </div>
+          )}
+
           {/* Segmentation Results */}
           {segmentationMasks.length > 0 && !isRefinementMode && (
             <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
@@ -458,9 +630,9 @@ const ImageViewerWithPrompting = () => {
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                {segmentationMasks.map((mask) => (
+                {segmentationMasks.map((mask, index) => (
                   <div
-                    key={mask.id}
+                    key={index}
                     className={`border rounded-md p-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
                       selectedMask && selectedMask.id === mask.id
                         ? "ring-2 ring-blue-500 bg-blue-50"
@@ -469,37 +641,84 @@ const ImageViewerWithPrompting = () => {
                     onClick={() => handleMaskSelect(mask)}
                   >
                     <div className="relative aspect-square bg-gray-100 overflow-hidden rounded-md">
-                      <img
-                        src={selectedImage.url}
-                        alt={`Original`}
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <img
-                          src={`data:image/png;base64,${mask.base64}`}
-                          alt={`Mask ${mask.id}`}
-                          className="w-full h-full object-cover opacity-70"
-                          style={{ mixBlendMode: "multiply" }}
-                        />
-                      </div>
+                      {imageObject && (
+                        <>
+                          <div className="absolute inset-0">
+                            <canvas
+                              ref={(canvas) => {
+                                if (canvas && imageObject) {
+                                  const ctx = canvas.getContext("2d");
+                                  canvas.width = canvas.offsetWidth;
+                                  canvas.height = canvas.offsetHeight;
+                                  ctx.drawImage(
+                                    imageObject,
+                                    0,
+                                    0,
+                                    canvas.width,
+                                    canvas.height
+                                  );
+
+                                  // Draw mask overlay
+                                  const maskImg = new Image();
+                                  maskImg.onload = () => {
+                                    ctx.drawImage(
+                                      maskImg,
+                                      0,
+                                      0,
+                                      canvas.width,
+                                      canvas.height
+                                    );
+                                    ctx.globalCompositeOperation = "source-in";
+                                    ctx.fillStyle = getMaskColor(index);
+                                    ctx.fillRect(
+                                      0,
+                                      0,
+                                      canvas.width,
+                                      canvas.height
+                                    );
+                                    ctx.globalCompositeOperation =
+                                      "source-over";
+                                  };
+                                  maskImg.src = `data:image/png;base64,${mask.base64}`;
+                                }
+                              }}
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                     <div className="mt-1 text-xs text-center">
                       <p>Segment {mask.id + 1}</p>
                       <p className="text-gray-500">
                         Quality: {(mask.quality * 100).toFixed(1)}%
                       </p>
+                      <button
+                        className="mt-1 text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveMask(index);
+                        }}
+                      >
+                        Save
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
 
               {selectedMask && (
-                <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex justify-end space-x-2">
                   <button
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
                     onClick={handleStartRefinement}
                   >
                     Refine Selected Segment
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
+                    onClick={() => handleSaveMask(selectedMask.id)}
+                  >
+                    Save Selected Segment
                   </button>
                 </div>
               )}
@@ -518,6 +737,71 @@ const ImageViewerWithPrompting = () => {
           )}
         </div>
       </div>
+
+      {/* Technical Details Panel (collapsible) */}
+      {selectedImage && (
+        <div className="mt-6 bg-white p-4 rounded-md shadow-md">
+          <details>
+            <summary className="font-semibold cursor-pointer">
+              Technical Details
+            </summary>
+            <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+              <h3 className="font-medium">Image Information:</h3>
+              <ul className="mt-2 space-y-1 text-sm">
+                <li>
+                  <strong>ID:</strong> {selectedImage.id}
+                </li>
+                <li>
+                  <strong>Name:</strong> {selectedImage.name}
+                </li>
+                {selectedImage.width && selectedImage.height && (
+                  <li>
+                    <strong>Dimensions:</strong> {selectedImage.width} ×{" "}
+                    {selectedImage.height} pixels
+                  </li>
+                )}
+                {selectedImage.hash && (
+                  <li>
+                    <strong>Hash:</strong> {selectedImage.hash.substring(0, 8)}
+                    ...
+                  </li>
+                )}
+                <li>
+                  <strong>Selected Model:</strong> {selectedModel}
+                </li>
+              </ul>
+
+              {promptingResult && promptingResult.length > 0 && (
+                <div className="mt-3">
+                  <h3 className="font-medium">Current Prompts:</h3>
+                  <pre className="mt-2 bg-gray-100 p-2 text-xs rounded overflow-auto max-h-40">
+                    {JSON.stringify(promptingResult, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {segmentationMasks.length > 0 && (
+                <div className="mt-3">
+                  <h3 className="font-medium">Segmentation Results:</h3>
+                  <p className="text-sm">
+                    {segmentationMasks.length} segments found
+                  </p>
+                  <pre className="mt-2 bg-gray-100 p-2 text-xs rounded overflow-auto max-h-40">
+                    {JSON.stringify(
+                      segmentationMasks.map((mask) => ({
+                        id: mask.id,
+                        quality: mask.quality,
+                      })),
+                      null,
+                      2
+                    )}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
+      )}
     </div>
   );
 };

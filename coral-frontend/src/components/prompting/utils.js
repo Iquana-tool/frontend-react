@@ -128,6 +128,24 @@ export const calculateCanvasSize = (container, image) => {
 };
 
 /**
+ * Convert base64 string to Blob
+ * @param {string} base64 - Base64 string
+ * @param {string} mimeType - MIME type
+ * @returns {Blob} Blob object
+ */
+export const base64ToBlob = (base64, mimeType = 'image/png') => {
+  const byteString = atob(base64);
+  const arrayBuffer = new ArrayBuffer(byteString.length);
+  const uint8Array = new Uint8Array(arrayBuffer);
+  
+  for (let i = 0; i < byteString.length; i++) {
+    uint8Array[i] = byteString.charCodeAt(i);
+  }
+  
+  return new Blob([arrayBuffer], { type: mimeType });
+};
+
+/**
  * Check if point is within image bounds
  * @param {number} x - X coordinate
  * @param {number} y - Y coordinate
@@ -174,81 +192,129 @@ export const getPromptTypeDescription = (type) => {
 
 /**
  * Creates a visual preview of a mask cutout
- * @param {HTMLImageElement} originalImage - Original image
- * @param {string} maskBase64 - Base64 encoded mask
- * @param {Object} options - Options for visualization
- * @returns {HTMLCanvasElement} Canvas with the visualization
+ * @param {HTMLImageElement} originalImage 
+ * @param {string} maskBase64 
+ * @param {Object} options 
+ * @returns {Promise<HTMLCanvasElement>} Canvas with the visualization
  */
 export const createMaskCutoutPreview = (originalImage, maskBase64, options = {}) => {
-  const {
-    darkenOutside = true,
-    darkeningFactor = 0.7,
-    padding = 0.1 // Padding around the mask as a fraction of image size
-  } = options;
-  
-  // Create a canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = originalImage.width;
-  canvas.height = originalImage.height;
-  const ctx = canvas.getContext('2d');
-  
-  // Draw the original image
-  ctx.drawImage(originalImage, 0, 0);
-  
-  // Create a temporary image for the mask
-  const maskImg = new Image();
-  maskImg.src = `data:image/png;base64,${maskBase64}`;
-  
-  // Function to process after mask loads
-  maskImg.onload = () => {
-    // Find the bounding box of the mask
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = maskImg.width;
-    maskCanvas.height = maskImg.height;
-    const maskCtx = maskCanvas.getContext('2d');
-    maskCtx.drawImage(maskImg, 0, 0);
+  return new Promise((resolve, reject) => {
+    const {
+      darkenOutside = true,
+      darkeningFactor = 0.7,
+      padding = 0.1 // Padding around the mask as a fraction of image size
+    } = options;
     
-    const maskData = maskCtx.getImageData(0, 0, maskImg.width, maskImg.height).data;
+    // Create a canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = originalImage.width;
+    canvas.height = originalImage.height;
+    const ctx = canvas.getContext('2d');
     
-    // Find bounds
-    let minX = maskImg.width, minY = maskImg.height, maxX = 0, maxY = 0;
-    for (let y = 0; y < maskImg.height; y++) {
-      for (let x = 0; x < maskImg.width; x++) {
-        const idx = (y * maskImg.width + x) * 4;
-        if (maskData[idx + 3] > 0) { // If not transparent
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
+    // Draw the original image
+    ctx.drawImage(originalImage, 0, 0);
+    
+    // Create a temporary image for the mask
+    const maskImg = new Image();
+    maskImg.onload = () => {
+      // Find the bounding box of the mask
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = maskImg.width;
+      maskCanvas.height = maskImg.height;
+      const maskCtx = maskCanvas.getContext('2d');
+      maskCtx.drawImage(maskImg, 0, 0);
+      
+      const maskData = maskCtx.getImageData(0, 0, maskImg.width, maskImg.height).data;
+      
+      // Find bounds
+      let minX = maskImg.width, minY = maskImg.height, maxX = 0, maxY = 0;
+      for (let y = 0; y < maskImg.height; y++) {
+        for (let x = 0; x < maskImg.width; x++) {
+          const idx = (y * maskImg.width + x) * 4;
+          if (maskData[idx + 3] > 0) { // If not transparent
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+          }
         }
       }
-    }
-    
-    // Add padding
-    const paddingX = Math.floor(padding * maskImg.width);
-    const paddingY = Math.floor(padding * maskImg.height);
-    
-    minX = Math.max(0, minX - paddingX);
-    minY = Math.max(0, minY - paddingY);
-    maxX = Math.min(maskImg.width, maxX + paddingX);
-    maxY = Math.min(maskImg.height, maxY + paddingY);
-    
-    if (darkenOutside) {
-      // Create a darken layer
-      ctx.fillStyle = `rgba(0, 0, 0, ${1 - darkeningFactor})`;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Clear the mask area
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.drawImage(maskImg, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-    }
+      // Add padding
+      const paddingX = Math.floor(padding * maskImg.width);
+      const paddingY = Math.floor(padding * maskImg.height);
+      
+      minX = Math.max(0, minX - paddingX);
+      minY = Math.max(0, minY - paddingY);
+      maxX = Math.min(maskImg.width, maxX + paddingX);
+      maxY = Math.min(maskImg.height, maxY + paddingY);
+      
+      if (darkenOutside) {
+        // Create a darken layer
+        ctx.fillStyle = `rgba(0, 0, 0, ${1 - darkeningFactor})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Clear the mask area
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.drawImage(maskImg, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      
+      // Draw a bounding box
+      ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+
+      // Resolve with the canvas and bounding box info
+      resolve({
+        canvas,
+        boundingBox: { minX, minY, maxX, maxY }
+      });
+    };
     
-    // Draw a bounding box
-    ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+    maskImg.onerror = () => {
+      reject(new Error("Failed to load mask image"));
+    };
+    
+    maskImg.src = `data:image/png;base64,${maskBase64}`;
+  });
+};
+
+// Utility function for converting image data from SAM to viewable format
+export const arrayBufferToBase64 = (buffer) => {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return window.btoa(binary);
+};
+
+// Function to convert backend model names to friendly display names
+export const getModelDisplayName = (modelName) => {
+  const displayNames = {
+    'SAM2Tiny': 'SAM2 Tiny (Fast)',
+    'SAM2Small': 'SAM2 Small (Balanced)',
+    'SAM2Large': 'SAM2 Large (Accurate)',
+    'SAM2BasePlus': 'SAM2 Base+ (Enhanced)'
   };
   
-  return canvas;
+  return displayNames[modelName] || modelName;
+};
+
+// Function to generate a color for a mask based on its index
+export const getMaskColor = (index, opacity = 0.6) => {
+  // Use a set of predefined colors that are visually distinct
+  const colors = [
+    `rgba(65, 105, 225, ${opacity})`, // RoyalBlue
+    `rgba(34, 139, 34, ${opacity})`,  // ForestGreen
+    `rgba(220, 20, 60, ${opacity})`,  // Crimson
+    `rgba(255, 140, 0, ${opacity})`,  // DarkOrange
+    `rgba(148, 0, 211, ${opacity})`,  // DarkViolet
+    `rgba(0, 139, 139, ${opacity})`,  // DarkCyan
+    `rgba(255, 20, 147, ${opacity})`, // DeepPink
+    `rgba(184, 134, 11, ${opacity})`, // DarkGoldenrod
+  ];
+  
+  return colors[index % colors.length];
 };
