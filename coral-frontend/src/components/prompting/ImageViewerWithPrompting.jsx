@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
-import {getMaskColor } from "./utils";
+import { getMaskColor } from "./utils";
 
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -36,13 +36,15 @@ const ImageViewerWithPrompting = () => {
           width: img.width,
           height: img.height,
           hash: img.hash_code,
-          // We'll load the actual image when selected
-          url: `data:image/jpeg;base64,placeholder`,
+          thumbnailUrl: null,  // We'll load thumbnails separately
           isFromAPI: true,
         }));
 
         // Combine API images with sample images for easier development/testing
         setAvailableImages([...apiImages, ...sampleImages]);
+        
+        // Load thumbnails for API images
+        apiImages.forEach(loadImageThumbnail);
       }
       setLoading(false);
     } catch (error) {
@@ -50,6 +52,27 @@ const ImageViewerWithPrompting = () => {
       setError("Failed to load images from server. Using sample images only.");
       setAvailableImages(sampleImages);
       setLoading(false);
+    }
+  };
+  
+  // Load thumbnail for an API image
+  const loadImageThumbnail = async (image) => {
+    if (!image.isFromAPI) return; // Only process API images
+    
+    try {
+      const imageData = await api.getImageById(image.id);
+      if (imageData && imageData[image.id]) {
+        // Update the image with its thumbnail
+        setAvailableImages(prev => 
+          prev.map(img => 
+            img.id === image.id && img.isFromAPI 
+              ? { ...img, thumbnailUrl: `data:image/jpeg;base64,${imageData[image.id]}` }
+              : img
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`Failed to load thumbnail for image ${image.id}:`, error);
     }
   };
 
@@ -71,6 +94,17 @@ const ImageViewerWithPrompting = () => {
 
       // If the image is from our API, we need to fetch the actual image data
       if (image.isFromAPI) {
+        // If we already have a thumbnail for this image, use it while we load the full image
+        if (image.thumbnailUrl) {
+          // Create a temporary image object to show immediately
+          const tempImg = new Image();
+          tempImg.src = image.thumbnailUrl;
+          tempImg.onload = () => {
+            // Show the thumbnail while loading the full image
+            setImageObject(tempImg);
+          };
+        }
+        
         const imageData = await api.getImageById(image.id);
         // The API returns a mapping of image ID to base64 data
         const base64Data = imageData[image.id];
@@ -220,6 +254,9 @@ const ImageViewerWithPrompting = () => {
                   (point.y * cutoutImage.height + cutoutPosition.y) /
                   originalImage.height,
               }));
+              break;
+            default:
+              
               break;
           }
 
@@ -509,9 +546,15 @@ const ImageViewerWithPrompting = () => {
                 >
                   <div className="flex items-center space-x-3 p-2">
                     <div className="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
-                      {image.url && !image.isFromAPI ? (
+                      {!image.isFromAPI && image.url ? (
                         <img
                           src={image.url}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : image.isFromAPI && image.thumbnailUrl ? (
+                        <img
+                          src={image.thumbnailUrl}
                           alt={image.name}
                           className="w-full h-full object-cover"
                         />
