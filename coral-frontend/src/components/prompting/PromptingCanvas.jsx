@@ -19,6 +19,7 @@ const PromptingCanvas = ({
   image,
   onPromptingComplete,
   isRefinementMode = false,
+  selectedMask = null,
 }) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
@@ -221,17 +222,49 @@ const PromptingCanvas = ({
 
     // Draw image
     ctx.drawImage(image, 0, 0, image.width, image.height);
-
-    // Draw all prompts
-    drawAllPrompts(ctx);
+    
+    // Draw selected mask if available
+    if (selectedMask && selectedMask.base64) {
+      const maskImg = new Image();
+      maskImg.onload = () => {
+        ctx.save();
+        
+        // Draw the mask using its alpha channel
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.drawImage(maskImg, 0, 0, image.width, image.height);
+        
+        // Apply color overlay using the mask as a clipping region
+        ctx.fillStyle = "rgba(65, 105, 225, 0.4)"; // Semi-transparent blue
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillRect(0, 0, image.width, image.height);
+        
+        // Also add a border around the mask
+        ctx.globalCompositeOperation = "source-over";
+        ctx.strokeStyle = "rgba(65, 105, 225, 0.8)";
+        ctx.lineWidth = 2 / (scale * zoomLevel); // Adjust line width based on zoom
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        // Draw all prompts after mask to keep them visible
+        drawAllPrompts(ctx);
+      };
+      maskImg.src = `data:image/png;base64,${selectedMask.base64}`;
+    } else {
+      // Draw all prompts
+      drawAllPrompts(ctx);
+    }
 
     ctx.restore();
   };
 
   // Update canvas when view parameters change
   useEffect(() => {
-    redrawCanvas();
-  }, [zoomLevel, panOffset, prompts, canvasSize, initialScale]);
+    if (canvasRef.current && image) {
+      redrawCanvas();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomLevel, panOffset, prompts, canvasSize, initialScale, selectedMask, image]);
 
   // Draw all prompts
   const drawAllPrompts = (ctx) => {

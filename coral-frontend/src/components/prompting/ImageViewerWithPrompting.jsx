@@ -256,7 +256,7 @@ const ImageViewerWithPrompting = () => {
               }));
               break;
             default:
-              
+              // Default case
               break;
           }
 
@@ -611,6 +611,7 @@ const ImageViewerWithPrompting = () => {
                 image={imageObject}
                 onPromptingComplete={handlePromptingComplete}
                 isRefinementMode={isRefinementMode}
+                selectedMask={selectedMask}
               />
             ) : (
               <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
@@ -700,6 +701,9 @@ const ImageViewerWithPrompting = () => {
                                   
                                   const ctx = canvas.getContext("2d");
                                   
+                                  // Clear the canvas
+                                  ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                                  
                                   // First draw the original image as background
                                   ctx.drawImage(
                                     imageObject,
@@ -713,47 +717,23 @@ const ImageViewerWithPrompting = () => {
                                   const maskImg = new Image();
                                   
                                   maskImg.onload = () => {
-                                    // Create a temporary canvas for mask processing
-                                    const tempCanvas = document.createElement('canvas');
-                                    tempCanvas.width = canvasWidth;
-                                    tempCanvas.height = canvasHeight;
-                                    const tempCtx = tempCanvas.getContext('2d');
+                                    // Draw the mask image on top with color
+                                    ctx.save();
                                     
-                                    // Draw mask on temporary canvas
-                                    tempCtx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
+                                    // Set the composite operation to only affect where the mask exists
+                                    ctx.globalCompositeOperation = "source-atop";
                                     
-                                    // Get mask pixel data
-                                    const imageData = tempCtx.getImageData(0, 0, canvasWidth, canvasHeight);
-                                    const data = imageData.data;
+                                    // Draw the mask using its alpha channel
+                                    ctx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
                                     
-                                    // Get original image data from main canvas
-                                    const originalImageData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
-                                    const originalData = originalImageData.data;
-                                    
-                                    // Combine the mask and original image
-                                    // For each pixel where mask is non-transparent, show the original image
-                                    // with a color overlay
+                                    // Apply color overlay using the mask as a clipping region
                                     const color = getMaskColor(index);
-                                    const colorMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([.\d]+))?\)/);
+                                    ctx.globalCompositeOperation = "source-atop";
+                                    ctx.fillStyle = color;
+                                    ctx.globalAlpha = 0.5; // Semi-transparent
+                                    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
                                     
-                                    if (colorMatch) {
-                                      const r = parseInt(colorMatch[1], 10);
-                                      const g = parseInt(colorMatch[2], 10);
-                                      const b = parseInt(colorMatch[3], 10);
-                                      const a = colorMatch[4] ? parseFloat(colorMatch[4]) : 1;
-                                      
-                                      for (let i = 0; i < data.length; i += 4) {
-                                        if (data[i + 3] > 0) { // If mask pixel is not fully transparent
-                                          // Apply a semi-transparent color overlay on the original image
-                                          originalData[i] = (originalData[i] * (1 - a) + r * a);
-                                          originalData[i + 1] = (originalData[i + 1] * (1 - a) + g * a);
-                                          originalData[i + 2] = (originalData[i + 2] * (1 - a) + b * a);
-                                        }
-                                      }
-                                    }
-                                    
-                                    // Put the modified image data back to the main canvas
-                                    ctx.putImageData(originalImageData, 0, 0);
+                                    ctx.restore();
                                   };
                                   
                                   // Set source and load the mask image
