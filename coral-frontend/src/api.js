@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = "http://localhost:8000";
 
 // Function to handle API errors
 const handleApiError = (response) => {
@@ -14,7 +14,7 @@ export const fetchImages = async () => {
     const response = await fetch(`${API_BASE_URL}/images/list_images`);
     return handleApiError(response);
   } catch (error) {
-    console.error('Error fetching images:', error);
+    console.error("Error fetching images:", error);
     throw error;
   }
 };
@@ -23,15 +23,15 @@ export const fetchImages = async () => {
 export const uploadImage = async (file) => {
   try {
     const formData = new FormData();
-    formData.append('file', file);
-    
+    formData.append("file", file);
+
     const response = await fetch(`${API_BASE_URL}/images/upload_image`, {
-      method: 'POST',
+      method: "POST",
       body: formData,
     });
     return handleApiError(response);
   } catch (error) {
-    console.error('Error uploading image:', error);
+    console.error("Error uploading image:", error);
     throw error;
   }
 };
@@ -42,7 +42,7 @@ export const getImageById = async (imageId) => {
     const response = await fetch(`${API_BASE_URL}/images/get_image/${imageId}`);
     return handleApiError(response);
   } catch (error) {
-    console.error('Error getting image:', error);
+    console.error("Error getting image:", error);
     throw error;
   }
 };
@@ -50,18 +50,25 @@ export const getImageById = async (imageId) => {
 // Delete image
 export const deleteImage = async (imageId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/images/delete_image/${imageId}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/images/delete_image/${imageId}`,
+      {
+        method: "DELETE",
+      }
+    );
     return handleApiError(response);
   } catch (error) {
-    console.error('Error deleting image:', error);
+    console.error("Error deleting image:", error);
     throw error;
   }
 };
 
 // Segment an image using the segmentation endpoint
-export const segmentImage = async (imageId, model = "SAM2Tiny", prompts = null) => {
+export const segmentImage = async (
+  imageId,
+  model = "SAM2Tiny",
+  prompts = null
+) => {
   try {
     const requestData = {
       image_id: imageId,
@@ -69,38 +76,54 @@ export const segmentImage = async (imageId, model = "SAM2Tiny", prompts = null) 
       use_prompts: !!prompts && prompts.length > 0,
       point_prompts: [],
       box_prompts: [],
+      polygon_prompts: [],
+      circle_prompts: [],
     };
 
     if (prompts && prompts.length > 0) {
       // Convert prompts to the format expected by the API
-      prompts.forEach(prompt => {
-        if (prompt.type === 'point') {
+      prompts.forEach((prompt) => {
+        if (prompt.type === "point") {
           requestData.point_prompts.push({
             x: prompt.coordinates.x,
             y: prompt.coordinates.y,
             label: prompt.label ? 1 : 0, // Convert boolean to 1/0
           });
-        } else if (prompt.type === 'box') {
+        } else if (prompt.type === "box") {
           requestData.box_prompts.push({
             min_x: prompt.coordinates.startX,
             min_y: prompt.coordinates.startY,
             max_x: prompt.coordinates.endX,
             max_y: prompt.coordinates.endY,
           });
+        } else if (prompt.type === "polygon") {
+          const vertices = prompt.coordinates.map((point) => [
+            point.x,
+            point.y,
+          ]);
+          requestData.polygon_prompts.push({
+            vertices: vertices,
+          });
+        } else if (prompt.type === "circle") {
+          requestData.circle_prompts.push({
+            center_x: prompt.coordinates.centerX,
+            center_y: prompt.coordinates.centerY,
+            radius: prompt.coordinates.radius,
+          });
         }
       });
     }
 
     const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     return handleApiError(response);
   } catch (error) {
-    console.error('Error segmenting image:', error);
+    console.error("Error segmenting image:", error);
     throw error;
   }
 };
@@ -111,19 +134,19 @@ export const saveMask = async (imageId, label, base64Mask) => {
     const requestData = {
       image_id: imageId,
       label: label,
-      base64_mask: base64Mask
+      base64_mask: base64Mask,
     };
 
     const response = await fetch(`${API_BASE_URL}/masks/save_mask`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     return handleApiError(response);
   } catch (error) {
-    console.error('Error saving mask:', error);
+    console.error("Error saving mask:", error);
     throw error;
   }
 };
@@ -131,10 +154,12 @@ export const saveMask = async (imageId, label, base64Mask) => {
 // Get all masks for an image
 export const getMasksForImage = async (imageId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/masks/get_masks_for_image/${imageId}`);
+    const response = await fetch(
+      `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`
+    );
     return handleApiError(response);
   } catch (error) {
-    console.error('Error getting masks for image:', error);
+    console.error("Error getting masks for image:", error);
     throw error;
   }
 };
@@ -145,7 +170,7 @@ export const getMask = async (maskId) => {
     const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`);
     return handleApiError(response);
   } catch (error) {
-    console.error('Error getting mask:', error);
+    console.error("Error getting mask:", error);
     throw error;
   }
 };
@@ -153,12 +178,15 @@ export const getMask = async (maskId) => {
 // Delete a mask
 export const deleteMask = async (maskId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/masks/delete_mask/${maskId}`, {
-      method: 'DELETE',
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/masks/delete_mask/${maskId}`,
+      {
+        method: "DELETE",
+      }
+    );
     return handleApiError(response);
   } catch (error) {
-    console.error('Error deleting mask:', error);
+    console.error("Error deleting mask:", error);
     throw error;
   }
 };
@@ -175,15 +203,15 @@ export const createCutouts = async (imageId, base64Mask, options = {}) => {
     };
 
     const response = await fetch(`${API_BASE_URL}/cutouts/get_cutouts`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(requestData),
     });
     return handleApiError(response);
   } catch (error) {
-    console.error('Error creating cutouts:', error);
+    console.error("Error creating cutouts:", error);
     throw error;
   }
 };
