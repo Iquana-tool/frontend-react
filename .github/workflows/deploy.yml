@@ -16,10 +16,24 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '18' # Use your project's Node.js version
-          cache: 'npm'
+          # Removed cache option to avoid errors
+          
+      - name: Verify Node and npm installation
+        run: |
+          echo "Node version: $(node -v)"
+          echo "npm version: $(npm -v || echo 'npm not found')"
+          
+      - name: Install npm if missing
+        run: |
+          if ! command -v npm &> /dev/null; then
+            echo "npm not found, installing it"
+            sudo apt-get update && sudo apt-get install -y npm
+          else
+            echo "npm is already installed"
+          fi
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       
       - name: Build React app
         run: npm run build
