@@ -191,18 +191,18 @@ export const getPromptTypeDescription = (type) => {
 };
 
 /**
- * Creates a visual preview of a mask cutout
+ * Creates a visual preview of a mask without modifying the original mask data
  * @param {HTMLImageElement} originalImage 
  * @param {string} maskBase64 
  * @param {Object} options 
  * @returns {Promise<HTMLCanvasElement>} Canvas with the visualization
  */
-export const createMaskCutoutPreview = (originalImage, maskBase64, options = {}) => {
+export const createMaskPreview = (originalImage, maskBase64, options = {}) => {
   return new Promise((resolve, reject) => {
     const {
-      darkenOutside = true,
-      darkeningFactor = 0.7,
-      padding = 0.1 // Padding around the mask as a fraction of image size
+      colorOverlay = true,
+      colorIndex = 0,
+      opacity = 0.6
     } = options;
     
     // Create a canvas
@@ -217,70 +217,38 @@ export const createMaskCutoutPreview = (originalImage, maskBase64, options = {})
     // Create a temporary image for the mask
     const maskImg = new Image();
     maskImg.onload = () => {
-      // Find the bounding box of the mask
-      const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = maskImg.width;
-      maskCanvas.height = maskImg.height;
-      const maskCtx = maskCanvas.getContext('2d');
-      maskCtx.drawImage(maskImg, 0, 0);
+      // Apply the mask with color overlay
+      ctx.save();
       
-      const maskData = maskCtx.getImageData(0, 0, maskImg.width, maskImg.height).data;
+      // Use the mask's alpha channel
+      ctx.globalAlpha = opacity;
+      ctx.drawImage(maskImg, 0, 0);
       
-      // Find bounds
-      let minX = maskImg.width, minY = maskImg.height, maxX = 0, maxY = 0;
-      for (let y = 0; y < maskImg.height; y++) {
-        for (let x = 0; x < maskImg.width; x++) {
-          const idx = (y * maskImg.width + x) * 4;
-          if (maskData[idx + 3] > 0) { // If not transparent
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x);
-            maxY = Math.max(maxY, y);
-          }
-        }
-      }
-      
-      // Add padding
-      const paddingX = Math.floor(padding * maskImg.width);
-      const paddingY = Math.floor(padding * maskImg.height);
-      
-      minX = Math.max(0, minX - paddingX);
-      minY = Math.max(0, minY - paddingY);
-      maxX = Math.min(maskImg.width, maxX + paddingX);
-      maxY = Math.min(maskImg.height, maxY + paddingY);
-      
-      if (darkenOutside) {
-        // Create a darken layer
-        ctx.fillStyle = `rgba(0, 0, 0, ${1 - darkeningFactor})`;
+      if (colorOverlay) {
+        // Apply color overlay on the mask
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = getMaskColor(colorIndex);
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Clear the mask area
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.drawImage(maskImg, 0, 0);
-        ctx.globalCompositeOperation = 'source-over';
       }
       
-      // Draw a bounding box
-      ctx.strokeStyle = 'rgba(0, 0, 255, 0.8)';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
-
-      // Resolve with the canvas and bounding box info
-      resolve({
-        canvas,
-        boundingBox: { minX, minY, maxX, maxY }
-      });
+      ctx.restore();
+      resolve(canvas);
     };
     
     maskImg.onerror = () => {
       reject(new Error("Failed to load mask image"));
     };
     
+    // Important: Use the mask data directly without processing
     maskImg.src = `data:image/png;base64,${maskBase64}`;
   });
 };
 
-// Utility function for converting image data from SAM to viewable format
+/**
+ * Utility function for converting image data from SAM to viewable format
+ * @param {ArrayBuffer} buffer - Array buffer to convert
+ * @returns {string} Base64 string
+ */
 export const arrayBufferToBase64 = (buffer) => {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -290,7 +258,11 @@ export const arrayBufferToBase64 = (buffer) => {
   return window.btoa(binary);
 };
 
-// Function to convert backend model names to friendly display names
+/**
+ * Function to convert backend model names to friendly display names
+ * @param {string} modelName - Backend model name
+ * @returns {string} Display name
+ */
 export const getModelDisplayName = (modelName) => {
   const displayNames = {
     'SAM2Tiny': 'SAM2 Tiny (Fast)',
@@ -302,7 +274,12 @@ export const getModelDisplayName = (modelName) => {
   return displayNames[modelName] || modelName;
 };
 
-// Function to generate a color for a mask based on its index
+/**
+ * Generate a color for a mask based on its index
+ * @param {number} index - Mask index
+ * @param {number} opacity - Color opacity (0-1)
+ * @returns {string} CSS color string
+ */
 export const getMaskColor = (index, opacity = 0.6) => {
   // Use a set of predefined colors that are visually distinct
   const colors = [

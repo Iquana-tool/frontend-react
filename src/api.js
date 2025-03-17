@@ -114,6 +114,8 @@ export const segmentImage = async (
       });
     }
 
+    console.log("Sending segmentation request:", requestData);
+    
     const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
       method: "POST",
       headers: {
@@ -121,7 +123,10 @@ export const segmentImage = async (
       },
       body: JSON.stringify(requestData),
     });
-    return handleApiError(response);
+    
+    const result = await handleApiError(response);
+    console.log("Received segmentation result with masks:", result.base64_masks.length);
+    return result;
   } catch (error) {
     console.error("Error segmenting image:", error);
     throw error;
@@ -131,6 +136,10 @@ export const segmentImage = async (
 // Save a mask
 export const saveMask = async (imageId, label, base64Mask) => {
   try {
+    console.log(`Saving mask for image ${imageId} with label ${label}`);
+    console.log(`Mask data length: ${base64Mask ? base64Mask.length : 0} characters`);
+    
+    //To Ensure we're sending the mask exactly as received from the backend
     const requestData = {
       image_id: imageId,
       label: label,

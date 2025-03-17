@@ -270,7 +270,7 @@ const ImageViewerWithPrompting = () => {
           adjustedPrompts
         );
 
-        // Update segmentation masks
+        // Store the raw masks as received from the backend
         setSegmentationMasks(
           segmentationResponse.base64_masks.map((mask, index) => ({
             id: index,
@@ -289,7 +289,7 @@ const ImageViewerWithPrompting = () => {
           prompts
         );
 
-        // Update segmentation masks
+        // Store the raw masks as received from the backend
         setSegmentationMasks(
           segmentationResponse.base64_masks.map((mask, index) => ({
             id: index,
@@ -431,7 +431,7 @@ const ImageViewerWithPrompting = () => {
     setImageObject(originalImage);
   };
 
-  // Save a mask to the database
+  // Save a mask to the database 
   const handleSaveMask = async (maskIndex) => {
     if (!selectedImage || maskIndex >= segmentationMasks.length) return;
 
@@ -439,10 +439,13 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
-      await api.saveMask(selectedImage.id, `segment_${maskIndex}`, mask.base64);
+      // Directly use the base64 mask data received from the backend
+      const result = await api.saveMask(selectedImage.id, `segment_${maskIndex}`, mask.base64);
+      console.log("Mask saved successfully:", result);
       setLoading(false);
       return true;
     } catch (error) {
+      console.error("Error saving mask:", error);
       setError(`Failed to save mask: ${error.message}`);
       setLoading(false);
       return false;
@@ -685,6 +688,7 @@ const ImageViewerWithPrompting = () => {
                     onClick={() => handleMaskSelect(mask)}
                   >
                     <div className="relative aspect-square bg-gray-100 overflow-hidden rounded-md">
+                      {/* Render the mask preview */}
                       {imageObject && (
                         <>
                           <div className="absolute inset-0">
@@ -720,10 +724,8 @@ const ImageViewerWithPrompting = () => {
                                     // Draw the mask image on top with color
                                     ctx.save();
                                     
-                                    // Set the composite operation to only affect where the mask exists
-                                    ctx.globalCompositeOperation = "source-atop";
-                                    
-                                    // Draw the mask using its alpha channel
+                                    // Draw the original mask using its alpha channel
+                                    ctx.globalAlpha = 0.7; // Semi-transparent
                                     ctx.drawImage(maskImg, 0, 0, canvasWidth, canvasHeight);
                                     
                                     // Apply color overlay using the mask as a clipping region
