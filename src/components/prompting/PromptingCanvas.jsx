@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import {
   MousePointer,
   Square,
@@ -15,14 +15,14 @@ import {
 } from "lucide-react";
 
 // This component allows users to add different types of prompts to an image for segmentation tasks.
-const PromptingCanvas = ({
+const PromptingCanvas = forwardRef(({
   image,
   onPromptingComplete,
   isRefinementMode = false,
   selectedMask = null,
   promptType,
   currentLabel
-}) => {
+}, ref) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -40,6 +40,21 @@ const PromptingCanvas = ({
   const [imageInfo, setImageInfo] = useState({ width: 0, height: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [initialScale, setInitialScale] = useState(1);
+
+  // Expose methods to parent component via ref
+  useImperativeHandle(ref, () => ({
+    clearPrompts: () => {
+      setPrompts([]);
+      setCurrentPrompt(null);
+      redrawCanvas();
+    },
+    getPrompts: () => getFormattedPrompts(),
+    savePrompts: () => handleSavePrompts(),
+    updateSelectedMask: (mask) => {
+      // Just trigger a redraw, the component already uses selectedMask from props
+      redrawCanvas();
+    }
+  }));
 
   // Initialize canvas when image changes
   useEffect(() => {
@@ -182,6 +197,21 @@ const PromptingCanvas = ({
     });
   };
 
+  // Add useEffect to watch for selectedMask changes
+  useEffect(() => {
+    if (canvasRef.current && image) {
+      // Clear existing timeouts to prevent multiple redraws
+      if (window.redrawTimeout) {
+        clearTimeout(window.redrawTimeout);
+      }
+      
+      // Use a small timeout to ensure canvas is ready
+      window.redrawTimeout = setTimeout(() => {
+        redrawCanvas();
+      }, 100);
+    }
+  }, [selectedMask]);
+
   // Draw all content to canvas
   const redrawCanvas = (initialScaleOverride = null) => {
     if (!canvasRef.current || !image) return;
@@ -220,41 +250,64 @@ const PromptingCanvas = ({
     ctx.translate(panOffset.x + centerX, panOffset.y + centerY);
     ctx.scale(scale * zoomLevel, scale * zoomLevel);
 
-    // Draw image
-    ctx.drawImage(image, 0, 0, image.width, image.height);
-    
-    // Draw selected mask if available
+    // Draw the image
+    ctx.drawImage(image, 0, 0);
+
+    // If there's a selected mask, darken the background
     if (selectedMask && selectedMask.base64) {
+      // Save the current context state
+      ctx.save();
+      
+      // First, draw a semi-transparent black overlay over the entire canvas
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, image.width, image.height);
+
+      // Create and load the mask image
       const maskImg = new Image();
-      maskImg.onload = () => {
-        ctx.save();
-        
-        // Draw the mask using its alpha channel
-        ctx.globalCompositeOperation = "source-atop";
-        ctx.drawImage(maskImg, 0, 0, image.width, image.height);
-        
-        // Apply color overlay using the mask as a clipping region
-        ctx.fillStyle = "rgba(65, 105, 225, 0.4)"; // Semi-transparent blue
-        ctx.globalCompositeOperation = "source-atop";
-        ctx.fillRect(0, 0, image.width, image.height);
-        
-        // Also add a border around the mask
-        ctx.globalCompositeOperation = "source-over";
-        ctx.strokeStyle = "rgba(65, 105, 225, 0.8)";
-        ctx.lineWidth = 2 / (scale * zoomLevel); // Adjust line width based on zoom
-        ctx.stroke();
-        
-        ctx.restore();
-        
-        // Draw all prompts after mask to keep them visible
-        drawAllPrompts(ctx);
-      };
       maskImg.src = `data:image/png;base64,${selectedMask.base64}`;
-    } else {
-      // Draw all prompts
-      drawAllPrompts(ctx);
+      
+      // Use the mask to clear the darkened area
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(maskImg, 0, 0);
+      
+      // Reset composite operation and draw yellow border
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 2 / (scale * zoomLevel);
+      
+      // Calculate and draw the bounding box
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = image.width;
+      maskCanvas.height = image.height;
+      const maskCtx = maskCanvas.getContext('2d');
+      maskCtx.drawImage(maskImg, 0, 0);
+      
+      const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+      let minX = maskCanvas.width, minY = maskCanvas.height, maxX = 0, maxY = 0;
+      
+      for (let y = 0; y < maskCanvas.height; y++) {
+        for (let x = 0; x < maskCanvas.width; x++) {
+          const idx = (y * maskCanvas.width + x) * 4;
+          if (maskData[idx + 3] > 0) {
+            minX = Math.min(minX, x);
+            minY = Math.min(minY, y);
+            maxX = Math.max(maxX, x);
+            maxY = Math.max(maxY, y);
+          }
+        }
+      }
+      
+      // Draw the bounding box
+      ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+
+      // Restore the original context state
+      ctx.restore();
     }
 
+    // Draw all prompts
+    drawAllPrompts(ctx);
+
+    // Restore original context state
     ctx.restore();
   };
 
@@ -864,6 +917,6 @@ const PromptingCanvas = ({
       )}
     </div>
   );
-};
+});
 
 export default PromptingCanvas;
