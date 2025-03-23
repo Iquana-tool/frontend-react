@@ -20,6 +20,8 @@ const PromptingCanvas = ({
   onPromptingComplete,
   isRefinementMode = false,
   selectedMask = null,
+  promptType,
+  currentLabel
 }) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
@@ -27,8 +29,6 @@ const PromptingCanvas = ({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState(null);
   const [prompts, setPrompts] = useState([]);
-  const [promptType, setPromptType] = useState("point");
-  const [currentLabel, setCurrentLabel] = useState(1); // 1 = foreground, 0 = background
 
   // View state
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -709,84 +709,6 @@ const PromptingCanvas = ({
 
   return (
     <div className="flex flex-col space-y-3">
-      {/* Tool Selection */}
-      <div className="flex justify-between items-center p-2 bg-gray-100 rounded-md">
-        <div className="flex space-x-2">
-          <button
-            className={`p-2 rounded-md ${
-              promptType === "point" ? "bg-blue-500 text-white" : "bg-white"
-            }`}
-            title="Point Prompts"
-            onClick={() => setPromptType("point")}
-          >
-            <MousePointer size={18} />
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              promptType === "box" ? "bg-blue-500 text-white" : "bg-white"
-            }`}
-            title="Box Prompts"
-            onClick={() => setPromptType("box")}
-          >
-            <Square size={18} />
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              promptType === "circle" ? "bg-blue-500 text-white" : "bg-white"
-            }`}
-            title="Circle Prompts"
-            onClick={() => setPromptType("circle")}
-          >
-            <Circle size={18} />
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              promptType === "polygon" ? "bg-blue-500 text-white" : "bg-white"
-            }`}
-            title="Polygon Prompts"
-            onClick={() => {
-              setPromptType("polygon");
-              // If switching while having an unfinished polygon, finish it
-              if (
-                currentPrompt &&
-                currentPrompt.type === "polygon" &&
-                currentPrompt.points &&
-                currentPrompt.points.length > 2
-              ) {
-                setPrompts([...prompts, currentPrompt]);
-                setCurrentPrompt(null);
-              }
-            }}
-          >
-            <Pentagon size={18} />
-          </button>
-        </div>
-
-        {/* Foreground/background toggle */}
-        <div className="flex space-x-2">
-          <button
-            className={`p-2 rounded-md ${
-              currentLabel === 1
-                ? "bg-green-500 text-white"
-                : "bg-white border border-green-500 text-green-500"
-            }`}
-            onClick={() => setCurrentLabel(1)}
-          >
-            Foreground (1)
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              currentLabel === 0
-                ? "bg-red-500 text-white"
-                : "bg-white border border-red-500 text-red-500"
-            }`}
-            onClick={() => setCurrentLabel(0)}
-          >
-            Background (0)
-          </button>
-        </div>
-      </div>
-
       {/* Canvas Container */}
       <div
         className={`relative border border-gray-300 rounded-md bg-gray-100 overflow-hidden ${
@@ -845,7 +767,7 @@ const PromptingCanvas = ({
         </button>
       </div>
 
-      {/* View Controls */}
+      {/* View Controls and Actions */}
       <div className="flex justify-between items-center p-2 bg-gray-100 rounded-md">
         <div className="flex space-x-2">
           <button

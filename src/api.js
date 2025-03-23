@@ -67,7 +67,8 @@ export const deleteImage = async (imageId) => {
 export const segmentImage = async (
   imageId,
   model = "SAM2Tiny",
-  prompts = null
+  prompts = null,
+  maskLabel = null
 ) => {
   try {
     const requestData = {
@@ -78,6 +79,7 @@ export const segmentImage = async (
       box_prompts: [],
       polygon_prompts: [],
       circle_prompts: [],
+      mask_label: maskLabel
     };
 
     if (prompts && prompts.length > 0) {
@@ -139,7 +141,6 @@ export const saveMask = async (imageId, label, base64Mask) => {
     console.log(`Saving mask for image ${imageId} with label ${label}`);
     console.log(`Mask data length: ${base64Mask ? base64Mask.length : 0} characters`);
     
-    //To Ensure we're sending the mask exactly as received from the backend
     const requestData = {
       image_id: imageId,
       label: label,

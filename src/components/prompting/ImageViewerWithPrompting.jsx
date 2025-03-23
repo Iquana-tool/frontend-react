@@ -3,6 +3,7 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor } from "./utils";
+import { MousePointer, Square, Circle, Pentagon } from "lucide-react";
 
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -18,6 +19,10 @@ const ImageViewerWithPrompting = () => {
   const [cutoutImage, setCutoutImage] = useState(null);
   const [cutoutPosition, setCutoutPosition] = useState(null);
   const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
+  const [selectedMaskLabel, setSelectedMaskLabel] = useState('coral');
+  const maskLabelOptions = ['petri_dish', 'coral', 'polyp'];
+  const [promptType, setPromptType] = useState("point");
+  const [currentLabel, setCurrentLabel] = useState(1);
 
   // Fetch images when component mounts
   useEffect(() => {
@@ -267,7 +272,8 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          adjustedPrompts
+          adjustedPrompts,
+          selectedMaskLabel
         );
 
         // Store the raw masks as received from the backend
@@ -286,7 +292,8 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          prompts
+          prompts,
+          selectedMaskLabel
         );
 
         // Store the raw masks as received from the backend
@@ -439,8 +446,8 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
-      // Directly use the base64 mask data received from the backend
-      const result = await api.saveMask(selectedImage.id, `segment_${maskIndex}`, mask.base64);
+      // Use the selected label when saving the mask
+      const result = await api.saveMask(selectedImage.id, selectedMaskLabel, mask.base64);
       console.log("Mask saved successfully:", result);
       setLoading(false);
       return true;
@@ -610,12 +617,110 @@ const ImageViewerWithPrompting = () => {
 
           {selectedImage ? (
             imageObject ? (
-              <PromptingCanvas
-                image={imageObject}
-                onPromptingComplete={handlePromptingComplete}
-                isRefinementMode={isRefinementMode}
-                selectedMask={selectedMask}
-              />
+              <>
+                {/* Toolbar */}
+                <div className="flex flex-wrap items-center gap-4 mb-4 p-3 bg-gray-50 rounded-md">
+                  {/* Tool Selection */}
+                  <div className="flex space-x-2">
+                    <button
+                      className={`p-2 rounded-md ${
+                        promptType === "point"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border border-gray-300"
+                      }`}
+                      onClick={() => setPromptType("point")}
+                      title="Point Tool"
+                    >
+                      <MousePointer size={20} />
+                    </button>
+                    <button
+                      className={`p-2 rounded-md ${
+                        promptType === "box"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border border-gray-300"
+                      }`}
+                      onClick={() => setPromptType("box")}
+                      title="Box Tool"
+                    >
+                      <Square size={20} />
+                    </button>
+                    <button
+                      className={`p-2 rounded-md ${
+                        promptType === "circle"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border border-gray-300"
+                      }`}
+                      onClick={() => setPromptType("circle")}
+                      title="Circle Tool"
+                    >
+                      <Circle size={20} />
+                    </button>
+                    <button
+                      className={`p-2 rounded-md ${
+                        promptType === "polygon"
+                          ? "bg-blue-500 text-white"
+                          : "bg-white border border-gray-300"
+                      }`}
+                      onClick={() => setPromptType("polygon")}
+                      title="Polygon Tool"
+                    >
+                      <Pentagon size={20} />
+                    </button>
+                  </div>
+
+                  {/* Foreground/Background Selection */}
+                  <div className="flex space-x-2">
+                    <button
+                      className={`p-2 rounded-md ${
+                        currentLabel === 1
+                          ? "bg-green-500 text-white"
+                          : "bg-white border border-green-500 text-green-500"
+                      }`}
+                      onClick={() => setCurrentLabel(1)}
+                    >
+                      Foreground (1)
+                    </button>
+                    <button
+                      className={`p-2 rounded-md ${
+                        currentLabel === 0
+                          ? "bg-red-500 text-white"
+                          : "bg-white border border-red-500 text-red-500"
+                      }`}
+                      onClick={() => setCurrentLabel(0)}
+                    >
+                      Background (0)
+                    </button>
+                  </div>
+
+                  {/* Mask Label Selection */}
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm font-medium text-gray-700">Mask Label:</label>
+                    <select
+                      className="border border-gray-300 rounded-md p-2 text-sm bg-white"
+                      value={selectedMaskLabel}
+                      onChange={(e) => setSelectedMaskLabel(e.target.value)}
+                    >
+                      {maskLabelOptions.map((label) => (
+                        <option key={label} value={label}>
+                          {label.replace('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      Segmenting as: {selectedMaskLabel}
+                    </span>
+                  </div>
+                </div>
+
+                <PromptingCanvas
+                  image={imageObject}
+                  onPromptingComplete={handlePromptingComplete}
+                  isRefinementMode={isRefinementMode}
+                  selectedMask={selectedMask}
+                  promptType={promptType}
+                  currentLabel={currentLabel}
+                />
+              </>
             ) : (
               <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
                 <div className="flex flex-col items-center">
@@ -671,9 +776,8 @@ const ImageViewerWithPrompting = () => {
           {segmentationMasks.length > 0 && !isRefinementMode && (
             <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
               <h3 className="font-bold">Segmentation Results:</h3>
-              <p className="text-sm text-gray-600 mt-1 mb-3">
-                {segmentationMasks.length} segment(s) found. Click on a segment
-                to refine it.
+              <p className="text-sm text-gray-600 mt-2 mb-3">
+                {segmentationMasks.length} segment(s) found. Click on a segment to refine it.
               </p>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
