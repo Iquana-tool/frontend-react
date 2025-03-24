@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide broken image icons */
+img:not([src]), img[src=""] {
+  visibility: hidden;
+}
+
 .dropzone {
   @apply p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer transition-colors;
 }

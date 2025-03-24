@@ -680,12 +680,14 @@ const ImageViewerWithPrompting = () => {
                           src={image.url}
                           alt={image.name}
                           className="w-full h-full object-cover"
+                          style={{ display: 'block' }}
                         />
                       ) : image.isFromAPI && image.thumbnailUrl ? (
                         <img
                           src={image.thumbnailUrl}
                           alt={image.name}
                           className="w-full h-full object-cover"
+                          style={{ display: 'block' }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-400">
@@ -1004,18 +1006,27 @@ const ImageViewerWithPrompting = () => {
                     >
                       {/* Mask preview */}
                       <div className="relative h-32 bg-gray-100 flex items-center justify-center rounded-md overflow-hidden">
+                        {/* Background image for context */}
                         {selectedImage && (
-                          <img
-                            src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                            alt="Original"
-                            className="absolute inset-0 w-full h-full object-contain opacity-50"
-                          />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <img
+                              src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
+                              className="w-full h-full object-contain opacity-50"
+                              aria-hidden="true"
+                              style={{ display: 'block' }}
+                            />
+                          </div>
                         )}
-                        <img
-                          src={`data:image/png;base64,${mask.base64}`}
-                          alt={`Segmentation ${mask.id}`}
-                          className="absolute inset-0 w-full h-full object-contain"
-                        />
+                        {/* Mask overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <img
+                            src={`data:image/png;base64,${mask.base64}`}
+                            alt={`Segment ${mask.id + 1}`}
+                            className="w-full h-full object-contain"
+                            style={{ display: 'block' }}
+                          />
+                        </div>
+                        {/* Selection indicator */}
                         {selectedMask && selectedMask.id === mask.id && (
                           <div className="absolute inset-0 border-4 border-blue-500 rounded-md"></div>
                         )}
@@ -1069,11 +1080,12 @@ const ImageViewerWithPrompting = () => {
                         }`}
                         onClick={() => handleCutoutSelect(cutout)}
                       >
-                        <div className="h-16 w-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden">
+                        <div className="h-16 w-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden relative">
                           <img 
                             src={cutout.previewUrl} 
-                            alt={`Cutout ${index+1}`}
+                            alt={`Segment region ${cutout.maskId + 1}`}
                             className="w-full h-full object-contain"
+                            style={{ display: 'block' }}
                           />
                         </div>
                         <div className="ml-3 flex-grow">
