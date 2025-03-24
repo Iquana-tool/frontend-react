@@ -695,40 +695,48 @@ const ImageViewerWithPrompting = () => {
         </div>
       )}
       
-      {/* Success Message - Toast Notification */}
+      {/* Success Message Toast */}
       {successMessage && (
-        <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg overflow-hidden max-w-md w-full z-50 flex transition-all duration-300 ease-out animate-slide-up border border-green-100">
-          <div className="w-2 bg-gradient-to-b from-green-400 to-green-600"></div>
-          <div className="flex items-center py-3 px-4 flex-grow">
-            <div className="bg-green-100 p-2 rounded-full mr-3 flex-shrink-0">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+        <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-xl overflow-hidden max-w-md w-full z-50 animate-slide-up border border-green-100">
+          <div className="flex items-center px-4 py-3">
+            <div className="bg-gradient-to-r from-green-400 to-green-500 p-2 rounded-full mr-3 flex-shrink-0">
+              <CheckCircle className="w-5 h-5 text-white" />
             </div>
             <div className="flex-grow">
-              <p className="font-medium text-gray-800 text-sm">{successMessage}</p>
+              <p className="font-medium text-gray-800">{successMessage}</p>
             </div>
             <button 
-              className="ml-2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100 flex-shrink-0"
+              className="ml-2 text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-full hover:bg-gray-100 flex-shrink-0"
               onClick={() => setSuccessMessage(null)}
               aria-label="Close notification"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
+        </svg>
             </button>
           </div>
+          <div className="h-1 bg-gradient-to-r from-green-400 to-green-500 loading-progress"></div>
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Image Selection Panel */}
-        <div className="bg-white p-4 rounded-md shadow-md">
-          <h2 className="text-lg font-semibold mb-4">Select Image</h2>
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+          <h2 className="text-lg font-semibold mb-4 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+            </svg>
+            Select Image
+          </h2>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Upload New Image:
             </label>
-            <div className="relative border-2 border-dashed border-gray-300 rounded-md p-4 hover:border-blue-500 transition-colors duration-200">
+            <div 
+              className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors duration-200 bg-gray-50 group"
+              style={{ minHeight: "120px" }}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -736,12 +744,15 @@ const ImageViewerWithPrompting = () => {
                 onChange={handleFileUpload}
                 disabled={isRefinementMode || loading}
               />
-              <div className="text-center">
-                <div className="text-sm text-gray-600">
-                  <span className="block mb-1">
+              <div className="text-center flex flex-col items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 group-hover:text-blue-500 transition-colors mb-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                </svg>
+                <div className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors">
+                  <span className="block font-medium mb-1">
                     Click to upload or drag and drop
                   </span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">
                     JPEG, PNG, or other image formats
                   </span>
                 </div>
@@ -751,63 +762,178 @@ const ImageViewerWithPrompting = () => {
 
           {/* Model Selection */}
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M13 7H7v6h6V7z" />
+                <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 010-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
+              </svg>
               Segmentation Model:
             </label>
-            <select
-              className="w-full border border-gray-300 rounded-md p-2"
-              value={selectedModel}
-              onChange={handleModelChange}
-              disabled={isRefinementMode || loading}
-            >
-              <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
-              <option value="SAM2Small">SAM2 Small</option>
-              <option value="SAM2Large">SAM2 Large</option>
-              <option value="SAM2BasePlus">SAM2 Base Plus</option>
-            </select>
-            <p className="text-xs text-gray-500 mt-1">
-              Larger models may be more accurate but will take longer to
-              process.
+            <div className="relative">
+              <select
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg py-2.5 pl-3 pr-10 text-sm appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+                value={selectedModel}
+                onChange={handleModelChange}
+                disabled={isRefinementMode || loading}
+              >
+                <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
+                <option value="SAM2Small">SAM2 Small</option>
+                <option value="SAM2Large">SAM2 Large</option>
+                <option value="SAM2BasePlus">SAM2 Base Plus</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 italic">
+              Larger models may be more accurate but will take longer to process.
             </p>
           </div>
 
-          <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
-            <h3 className="font-medium text-sm mb-3">Available Images:</h3>
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="font-medium text-sm text-gray-700 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+              </svg>
+              Available Images:
+            </h3>
+            
+            <div className="flex space-x-1">
+              <button 
+                className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid View"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </button>
+              <button 
+                className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                onClick={() => setViewMode('list')}
+                title="List View"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
             {loading && !selectedImage ? (
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center items-center py-8">
                 <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
               </div>
             ) : availableImages.length === 0 ? (
-              <p className="text-gray-500 text-sm">No images available. Upload an image to get started.</p>
+              <div className="flex flex-col items-center justify-center py-6 text-center bg-gray-50 rounded-lg border border-gray-100">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p className="text-gray-500 text-sm font-medium">No images available</p>
+                <p className="text-gray-400 text-xs mt-1">Upload an image to get started</p>
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 gap-2">
+                {availableImages.map((image) => (
+                  <div
+                    key={`image-${image.id}-${selectedImageId === image.id ? 'selected' : 'unselected'}`}
+                    className={`rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border hover:shadow-md hover:-translate-y-0.5 ${
+                      selectedImageId === image.id
+                        ? "border-blue-500 ring-2 ring-blue-200"
+                        : "border-gray-200"
+                    } ${
+                      isRefinementMode || loading
+                        ? "opacity-50 pointer-events-none"
+                        : ""
+                    }`}
+                    onClick={() => {
+                      if (!isRefinementMode && !loading) {
+                        setSelectedImageId(null);
+                        setSelectedImage(null);
+                        setImageObject(null);
+                        
+                        setTimeout(() => {
+                          handleImageSelect(image);
+                        }, 10);
+                      }
+                    }}
+                  >
+                    <div className="aspect-square bg-gray-100 relative overflow-hidden">
+                      {!image.isFromAPI && image.url ? (
+                        <img
+                          src={image.url}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : image.isFromAPI && image.thumbnailUrl ? (
+                        <img
+                          src={image.thumbnailUrl}
+                          alt={image.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      )}
+                      {selectedImageId === image.id && (
+                        <div className="absolute top-2 right-2 bg-blue-500 rounded-full p-1 shadow-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-xs font-medium truncate text-gray-700">{image.name}</p>
+                      <div className="flex items-center mt-1">
+                        {image.isFromAPI ? (
+                          <span className="text-xxs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">Server</span>
+                        ) : (
+                          <span className="text-xxs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded-full">Sample</span>
+                        )}
+                        {image.width && image.height && (
+                          <p className="text-xs text-gray-500 ml-3">
+                            {image.width}×{image.height}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : (
-              availableImages.map((image) => (
-                <div
-                  key={`image-${image.id}-${selectedImageId === image.id ? 'selected' : 'unselected'}`}
-                  className={`mb-3 border-2 rounded-md overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-                    selectedImageId === image.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-transparent"
-                  } ${
-                    isRefinementMode || loading
-                      ? "opacity-50 pointer-events-none"
-                      : ""
-                  }`}
-                  onClick={() => {
-                    if (!isRefinementMode && !loading) {
-                      // Force a complete selection reset
-                      setSelectedImageId(null);
-                      setSelectedImage(null);
-                      setImageObject(null);
-                      
-                      // Small delay to ensure state updates
-                      setTimeout(() => {
-                        handleImageSelect(image);
-                      }, 10);
-                    }
-                  }}
-                >
-                  <div className="flex items-center space-x-3 p-2">
-                    <div className="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
+              <div className="space-y-2">
+                {availableImages.map((image) => (
+                  <div
+                    key={`image-${image.id}-${selectedImageId === image.id ? 'selected' : 'unselected'}`}
+                    className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-all duration-200 border ${
+                      selectedImageId === image.id
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                    } ${
+                      isRefinementMode || loading
+                        ? "opacity-50 pointer-events-none"
+                        : ""
+                    }`}
+                    onClick={() => {
+                      if (!isRefinementMode && !loading) {
+                        setSelectedImageId(null);
+                        setSelectedImage(null);
+                        setImageObject(null);
+                        
+                        setTimeout(() => {
+                          handleImageSelect(image);
+                        }, 10);
+                      }
+                    }}
+                  >
+                    <div className="w-14 h-14 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
                       {!image.isFromAPI && image.url ? (
                         <img
                           src={image.url}
@@ -829,42 +955,76 @@ const ImageViewerWithPrompting = () => {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
+                      <p className="text-sm font-medium truncate text-gray-700">
                         {image.name}
                       </p>
-                      {image.isFromAPI ? (
-                        <p className="text-xs text-blue-600">From Server</p>
-                      ) : (
-                        <p className="text-xs text-orange-600">Sample</p>
-                      )}
-                      {image.width && image.height && (
-                        <p className="text-xs text-gray-500">
-                          {image.width} × {image.height}
-                        </p>
-                      )}
+                      <div className="flex items-center mt-1">
+                        {image.isFromAPI ? (
+                          <span className="text-xs text-blue-600 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                            </svg>
+                            Server
+                          </span>
+                        ) : (
+                          <span className="text-xs text-orange-600 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
+                            </svg>
+                            Sample
+                          </span>
+                        )}
+                        {image.width && image.height && (
+                          <p className="text-xs text-gray-500 ml-3">
+                            {image.width} × {image.height}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    {selectedImageId === image.id && (
+                      <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </div>
         </div>
 
         {/* Image Viewer and Prompting Canvas */}
-        <div className="md:col-span-2 bg-white p-4 rounded-md shadow-md">
+        <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">
-              {isRefinementMode
-                ? "Refining Segmentation"
-                : "Image Viewer with Prompting"}
+            <h2 className="text-lg font-semibold flex items-center">
+              {isRefinementMode ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  Refining Segmentation
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" />
+                  </svg>
+                  Image Viewer with Prompting
+                </>
+              )}
             </h2>
 
             {isRefinementMode && (
               <button
-                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1"
+                className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-1"
                 onClick={handleCancelRefinement}
               >
-                <span>← Back to full image</span>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                </svg>
+                <span>Back to full image</span>
               </button>
             )}
           </div>
@@ -873,48 +1033,52 @@ const ImageViewerWithPrompting = () => {
             imageObject ? (
               <>
                 {/* Toolbar */}
-                <div className="flex flex-wrap items-center gap-4 mb-4 p-3 bg-gray-50 rounded-md">
+                <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
                   {/* Tool Selection */}
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
                     <button
-                      className={`p-2 rounded-md ${
+                      className={`p-2 transition-colors ${
                         promptType === "point"
                           ? "bg-blue-500 text-white"
-                          : "bg-white border border-gray-300"
+                          : "hover:bg-gray-100"
                       }`}
                       onClick={() => setPromptType("point")}
+                      title="Point Tool"
                     >
-                      <MousePointer className="w-5 h-5" />
+                      <MousePointer className="w-4 h-4" />
                     </button>
                     <button
-                      className={`p-2 rounded-md ${
+                      className={`p-2 transition-colors ${
                         promptType === "box"
                           ? "bg-blue-500 text-white"
-                          : "bg-white border border-gray-300"
+                          : "hover:bg-gray-100"
                       }`}
                       onClick={() => setPromptType("box")}
+                      title="Box Tool"
                     >
-                      <Square className="w-5 h-5" />
+                      <Square className="w-4 h-4" />
                     </button>
                     <button
-                      className={`p-2 rounded-md ${
+                      className={`p-2 transition-colors ${
                         promptType === "circle"
                           ? "bg-blue-500 text-white"
-                          : "bg-white border border-gray-300"
+                          : "hover:bg-gray-100"
                       }`}
                       onClick={() => setPromptType("circle")}
+                      title="Circle Tool"
                     >
-                      <Circle className="w-5 h-5" />
+                      <Circle className="w-4 h-4" />
                     </button>
                     <button
-                      className={`p-2 rounded-md ${
+                      className={`p-2 transition-colors ${
                         promptType === "polygon"
                           ? "bg-blue-500 text-white"
-                          : "bg-white border border-gray-300"
+                          : "hover:bg-gray-100"
                       }`}
                       onClick={() => setPromptType("polygon")}
+                      title="Polygon Tool"
                     >
-                      <Pentagon className="w-5 h-5" />
+                      <Pentagon className="w-4 h-4" />
                     </button>
                   </div>
 

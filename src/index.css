@@ -7,10 +7,58 @@ img:not([src]), img[src=""] {
   visibility: hidden;
 }
 
+/* Add custom font size for extra small text */
+.text-xxs {
+  font-size: 0.65rem;
+  line-height: 1rem;
+}
+
+/* Modern card hover effects */
+.hover-card-rise {
+  @apply transition-all duration-300 ease-out transform hover:-translate-y-1 hover:shadow-md;
+}
+
+/* Input focus states */
+input:focus, select:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* Modern button styles */
+.btn {
+  @apply px-4 py-2 rounded-md font-medium transition-all duration-200 transform;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-md;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
+}
+
+.btn-danger {
+  @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+}
+
+.btn-sm {
+  @apply px-3 py-1 text-sm;
+}
+
+.btn-icon {
+  @apply p-2 rounded-full;
+}
+
+/* App-specific custom styles */
 .dropzone {
   @apply p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer transition-colors;
 }
 
+/* Glass morphism effect for cards */
+.glass-card {
+  @apply backdrop-blur-sm bg-white/80 border border-white/20 shadow-lg;
+}
+
+/* Gradient animations */
 @keyframes gradient {
   0% {
     background-position: 0% 50%;
@@ -59,6 +107,20 @@ img:not([src]), img[src=""] {
   animation: fade-in 0.3s ease-out forwards;
 }
 
+/* Modern card skeleton loading animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.skeleton-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* Custom loading indicator animations */
 @keyframes spin-pulse {
   0% {
@@ -103,4 +165,34 @@ img:not([src]), img[src=""] {
 
 .loading-progress {
   animation: progress-bar 3s ease-in-out infinite alternate;
+}
+
+/* Scrollbar styling */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded-lg;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-lg;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* Image grid hover effects */
+.image-grid-item {
+  @apply transition-all duration-300 ease-out overflow-hidden;
+}
+
+.image-grid-item:hover img {
+  @apply transform scale-105;
+}
+
+.image-grid-item img {
+  @apply transition-transform duration-500 ease-out;
 }
