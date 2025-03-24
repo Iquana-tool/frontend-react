@@ -12,6 +12,7 @@ const ImageViewerWithPrompting = () => {
   const [promptingResult, setPromptingResult] = useState(null);
   const [segmentationMasks, setSegmentationMasks] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isSegmenting, setIsSegmenting] = useState(false);
   const [error, setError] = useState(null);
   const [selectedMask, setSelectedMask] = useState(null);
   const [selectedImageId, setSelectedImageId] = useState(null);
@@ -219,6 +220,7 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
+      setIsSegmenting(true);
 
       // Different handling for refinement mode vs. normal mode
       if (isRefinementMode && cutoutPosition) {
@@ -332,9 +334,11 @@ const ImageViewerWithPrompting = () => {
         );
       }
 
+      setIsSegmenting(false);
       setLoading(false);
     } catch (error) {
       setError("Failed to generate segmentation: " + error.message);
+      setIsSegmenting(false);
       setLoading(false);
     }
   };
@@ -372,6 +376,7 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
+      setIsSegmenting(true);
 
       // Create a temporary canvas to render the cutout preview
       const cutoutPreviewCanvas = document.createElement("canvas");
@@ -490,10 +495,14 @@ const ImageViewerWithPrompting = () => {
               return [...prevList, cutoutInfo];
             }
           });
+
+          // Remember to set segmenting back to false at the end of the onload handler
+          setIsSegmenting(false);
         };
       };
     } catch (error) {
-      setError("Failed to create cutout: " + error.message);
+      setError(`Failed to start refinement: ${error.message}`);
+      setIsSegmenting(false);
       setLoading(false);
     }
   };
@@ -909,7 +918,9 @@ const ImageViewerWithPrompting = () => {
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-1">Processing</h3>
                 <p className="text-sm text-gray-600 text-center mb-3">
-                  Applying {selectedModel} segmentation model to your image
+                  {isSegmenting 
+                    ? `Applying ${selectedModel} segmentation model to your image`
+                    : "Loading..."}
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1 overflow-hidden">
                   <div className="bg-blue-500 h-1.5 rounded-full loading-progress"></div>
