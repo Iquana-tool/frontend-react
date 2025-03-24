@@ -14,12 +14,14 @@ const ImageViewerWithPrompting = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedMask, setSelectedMask] = useState(null);
+  const [selectedImageId, setSelectedImageId] = useState(null);
   const [isRefinementMode, setIsRefinementMode] = useState(false);
   const [originalImage, setOriginalImage] = useState(null);
   const [cutoutImage, setCutoutImage] = useState(null);
   const [cutoutPosition, setCutoutPosition] = useState(null);
   const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
   const [selectedMaskLabel, setSelectedMaskLabel] = useState('coral');
+  const [customMaskLabel, setCustomMaskLabel] = useState('');
   const maskLabelOptions = ['petri_dish', 'coral', 'polyp'];
   const [promptType, setPromptType] = useState("point");
   const [currentLabel, setCurrentLabel] = useState(1);
@@ -30,6 +32,14 @@ const ImageViewerWithPrompting = () => {
   // Fetch images when component mounts
   useEffect(() => {
     fetchImagesFromAPI();
+    
+    // Cleanup function to ensure state is properly reset when component unmounts
+    return () => {
+      setSelectedImageId(null);
+      setSelectedImage(null);
+      setImageObject(null);
+      setAvailableImages([]);
+    };
   }, []);
 
   const fetchImagesFromAPI = async () => {
@@ -48,8 +58,8 @@ const ImageViewerWithPrompting = () => {
           isFromAPI: true,
         }));
 
-        // Combine API images with sample images for easier development/testing
-        setAvailableImages([...apiImages, ...sampleImages]);
+        // Set available images from API only (sample images array is now empty)
+        setAvailableImages(apiImages);
         
         // Load thumbnails for API images
         apiImages.forEach(loadImageThumbnail);
@@ -57,8 +67,8 @@ const ImageViewerWithPrompting = () => {
       setLoading(false);
     } catch (error) {
       console.error("Failed to fetch images:", error);
-      setError("Failed to load images from server. Using sample images only.");
-      setAvailableImages(sampleImages);
+      setError("Failed to load images from server. Please upload an image to get started.");
+      setAvailableImages([]);
       setLoading(false);
     }
   };
@@ -86,6 +96,8 @@ const ImageViewerWithPrompting = () => {
 
   // Handle image selection
   const handleImageSelect = async (image) => {
+    console.log("Selecting image with ID:", image.id); // Debug log
+    
     // Reset refinement mode when selecting a new image
     setIsRefinementMode(false);
     setSelectedMask(null);
@@ -93,55 +105,67 @@ const ImageViewerWithPrompting = () => {
     setSegmentationMasks([]);
     setPromptingResult(null);
 
-    setSelectedImage(image);
-    setLoading(true);
-    setError(null);
+    // Update the selected image ID for visual tracking
+    setSelectedImageId(image.id);
+    
+    // Clear previous selection state
+    setSelectedImage(null);
+    setImageObject(null);
+    
+    // Small delay to ensure state updates properly
+    setTimeout(async () => {
+      setSelectedImage(image);
+      setLoading(true);
+      setError(null);
 
-    try {
-      let imageUrl;
+      try {
+        let imageUrl;
 
-      // If the image is from our API, we need to fetch the actual image data
-      if (image.isFromAPI) {
-        // If we already have a thumbnail for this image, use it while we load the full image
-        if (image.thumbnailUrl) {
-          // Create a temporary image object to show immediately
-          const tempImg = new Image();
-          tempImg.src = image.thumbnailUrl;
-          tempImg.onload = () => {
-            // Show the thumbnail while loading the full image
-            setImageObject(tempImg);
-          };
+        // If the image is from our API, we need to fetch the actual image data
+        if (image.isFromAPI) {
+          // If we already have a thumbnail for this image, use it while we load the full image
+          if (image.thumbnailUrl) {
+            // Create a temporary image object to show immediately
+            const tempImg = new Image();
+            tempImg.src = image.thumbnailUrl;
+            tempImg.onload = () => {
+              // Show the thumbnail while loading the full image
+              setImageObject(tempImg);
+            };
+          }
+          
+          const imageData = await api.getImageById(image.id);
+          // The API returns a mapping of image ID to base64 data
+          const base64Data = imageData[image.id];
+          imageUrl = `data:image/jpeg;base64,${base64Data}`;
+        } else {
+          // For sample images, just use the provided URL
+          imageUrl = image.url;
         }
-        
-        const imageData = await api.getImageById(image.id);
-        // The API returns a mapping of image ID to base64 data
-        const base64Data = imageData[image.id];
-        imageUrl = `data:image/jpeg;base64,${base64Data}`;
-      } else {
-        // For sample images, just use the provided URL
-        imageUrl = image.url;
-      }
 
-      // Load the image object for the canvas
-      const img = new Image();
-      img.src = imageUrl;
+        // Load the image object for the canvas
+        const img = new Image();
+        img.src = imageUrl;
 
-      img.onload = () => {
-        setImageObject(img);
-        setOriginalImage(img);
-        setLoading(false);
-      };
+        img.onload = () => {
+          setImageObject(img);
+          setOriginalImage(img);
+          setLoading(false);
+        };
 
-      img.onerror = () => {
-        setError("Failed to load image. Please try another one.");
+        img.onerror = () => {
+          setError("Failed to load image. Please try another one.");
+          setLoading(false);
+          setSelectedImage(null);
+          setSelectedImageId(null); // Clear visual selection
+        };
+      } catch (error) {
+        setError(`Failed to load image: ${error.message}`);
         setLoading(false);
         setSelectedImage(null);
-      };
-    } catch (error) {
-      setError(`Failed to load image: ${error.message}`);
-      setLoading(false);
-      setSelectedImage(null);
-    }
+        setSelectedImageId(null); // Clear visual selection
+      }
+    }, 0);
   };
 
   // Handle file upload
@@ -161,6 +185,7 @@ const ImageViewerWithPrompting = () => {
     setIsRefinementMode(false);
     setSelectedMask(null);
     setCutoutImage(null);
+    setSelectedImageId(null); // Clear the image selection indicator
 
     try {
       // Upload to the API
@@ -275,8 +300,7 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          adjustedPrompts,
-          selectedMaskLabel
+          adjustedPrompts
         );
 
         // Store the raw masks as received from the backend
@@ -284,7 +308,7 @@ const ImageViewerWithPrompting = () => {
           segmentationResponse.base64_masks.map((mask, index) => ({
             id: index,
             base64: mask,
-            quality: segmentationResponse.quality[index],
+            quality: segmentationResponse.quality[index]
           }))
         );
 
@@ -295,8 +319,7 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          prompts,
-          selectedMaskLabel
+          prompts
         );
 
         // Store the raw masks as received from the backend
@@ -304,7 +327,7 @@ const ImageViewerWithPrompting = () => {
           segmentationResponse.base64_masks.map((mask, index) => ({
             id: index,
             base64: mask,
-            quality: segmentationResponse.quality[index],
+            quality: segmentationResponse.quality[index]
           }))
         );
       }
@@ -496,8 +519,9 @@ const ImageViewerWithPrompting = () => {
 
     try {
       setLoading(true);
-      // Use the selected label when saving the mask
-      const result = await api.saveMask(selectedImage.id, selectedMaskLabel, mask.base64);
+      // Use customMaskLabel if provided, otherwise use selectedMaskLabel
+      const maskLabel = customMaskLabel.trim() || selectedMaskLabel;
+      const result = await api.saveMask(selectedImage.id, maskLabel, mask.base64);
       console.log("Mask saved successfully:", result);
       setLoading(false);
       return true;
@@ -511,7 +535,20 @@ const ImageViewerWithPrompting = () => {
 
   // Handle model selection change
   const handleModelChange = (e) => {
-    setSelectedModel(e.target.value);
+    const modelName = e.target.value;
+    setSelectedModel(modelName);
+  };
+
+  // Handle reset
+  const handleReset = () => {
+    setPromptingResult(null);
+    setSegmentationMasks([]);
+    setSelectedMask(null);
+    setIsRefinementMode(false);
+    setSelectedImageId(null); // Clear the image selection indicator
+    setSelectedImage(null);
+    setImageObject(null);
+    setCutoutImage(null);
   };
 
   // Switch to a specific cutout from the list
@@ -599,13 +636,13 @@ const ImageViewerWithPrompting = () => {
                 <div className="w-8 h-8 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
               </div>
             ) : availableImages.length === 0 ? (
-              <p className="text-gray-500 text-sm">No images available</p>
+              <p className="text-gray-500 text-sm">No images available. Upload an image to get started.</p>
             ) : (
               availableImages.map((image) => (
                 <div
-                  key={image.id}
+                  key={`image-${image.id}-${selectedImageId === image.id ? 'selected' : 'unselected'}`}
                   className={`mb-3 border-2 rounded-md overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
-                    selectedImage && selectedImage.id === image.id
+                    selectedImageId === image.id
                       ? "border-blue-500 bg-blue-50"
                       : "border-transparent"
                   } ${
@@ -613,9 +650,19 @@ const ImageViewerWithPrompting = () => {
                       ? "opacity-50 pointer-events-none"
                       : ""
                   }`}
-                  onClick={() =>
-                    !isRefinementMode && !loading && handleImageSelect(image)
-                  }
+                  onClick={() => {
+                    if (!isRefinementMode && !loading) {
+                      // Force a complete selection reset
+                      setSelectedImageId(null);
+                      setSelectedImage(null);
+                      setImageObject(null);
+                      
+                      // Small delay to ensure state updates
+                      setTimeout(() => {
+                        handleImageSelect(image);
+                      }, 10);
+                    }
+                  }}
                 >
                   <div className="flex items-center space-x-3 p-2">
                     <div className="w-20 h-20 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
@@ -756,21 +803,41 @@ const ImageViewerWithPrompting = () => {
                   </div>
 
                   {/* Mask Label Selection */}
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col space-y-2 mb-2">
                     <label className="text-sm font-medium text-gray-700">Mask Label:</label>
-                    <select
-                      className="border border-gray-300 rounded-md p-2 text-sm bg-white"
-                      value={selectedMaskLabel}
-                      onChange={(e) => setSelectedMaskLabel(e.target.value)}
-                    >
-                      {maskLabelOptions.map((label) => (
-                        <option key={label} value={label}>
-                          {label.replace('_', ' ')}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center space-x-2">
+                      <select
+                        className="border border-gray-300 rounded-md p-2 text-sm bg-white"
+                        value={selectedMaskLabel}
+                        onChange={(e) => {
+                          setSelectedMaskLabel(e.target.value);
+                          setCustomMaskLabel(''); // Clear custom label when selecting from dropdown
+                        }}
+                      >
+                        {maskLabelOptions.map((label) => (
+                          <option key={label} value={label}>
+                            {label.replace('_', ' ')}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-xs whitespace-nowrap">or</span>
+                      <input
+                        type="text"
+                        placeholder="Custom label"
+                        className="border border-gray-300 rounded-md p-2 text-sm flex-grow"
+                        value={customMaskLabel}
+                        onChange={(e) => {
+                          setCustomMaskLabel(e.target.value);
+                          if (e.target.value.trim()) {
+                            setSelectedMaskLabel(''); // Clear dropdown selection when custom label is entered
+                          } else {
+                            setSelectedMaskLabel('coral'); // Reset to default if custom field is empty
+                          }
+                        }}
+                      />
+                    </div>
                     <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                      Segmenting as: {selectedMaskLabel}
+                      Segmenting as: {customMaskLabel.trim() || selectedMaskLabel}
                     </span>
                   </div>
                 </div>
@@ -869,13 +936,30 @@ const ImageViewerWithPrompting = () => {
 
               {/* Add selected mask instruction when a mask is selected */}
               {selectedMask && (
-                <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-700 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Segment {selectedMask.id + 1} is selected. The area outside this segment is darkened.
-                  </p>
+                <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-md flex items-center justify-between">
+                  <div>
+                    <strong>Selected Segment #{selectedMask.id + 1}</strong>
+                    <span className="ml-2 px-2 py-1 bg-blue-200 rounded-md text-xs">
+                      {customMaskLabel.trim() || selectedMaskLabel}
+                    </span>
+                    <div className="text-sm mt-1">
+                      Quality: {Math.round(selectedMask.quality * 100)}%
+                    </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm"
+                      onClick={handleStartRefinement}
+                    >
+                      Refine
+                    </button>
+                    <button
+                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm"
+                      onClick={() => handleSaveMask(selectedMask.id)}
+                    >
+                      Save
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -906,17 +990,21 @@ const ImageViewerWithPrompting = () => {
                           className="absolute inset-0 w-full h-full object-contain"
                         />
                         {selectedMask && selectedMask.id === mask.id && (
-                          <div className="absolute bottom-0 left-0 right-0 bg-blue-500 text-white text-xs py-1 text-center">
-                            Selected
-                          </div>
+                          <div className="absolute inset-0 border-4 border-blue-500 rounded-md"></div>
                         )}
                       </div>
-
-                      <div className="mt-1 text-xs text-center">
-                        <p>Segment {mask.id + 1}</p>
-                        <p className="text-gray-500">
-                          Quality: {(mask.quality * 100).toFixed(1)}%
-                        </p>
+                      
+                      {/* Mask details */}
+                      <div className="mt-2 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold">Segment #{mask.id + 1}</span>
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs truncate max-w-[100px]" title="Label to apply when saving">
+                            {customMaskLabel.trim() || selectedMaskLabel}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span>Quality: {Math.round(mask.quality * 100)}%</span>
+                        </div>
                         <div className="flex flex-col mt-2 gap-1">
                           <button
                             className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 w-full flex items-center justify-center"
@@ -926,7 +1014,7 @@ const ImageViewerWithPrompting = () => {
                               handleStartRefinement();
                             }}
                           >
-                            <span>Select to Refine</span>
+                            <span>Refine</span>
                           </button>
                           <button
                             className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-full"
@@ -984,24 +1072,6 @@ const ImageViewerWithPrompting = () => {
                       <p className="text-sm mt-1">Select a segmentation and click "Refine Selected Segment" to create cutouts.</p>
                     </div>
                   )}
-                </div>
-              )}
-
-              {selectedMask && (
-                <div className="mt-3 flex justify-end space-x-2">
-                  <button
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-2"
-                    onClick={handleStartRefinement}
-                  >
-                    <Square size={16} />
-                    <span>Refine Selected Segment</span>
-                  </button>
-                  <button
-                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors"
-                    onClick={() => handleSaveMask(selectedMask.id)}
-                  >
-                    Save Selected Segment
-                  </button>
                 </div>
               )}
             </div>
@@ -1072,7 +1142,7 @@ const ImageViewerWithPrompting = () => {
                     {JSON.stringify(
                       segmentationMasks.map((mask) => ({
                         id: mask.id,
-                        quality: mask.quality,
+                        quality: mask.quality
                       })),
                       null,
                       2
@@ -1084,6 +1154,16 @@ const ImageViewerWithPrompting = () => {
           </details>
         </div>
       )}
+
+      {/* Reset Prompts Button */}
+      <div className="flex gap-4 mt-4">
+        <button
+          className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md flex items-center space-x-2 transition-colors"
+          onClick={handleReset}
+        >
+          <span>Reset Selection</span>
+        </button>
+      </div>
     </div>
   );
 };
