@@ -1,9 +1,39 @@
 const API_BASE_URL = "http://localhost:8000";
 
 // Function to handle API errors
-const handleApiError = (response) => {
+const handleApiError = async (response) => {
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    // Try to parse the error message from the response
+    try {
+      const errorData = await response.json();
+      console.error("API Error Response:", errorData);
+      
+      // Handle FastAPI validation errors which come in 'detail' field
+      if (errorData.detail) {
+        if (Array.isArray(errorData.detail)) {
+          // FastAPI validation errors are often arrays
+          const errorMessage = errorData.detail.map(err => 
+            `${err.loc.join('.')}: ${err.msg}`
+          ).join(', ');
+          throw new Error(`API Validation Error: ${errorMessage}`);
+        } else {
+          throw new Error(`API Error: ${errorData.detail}`);
+        }
+      }
+      
+      // Handle general error message
+      if (errorData.message) {
+        throw new Error(`API Error: ${errorData.message}`);
+      }
+      
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    } catch (parseError) {
+      if (parseError instanceof SyntaxError) {
+        // Could not parse the error response as JSON
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+      throw parseError;
+    }
   }
   return response.json();
 };
@@ -136,14 +166,36 @@ export const segmentImage = async (
 // Save a mask
 export const saveMask = async (imageId, label, base64Mask) => {
   try {
+    // Validate parameters
+    if (imageId === undefined || imageId === null) {
+      throw new Error("Image ID is required");
+    }
+    
+    if (!label || typeof label !== 'string') {
+      throw new Error("Label is required and must be a string");
+    }
+    
+    if (!base64Mask || typeof base64Mask !== 'string') {
+      throw new Error("Mask data is required and must be a base64 string");
+    }
+    
     console.log(`Saving mask for image ${imageId} with label ${label}`);
     console.log(`Mask data length: ${base64Mask ? base64Mask.length : 0} characters`);
     
+    // Convert imageId to number if it's a string
+    const numericImageId = typeof imageId === 'string' ? parseInt(imageId, 10) : imageId;
+    
+    if (isNaN(numericImageId)) {
+      throw new Error(`Invalid image ID: ${imageId}`);
+    }
+    
     const requestData = {
-      image_id: imageId,
+      image_id: numericImageId,
       label: label,
       base64_mask: base64Mask,
     };
+
+    console.log("Sending save mask request:", JSON.stringify(requestData).substring(0, 100) + "...");
 
     const response = await fetch(`${API_BASE_URL}/masks/save_mask`, {
       method: "POST",
@@ -152,7 +204,7 @@ export const saveMask = async (imageId, label, base64Mask) => {
       },
       body: JSON.stringify(requestData),
     });
-    return handleApiError(response);
+    return await handleApiError(response);
   } catch (error) {
     console.error("Error saving mask:", error);
     throw error;

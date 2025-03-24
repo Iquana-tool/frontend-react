@@ -3,7 +3,7 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle } from "lucide-react";
 
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -14,6 +14,7 @@ const ImageViewerWithPrompting = () => {
   const [loading, setLoading] = useState(false);
   const [isSegmenting, setIsSegmenting] = useState(false);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [selectedMask, setSelectedMask] = useState(null);
   const [selectedImageId, setSelectedImageId] = useState(null);
   const [isRefinementMode, setIsRefinementMode] = useState(false);
@@ -31,6 +32,35 @@ const ImageViewerWithPrompting = () => {
   const [saveMaskLabel, setSaveMaskLabel] = useState('coral');
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState('');
   const promptingCanvasRef = useRef(null); // Ref to access PromptingCanvas methods
+  const segmentationResultsRef = useRef(null); // Add a ref to the segmentation results section
+
+  // Add CSS for animations
+  useEffect(() => {
+    // Create a style element
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+      @keyframes slide-up {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 20px);
+        }
+        100% {
+          opacity: 1;
+          transform: translate(-50%, 0);
+        }
+      }
+      
+      .animate-slide-up {
+        animation: slide-up 0.3s ease-out forwards;
+      }
+    `;
+    document.head.appendChild(styleEl);
+    
+    // Clean up
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
 
   // Fetch images when component mounts
   useEffect(() => {
@@ -215,6 +245,21 @@ const ImageViewerWithPrompting = () => {
     }
   };
 
+  // Set success message with auto-clear timer
+  const setSuccessMessageWithTimeout = (message, timeout = 5000) => {
+    setSuccessMessage(message);
+    
+    // Clear any existing timers
+    if (window.successMessageTimer) {
+      clearTimeout(window.successMessageTimer);
+    }
+    
+    // Set a timer to clear the message
+    window.successMessageTimer = setTimeout(() => {
+      setSuccessMessage(null);
+    }, timeout);
+  };
+
   // Handle prompting
   const handlePromptingComplete = async (prompts) => {
     setPromptingResult(prompts);
@@ -223,6 +268,7 @@ const ImageViewerWithPrompting = () => {
     try {
       setLoading(true);
       setIsSegmenting(true);
+      setSuccessMessage(null); // Clear any previous success messages
 
       // Different handling for refinement mode vs. normal mode
       if (isRefinementMode && cutoutPosition) {
@@ -318,6 +364,16 @@ const ImageViewerWithPrompting = () => {
 
         // Return to full image view after refinement
         handleCancelRefinement();
+        
+        // Show success message for refinement
+        setSuccessMessageWithTimeout(`Refinement complete! Found ${segmentationResponse.base64_masks.length} segments.`);
+        
+        // Scroll to segmentation results after a short delay
+        setTimeout(() => {
+          if (segmentationResultsRef.current) {
+            segmentationResultsRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 200);
       } else {
         // Regular segmentation
         const segmentationResponse = await api.segmentImage(
@@ -334,6 +390,16 @@ const ImageViewerWithPrompting = () => {
             quality: segmentationResponse.quality[index]
           }))
         );
+        
+        // Show success message for regular segmentation
+        setSuccessMessageWithTimeout(`Segmentation complete! Found ${segmentationResponse.base64_masks.length} segments.`);
+        
+        // Scroll to segmentation results after a short delay
+        setTimeout(() => {
+          if (segmentationResultsRef.current) {
+            segmentationResultsRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 200);
       }
 
       setIsSegmenting(false);
@@ -532,24 +598,53 @@ const ImageViewerWithPrompting = () => {
 
   // Actually save the mask to the database after selecting a label
   const saveSelectedMask = async () => {
-    if (!selectedImage || savingMaskIndex === null || savingMaskIndex >= segmentationMasks.length) return;
+    console.log("Save button clicked, saving mask index:", savingMaskIndex);
+    console.log("Available masks:", segmentationMasks.length);
+    
+    if (savingMaskIndex === null || savingMaskIndex >= segmentationMasks.length) {
+      console.error("Invalid mask index to save:", savingMaskIndex);
+      setError("Failed to save: Invalid mask selection");
+      setShowSaveMaskDialog(false);
+      return;
+    }
 
     const mask = segmentationMasks[savingMaskIndex];
+    console.log("Selected mask to save:", mask);
 
     try {
       setLoading(true);
+      setShowSaveMaskDialog(false); // Close dialog immediately to show loading indicator
+      setSuccessMessage(null); // Clear any previous success messages
+      
       // Use customSaveMaskLabel if provided, otherwise use saveMaskLabel
       const maskLabel = customSaveMaskLabel.trim() || saveMaskLabel;
-      const result = await api.saveMask(selectedImage.id, maskLabel, mask.base64);
+      
+      if (!maskLabel) {
+        throw new Error("Please select or enter a class label");
+      }
+      
+      // Ensure the image ID is a number
+      const imageId = parseInt(selectedImage.id, 10);
+      if (isNaN(imageId)) {
+        throw new Error(`Invalid image ID: ${selectedImage.id} is not a number`);
+      }
+      
+      console.log("Saving mask with index:", savingMaskIndex, "and label:", maskLabel);
+      console.log("Image ID:", imageId, "(original:", selectedImage.id, ")");
+      console.log("Mask data length:", mask.base64.length);
+      
+      const result = await api.saveMask(imageId, maskLabel, mask.base64);
       console.log("Mask saved successfully:", result);
-      setShowSaveMaskDialog(false);
+      
+      // Show success message
+      setSuccessMessageWithTimeout(`Mask saved successfully as "${maskLabel}"!`);
+      
       setSavingMaskIndex(null);
       setLoading(false);
       return true;
     } catch (error) {
       console.error("Error saving mask:", error);
       setError(`Failed to save mask: ${error.message}`);
-      setShowSaveMaskDialog(false);
       setSavingMaskIndex(null);
       setLoading(false);
       return false;
@@ -597,6 +692,30 @@ const ImageViewerWithPrompting = () => {
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4">
           <p>{error}</p>
+        </div>
+      )}
+      
+      {/* Success Message - Toast Notification */}
+      {successMessage && (
+        <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg overflow-hidden max-w-md w-full z-50 flex transition-all duration-300 ease-out animate-slide-up border border-green-100">
+          <div className="w-2 bg-gradient-to-b from-green-400 to-green-600"></div>
+          <div className="flex items-center py-3 px-4 flex-grow">
+            <div className="bg-green-100 p-2 rounded-full mr-3 flex-shrink-0">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="flex-grow">
+              <p className="font-medium text-gray-800 text-sm">{successMessage}</p>
+            </div>
+            <button 
+              className="ml-2 text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100 flex-shrink-0"
+              onClick={() => setSuccessMessage(null)}
+              aria-label="Close notification"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
@@ -905,13 +1024,16 @@ const ImageViewerWithPrompting = () => {
 
           {/* Segmentation Results */}
           {segmentationMasks.length > 0 && !isRefinementMode && (
-            <div className="mt-4 p-3 bg-gray-50 rounded-md border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-bold">Segmentation Results:</h3>
-                <div className="flex space-x-2">
+            <div 
+              ref={segmentationResultsRef}
+              className="mt-6 bg-white rounded-lg shadow-md overflow-hidden border border-gray-200"
+            >
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex justify-between items-center">
+                <h3 className="font-bold text-white text-lg">Segmentation Results:</h3>
+                <div className="flex space-x-2 bg-white/20 rounded-md p-1">
                   <button
-                    className={`p-2 rounded-md ${
-                      viewMode === "grid" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
+                    className={`p-1.5 rounded-md transition-all ${
+                      viewMode === "grid" ? "bg-white text-blue-700" : "text-white hover:bg-white/30"
                     }`}
                     onClick={() => setViewMode("grid")}
                     title="Grid View"
@@ -919,8 +1041,8 @@ const ImageViewerWithPrompting = () => {
                     <Layers size={16} />
                   </button>
                   <button
-                    className={`p-2 rounded-md ${
-                      viewMode === "list" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
+                    className={`p-1.5 rounded-md transition-all ${
+                      viewMode === "list" ? "bg-white text-blue-700" : "text-white hover:bg-white/30"
                     }`}
                     onClick={() => setViewMode("list")}
                     title="List View"
@@ -930,154 +1052,224 @@ const ImageViewerWithPrompting = () => {
                 </div>
               </div>
               
-              <p className="text-sm text-gray-600 mt-2 mb-3">
-                {segmentationMasks.length} segment(s) found. Click on a segment to refine it.
-              </p>
+              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="font-bold text-blue-600">{segmentationMasks.length}</span>
+                  </div>
+                  <p className="text-blue-800">
+                    segment{segmentationMasks.length !== 1 ? 's' : ''} found. Click on a segment to refine it.
+                  </p>
+                </div>
+              </div>
 
               {/* Add selected mask instruction when a mask is selected */}
               {selectedMask && (
-                <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-md flex items-center justify-between">
+                <div className="m-4 p-4 bg-blue-100 text-blue-800 rounded-md flex items-center justify-between shadow-sm">
                   <div>
-                    <strong>Selected Segment #{selectedMask.id + 1}</strong>
-                    <div className="text-sm mt-1">
+                    <div className="flex items-center">
+                      <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center mr-2">
+                        <span className="font-bold text-blue-600">{selectedMask.id + 1}</span>
+                      </div>
+                      <strong>Selected Segment</strong>
+                    </div>
+                    <div className="text-sm mt-2 flex items-center">
+                      <div className="w-full max-w-[120px] bg-gray-200 rounded-full h-2 mr-2">
+                        <div 
+                          className={`h-2 rounded-full ${
+                            selectedMask.quality >= 0.7 ? 'bg-green-500' : 
+                            selectedMask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                          }`}
+                          style={{ width: `${Math.round(selectedMask.quality * 100)}%` }}
+                        ></div>
+                      </div>
                       Quality: {Math.round(selectedMask.quality * 100)}%
                     </div>
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm"
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center"
                       onClick={handleStartRefinement}
                     >
-                      Refine
+                      <span className="mr-1">Refine</span>
                     </button>
                     <button
-                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm"
-                      onClick={() => handleSaveMask(selectedMask.id)}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        console.log("Save button clicked for mask index:", selectedMask.id);
+                        handleSaveMask(selectedMask.id);
+                      }}
                     >
-                      Save
+                      <span className="mr-1">Save</span>
                     </button>
                   </div>
                 </div>
               )}
 
-              {viewMode === "grid" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                  {segmentationMasks.map((mask, index) => (
-                    <div
-                      key={index}
-                      className={`border rounded-md p-2 cursor-pointer transition-all duration-200 hover:shadow-md ${
-                        selectedMask && selectedMask.id === mask.id
-                          ? "ring-2 ring-blue-500 bg-blue-50"
-                          : ""
-                      }`}
-                      onClick={() => handleMaskSelect(mask)}
-                    >
-                      {/* Mask preview */}
-                      <div className="relative h-32 bg-gray-100 flex items-center justify-center rounded-md overflow-hidden">
-                        {/* Background image for context */}
-                        {selectedImage && (
+              <div className="p-4">
+                {viewMode === "grid" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {segmentationMasks.map((mask, index) => (
+                      <div
+                        key={index}
+                        className={`border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                          selectedMask && selectedMask.id === mask.id
+                            ? "ring-2 ring-blue-500 shadow-md bg-blue-50 transform scale-[1.02]"
+                            : "hover:transform hover:scale-[1.01]"
+                        }`}
+                        onClick={() => handleMaskSelect(mask)}
+                      >
+                        {/* Mask preview */}
+                        <div className="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
+                          {/* Background image for context */}
+                          {selectedImage && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-white">
+                              <img
+                                src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
+                                className="w-full h-full object-contain opacity-40"
+                                aria-hidden="true"
+                                style={{ display: 'block' }}
+                              />
+                            </div>
+                          )}
+                          {/* Mask overlay */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <img
-                              src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                              className="w-full h-full object-contain opacity-50"
-                              aria-hidden="true"
+                              src={`data:image/png;base64,${mask.base64}`}
+                              alt={`Segment ${mask.id + 1}`}
+                              className="w-full h-full object-contain"
                               style={{ display: 'block' }}
                             />
                           </div>
-                        )}
-                        {/* Mask overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <img
-                            src={`data:image/png;base64,${mask.base64}`}
-                            alt={`Segment ${mask.id + 1}`}
-                            className="w-full h-full object-contain"
-                            style={{ display: 'block' }}
-                          />
+                          {/* Quality indicator */}
+                          <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium shadow-sm">
+                            <div className="flex items-center">
+                              <div className={`w-2 h-2 rounded-full mr-1 ${
+                                mask.quality >= 0.7 ? 'bg-green-500' : 
+                                mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                              }`}></div>
+                              {Math.round(mask.quality * 100)}%
+                            </div>
+                          </div>
+                          {/* Selection indicator */}
+                          {selectedMask && selectedMask.id === mask.id && (
+                            <div className="absolute inset-0 border-4 border-blue-500 rounded-md"></div>
+                          )}
                         </div>
-                        {/* Selection indicator */}
-                        {selectedMask && selectedMask.id === mask.id && (
-                          <div className="absolute inset-0 border-4 border-blue-500 rounded-md"></div>
-                        )}
-                      </div>
-                      
-                      {/* Mask details */}
-                      <div className="mt-2 text-xs">
-                        <div className="flex justify-between items-center">
-                          <span className="font-semibold">Segment #{mask.id + 1}</span>
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span>Quality: {Math.round(mask.quality * 100)}%</span>
-                        </div>
-                        <div className="flex flex-col mt-2 gap-1">
-                          <button
-                            className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 w-full flex items-center justify-center"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMaskSelect(mask);
-                              handleStartRefinement();
-                            }}
-                          >
-                            <span>Refine</span>
-                          </button>
-                          <button
-                            className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSaveMask(index);
-                            }}
-                          >
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  {/* List view of cutouts */}
-                  {cutoutsList.length > 0 ? (
-                    cutoutsList.map((cutout, index) => (
-                      <div 
-                        key={index}
-                        className={`flex items-center border rounded-md p-2 cursor-pointer hover:bg-blue-50 ${
-                          selectedMask && selectedMask.id === cutout.maskId ? "bg-blue-50 border-blue-300" : ""
-                        }`}
-                        onClick={() => handleCutoutSelect(cutout)}
-                      >
-                        <div className="h-16 w-16 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden relative">
-                          <img 
-                            src={cutout.previewUrl} 
-                            alt={`Segment region ${cutout.maskId + 1}`}
-                            className="w-full h-full object-contain"
-                            style={{ display: 'block' }}
-                          />
-                        </div>
-                        <div className="ml-3 flex-grow">
-                          <div className="font-medium">Segment {cutout.maskId + 1}</div>
-                          <div className="text-xs text-gray-500">
-                            {cutout.width}×{cutout.height} px · Region at ({cutout.x}, {cutout.y})
+                        
+                        {/* Mask details */}
+                        <div className="p-3 border-t bg-white">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-medium text-gray-800">Segment #{mask.id + 1}</span>
+                          </div>
+                          <div className="flex justify-between items-center mb-3">
+                            <div className="w-full bg-gray-200 rounded-full h-1.5">
+                              <div 
+                                className={`h-1.5 rounded-full ${
+                                  mask.quality >= 0.7 ? 'bg-green-500' : 
+                                  mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                                }`}
+                                style={{ width: `${Math.round(mask.quality * 100)}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              className="flex-1 text-xs bg-blue-600 text-white px-2 py-1.5 rounded-md hover:bg-blue-700 font-medium shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMaskSelect(mask);
+                                handleStartRefinement();
+                              }}
+                            >
+                              Refine
+                            </button>
+                            <button
+                              className="flex-1 text-xs bg-green-600 text-white px-2 py-1.5 rounded-md hover:bg-green-700 font-medium shadow-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                console.log("Save button clicked for mask index:", index);
+                                handleSaveMask(index);
+                              }}
+                            >
+                              Save
+                            </button>
                           </div>
                         </div>
-                        <button
-                          className="ml-2 px-3 py-1 bg-blue-500 text-white text-xs rounded-md hover:bg-blue-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCutoutSelect(cutout);
-                          }}
-                        >
-                          Select to Refine
-                        </button>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <p>No cutouts available yet.</p>
-                      <p className="text-sm mt-1">Select a segmentation and click "Refine Selected Segment" to create cutouts.</p>
-                    </div>
-                  )}
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-2 space-y-3">
+                    {/* List view of cutouts */}
+                    {cutoutsList.length > 0 ? (
+                      cutoutsList.map((cutout, index) => (
+                        <div 
+                          key={index}
+                          className={`flex items-center border rounded-lg p-3 cursor-pointer hover:bg-blue-50 transition-all ${
+                            selectedMask && selectedMask.id === cutout.maskId ? "bg-blue-50 border-blue-300 shadow-sm" : ""
+                          }`}
+                          onClick={() => handleCutoutSelect(cutout)}
+                        >
+                          <div className="h-20 w-20 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden relative shadow-sm">
+                            <img 
+                              src={cutout.previewUrl} 
+                              alt={`Segment region ${cutout.maskId + 1}`}
+                              className="w-full h-full object-contain"
+                              style={{ display: 'block' }}
+                            />
+                          </div>
+                          <div className="ml-4 flex-grow">
+                            <div className="font-medium text-gray-800 flex items-center">
+                              <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mr-2 text-xs font-bold text-blue-600">
+                                {cutout.maskId + 1}
+                              </div>
+                              Segment {cutout.maskId + 1}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {cutout.width}×{cutout.height} px · Region at ({cutout.x}, {cutout.y})
+                            </div>
+                            {segmentationMasks[cutout.maskId] && (
+                              <div className="flex items-center mt-2">
+                                <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
+                                  <div 
+                                    className={`h-1.5 rounded-full ${
+                                      segmentationMasks[cutout.maskId].quality >= 0.7 ? 'bg-green-500' : 
+                                      segmentationMasks[cutout.maskId].quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                                    }`}
+                                    style={{ width: `${Math.round(segmentationMasks[cutout.maskId].quality * 100)}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs">
+                                  Quality: {Math.round(segmentationMasks[cutout.maskId].quality * 100)}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            className="ml-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 shadow-sm font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCutoutSelect(cutout);
+                            }}
+                          >
+                            Refine
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-10 text-gray-500">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-3">
+                          <Layers size={24} className="text-gray-400" />
+                        </div>
+                        <p className="font-medium">No cutouts available yet</p>
+                        <p className="text-sm mt-1">Select a segmentation and click "Refine" to create cutouts</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1161,7 +1353,7 @@ const ImageViewerWithPrompting = () => {
 
       {/* Save Mask Dialog */}
       {showSaveMaskDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
           <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
             <h2 className="text-xl font-bold mb-4">Save Mask As</h2>
             
@@ -1214,12 +1406,19 @@ const ImageViewerWithPrompting = () => {
                   setShowSaveMaskDialog(false);
                   setSavingMaskIndex(null);
                 }}
+                type="button"
               >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
-                onClick={saveSelectedMask}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log("Save button clicked in dialog - explicit function call");
+                  saveSelectedMask();
+                }}
+                type="button"
               >
                 Save
               </button>
