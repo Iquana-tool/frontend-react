@@ -22,3 +22,49 @@
   background-size: 200% 200%;
   animation: gradient 8s ease infinite;
 }
+
+/* Custom loading indicator animations */
+@keyframes spin-pulse {
+  0% {
+    transform: rotate(0deg);
+    border-width: 4px;
+  }
+  50% {
+    border-width: 3px;
+  }
+  100% {
+    transform: rotate(360deg);
+    border-width: 4px;
+  }
+}
+
+@keyframes dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+
+@keyframes progress-bar {
+  0% { width: 15%; }
+  50% { width: 70%; }
+  75% { width: 85%; }
+  90% { width: 95%; }
+  100% { width: 100%; }
+}
+
+.loading-spinner {
+  animation: spin-pulse 1.5s ease-in-out infinite;
+}
+
+.loading-progress {
+  animation: progress-bar 3s ease-in-out infinite alternate;
+}

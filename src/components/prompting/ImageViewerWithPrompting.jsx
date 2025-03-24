@@ -633,7 +633,7 @@ const ImageViewerWithPrompting = () => {
             <h3 className="font-medium text-sm mb-3">Available Images:</h3>
             {loading && !selectedImage ? (
               <div className="flex justify-center py-4">
-                <div className="w-8 h-8 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
               </div>
             ) : availableImages.length === 0 ? (
               <p className="text-gray-500 text-sm">No images available. Upload an image to get started.</p>
@@ -855,7 +855,7 @@ const ImageViewerWithPrompting = () => {
             ) : (
               <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
                 <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-2"></div>
+                  <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
                   <p>Loading image...</p>
                 </div>
               </div>
@@ -895,10 +895,26 @@ const ImageViewerWithPrompting = () => {
 
           {/* Loading indicator */}
           {loading && (
-            <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-              <div className="bg-white p-5 rounded-lg shadow-lg flex flex-col items-center">
-                <div className="w-12 h-12 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin mb-3"></div>
-                <p className="text-gray-700">Processing...</p>
+            <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
+              <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center max-w-md w-full transform transition-all">
+                <div className="relative w-20 h-20 mb-4">
+                  {/* Main spinner */}
+                  <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+                  
+                  {/* Inner pulsing dot */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-1">Processing</h3>
+                <p className="text-sm text-gray-600 text-center mb-3">
+                  Applying {selectedModel} segmentation model to your image
+                </p>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1 overflow-hidden">
+                  <div className="bg-blue-500 h-1.5 rounded-full loading-progress"></div>
+                </div>
+                <p className="text-xs text-gray-500">This may take a few moments...</p>
               </div>
             </div>
           )}

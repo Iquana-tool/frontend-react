@@ -784,8 +784,23 @@ const PromptingCanvas = forwardRef(({
 
         {/* Loading indicator */}
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80 z-30">
-            <div className="w-10 h-10 border-4 border-t-blue-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 z-30 backdrop-blur-[2px]">
+            <div className="bg-white p-4 rounded-lg shadow-lg flex flex-col items-center">
+              <div className="relative w-16 h-16 mb-3">
+                {/* Layered spinner animation */}
+                <div className="absolute inset-0 border-4 border-blue-50 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-t-blue-500 border-r-blue-300 border-b-transparent border-l-blue-400 rounded-full loading-spinner"></div>
+                
+                {/* Inner elements */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <p className="text-blue-600 font-medium">Processing canvas...</p>
+              <div className="w-32 h-1 bg-gray-200 rounded-full mt-2 overflow-hidden">
+                <div className="h-full bg-blue-500 loading-progress"></div>
+              </div>
+            </div>
           </div>
         )}
 
