@@ -21,13 +21,15 @@ const ImageViewerWithPrompting = () => {
   const [cutoutImage, setCutoutImage] = useState(null);
   const [cutoutPosition, setCutoutPosition] = useState(null);
   const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
-  const [selectedMaskLabel, setSelectedMaskLabel] = useState('coral');
-  const [customMaskLabel, setCustomMaskLabel] = useState('');
   const maskLabelOptions = ['petri_dish', 'coral', 'polyp'];
   const [promptType, setPromptType] = useState("point");
   const [currentLabel, setCurrentLabel] = useState(1);
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
   const [cutoutsList, setCutoutsList] = useState([]);
+  const [showSaveMaskDialog, setShowSaveMaskDialog] = useState(false);
+  const [savingMaskIndex, setSavingMaskIndex] = useState(null);
+  const [saveMaskLabel, setSaveMaskLabel] = useState('coral');
+  const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState('');
   const promptingCanvasRef = useRef(null); // Ref to access PromptingCanvas methods
 
   // Fetch images when component mounts
@@ -522,21 +524,33 @@ const ImageViewerWithPrompting = () => {
 
   // Save a mask to the database 
   const handleSaveMask = async (maskIndex) => {
-    if (!selectedImage || maskIndex >= segmentationMasks.length) return;
+    setSavingMaskIndex(maskIndex);
+    setSaveMaskLabel('coral'); // Default label
+    setCustomSaveMaskLabel('');
+    setShowSaveMaskDialog(true);
+  };
 
-    const mask = segmentationMasks[maskIndex];
+  // Actually save the mask to the database after selecting a label
+  const saveSelectedMask = async () => {
+    if (!selectedImage || savingMaskIndex === null || savingMaskIndex >= segmentationMasks.length) return;
+
+    const mask = segmentationMasks[savingMaskIndex];
 
     try {
       setLoading(true);
-      // Use customMaskLabel if provided, otherwise use selectedMaskLabel
-      const maskLabel = customMaskLabel.trim() || selectedMaskLabel;
+      // Use customSaveMaskLabel if provided, otherwise use saveMaskLabel
+      const maskLabel = customSaveMaskLabel.trim() || saveMaskLabel;
       const result = await api.saveMask(selectedImage.id, maskLabel, mask.base64);
       console.log("Mask saved successfully:", result);
+      setShowSaveMaskDialog(false);
+      setSavingMaskIndex(null);
       setLoading(false);
       return true;
     } catch (error) {
       console.error("Error saving mask:", error);
       setError(`Failed to save mask: ${error.message}`);
+      setShowSaveMaskDialog(false);
+      setSavingMaskIndex(null);
       setLoading(false);
       return false;
     }
@@ -750,9 +764,8 @@ const ImageViewerWithPrompting = () => {
                           : "bg-white border border-gray-300"
                       }`}
                       onClick={() => setPromptType("point")}
-                      title="Point Tool"
                     >
-                      <MousePointer size={20} />
+                      <MousePointer className="w-5 h-5" />
                     </button>
                     <button
                       className={`p-2 rounded-md ${
@@ -761,9 +774,8 @@ const ImageViewerWithPrompting = () => {
                           : "bg-white border border-gray-300"
                       }`}
                       onClick={() => setPromptType("box")}
-                      title="Box Tool"
                     >
-                      <Square size={20} />
+                      <Square className="w-5 h-5" />
                     </button>
                     <button
                       className={`p-2 rounded-md ${
@@ -772,9 +784,8 @@ const ImageViewerWithPrompting = () => {
                           : "bg-white border border-gray-300"
                       }`}
                       onClick={() => setPromptType("circle")}
-                      title="Circle Tool"
                     >
-                      <Circle size={20} />
+                      <Circle className="w-5 h-5" />
                     </button>
                     <button
                       className={`p-2 rounded-md ${
@@ -783,13 +794,12 @@ const ImageViewerWithPrompting = () => {
                           : "bg-white border border-gray-300"
                       }`}
                       onClick={() => setPromptType("polygon")}
-                      title="Polygon Tool"
                     >
-                      <Pentagon size={20} />
+                      <Pentagon className="w-5 h-5" />
                     </button>
                   </div>
 
-                  {/* Foreground/Background Selection */}
+                  {/* Foreground/Background buttons - Keep these */}
                   <div className="flex space-x-2">
                     <button
                       className={`p-2 rounded-md ${
@@ -811,45 +821,6 @@ const ImageViewerWithPrompting = () => {
                     >
                       Background (0)
                     </button>
-                  </div>
-
-                  {/* Mask Label Selection */}
-                  <div className="flex flex-col space-y-2 mb-2">
-                    <label className="text-sm font-medium text-gray-700">Mask Label:</label>
-                    <div className="flex items-center space-x-2">
-                      <select
-                        className="border border-gray-300 rounded-md p-2 text-sm bg-white"
-                        value={selectedMaskLabel}
-                        onChange={(e) => {
-                          setSelectedMaskLabel(e.target.value);
-                          setCustomMaskLabel(''); // Clear custom label when selecting from dropdown
-                        }}
-                      >
-                        {maskLabelOptions.map((label) => (
-                          <option key={label} value={label}>
-                            {label.replace('_', ' ')}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="text-xs whitespace-nowrap">or</span>
-                      <input
-                        type="text"
-                        placeholder="Custom label"
-                        className="border border-gray-300 rounded-md p-2 text-sm flex-grow"
-                        value={customMaskLabel}
-                        onChange={(e) => {
-                          setCustomMaskLabel(e.target.value);
-                          if (e.target.value.trim()) {
-                            setSelectedMaskLabel(''); // Clear dropdown selection when custom label is entered
-                          } else {
-                            setSelectedMaskLabel('coral'); // Reset to default if custom field is empty
-                          }
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                      Segmenting as: {customMaskLabel.trim() || selectedMaskLabel}
-                    </span>
                   </div>
                 </div>
 
@@ -968,9 +939,6 @@ const ImageViewerWithPrompting = () => {
                 <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-md flex items-center justify-between">
                   <div>
                     <strong>Selected Segment #{selectedMask.id + 1}</strong>
-                    <span className="ml-2 px-2 py-1 bg-blue-200 rounded-md text-xs">
-                      {customMaskLabel.trim() || selectedMaskLabel}
-                    </span>
                     <div className="text-sm mt-1">
                       Quality: {Math.round(selectedMask.quality * 100)}%
                     </div>
@@ -1036,9 +1004,6 @@ const ImageViewerWithPrompting = () => {
                       <div className="mt-2 text-xs">
                         <div className="flex justify-between items-center">
                           <span className="font-semibold">Segment #{mask.id + 1}</span>
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs truncate max-w-[100px]" title="Label to apply when saving">
-                            {customMaskLabel.trim() || selectedMaskLabel}
-                          </span>
                         </div>
                         <div className="flex justify-between mt-1">
                           <span>Quality: {Math.round(mask.quality * 100)}%</span>
@@ -1191,6 +1156,75 @@ const ImageViewerWithPrompting = () => {
               )}
             </div>
           </details>
+        </div>
+      )}
+
+      {/* Save Mask Dialog */}
+      {showSaveMaskDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Save Mask As</h2>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Select a class label:</label>
+              <div className="flex flex-col space-y-2">
+                <select
+                  className="border border-gray-300 rounded-md p-2 bg-white"
+                  value={saveMaskLabel}
+                  onChange={(e) => {
+                    setSaveMaskLabel(e.target.value);
+                    setCustomSaveMaskLabel(''); // Clear custom label when selecting from dropdown
+                  }}
+                >
+                  {maskLabelOptions.map((label) => (
+                    <option key={label} value={label}>
+                      {label.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+                
+                <div className="flex items-center">
+                  <span className="text-sm mr-2">Or create new class:</span>
+                  <input
+                    type="text"
+                    placeholder="Custom class label"
+                    className="border border-gray-300 rounded-md p-2 flex-grow"
+                    value={customSaveMaskLabel}
+                    onChange={(e) => {
+                      setCustomSaveMaskLabel(e.target.value);
+                      if (e.target.value.trim()) {
+                        setSaveMaskLabel(''); // Clear dropdown selection when custom label is entered
+                      } else {
+                        setSaveMaskLabel('coral'); // Reset to default if custom field is empty
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded">
+                Saving mask as: <strong>{customSaveMaskLabel.trim() || saveMaskLabel}</strong>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => {
+                  setShowSaveMaskDialog(false);
+                  setSavingMaskIndex(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md"
+                onClick={saveSelectedMask}
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
