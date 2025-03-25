@@ -4,14 +4,14 @@ FROM node:18-alpine
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json (or yarn.lock)
+# Copy package files
 COPY package*.json ./
 
 # Install dependencies
-# Note: Using --force and --legacy-peer-deps to avoid dependency conflicts in some cases
 RUN npm install --silent --force --legacy-peer-deps
+RUN npm install ajv ajv-keywords --force
 
-# Copy the rest of the application code
+# Copy the rest of the application
 COPY . .
 
 # Make port 3000 available to the world outside this container
