@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  react-app:
+    container_name: react-frontend
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    labels:
+      - "authors=prathmesh"
