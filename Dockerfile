@@ -15,8 +15,14 @@ RUN npm install -g react-scripts
 # Copy the rest of the application
 COPY . .
 
+# Build app for production
+RUN npm run build
+
 # Make port 3000 available to the world outside this container
 EXPOSE 3000
 
-# Define the command to run the app
-CMD ["npm", "start"]
+# Install serve to run the application
+RUN npm install -g serve
+
+# Define the command to run the app in detached mode
+CMD ["serve", "-s", "build", "-l", "3000"]
