@@ -10,6 +10,7 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --silent --force --legacy-peer-deps
 RUN npm install ajv ajv-keywords --force
+RUN npm install -g react-scripts
 
 # Copy the rest of the application
 COPY . .
