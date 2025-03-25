@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de";
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
 
 // Function to handle API errors
 const handleApiError = async (response) => {
@@ -52,6 +52,7 @@ export const fetchImages = async () => {
 // Upload an image
 export const uploadImage = async (file) => {
   try {
+    console.log("Uploading to:", `${API_BASE_URL}/images/upload_image`);
     const formData = new FormData();
     formData.append("file", file);
 
@@ -59,6 +60,11 @@ export const uploadImage = async (file) => {
       method: "POST",
       body: formData,
     });
+    if (!response.ok) {
+      console.error("Upload failed with status:", response.status);
+      console.error("Response:", await response.text());
+      throw new Error(`Upload failed with status ${response.status}`);
+    }
     return handleApiError(response);
   } catch (error) {
     console.error("Error uploading image:", error);
