@@ -1,13 +1,24 @@
 import React from "react";
 import ImageViewerWithPrompting from "./components/prompting/ImageViewerWithPrompting";
+import { BugIcon } from "lucide-react";
 
 function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-md">
-        <div className="container mx-auto px-4 py-3 flex items-center">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <a href="/" className="group">
             <h1 className="text-xl font-bold transition-colors group-hover:text-blue-200">Coral Segmentation</h1>
+          </a>
+          
+          <a 
+            href="https://github.com/yapat-app/AquaMorph/issues" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-md transition-colors"
+          >
+            <BugIcon size={16} />
+            <span>Report Bug</span>
           </a>
         </div>
       </nav>
