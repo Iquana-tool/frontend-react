@@ -128,3 +128,95 @@ src/
 ├── sampleImages.js # Sample images for development
 └── index.js        # Entry point
 ```
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for Continuous Integration and Continuous Deployment.
+
+### Workflow Overview
+
+The CI/CD pipeline consists of four main jobs:
+
+1. **Build and Test**
+   - Checkout code
+   - Set up Node.js environment
+   - Install dependencies
+   - Run linting checks
+   - Run tests
+   - Build the application
+   - Upload build artifacts
+
+2. **Docker Build**
+   - Builds a Docker image for the application
+   - Pushes the image to Docker Hub with appropriate tags
+   - Uses build caching for faster builds
+   - Comments on pull requests with Docker image information
+   - Runs only on pushes to main and development branches
+
+3. **Staging Deployment** (for development branch)
+   - Connects to the staging server via SSH
+   - Deploys the latest development image
+   - Uses environment variables for flexibility
+   - Runs container on port 3001
+
+4. **Production Deployment** (for main branch)
+   - Connects to the production server via SSH
+   - Deploys the latest main branch image
+   - Uses environment variables for flexibility
+   - Runs container on port 3000
+
+### Required Secrets
+
+To use this CI/CD workflow, you need to set up the following GitHub secrets:
+
+- `DOCKER_HUB_USERNAME`: The Docker Hub username
+- `DOCKER_HUB_TOKEN`: A Docker Hub access token
+- `SSH_HOST`: The IP address or hostname of your deployment VM
+- `SSH_USERNAME`: The username for SSH access to the VM
+- `SSH_PRIVATE_KEY`: The private SSH key for authentication
+
+### Team Collaboration
+
+This CI/CD setup supports collaborative development through:
+
+1. **Branch-Based Workflow**
+   - `main`: Production branch (deployed to production environment)
+   - `development`: Staging branch (deployed to staging environment)
+   - Feature branches: Create from development, merge via pull request
+
+2. **Pull Request Workflow**
+   - Create a feature branch from development
+   - Make your changes and push
+   - Create a pull request to development
+   - CI will run tests and build Docker image
+   - Review and approve
+   - Merge to trigger deployment to staging
+
+3. **Local Development with Docker**
+   
+   You can use the same Docker images locally:
+   ```bash
+   # Pull the latest development image
+   docker pull [DOCKER_USERNAME]/frontend-coral:development
+   
+   # Run locally
+   docker run -p 3000:3000 [DOCKER_USERNAME]/frontend-coral:development
+   ```
+
+4. **Manual Deployment**
+   
+   If needed, you can deploy manually using the script:
+   ```bash
+   # Deploy the latest main image
+   ./scripts/deploy.sh --username [DOCKER_USERNAME] --tag main
+   
+   # Or deploy with custom settings
+   ./scripts/deploy.sh --username [DOCKER_USERNAME] --tag development --port 3001 --container react-frontend-dev
+   ```
+
+### Best Practices
+
+- Always create pull requests for changes
+- Wait for CI checks to pass before merging
+- Test on staging before promoting to production
+- Use descriptive commit messages
