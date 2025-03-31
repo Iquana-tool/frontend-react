@@ -1,0 +1,80 @@
+name: Deploy React App to Ubuntu VM
+
+on:
+  push:
+    branches: [ development ] # Targeting the development branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18' # Use your project's Node.js version
+          # Removed cache option to avoid errors
+          
+      - name: Verify Node and npm installation
+        run: |
+          echo "Node version: $(node -v)"
+          echo "npm version: $(npm -v || echo 'npm not found')"
+          
+      - name: Install npm if missing
+        run: |
+          if ! command -v npm &> /dev/null; then
+            echo "npm not found, installing it"
+            sudo apt-get update && sudo apt-get install -y npm
+          else
+            echo "npm is already installed"
+          fi
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build React app
+        run: npm run build
+        env:
+          CI: false # Prevents treating warnings as errors
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo -e "Host vm\n\tHostName ${{ secrets.SSH_HOST }}\n\tUser ${{ secrets.SSH_USERNAME }}\n\tIdentityFile ~/.ssh/deploy_key\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+      
+      - name: Deploy to VM
+        run: |
+          # Create a timestamp for backup
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          
+          # Compress the build directory
+          tar -czf build.tar.gz -C build .
+          
+          # Transfer the compressed file to the VM
+          scp build.tar.gz vm:~
+          
+          # SSH into the VM and deploy
+          ssh vm << 'EOF'
+            # Backup existing deployment if it exists
+            if [ -d "${{ secrets.DEPLOY_PATH }}" ]; then
+              mkdir -p ~/backups
+              tar -czf ~/backups/deploy_backup_${TIMESTAMP}.tar.gz -C ${{ secrets.DEPLOY_PATH }} .
+            fi
+            
+            # Ensure deploy path exists
+            mkdir -p ${{ secrets.DEPLOY_PATH }}
+            
+            # Clear current contents
+            rm -rf ${{ secrets.DEPLOY_PATH }}/*
+            
+            # Extract new build
+            tar -xzf ~/build.tar.gz -C ${{ secrets.DEPLOY_PATH }}
+            
+            # Clean up
+            rm ~/build.tar.gz
+          EOF
