@@ -25,4 +25,4 @@ EXPOSE 3000
 RUN npm install -g serve
 
 # Define the command to run the app in detached mode
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["npm", "start"]
