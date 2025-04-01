@@ -23,7 +23,7 @@ node_modules/
 build/
 
 # Dependencies and lock files
-package-lock.json
+# package-lock.json - required for CI
 yarn.lock
 pnpm-lock.yaml
 
