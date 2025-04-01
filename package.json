@@ -43,8 +43,16 @@
     ]
   },
   "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@tailwindcss/postcss": "^4.0.6",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.2"
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!lucide-react)/"
+    ]
   }
 }

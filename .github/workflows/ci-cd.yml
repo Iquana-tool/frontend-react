@@ -24,6 +24,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Install test dependencies
+        run: |
+          npm install --no-save @testing-library/jest-dom
+          npm install --no-save @testing-library/react
+          npm install --no-save @babel/plugin-proposal-private-property-in-object
+      
       - name: Run linting
         run: npm run lint || echo "Linting step skipped - add lint script to package.json to enable"
       
