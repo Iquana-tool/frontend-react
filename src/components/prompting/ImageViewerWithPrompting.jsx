@@ -114,13 +114,34 @@ const ImageViewerWithPrompting = () => {
           hash: img.hash_code,
           thumbnailUrl: null,  // We'll load thumbnails separately
           isFromAPI: true,
+          isLoading: false,
+          loadError: false
         }));
 
-        // Set available images from API only (sample images array is now empty)
+        // Set available images from API only
         setAvailableImages(apiImages);
         
-        // Load thumbnails for API images
-        apiImages.forEach(loadImageThumbnail);
+        // Sort images by ID (newest first) to ensure newest uploads are prioritized
+        const sortedImages = [...apiImages].sort((a, b) => b.id - a.id);
+        
+        // Load thumbnails for API images, with prioritization for recently added images
+        // Load first 3 images immediately, then queue the rest
+        const priorityImages = sortedImages.slice(0, 3);
+        const remainingImages = sortedImages.slice(3);
+        
+        // Load priority images first (likely the most recently uploaded ones)
+        await Promise.all(priorityImages.map(image => loadImageThumbnail(image)));
+        
+        // Then load the rest in batches to avoid overwhelming the server
+        const batchSize = 5;
+        for (let i = 0; i < remainingImages.length; i += batchSize) {
+          const batch = remainingImages.slice(i, i + batchSize);
+          await Promise.all(batch.map(image => loadImageThumbnail(image)));
+          // Small delay between batches
+          if (i + batchSize < remainingImages.length) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
+        }
       }
       setLoading(false);
     } catch (error) {
@@ -136,94 +157,219 @@ const ImageViewerWithPrompting = () => {
     if (!image.isFromAPI) return; // Only process API images
     
     try {
+      // Skip if the image already has a thumbnail
+      if (image.thumbnailUrl) return;
+      
+      // Add loading status to the image while fetching
+      setAvailableImages(prev => 
+        prev.map(img => 
+          img.id === image.id && img.isFromAPI 
+            ? { ...img, isLoading: true }
+            : img
+        )
+      );
+      
       const imageData = await api.getImageById(image.id);
       if (imageData && imageData[image.id]) {
+        // Create an Image object to verify the data loads correctly
+        const imgObj = new Image();
+        const base64Data = imageData[image.id];
+        const thumbnailUrl = `data:image/jpeg;base64,${base64Data}`;
+        
+        // Set up promise to wait for image to load or fail
+        const imageLoadPromise = new Promise((resolve, reject) => {
+          imgObj.onload = () => resolve(thumbnailUrl);
+          imgObj.onerror = () => reject(new Error(`Failed to load thumbnail for image ${image.id}`));
+          // Set timeout in case loading hangs
+          setTimeout(() => reject(new Error('Thumbnail load timeout')), 5000);
+        });
+        
+        // Start loading
+        imgObj.src = thumbnailUrl;
+        
+        // Wait for successful load
+        const validThumbnailUrl = await imageLoadPromise;
+        
         // Update the image with its thumbnail
         setAvailableImages(prev => 
           prev.map(img => 
             img.id === image.id && img.isFromAPI 
-              ? { ...img, thumbnailUrl: `data:image/jpeg;base64,${imageData[image.id]}` }
+              ? { ...img, thumbnailUrl: validThumbnailUrl, isLoading: false }
+              : img
+          )
+        );
+      } else {
+        // Handle missing image data
+        console.warn(`No image data returned for image ${image.id}`);
+        setAvailableImages(prev => 
+          prev.map(img => 
+            img.id === image.id && img.isFromAPI 
+              ? { ...img, loadError: true, isLoading: false }
               : img
           )
         );
       }
     } catch (error) {
       console.error(`Failed to load thumbnail for image ${image.id}:`, error);
+      // Update image with error state
+      setAvailableImages(prev => 
+        prev.map(img => 
+          img.id === image.id && img.isFromAPI 
+            ? { ...img, loadError: true, isLoading: false }
+            : img
+        )
+      );
     }
   };
 
   // Handle image selection
   const handleImageSelect = async (image) => {
-    console.log("Selecting image with ID:", image.id); // Debug log
+    console.log("Selecting image with ID:", image.id);
     
-    // Reset refinement mode when selecting a new image
+    // Only reset related states, don't clear the image until we have a new one loaded
     setIsRefinementMode(false);
     setSelectedMask(null);
     setCutoutImage(null);
     setSegmentationMasks([]);
     setPromptingResult(null);
-
-    // Update the selected image ID for visual tracking
+    setError(null);
+    
+    // Set the selected ID immediately for visual feedback
     setSelectedImageId(image.id);
     
-    // Clear previous selection state
-    setSelectedImage(null);
-    setImageObject(null);
-    
-    // Small delay to ensure state updates properly
-    setTimeout(async () => {
-      setSelectedImage(image);
+    try {
       setLoading(true);
-      setError(null);
-
-      try {
-        let imageUrl;
-
-        // If the image is from our API, we need to fetch the actual image data
-        if (image.isFromAPI) {
-          // If we already have a thumbnail for this image, use it while we load the full image
-          if (image.thumbnailUrl) {
-            // Create a temporary image object to show immediately
-            const tempImg = new Image();
-            tempImg.src = image.thumbnailUrl;
-            tempImg.onload = () => {
-              // Show the thumbnail while loading the full image
-              setImageObject(tempImg);
-            };
-          }
-          
-          const imageData = await api.getImageById(image.id);
-          // The API returns a mapping of image ID to base64 data
-          const base64Data = imageData[image.id];
-          imageUrl = `data:image/jpeg;base64,${base64Data}`;
-        } else {
-          // For sample images, just use the provided URL
-          imageUrl = image.url;
+      
+      // If we already have a loaded thumbnail, show it immediately while loading the full image
+      // This provides instant visual feedback to the user
+      if (image.thumbnailUrl) {
+        // Create a new image to ensure it's loaded
+        const tempImg = new Image();
+        tempImg.src = image.thumbnailUrl;
+        
+        // Use a timeout to prevent blocking the UI
+        const loadThumbnailPromise = new Promise((resolve) => {
+          tempImg.onload = () => resolve(tempImg);
+          tempImg.onerror = () => resolve(null); // Continue even if thumbnail fails
+          setTimeout(() => resolve(null), 1000); // Timeout after 1 second
+        });
+        
+        const loadedThumbnail = await loadThumbnailPromise;
+        if (loadedThumbnail) {
+          // Show the thumbnail first for a better UX
+          setImageObject(loadedThumbnail);
+          setSelectedImage(image);
         }
-
-        // Load the image object for the canvas
-        const img = new Image();
-        img.src = imageUrl;
-
-        img.onload = () => {
-          setImageObject(img);
-          setOriginalImage(img);
-          setLoading(false);
-        };
-
-        img.onerror = () => {
-          setError("Failed to load image. Please try another one.");
-          setLoading(false);
-          setSelectedImage(null);
-          setSelectedImageId(null); // Clear visual selection
-        };
-      } catch (error) {
-        setError(`Failed to load image: ${error.message}`);
-        setLoading(false);
-        setSelectedImage(null);
-        setSelectedImageId(null); // Clear visual selection
       }
-    }, 0);
+
+      // For both API and sample images, ensure we have the full image loaded
+      let fullImage = null;
+      
+      if (image.isFromAPI) {
+        // Fetch server image with retries
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (retryCount < maxRetries && !fullImage) {
+          try {
+            console.log(`Fetching image ${image.id}, attempt ${retryCount + 1}/${maxRetries}`);
+            
+            // Skip the fetch if we're using a local preview (for newly uploaded images)
+            if (image.isTemp) {
+              console.log("Using local preview instead of fetching from server");
+              fullImage = imageObject; // Use the already loaded image
+              break;
+            }
+            
+            const imageData = await api.getImageById(image.id);
+            
+            if (imageData && imageData[image.id]) {
+              const base64Data = imageData[image.id];
+              const imageUrl = `data:image/jpeg;base64,${base64Data}`;
+              
+              // Load the image
+              const img = new Image();
+              img.src = imageUrl;
+              
+              // Wait for the image to load with a timeout
+              fullImage = await new Promise((resolve, reject) => {
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error("Failed to load image"));
+                setTimeout(() => reject(new Error("Image load timeout")), 5000);
+              });
+              
+              break; // Success, exit the retry loop
+            } else {
+              throw new Error("No image data returned from server");
+            }
+          } catch (err) {
+            console.warn(`Retry ${retryCount + 1} failed:`, err);
+            retryCount++;
+            
+            if (retryCount >= maxRetries) {
+              // All retries failed, but we might still have a thumbnail
+              if (imageObject) {
+                console.log("Using thumbnail as fallback");
+                fullImage = imageObject;
+              } else {
+                throw new Error(`Failed to load image after ${maxRetries} attempts`);
+              }
+            }
+            
+            // Wait before retrying with increasing delay
+            await new Promise(r => setTimeout(r, 300 * Math.pow(1.5, retryCount)));
+          }
+        }
+      } else {
+        // For sample/local images, just use the URL
+        try {
+          const img = new Image();
+          img.src = image.url;
+          
+          fullImage = await new Promise((resolve, reject) => {
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Failed to load sample image"));
+            setTimeout(() => reject(new Error("Image load timeout")), 5000);
+          });
+        } catch (error) {
+          console.error("Error loading sample image:", error);
+          throw error;
+        }
+      }
+      
+      // We should have a full image by now, either from server or fallback
+      if (fullImage) {
+        setImageObject(fullImage);
+        setOriginalImage(fullImage);
+        setSelectedImage(image);
+        
+        // Update the image dimensions in the available images if needed
+        if (image.width === undefined || image.height === undefined) {
+          setAvailableImages(prev => 
+            prev.map(img => 
+              img.id === image.id 
+                ? { ...img, width: fullImage.width, height: fullImage.height }
+                : img
+            )
+          );
+        }
+      } else {
+        throw new Error("Failed to load image");
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error in handleImageSelect:", error);
+      setError(`Failed to load image: ${error.message}. Please try again or select a different image.`);
+      
+      // Don't clear the selection if we at least have a thumbnail
+      if (!imageObject) {
+        setSelectedImage(null);
+        setSelectedImageId(null);
+      }
+      
+      setLoading(false);
+    }
   };
 
   // Handle file upload
@@ -243,30 +389,123 @@ const ImageViewerWithPrompting = () => {
     setIsRefinementMode(false);
     setSelectedMask(null);
     setCutoutImage(null);
-    setSelectedImageId(null); // Clear the image selection indicator
+    setSelectedImageId(null);
+    setSegmentationMasks([]);
 
     try {
+      // Create a local URL for immediate display while uploading
+      const localPreviewUrl = URL.createObjectURL(file);
+      const localPreviewImg = new Image();
+      localPreviewImg.src = localPreviewUrl;
+      
+      // Wait for the local preview image to load
+      await new Promise((resolve) => {
+        localPreviewImg.onload = resolve;
+      });
+
+      // Show a temporary local preview while the upload happens
+      const tempImage = {
+        id: 'temp',
+        name: file.name,
+        isTemp: true,
+        thumbnailUrl: localPreviewUrl
+      };
+      
+      setImageObject(localPreviewImg);
+      setSelectedImage(tempImage);
+      
       // Upload to the API
+      console.log("Uploading image:", file.name);
       const response = await api.uploadImage(file);
 
       if (response.success) {
-        // Refresh the image list to include the new upload
-        await fetchImagesFromAPI();
-
-        // Find the uploaded image in the list
-        const uploadedImage = {
+        console.log("Upload successful, image ID:", response.image_id);
+        
+        // Create a placeholder for the uploaded image
+        const uploadedImagePlaceholder = {
           id: response.image_id,
           name: file.name,
           isFromAPI: true,
+          thumbnailUrl: localPreviewUrl, // Use local preview temporarily
+          isLoading: false
         };
-
-        handleImageSelect(uploadedImage);
+        
+        // Immediately add the new image to the available images list at the beginning
+        setAvailableImages(prev => [uploadedImagePlaceholder, ...prev]);
+        
+        // Set as selected to provide immediate feedback
+        setSelectedImageId(response.image_id);
+        setSelectedImage(uploadedImagePlaceholder);
+        
+        // Now fetch the actual image data from the server
+        try {
+          console.log("Fetching uploaded image from server:", response.image_id);
+          const imageData = await api.getImageById(response.image_id);
+          
+          if (imageData && imageData[response.image_id]) {
+            // Create the actual image object with server data
+            const base64Data = imageData[response.image_id];
+            const serverUrl = `data:image/jpeg;base64,${base64Data}`;
+            
+            // Load the server image 
+            const serverImg = new Image();
+            serverImg.src = serverUrl;
+            
+            // Wait for image to load from server
+            await new Promise((resolve, reject) => {
+              serverImg.onload = resolve;
+              serverImg.onerror = reject;
+              setTimeout(reject, 5000); // 5 second timeout
+            });
+            
+            // Update the image in available images with server data
+            const updatedImage = {
+              ...uploadedImagePlaceholder,
+              thumbnailUrl: serverUrl,
+              width: serverImg.width,
+              height: serverImg.height
+            };
+            
+            // Update available images
+            setAvailableImages(prev => 
+              prev.map(img => img.id === response.image_id ? updatedImage : img)
+            );
+            
+            // Update selected image and image object
+            setSelectedImage(updatedImage);
+            setImageObject(serverImg);
+            setOriginalImage(serverImg);
+            
+            // Revoke the local object URL to free memory
+            URL.revokeObjectURL(localPreviewUrl);
+            
+            // Fetch all images to ensure we have the latest list
+            // but don't modify the current selection
+            setTimeout(() => {
+              fetchImagesFromAPI().catch(console.error);
+            }, 1000);
+          }
+        } catch (loadError) {
+          console.error("Error loading server image:", loadError);
+          // Keep using the local preview rather than showing an error
+          // Just update the state to reflect the server ID
+          setAvailableImages(prev => 
+            prev.map(img => img.id === 'temp' ? {...img, id: response.image_id} : img)
+          );
+          setError("Image uploaded successfully, but using local preview. Changes may not be saved correctly.");
+        }
       } else {
-        throw new Error("Upload failed");
+        URL.revokeObjectURL(localPreviewUrl);
+        throw new Error("Upload failed: " + (response.message || "Unknown error"));
       }
+      
+      setLoading(false);
     } catch (error) {
+      console.error("Upload error:", error);
       setError(`Failed to upload image: ${error.message}`);
       setLoading(false);
+      setSelectedImage(null);
+      setImageObject(null);
     }
   };
 
@@ -899,13 +1138,11 @@ const ImageViewerWithPrompting = () => {
                     }`}
                     onClick={() => {
                       if (!isRefinementMode && !loading) {
-                        setSelectedImageId(null);
-                        setSelectedImage(null);
-                        setImageObject(null);
-                        
-                        setTimeout(() => {
-                          handleImageSelect(image);
-                        }, 10);
+                        console.log("Clicked on image:", image.id);
+                        // Set selected ID immediately for visual feedback
+                        setSelectedImageId(image.id);
+                        // Don't clear previous image until new one loads
+                        handleImageSelect(image);
                       }
                     }}
                   >
@@ -971,13 +1208,11 @@ const ImageViewerWithPrompting = () => {
                     }`}
                     onClick={() => {
                       if (!isRefinementMode && !loading) {
-                        setSelectedImageId(null);
-                        setSelectedImage(null);
-                        setImageObject(null);
-                        
-                        setTimeout(() => {
-                          handleImageSelect(image);
-                        }, 10);
+                        console.log("Clicked on image:", image.id);
+                        // Set selected ID immediately for visual feedback
+                        setSelectedImageId(image.id);
+                        // Don't clear previous image until new one loads
+                        handleImageSelect(image);
                       }
                     }}
                   >

@@ -51,32 +51,145 @@ export const fetchImages = async () => {
 
 // Upload an image
 export const uploadImage = async (file) => {
-  try {
-    console.log("Uploading to:", `${API_BASE_URL}/images/upload_image`);
-    const formData = new FormData();
-    formData.append("file", file);
+  const maxRetries = 2;
+  let retryCount = 0;
+  let lastError = null;
 
-    const response = await fetch(`${API_BASE_URL}/images/upload_image`, {
-      method: "POST",
-      body: formData,
-    });
-    if (!response.ok) {
-      console.error("Upload failed with status:", response.status);
-      console.error("Response:", await response.text());
-      throw new Error(`Upload failed with status ${response.status}`);
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`Uploading to: ${API_BASE_URL}/images/upload_image (attempt ${retryCount + 1}/${maxRetries + 1})`);
+      
+      // Create a new FormData for each attempt
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Use a timeout to abort the request if it takes too long
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/images/upload_image`, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal
+        });
+        
+        // Clear the timeout since the request completed
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.error("Upload failed with status:", response.status);
+          const responseText = await response.text();
+          console.error("Response:", responseText);
+          
+          // Specific handling for different error codes
+          if (response.status === 413) {
+            throw new Error("File is too large. Maximum file size is 10MB.");
+          } else if (response.status === 415) {
+            throw new Error("Unsupported file type. Please upload a valid image file.");
+          } else if (response.status === 401 || response.status === 403) {
+            throw new Error("Unauthorized. Please try again or refresh the page.");
+          } else if (response.status >= 500) {
+            // Server errors are worth retrying
+            throw new Error(`Server error (${response.status}). Retrying...`);
+          }
+          
+          throw new Error(`Upload failed with status ${response.status}`);
+        }
+        
+        // Parse the response
+        const data = await response.json();
+        return data;
+      } catch (fetchError) {
+        // Clear the timeout if we got an error
+        clearTimeout(timeoutId);
+        
+        // Handle abort errors specially
+        if (fetchError.name === 'AbortError') {
+          console.warn("Upload request timed out");
+          throw new Error("Upload timed out. Please try again with a smaller file or check your connection.");
+        }
+        
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error(`Upload attempt ${retryCount + 1} failed:`, error);
+      lastError = error;
+      
+      // Only retry on network errors and server errors (5xx)
+      const isServerError = error.message.includes("Server error") || 
+                           error.message.includes("network") ||
+                           error.message.includes("failed to fetch");
+      
+      if (!isServerError || retryCount >= maxRetries) {
+        break; // Don't retry client errors or if we've hit the retry limit
+      }
+      
+      // Wait before retrying
+      const delay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      retryCount++;
     }
-    return handleApiError(response);
-  } catch (error) {
-    console.error("Error uploading image:", error);
-    throw error;
   }
+  
+  // If we got here, all retries failed
+  throw lastError || new Error("Failed to upload image after multiple attempts");
 };
 
 // Get image by ID
 export const getImageById = async (imageId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/images/get_image/${imageId}`);
-    return handleApiError(response);
+    const maxRetries = 3;
+    let retries = 0;
+    let lastError = null;
+    
+    while (retries < maxRetries) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/images/get_image/${imageId}`);
+        
+        if (!response.ok) {
+          // Log detailed error information
+          const errorText = await response.text();
+          console.warn(`Error fetching image ${imageId}, attempt ${retries + 1}/${maxRetries}:`, {
+            status: response.status,
+            statusText: response.statusText,
+            errorText
+          });
+          
+          // If we get a 404, don't retry - the image doesn't exist
+          if (response.status === 404) {
+            throw new Error(`Image with ID ${imageId} not found`);
+          }
+          
+          // For other errors, retry
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+        
+        // Try to parse as JSON, retry if parsing fails
+        try {
+          const data = await response.json();
+          return data;
+        } catch (parseError) {
+          console.warn(`JSON parse error for image ${imageId}, attempt ${retries + 1}/${maxRetries}:`, parseError);
+          throw new Error("Invalid response format from server");
+        }
+      } catch (err) {
+        lastError = err;
+        retries++;
+        
+        if (retries >= maxRetries) {
+          console.error(`All ${maxRetries} attempts to fetch image ${imageId} failed`);
+          break;
+        }
+        
+        // Wait before retrying, with increasing backoff
+        await new Promise(resolve => setTimeout(resolve, 300 * retries));
+      }
+    }
+    
+    throw lastError || new Error(`Failed to fetch image after ${maxRetries} attempts`);
   } catch (error) {
     console.error("Error getting image:", error);
     throw error;
