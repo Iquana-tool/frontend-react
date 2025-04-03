@@ -5,6 +5,31 @@ import * as api from "../../api";
 import { getMaskColor } from "./utils";
 import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle } from "lucide-react";
 
+// Add custom styles to fix the overlapping text issue
+const customStyles = `
+  [data-segment-results="true"] [data-header="true"] [data-content="true"] [data-text="segments-found"]::after {
+    content: none !important;
+  }
+  [data-segment-results="true"] [data-header="true"] [data-content="true"] [data-text="segments-found"]::before {
+    content: none !important;
+  }
+  [data-segment-results="true"] [data-header="true"] [data-content="true"]::after {
+    content: none !important;
+  }
+  [data-segment-results="true"] [data-header="true"]::after {
+    content: none !important;
+  }
+  [data-text="segments-found"] {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  /* Specifically target anything containing "Segmentation Tool" text */
+  *::after, *::before {
+    content: normal !important;
+  }
+`;
+
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageObject, setImageObject] = useState(null);
@@ -262,111 +287,84 @@ const ImageViewerWithPrompting = () => {
 
   // Handle prompting
   const handlePromptingComplete = async (prompts) => {
-    setPromptingResult(prompts);
-    console.log("Prompting complete:", prompts);
+    // If we're in refinement mode, we need to adjust the prompts to the
+    // coordinates relative to the original image
+    if (!prompts || prompts.length === 0) {
+      setError("Please add at least one prompt for segmentation.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    setIsSegmenting(true);
+    setSuccessMessage(null);
 
     try {
-      setLoading(true);
-      setIsSegmenting(true);
-      setSuccessMessage(null); // Clear any previous success messages
+      if (isRefinementMode) {
+        // Adjust prompts from cutout coordinates to original image coordinates
+        const { x: offsetX, y: offsetY } = cutoutPosition;
 
-      // Different handling for refinement mode vs. normal mode
-      if (isRefinementMode && cutoutPosition) {
-        // In refinement mode, we need to transform the coordinates back to the original image
-        const adjustedPrompts = prompts.map((prompt) => {
-          const newPrompt = { ...prompt };
+        // Deep clone the prompts to avoid modifying the original
+        const adjustedPrompts = JSON.parse(JSON.stringify(prompts));
 
-          // Adjust coordinates based on cutout position
-          switch (prompt.type) {
-            case "point":
-              newPrompt.coordinates = {
-                x:
-                  (prompt.coordinates.x * cutoutImage.width +
-                    cutoutPosition.x) /
-                  originalImage.width,
-                y:
-                  (prompt.coordinates.y * cutoutImage.height +
-                    cutoutPosition.y) /
-                  originalImage.height,
-              };
-              break;
-            case "box":
-              newPrompt.coordinates = {
-                startX:
-                  (prompt.coordinates.startX * cutoutImage.width +
-                    cutoutPosition.x) /
-                  originalImage.width,
-                startY:
-                  (prompt.coordinates.startY * cutoutImage.height +
-                    cutoutPosition.y) /
-                  originalImage.height,
-                endX:
-                  (prompt.coordinates.endX * cutoutImage.width +
-                    cutoutPosition.x) /
-                  originalImage.width,
-                endY:
-                  (prompt.coordinates.endY * cutoutImage.height +
-                    cutoutPosition.y) /
-                  originalImage.height,
-              };
-              break;
-            case "circle":
-              newPrompt.coordinates = {
-                centerX:
-                  (prompt.coordinates.centerX * cutoutImage.width +
-                    cutoutPosition.x) /
-                  originalImage.width,
-                centerY:
-                  (prompt.coordinates.centerY * cutoutImage.height +
-                    cutoutPosition.y) /
-                  originalImage.height,
-                // Scale the radius proportionally to the original image's dimensions
-                radius:
-                  (prompt.coordinates.radius *
-                    Math.max(cutoutImage.width, cutoutImage.height)) /
-                  Math.max(originalImage.width, originalImage.height),
-              };
-              break;
-            case "polygon":
-              // For polygons, we need to transform each point in the polygon
-              newPrompt.coordinates = prompt.coordinates.map((point) => ({
-                x:
-                  (point.x * cutoutImage.width + cutoutPosition.x) /
-                  originalImage.width,
-                y:
-                  (point.y * cutoutImage.height + cutoutPosition.y) /
-                  originalImage.height,
-              }));
-              break;
-            default:
-              // Default case
-              break;
+        // Adjust each prompt based on its type
+        adjustedPrompts.forEach((prompt) => {
+          if (prompt.type === "point") {
+            prompt.coordinates.x = (prompt.coordinates.x * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
+            prompt.coordinates.y = (prompt.coordinates.y * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
+          } else if (prompt.type === "box") {
+            prompt.coordinates.startX = (prompt.coordinates.startX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
+            prompt.coordinates.startY = (prompt.coordinates.startY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
+            prompt.coordinates.endX = (prompt.coordinates.endX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
+            prompt.coordinates.endY = (prompt.coordinates.endY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
+          } else if (prompt.type === "circle") {
+            prompt.coordinates.centerX = (prompt.coordinates.centerX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
+            prompt.coordinates.centerY = (prompt.coordinates.centerY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
+            prompt.coordinates.radius = prompt.coordinates.radius * cutoutImage.width / originalImage.width;
+          } else if (prompt.type === "polygon") {
+            prompt.coordinates.forEach((point) => {
+              point.x = (point.x * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
+              point.y = (point.y * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
+            });
           }
-
-          return newPrompt;
         });
 
-        // Send to API with the refined prompts
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
           adjustedPrompts
         );
 
-        // Store the raw masks as received from the backend
-        setSegmentationMasks(
-          segmentationResponse.base64_masks.map((mask, index) => ({
-            id: index,
-            base64: mask,
-            quality: segmentationResponse.quality[index]
-          }))
-        );
+        // Handle the new response format
+        if (segmentationResponse.original_masks) {
+          // Store the raw masks from the new format
+          setSegmentationMasks(
+            segmentationResponse.original_masks.map((mask, index) => ({
+              id: index,
+              base64: segmentationResponse.base64_masks[index],
+              quality: segmentationResponse.quality[index],
+              contours: mask.contours // Store the contours for rendering
+            }))
+          );
+        } else {
+          // Fallback to the old format if needed
+          setSegmentationMasks(
+            segmentationResponse.base64_masks.map((mask, index) => ({
+              id: index,
+              base64: mask,
+              quality: segmentationResponse.quality[index]
+            }))
+          );
+        }
 
         // Return to full image view after refinement
         handleCancelRefinement();
         
         // Show success message for refinement
-        setSuccessMessageWithTimeout(`Refinement complete! Found ${segmentationResponse.base64_masks.length} segments.`);
+        const masksCount = segmentationResponse.original_masks 
+          ? segmentationResponse.original_masks.length 
+          : segmentationResponse.base64_masks.length;
+        setSuccessMessageWithTimeout(`Refinement complete! Found ${masksCount} segments.`);
         
         // Scroll to segmentation results after a short delay
         setTimeout(() => {
@@ -382,17 +380,33 @@ const ImageViewerWithPrompting = () => {
           prompts
         );
 
-        // Store the raw masks as received from the backend
-        setSegmentationMasks(
-          segmentationResponse.base64_masks.map((mask, index) => ({
-            id: index,
-            base64: mask,
-            quality: segmentationResponse.quality[index]
-          }))
-        );
+        // Handle the new response format
+        if (segmentationResponse.original_masks) {
+          // Store the raw masks from the new format
+          setSegmentationMasks(
+            segmentationResponse.original_masks.map((mask, index) => ({
+              id: index,
+              base64: segmentationResponse.base64_masks[index],
+              quality: segmentationResponse.quality[index],
+              contours: mask.contours // Store the contours for rendering
+            }))
+          );
+        } else {
+          // Fallback to the old format if needed
+          setSegmentationMasks(
+            segmentationResponse.base64_masks.map((mask, index) => ({
+              id: index,
+              base64: mask,
+              quality: segmentationResponse.quality[index]
+            }))
+          );
+        }
         
         // Show success message for regular segmentation
-        setSuccessMessageWithTimeout(`Segmentation complete! Found ${segmentationResponse.base64_masks.length} segments.`);
+        const masksCount = segmentationResponse.original_masks 
+          ? segmentationResponse.original_masks.length 
+          : segmentationResponse.base64_masks.length;
+        setSuccessMessageWithTimeout(`Segmentation complete! Found ${masksCount} segments.`);
         
         // Scroll to segmentation results after a short delay
         setTimeout(() => {
@@ -598,56 +612,87 @@ const ImageViewerWithPrompting = () => {
 
   // Actually save the mask to the database after selecting a label
   const saveSelectedMask = async () => {
-    console.log("Save button clicked, saving mask index:", savingMaskIndex);
-    console.log("Available masks:", segmentationMasks.length);
+    if (!selectedMask) return;
     
-    if (savingMaskIndex === null || savingMaskIndex >= segmentationMasks.length) {
-      console.error("Invalid mask index to save:", savingMaskIndex);
-      setError("Failed to save: Invalid mask selection");
-      setShowSaveMaskDialog(false);
+    // Get the label (either custom or predefined)
+    const label = customSaveMaskLabel || saveMaskLabel;
+    
+    // Validate label
+    if (!label || label.trim() === '') {
+      setError("Please provide a valid label for the mask");
       return;
     }
-
-    const mask = segmentationMasks[savingMaskIndex];
-    console.log("Selected mask to save:", mask);
-
+    
+    // Show loading state
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      setShowSaveMaskDialog(false); // Close dialog immediately to show loading indicator
-      setSuccessMessage(null); // Clear any previous success messages
+      let maskData = selectedMask.base64;
       
-      // Use customSaveMaskLabel if provided, otherwise use saveMaskLabel
-      const maskLabel = customSaveMaskLabel.trim() || saveMaskLabel;
-      
-      if (!maskLabel) {
-        throw new Error("Please select or enter a class label");
+      // Handle contour data
+      if (selectedMask.contours) {
+        // For the saveMask API, we still need a base64 encoded mask image
+        // We need to generate a mask image from the contours
+        const canvas = document.createElement('canvas');
+        canvas.width = originalImage.width;
+        canvas.height = originalImage.height;
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the contours as a filled shape
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Set up for drawing black contours
+        ctx.fillStyle = 'black';
+        
+        selectedMask.contours.forEach(contour => {
+          if (!contour.x || !contour.y || contour.x.length < 3) return;
+          
+          // Start a new path for this contour
+          ctx.beginPath();
+          
+          // Convert normalized coordinates to actual pixel positions
+          const startX = contour.x[0] * originalImage.width;
+          const startY = contour.y[0] * originalImage.height;
+          
+          ctx.moveTo(startX, startY);
+          
+          // Draw each point of the contour
+          for (let i = 1; i < contour.x.length; i++) {
+            const x = contour.x[i] * originalImage.width;
+            const y = contour.y[i] * originalImage.height;
+            ctx.lineTo(x, y);
+          }
+          
+          // Close the path
+          ctx.closePath();
+          
+          // Fill the path
+          ctx.fill();
+        });
+        
+        // Get the base64 data (remove the data:image/png;base64, prefix)
+        const base64Data = canvas.toDataURL('image/png').split(',')[1];
+        maskData = base64Data;
       }
       
-      // Ensure the image ID is a number
-      const imageId = parseInt(selectedImage.id, 10);
-      if (isNaN(imageId)) {
-        throw new Error(`Invalid image ID: ${selectedImage.id} is not a number`);
+      const response = await api.saveMask(selectedImage.id, label, maskData);
+      
+      if (response.success) {
+        setSuccessMessageWithTimeout(`Mask saved successfully with label: ${label}`);
+        // Hide the save dialog
+        setShowSaveMaskDialog(false);
+        setSavingMaskIndex(null);
+        setSaveMaskLabel('coral');
+        setCustomSaveMaskLabel('');
+      } else {
+        setError("Failed to save mask: " + (response.message || "Unknown error"));
       }
       
-      console.log("Saving mask with index:", savingMaskIndex, "and label:", maskLabel);
-      console.log("Image ID:", imageId, "(original:", selectedImage.id, ")");
-      console.log("Mask data length:", mask.base64.length);
-      
-      const result = await api.saveMask(imageId, maskLabel, mask.base64);
-      console.log("Mask saved successfully:", result);
-      
-      // Show success message
-      setSuccessMessageWithTimeout(`Mask saved successfully as "${maskLabel}"!`);
-      
-      setSavingMaskIndex(null);
       setLoading(false);
-      return true;
     } catch (error) {
-      console.error("Error saving mask:", error);
-      setError(`Failed to save mask: ${error.message}`);
-      setSavingMaskIndex(null);
+      setError("Error saving mask: " + error.message);
       setLoading(false);
-      return false;
     }
   };
 
@@ -684,6 +729,9 @@ const ImageViewerWithPrompting = () => {
 
   return (
     <div className="container mx-auto p-4">
+      {/* Add style tag */}
+      <style>{customStyles}</style>
+      
       <h1 className="text-2xl font-bold mb-4">
         Coral Segmentation - Image Viewer with Prompting
       </h1>
@@ -1190,249 +1238,148 @@ const ImageViewerWithPrompting = () => {
           {segmentationMasks.length > 0 && !isRefinementMode && (
             <div 
               ref={segmentationResultsRef}
-              className="mt-6 bg-white rounded-lg shadow-md overflow-hidden border border-gray-200"
+              className="mt-6 bg-white rounded-lg shadow-lg overflow-hidden"
+              data-segment-results="true"
             >
-              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex justify-between items-center">
-                <h3 className="font-bold text-white text-lg">Segmentation Results:</h3>
-                <div className="flex space-x-2 bg-white/20 rounded-md p-1">
-                  <button
-                    className={`p-1.5 rounded-md transition-all ${
-                      viewMode === "grid" ? "bg-white text-blue-700" : "text-white hover:bg-white/30"
-                    }`}
-                    onClick={() => setViewMode("grid")}
-                    title="Grid View"
-                  >
-                    <Layers size={16} />
-                  </button>
-                  <button
-                    className={`p-1.5 rounded-md transition-all ${
-                      viewMode === "list" ? "bg-white text-blue-700" : "text-white hover:bg-white/30"
-                    }`}
-                    onClick={() => setViewMode("list")}
-                    title="List View"
-                  >
-                    <List size={16} />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="px-4 py-3 bg-blue-50 border-b border-blue-100">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="font-bold text-blue-600">{segmentationMasks.length}</span>
+              <div className="bg-blue-600 px-6 py-4" data-header="true">
+                <div className="flex items-center" data-content="true">
+                  <div className="bg-white/20 rounded-full w-10 h-10 flex items-center justify-center">
+                    <span className="font-semibold text-white text-xl">{segmentationMasks.length}</span>
                   </div>
-                  <p className="text-blue-800">
-                    segment{segmentationMasks.length !== 1 ? 's' : ''} found. Click on a segment to refine it.
-                  </p>
+                  <span className="text-white text-lg font-medium ml-3" data-text="segments-found">
+                    segments found
+                  </span>
                 </div>
               </div>
 
-              {/* Add selected mask instruction when a mask is selected */}
               {selectedMask && (
-                <div className="m-4 p-4 bg-blue-100 text-blue-800 rounded-md flex items-center justify-between shadow-sm">
-                  <div>
-                    <div className="flex items-center">
-                      <div className="w-6 h-6 bg-blue-200 rounded-full flex items-center justify-center mr-2">
-                        <span className="font-bold text-blue-600">{selectedMask.id + 1}</span>
+                <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center">
+                        <span className="font-semibold text-blue-600 text-lg">{selectedMask.id + 1}</span>
                       </div>
-                      <strong>Selected Segment</strong>
-                    </div>
-                    <div className="text-sm mt-2 flex items-center">
-                      <div className="w-full max-w-[120px] bg-gray-200 rounded-full h-2 mr-2">
-                        <div 
-                          className={`h-2 rounded-full ${
-                            selectedMask.quality >= 0.7 ? 'bg-green-500' : 
-                            selectedMask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                          }`}
-                          style={{ width: `${Math.round(selectedMask.quality * 100)}%` }}
-                        ></div>
+                      <div>
+                        <p className="font-medium text-blue-900">Selected Segment</p>
+                        <div className="flex items-center mt-2">
+                          <div className="w-32 h-1.5 bg-gray-200 rounded-full mr-3">
+                            <div 
+                              className={`h-1.5 rounded-full ${
+                                selectedMask.quality >= 0.7 ? 'bg-green-500' : 
+                                selectedMask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                              }`}
+                              style={{ width: `${Math.round(selectedMask.quality * 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-blue-700 font-medium">{Math.round(selectedMask.quality * 100)}% confidence</span>
+                        </div>
                       </div>
-                      Quality: {Math.round(selectedMask.quality * 100)}%
                     </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center"
-                      onClick={handleStartRefinement}
-                    >
-                      <span className="mr-1">Refine</span>
-                    </button>
-                    <button
-                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log("Save button clicked for mask index:", selectedMask.id);
-                        handleSaveMask(selectedMask.id);
-                      }}
-                    >
-                      <span className="mr-1">Save</span>
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        className="px-4 py-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm font-medium shadow-sm flex items-center gap-2 transition-colors"
+                        onClick={handleStartRefinement}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
+                          <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                        Refine
+                      </button>
+                      <button
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center gap-2 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveMask(selectedMask.id);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        Save
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
 
-              <div className="p-4">
-                {viewMode === "grid" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {segmentationMasks.map((mask, index) => (
-                      <div
-                        key={index}
-                        className={`border rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg ${
-                          selectedMask && selectedMask.id === mask.id
-                            ? "ring-2 ring-blue-500 shadow-md bg-blue-50 transform scale-[1.02]"
-                            : "hover:transform hover:scale-[1.01]"
-                        }`}
-                        onClick={() => handleMaskSelect(mask)}
-                      >
-                        {/* Mask preview */}
-                        <div className="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
-                          {/* Background image for context */}
-                          {selectedImage && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white">
-                              <img
-                                src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                                className="w-full h-full object-contain opacity-40"
-                                aria-hidden="true"
-                                style={{ display: 'block' }}
-                              />
-                            </div>
-                          )}
-                          {/* Mask overlay */}
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <img
-                              src={`data:image/png;base64,${mask.base64}`}
-                              alt={`Segment ${mask.id + 1}`}
-                              className="w-full h-full object-contain"
-                              style={{ display: 'block' }}
-                            />
-                          </div>
-                          {/* Quality indicator */}
-                          <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full text-xs font-medium shadow-sm">
-                            <div className="flex items-center">
-                              <div className={`w-2 h-2 rounded-full mr-1 ${
-                                mask.quality >= 0.7 ? 'bg-green-500' : 
-                                mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                              }`}></div>
-                              {Math.round(mask.quality * 100)}%
-                            </div>
-                          </div>
-                          {/* Selection indicator */}
-                          {selectedMask && selectedMask.id === mask.id && (
-                            <div className="absolute inset-0 border-4 border-blue-500 rounded-md"></div>
-                          )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                {segmentationMasks.map((mask, index) => (
+                  <div
+                    key={index}
+                    className={`bg-white rounded-lg overflow-hidden transition-all duration-200 cursor-pointer shadow-sm ${
+                      selectedMask && selectedMask.id === mask.id
+                        ? "ring-2 ring-blue-500 shadow-md"
+                        : "border border-gray-200 hover:border-blue-200 hover:shadow"
+                    }`}
+                    onClick={() => handleMaskSelect(mask)}
+                  >
+                    <div className="relative aspect-square bg-gray-50">
+                      {selectedImage && (
+                        <div className="absolute inset-0">
+                          <img
+                            src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
+                            className="w-full h-full object-cover opacity-30"
+                            alt=""
+                          />
                         </div>
-                        
-                        {/* Mask details */}
-                        <div className="p-3 border-t bg-white">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="font-medium text-gray-800">Segment #{mask.id + 1}</span>
-                          </div>
-                          <div className="flex justify-between items-center mb-3">
-                            <div className="w-full bg-gray-200 rounded-full h-1.5">
-                              <div 
-                                className={`h-1.5 rounded-full ${
-                                  mask.quality >= 0.7 ? 'bg-green-500' : 
-                                  mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                                }`}
-                                style={{ width: `${Math.round(mask.quality * 100)}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              className="flex-1 text-xs bg-blue-600 text-white px-2 py-1.5 rounded-md hover:bg-blue-700 font-medium shadow-sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMaskSelect(mask);
-                                handleStartRefinement();
-                              }}
-                            >
-                              Refine
-                            </button>
-                            <button
-                              className="flex-1 text-xs bg-green-600 text-white px-2 py-1.5 rounded-md hover:bg-green-700 font-medium shadow-sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log("Save button clicked for mask index:", index);
-                                handleSaveMask(index);
-                              }}
-                            >
-                              Save
-                            </button>
-                          </div>
+                      )}
+                      <div className="absolute inset-0">
+                        <img
+                          src={`data:image/png;base64,${mask.base64}`}
+                          alt={`Segment ${mask.id + 1}`}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
+                        <div className="flex items-center gap-1.5">
+                          <div className={`w-2 h-2 rounded-full ${
+                            mask.quality >= 0.7 ? 'bg-green-500' : 
+                            mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
+                          }`}></div>
+                          {Math.round(mask.quality * 100)}%
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-2 space-y-3">
-                    {/* List view of cutouts */}
-                    {cutoutsList.length > 0 ? (
-                      cutoutsList.map((cutout, index) => (
-                        <div 
-                          key={index}
-                          className={`flex items-center border rounded-lg p-3 cursor-pointer hover:bg-blue-50 transition-all ${
-                            selectedMask && selectedMask.id === cutout.maskId ? "bg-blue-50 border-blue-300 shadow-sm" : ""
-                          }`}
-                          onClick={() => handleCutoutSelect(cutout)}
+                    </div>
+                    
+                    <div className="p-3 border-t border-gray-100">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100">
+                          <span className="text-blue-600 text-sm font-medium">{index + 1}</span>
+                        </div>
+                        <span className="text-gray-900 font-medium">Segment</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="flex-1 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMaskSelect(mask);
+                            handleStartRefinement();
+                          }}
                         >
-                          <div className="h-20 w-20 flex-shrink-0 bg-gray-100 rounded-md overflow-hidden relative shadow-sm">
-                            <img 
-                              src={cutout.previewUrl} 
-                              alt={`Segment region ${cutout.maskId + 1}`}
-                              className="w-full h-full object-contain"
-                              style={{ display: 'block' }}
-                            />
-                          </div>
-                          <div className="ml-4 flex-grow">
-                            <div className="font-medium text-gray-800 flex items-center">
-                              <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mr-2 text-xs font-bold text-blue-600">
-                                {cutout.maskId + 1}
-                              </div>
-                              Segment {cutout.maskId + 1}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {cutout.width}×{cutout.height} px · Region at ({cutout.x}, {cutout.y})
-                            </div>
-                            {segmentationMasks[cutout.maskId] && (
-                              <div className="flex items-center mt-2">
-                                <div className="w-24 bg-gray-200 rounded-full h-1.5 mr-2">
-                                  <div 
-                                    className={`h-1.5 rounded-full ${
-                                      segmentationMasks[cutout.maskId].quality >= 0.7 ? 'bg-green-500' : 
-                                      segmentationMasks[cutout.maskId].quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                                    }`}
-                                    style={{ width: `${Math.round(segmentationMasks[cutout.maskId].quality * 100)}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-xs">
-                                  Quality: {Math.round(segmentationMasks[cutout.maskId].quality * 100)}%
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <button
-                            className="ml-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 shadow-sm font-medium"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCutoutSelect(cutout);
-                            }}
-                          >
-                            Refine
-                          </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-10 text-gray-500">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full mx-auto flex items-center justify-center mb-3">
-                          <Layers size={24} className="text-gray-400" />
-                        </div>
-                        <p className="font-medium">No cutouts available yet</p>
-                        <p className="text-sm mt-1">Select a segmentation and click "Refine" to create cutouts</p>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
+                            <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                          </svg>
+                          Refine
+                        </button>
+                        <button
+                          className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveMask(index);
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                          Save
+                        </button>
                       </div>
-                    )}
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -1449,71 +1396,6 @@ const ImageViewerWithPrompting = () => {
           )}
         </div>
       </div>
-
-      {/* Technical Details Panel (collapsible) */}
-      {selectedImage && (
-        <div className="mt-6 bg-white p-4 rounded-md shadow-md">
-          <details>
-            <summary className="font-semibold cursor-pointer">
-              Technical Details
-            </summary>
-            <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
-              <h3 className="font-medium">Image Information:</h3>
-              <ul className="mt-2 space-y-1 text-sm">
-                <li>
-                  <strong>ID:</strong> {selectedImage.id}
-                </li>
-                <li>
-                  <strong>Name:</strong> {selectedImage.name}
-                </li>
-                {selectedImage.width && selectedImage.height && (
-                  <li>
-                    <strong>Dimensions:</strong> {selectedImage.width} ×{" "}
-                    {selectedImage.height} pixels
-                  </li>
-                )}
-                {selectedImage.hash && (
-                  <li>
-                    <strong>Hash:</strong> {selectedImage.hash.substring(0, 8)}
-                    ...
-                  </li>
-                )}
-                <li>
-                  <strong>Selected Model:</strong> {selectedModel}
-                </li>
-              </ul>
-
-              {promptingResult && promptingResult.length > 0 && (
-                <div className="mt-3">
-                  <h3 className="font-medium">Current Prompts:</h3>
-                  <pre className="mt-2 bg-gray-100 p-2 text-xs rounded overflow-auto max-h-40">
-                    {JSON.stringify(promptingResult, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {segmentationMasks.length > 0 && (
-                <div className="mt-3">
-                  <h3 className="font-medium">Segmentation Results:</h3>
-                  <p className="text-sm">
-                    {segmentationMasks.length} segments found
-                  </p>
-                  <pre className="mt-2 bg-gray-100 p-2 text-xs rounded overflow-auto max-h-40">
-                    {JSON.stringify(
-                      segmentationMasks.map((mask) => ({
-                        id: mask.id,
-                        quality: mask.quality
-                      })),
-                      null,
-                      2
-                    )}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </details>
-        </div>
-      )}
 
       {/* Save Mask Dialog */}
       {showSaveMaskDialog && (

@@ -161,7 +161,33 @@ export const segmentImage = async (
     });
     
     const result = await handleApiError(response);
-    console.log("Received segmentation result with masks:", result.base64_masks.length);
+    
+    // Handle the new response format (masks with contours instead of base64_masks)
+    if (result.masks && Array.isArray(result.masks)) {
+      console.log("Received segmentation result with masks:", result.masks.length);
+      
+      // Convert the new response format to the old format for backward compatibility
+      // This helps minimize changes in the rest of the application
+      result.base64_masks = [];
+      result.quality = [];
+      
+      // For now, just return the first contour of each mask
+      // In a more complete implementation, we would process all contours
+      result.masks.forEach(mask => {
+        if (mask.contours && mask.contours.length > 0) {
+          // We'll create placeholder base64 masks - these won't be actual image data
+          // but will serve as identifiers for the contours
+          result.base64_masks.push(JSON.stringify(mask.contours));
+          result.quality.push(mask.predicted_iou);
+        }
+      });
+      
+      // Add the original response format to allow proper rendering later
+      result.original_masks = result.masks;
+    } else {
+      console.warn("Unexpected response format from segmentation endpoint:", result);
+    }
+    
     return result;
   } catch (error) {
     console.error("Error segmenting image:", error);
