@@ -284,14 +284,16 @@ export const segmentImage = async (
       result.base64_masks = [];
       result.quality = [];
       
-      // For now, just return the first contour of each mask
-      // In a more complete implementation, we would process all contours
       result.masks.forEach(mask => {
         if (mask.contours && mask.contours.length > 0) {
-          // We'll create placeholder base64 masks - these won't be actual image data
-          // but will serve as identifiers for the contours
-          result.base64_masks.push(JSON.stringify(mask.contours));
+          // We'll use a placeholder for base64_masks since we'll use the contours directly
+          result.base64_masks.push('placeholder');
           result.quality.push(mask.predicted_iou);
+          
+          // Log quantification data if available for debugging
+          if (mask.contours[0].quantifications) {
+            console.log("Mask has quantifications:", mask.contours[0].quantifications);
+          }
         }
       });
       

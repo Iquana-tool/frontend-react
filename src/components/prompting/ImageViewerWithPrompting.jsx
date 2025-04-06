@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
-import { getMaskColor } from "./utils";
+import { getMaskColor, createMaskPreviewFromContours } from "./utils";
 import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle } from "lucide-react";
+import QuantificationDisplay from "./QuantificationDisplay";
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -36,6 +37,7 @@ const ImageViewerWithPrompting = () => {
   const [availableImages, setAvailableImages] = useState([]);
   const [promptingResult, setPromptingResult] = useState(null);
   const [segmentationMasks, setSegmentationMasks] = useState([]);
+  const [processedMaskImages, setProcessedMaskImages] = useState({});
   const [loading, setLoading] = useState(false);
   const [isSegmenting, setIsSegmenting] = useState(false);
   const [error, setError] = useState(null);
@@ -58,6 +60,7 @@ const ImageViewerWithPrompting = () => {
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState('');
   const promptingCanvasRef = useRef(null); // Ref to access PromptingCanvas methods
   const segmentationResultsRef = useRef(null); // Add a ref to the segmentation results section
+  const [showExpandedQuantifications, setShowExpandedQuantifications] = useState(false);
 
   // Add CSS for animations
   useEffect(() => {
@@ -582,7 +585,10 @@ const ImageViewerWithPrompting = () => {
               id: index,
               base64: segmentationResponse.base64_masks[index],
               quality: segmentationResponse.quality[index],
-              contours: mask.contours // Store the contours for rendering
+              contours: mask.contours, // Store all contours
+              // Store the first contour for visualization and its quantifications
+              contour: mask.contours.length > 0 ? mask.contours[0] : null,
+              quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
             }))
           );
         } else {
@@ -627,7 +633,10 @@ const ImageViewerWithPrompting = () => {
               id: index,
               base64: segmentationResponse.base64_masks[index],
               quality: segmentationResponse.quality[index],
-              contours: mask.contours // Store the contours for rendering
+              contours: mask.contours, // Store all contours
+              // Store the first contour for visualization and its quantifications
+              contour: mask.contours.length > 0 ? mask.contours[0] : null,
+              quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
             }))
           );
         } else {
@@ -870,49 +879,23 @@ const ImageViewerWithPrompting = () => {
       
       // Handle contour data
       if (selectedMask.contours) {
-        // For the saveMask API, we still need a base64 encoded mask image
-        // We need to generate a mask image from the contours
-        const canvas = document.createElement('canvas');
-        canvas.width = originalImage.width;
-        canvas.height = originalImage.height;
-        const ctx = canvas.getContext('2d');
-        
-        // Draw the contours as a filled shape
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Set up for drawing black contours
-        ctx.fillStyle = 'black';
-        
-        selectedMask.contours.forEach(contour => {
-          if (!contour.x || !contour.y || contour.x.length < 3) return;
+        // First check if we've already processed this mask
+        if (processedMaskImages[selectedMask.id]) {
+          maskData = processedMaskImages[selectedMask.id];
+        } else {
+          // Otherwise generate the mask image from contours
+          maskData = await generateMaskImageFromContours(selectedMask, imageObject);
           
-          // Start a new path for this contour
-          ctx.beginPath();
-          
-          // Convert normalized coordinates to actual pixel positions
-          const startX = contour.x[0] * originalImage.width;
-          const startY = contour.y[0] * originalImage.height;
-          
-          ctx.moveTo(startX, startY);
-          
-          // Draw each point of the contour
-          for (let i = 1; i < contour.x.length; i++) {
-            const x = contour.x[i] * originalImage.width;
-            const y = contour.y[i] * originalImage.height;
-            ctx.lineTo(x, y);
+          if (!maskData) {
+            throw new Error("Failed to generate mask image from contours");
           }
           
-          // Close the path
-          ctx.closePath();
-          
-          // Fill the path
-          ctx.fill();
-        });
-        
-        // Get the base64 data (remove the data:image/png;base64, prefix)
-        const base64Data = canvas.toDataURL('image/png').split(',')[1];
-        maskData = base64Data;
+          // Store for future use
+          setProcessedMaskImages(prev => ({
+            ...prev,
+            [selectedMask.id]: maskData
+          }));
+        }
       }
       
       const response = await api.saveMask(selectedImage.id, label, maskData);
@@ -965,6 +948,93 @@ const ImageViewerWithPrompting = () => {
       setIsRefinementMode(true);
     }
   };
+
+  // function to make segments more visually distinct
+  const generateMaskImageFromContours = async (mask, originalImg) => {
+    if (!mask.contours || !originalImg) return null;
+    
+    try {
+      // Create a canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = originalImg.width;
+      canvas.height = originalImg.height;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw the original image first (semi-transparent)
+      ctx.drawImage(originalImg, 0, 0);
+      
+      // Semi-transparent overlay to dim the original image
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Get color for this mask based on index
+      const maskColor = getMaskColor(mask.id % 10);
+      
+      // Set up for drawing filled contours with color
+      ctx.fillStyle = maskColor;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      
+      mask.contours.forEach(contour => {
+        if (!contour.x || !contour.y || contour.x.length < 3) return;
+        
+        // Start a new path for this contour
+        ctx.beginPath();
+        
+        // Convert normalized coordinates to actual pixel positions
+        const startX = contour.x[0] * originalImg.width;
+        const startY = contour.y[0] * originalImg.height;
+        
+        ctx.moveTo(startX, startY);
+        
+        // Draw each point of the contour
+        for (let i = 1; i < contour.x.length; i++) {
+          const x = contour.x[i] * originalImg.width;
+          const y = contour.y[i] * originalImg.height;
+          ctx.lineTo(x, y);
+        }
+        
+        // Close the path
+        ctx.closePath();
+        
+        // Fill with color and add white border
+        ctx.fill();
+        ctx.stroke();
+      });
+      
+      // Get the base64 data (remove the data:image/png;base64, prefix)
+      return canvas.toDataURL('image/png').split(',')[1];
+    } catch (error) {
+      console.error('Error generating mask image from contours:', error);
+      return null;
+    }
+  };
+  
+  // Update mask images when segmentation masks change
+  useEffect(() => {
+    const updateMaskImages = async () => {
+      if (!segmentationMasks.length || !imageObject) return;
+      
+      const newProcessedMasks = { ...processedMaskImages };
+      
+      for (const mask of segmentationMasks) {
+        // Skip if we already processed this mask
+        if (newProcessedMasks[mask.id]) continue;
+        
+        // Process contour-based masks
+        if (mask.contours) {
+          const base64Image = await generateMaskImageFromContours(mask, imageObject);
+          if (base64Image) {
+            newProcessedMasks[mask.id] = base64Image;
+          }
+        }
+      }
+      
+      setProcessedMaskImages(newProcessedMasks);
+    };
+    
+    updateMaskImages();
+  }, [segmentationMasks, imageObject, processedMaskImages]);
 
   return (
     <div className="container mx-auto p-4">
@@ -1489,9 +1559,9 @@ const ImageViewerWithPrompting = () => {
 
               {selectedMask && (
                 <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center mt-1">
                         <span className="font-semibold text-blue-600 text-lg">{selectedMask.id + 1}</span>
                       </div>
                       <div>
@@ -1508,43 +1578,95 @@ const ImageViewerWithPrompting = () => {
                           </div>
                           <span className="text-sm text-blue-700 font-medium">{Math.round(selectedMask.quality * 100)}% confidence</span>
                         </div>
+                        <div className="mt-2 mb-3">
+                          {selectedMask.quantifications && (
+                            <div>
+                              <div className="flex justify-between items-center mb-1">
+                                <h3 className="text-xs font-medium text-gray-700">Measurements & Analysis</h3>
+                                <button 
+                                  onClick={() => setShowExpandedQuantifications(!showExpandedQuantifications)}
+                                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center"
+                                >
+                                  {showExpandedQuantifications ? (
+                                    <>
+                                      <span className="mr-1">Hide Details</span>
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="mr-1">Show Details</span>
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              <QuantificationDisplay 
+                                quantifications={selectedMask.quantifications}
+                                contour={selectedMask.contour}
+                                expanded={showExpandedQuantifications}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            className="flex-1 py-1.5 px-3 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm font-medium shadow-sm flex items-center justify-center gap-1.5 transition-colors"
+                            onClick={handleStartRefinement}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
+                              <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                            Refine
+                          </button>
+                          <button
+                            className="flex-1 py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center justify-center gap-1.5 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSaveMask(selectedMask.id);
+                            }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                            Save
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-3">
-                      <button
-                        className="px-4 py-2 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm font-medium shadow-sm flex items-center gap-2 transition-colors"
-                        onClick={handleStartRefinement}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
-                          <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                        </svg>
-                        Refine
-                      </button>
-                      <button
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center gap-2 transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSaveMask(selectedMask.id);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                        Save
-                      </button>
+                    <div className="relative w-24 h-24 border border-blue-200 rounded-md overflow-hidden shadow-sm">
+                      {selectedImage && (
+                        <img 
+                          src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
+                          className="absolute inset-0 w-full h-full object-cover" 
+                          alt=""
+                        />
+                      )}
+                      <img 
+                        src={`data:image/png;base64,${
+                          selectedMask.contours && processedMaskImages[selectedMask.id] 
+                            ? processedMaskImages[selectedMask.id] 
+                            : selectedMask.base64
+                        }`}
+                        className="absolute inset-0 w-full h-full object-contain" 
+                        alt="Selected segment"
+                      />
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-5">
                 {segmentationMasks.map((mask, index) => (
                   <div
                     key={index}
                     className={`bg-white rounded-lg overflow-hidden transition-all duration-200 cursor-pointer shadow-sm ${
                       selectedMask && selectedMask.id === mask.id
-                        ? "ring-2 ring-blue-500 shadow-md"
+                        ? "ring-2 ring-blue-500 shadow-lg"
                         : "border border-gray-200 hover:border-blue-200 hover:shadow"
                     }`}
                     onClick={() => handleMaskSelect(mask)}
@@ -1554,17 +1676,28 @@ const ImageViewerWithPrompting = () => {
                         <div className="absolute inset-0">
                           <img
                             src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                            className="w-full h-full object-cover opacity-30"
+                            className="w-full h-full object-cover"
                             alt=""
                           />
                         </div>
                       )}
                       <div className="absolute inset-0">
                         <img
-                          src={`data:image/png;base64,${mask.base64}`}
+                          src={`data:image/png;base64,${
+                            mask.contours && processedMaskImages[mask.id] 
+                              ? processedMaskImages[mask.id] 
+                              : mask.base64
+                          }`}
                           alt={`Segment ${mask.id + 1}`}
                           className="w-full h-full object-contain"
                         />
+                      </div>
+                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs">
+                            {index + 1}
+                          </div>
+                        </div>
                       </div>
                       <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
                         <div className="flex items-center gap-1.5">
@@ -1578,35 +1711,44 @@ const ImageViewerWithPrompting = () => {
                     </div>
                     
                     <div className="p-3 border-t border-gray-100">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100">
-                          <span className="text-blue-600 text-sm font-medium">{index + 1}</span>
+                      {mask.quantifications && (
+                        <div className="py-1.5 px-2 border-b border-gray-100">
+                          <h4 className="text-[10px] uppercase tracking-wide font-medium text-gray-500 mb-1">Measurements</h4>
+                          <div className="grid grid-cols-2 gap-x-1 gap-y-0.5 text-xs">
+                            <div className="text-gray-500">Area:</div>
+                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.area.toFixed(2)}</div>
+                            
+                            <div className="text-gray-500">Perimeter:</div>
+                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.perimeter.toFixed(2)}</div>
+                            
+                            <div className="text-gray-500">Circularity:</div>
+                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.circularity.toFixed(2)}</div>
+                          </div>
                         </div>
-                        <span className="text-gray-900 font-medium">Segment</span>
-                      </div>
-                      <div className="flex gap-2">
+                      )}
+                      <div className="flex gap-2 mt-2">
                         <button
-                          className="flex-1 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleMaskSelect(mask);
                             handleStartRefinement();
                           }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
                             <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                           </svg>
                           Refine
                         </button>
                         <button
-                          className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleSaveMask(index);
+                            handleSaveMask(mask.id);
                           }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                           Save
