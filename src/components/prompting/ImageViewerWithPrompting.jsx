@@ -574,7 +574,14 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          adjustedPrompts
+          adjustedPrompts,
+          {
+            min_x: cutoutPosition.x / originalImage.width,
+            min_y: cutoutPosition.y / originalImage.height,
+            max_x: (cutoutPosition.x + cutoutPosition.width) / originalImage.width,
+            max_y: (cutoutPosition.y + cutoutPosition.height) / originalImage.height
+          },
+          selectedMask ? selectedMask.label || 0 : 0
         );
 
         // Handle the new response format
@@ -622,7 +629,9 @@ const ImageViewerWithPrompting = () => {
         const segmentationResponse = await api.segmentImage(
           selectedImage.id,
           selectedModel,
-          prompts
+          prompts,
+          { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
+          currentLabel
         );
 
         // Handle the new response format

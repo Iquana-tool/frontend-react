@@ -216,7 +216,9 @@ export const deleteImage = async (imageId) => {
 export const segmentImage = async (
   imageId,
   model = "SAM2Tiny",
-  prompts = null
+  prompts = null,
+  cropCoords = { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
+  label = 0
 ) => {
   try {
     const requestData = {
@@ -226,7 +228,12 @@ export const segmentImage = async (
       point_prompts: [],
       box_prompts: [],
       polygon_prompts: [],
-      circle_prompts: []
+      circle_prompts: [],
+      min_x: cropCoords.min_x,
+      min_y: cropCoords.min_y,
+      max_x: cropCoords.max_x,
+      max_y: cropCoords.max_y,
+      label: label
     };
 
     if (prompts && prompts.length > 0) {
