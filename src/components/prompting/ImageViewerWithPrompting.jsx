@@ -3,8 +3,10 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
+import MaskGenerationPanel from "./MaskGenerationPanel";
+import ContourEditor from "./ContourEditor";
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -29,6 +31,18 @@ const customStyles = `
   *::after, *::before {
     content: normal !important;
   }
+  
+  /* Fix for canvas container height */
+  .h-\\[500px\\] {
+    height: 500px !important;
+    max-height: 500px !important;
+    overflow: hidden;
+  }
+  
+  /* Ensure PromptingCanvas doesn't affect layout */
+  [data-segment-results="true"] {
+    margin-top: 1.5rem !important;
+  }
 `;
 
 const ImageViewerWithPrompting = () => {
@@ -38,6 +52,7 @@ const ImageViewerWithPrompting = () => {
   const [promptingResult, setPromptingResult] = useState(null);
   const [segmentationMasks, setSegmentationMasks] = useState([]);
   const [processedMaskImages, setProcessedMaskImages] = useState({});
+  const [maskImagesLoading, setMaskImagesLoading] = useState({});
   const [loading, setLoading] = useState(false);
   const [isSegmenting, setIsSegmenting] = useState(false);
   const [error, setError] = useState(null);
@@ -61,6 +76,9 @@ const ImageViewerWithPrompting = () => {
   const promptingCanvasRef = useRef(null); // Ref to access PromptingCanvas methods
   const segmentationResultsRef = useRef(null); // Add a ref to the segmentation results section
   const [showExpandedQuantifications, setShowExpandedQuantifications] = useState(false);
+  const [showMaskGenerationPanel, setShowMaskGenerationPanel] = useState(false);
+  const [editingMask, setEditingMask] = useState(null);
+  const [finalMask, setFinalMask] = useState(null);
 
   // Add CSS for animations
   useEffect(() => {
@@ -585,29 +603,41 @@ const ImageViewerWithPrompting = () => {
         );
 
         // Handle the new response format
+        let newMasks = [];
         if (segmentationResponse.original_masks) {
-          // Store the raw masks from the new format
-          setSegmentationMasks(
-            segmentationResponse.original_masks.map((mask, index) => ({
-              id: index,
-              base64: segmentationResponse.base64_masks[index],
-              quality: segmentationResponse.quality[index],
-              contours: mask.contours, // Store all contours
-              // Store the first contour for visualization and its quantifications
-              contour: mask.contours.length > 0 ? mask.contours[0] : null,
-              quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
-            }))
-          );
+          // Create masks from the new format
+          newMasks = segmentationResponse.original_masks.map((mask, index) => ({
+            id: index,
+            base64: segmentationResponse.base64_masks[index],
+            quality: segmentationResponse.quality[index],
+            contours: mask.contours, // Store all contours
+            // Store the first contour for visualization and its quantifications
+            contour: mask.contours.length > 0 ? mask.contours[0] : null,
+            quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
+          }));
         } else {
           // Fallback to the old format if needed
-          setSegmentationMasks(
-            segmentationResponse.base64_masks.map((mask, index) => ({
-              id: index,
-              base64: mask,
-              quality: segmentationResponse.quality[index]
-            }))
-          );
+          newMasks = segmentationResponse.base64_masks.map((mask, index) => ({
+            id: index,
+            base64: mask,
+            quality: segmentationResponse.quality[index]
+          }));
         }
+        
+        // Set initial loading states for all the new masks
+        const newMaskLoadingStates = {};
+        newMasks.forEach(mask => {
+          newMaskLoadingStates[mask.id] = true;
+        });
+        
+        // Update the loading states first
+        setMaskImagesLoading(prev => ({
+          ...prev,
+          ...newMaskLoadingStates
+        }));
+        
+        // Then update the segmentation masks
+        setSegmentationMasks(newMasks);
 
         // Return to full image view after refinement
         handleCancelRefinement();
@@ -635,30 +665,42 @@ const ImageViewerWithPrompting = () => {
         );
 
         // Handle the new response format
+        let newMasks = [];
         if (segmentationResponse.original_masks) {
-          // Store the raw masks from the new format
-          setSegmentationMasks(
-            segmentationResponse.original_masks.map((mask, index) => ({
-              id: index,
-              base64: segmentationResponse.base64_masks[index],
-              quality: segmentationResponse.quality[index],
-              contours: mask.contours, // Store all contours
-              // Store the first contour for visualization and its quantifications
-              contour: mask.contours.length > 0 ? mask.contours[0] : null,
-              quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
-            }))
-          );
+          // Create masks from the new format
+          newMasks = segmentationResponse.original_masks.map((mask, index) => ({
+            id: index,
+            base64: segmentationResponse.base64_masks[index],
+            quality: segmentationResponse.quality[index],
+            contours: mask.contours, // Store all contours
+            // Store the first contour for visualization and its quantifications
+            contour: mask.contours.length > 0 ? mask.contours[0] : null,
+            quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
+          }));
         } else {
           // Fallback to the old format if needed
-          setSegmentationMasks(
-            segmentationResponse.base64_masks.map((mask, index) => ({
-              id: index,
-              base64: mask,
-              quality: segmentationResponse.quality[index]
-            }))
-          );
+          newMasks = segmentationResponse.base64_masks.map((mask, index) => ({
+            id: index,
+            base64: mask,
+            quality: segmentationResponse.quality[index]
+          }));
         }
         
+        // Set initial loading states for all the new masks
+        const newMaskLoadingStates = {};
+        newMasks.forEach(mask => {
+          newMaskLoadingStates[mask.id] = true;
+        });
+        
+        // Update the loading states first
+        setMaskImagesLoading(prev => ({
+          ...prev,
+          ...newMaskLoadingStates
+        }));
+        
+        // Then update the segmentation masks
+        setSegmentationMasks(newMasks);
+
         // Show success message for regular segmentation
         const masksCount = segmentationResponse.original_masks 
           ? segmentationResponse.original_masks.length 
@@ -1025,25 +1067,110 @@ const ImageViewerWithPrompting = () => {
       if (!segmentationMasks.length || !imageObject) return;
       
       const newProcessedMasks = { ...processedMaskImages };
+      const newMaskImagesLoading = { ...maskImagesLoading };
       
       for (const mask of segmentationMasks) {
+        // Set loading state for this mask
+        if (!newMaskImagesLoading.hasOwnProperty(mask.id)) {
+          newMaskImagesLoading[mask.id] = true;
+        }
+        
         // Skip if we already processed this mask
-        if (newProcessedMasks[mask.id]) continue;
+        if (newProcessedMasks[mask.id]) {
+          newMaskImagesLoading[mask.id] = false;
+          continue;
+        }
         
         // Process contour-based masks
         if (mask.contours) {
-          const base64Image = await generateMaskImageFromContours(mask, imageObject);
-          if (base64Image) {
-            newProcessedMasks[mask.id] = base64Image;
+          try {
+            const base64Image = await generateMaskImageFromContours(mask, imageObject);
+            if (base64Image) {
+              newProcessedMasks[mask.id] = base64Image;
+            }
+          } catch (error) {
+            console.error(`Error processing mask ${mask.id}:`, error);
+          } finally {
+            newMaskImagesLoading[mask.id] = false;
           }
+        } else if (mask.base64) {
+          // For masks that already have base64 data
+          // Create an image to preload it
+          const img = new Image();
+          img.onload = () => {
+            newMaskImagesLoading[mask.id] = false;
+            setMaskImagesLoading({...newMaskImagesLoading});
+          };
+          img.onerror = () => {
+            newMaskImagesLoading[mask.id] = false;
+            setMaskImagesLoading({...newMaskImagesLoading});
+          };
+          img.src = `data:image/png;base64,${mask.base64}`;
         }
       }
       
       setProcessedMaskImages(newProcessedMasks);
+      setMaskImagesLoading(newMaskImagesLoading);
     };
     
     updateMaskImages();
-  }, [segmentationMasks, imageObject, processedMaskImages]);
+  }, [segmentationMasks, imageObject, processedMaskImages, maskImagesLoading]);
+
+  // Add handler for mask generation button
+  const handleToggleMaskGeneration = () => {
+    setShowMaskGenerationPanel(prev => !prev);
+    
+    // Close any other open panels/modes
+    if (!showMaskGenerationPanel) {
+      setIsRefinementMode(false);
+      setShowExpandedQuantifications(false);
+    }
+  };
+
+  // Handle mask selection from MaskGenerationPanel
+  const handleMaskSelected = (mask) => {
+    setSelectedMask(mask);
+    
+    // If it's the final mask, we might want to handle it differently
+    if (mask && mask.is_final) {
+      setFinalMask(mask);
+    }
+  };
+
+  // Handle adding contours to final mask
+  const handleAddToFinalMask = (contours) => {
+    // This will be handled internally by MaskGenerationPanel
+    console.log("Contours added to final mask");
+  };
+
+  // Handle final mask updates
+  const handleFinalMaskUpdated = (updatedMask) => {
+    setFinalMask(updatedMask);
+    // Might need to update other state or UI here
+  };
+
+  // Handle editing a mask
+  const handleEditMask = (mask) => {
+    setEditingMask(mask);
+  };
+
+  // Handle mask update from editor
+  const handleMaskUpdated = (updatedMask) => {
+    // Update masks list if needed
+    if (updatedMask.is_final) {
+      setFinalMask(updatedMask);
+    } else {
+      // Update in segmentation masks list if it exists there
+      setSegmentationMasks(prev => 
+        prev.map(mask => 
+          mask.id === updatedMask.id ? updatedMask : mask
+        )
+      );
+    }
+    
+    // Close editor
+    setEditingMask(null);
+  };
 
   return (
     <div className="container mx-auto p-4">
@@ -1137,7 +1264,7 @@ const ImageViewerWithPrompting = () => {
             </label>
             <div className="relative">
               <select
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg py-2.5 pl-3 pr-10 text-sm appearance-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
+                className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
                 value={selectedModel}
                 onChange={handleModelChange}
                 disabled={isRefinementMode || loading}
@@ -1469,18 +1596,20 @@ const ImageViewerWithPrompting = () => {
                   </div>
                 </div>
 
-                <PromptingCanvas
-                  ref={promptingCanvasRef}
-                  image={imageObject}
-                  onPromptingComplete={handlePromptingComplete}
-                  isRefinementMode={isRefinementMode}
-                  selectedMask={selectedMask}
-                  promptType={promptType}
-                  currentLabel={currentLabel}
-                />
+                <div className="h-[500px]">
+                  <PromptingCanvas
+                    ref={promptingCanvasRef}
+                    image={imageObject}
+                    onPromptingComplete={handlePromptingComplete}
+                    isRefinementMode={isRefinementMode}
+                    selectedMask={selectedMask}
+                    promptType={promptType}
+                    currentLabel={currentLabel}
+                  />
+                </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
+              <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
                 <div className="flex flex-col items-center">
                   <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
                   <p>Loading image...</p>
@@ -1488,7 +1617,7 @@ const ImageViewerWithPrompting = () => {
               </div>
             )
           ) : (
-            <div className="flex items-center justify-center h-64 bg-gray-100 rounded-md">
+            <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
               <p className="text-gray-500">
                 Select an image to start prompting
               </p>
@@ -1600,7 +1729,7 @@ const ImageViewerWithPrompting = () => {
                                     <>
                                       <span className="mr-1">Hide Details</span>
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                        <path fillRule="evenodd" d="M14xx.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
                                       </svg>
                                     </>
                                   ) : (
@@ -1655,15 +1784,30 @@ const ImageViewerWithPrompting = () => {
                           alt=""
                         />
                       )}
-                      <img 
-                        src={`data:image/png;base64,${
-                          selectedMask.contours && processedMaskImages[selectedMask.id] 
-                            ? processedMaskImages[selectedMask.id] 
-                            : selectedMask.base64
-                        }`}
-                        className="absolute inset-0 w-full h-full object-contain" 
-                        alt="Selected segment"
-                      />
+                      {maskImagesLoading[selectedMask.id] ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50">
+                          <div className="w-6 h-6 border-2 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+                        </div>
+                      ) : (
+                        <img 
+                          src={`data:image/png;base64,${
+                            selectedMask.contours && processedMaskImages[selectedMask.id] 
+                              ? processedMaskImages[selectedMask.id] 
+                              : selectedMask.base64
+                          }`}
+                          className="absolute inset-0 w-full h-full object-contain" 
+                          alt="Selected segment"
+                          onLoad={() => {
+                            // Ensure loading state is cleared when image loads
+                            if (maskImagesLoading[selectedMask.id]) {
+                              setMaskImagesLoading(prev => ({
+                                ...prev,
+                                [selectedMask.id]: false
+                              }));
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1681,7 +1825,7 @@ const ImageViewerWithPrompting = () => {
                     onClick={() => handleMaskSelect(mask)}
                   >
                     <div className="relative aspect-square bg-gray-50">
-                      {selectedImage && (
+                      {/* {selectedImage && (
                         <div className="absolute inset-0">
                           <img
                             src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
@@ -1689,18 +1833,36 @@ const ImageViewerWithPrompting = () => {
                             alt=""
                           />
                         </div>
+                      )} */}
+                      {maskImagesLoading[mask.id] ? (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex flex-col items-center">
+                            <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
+                            <p className="text-sm text-gray-500">Loading mask...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="absolute inset-0">
+                          <img
+                            src={`data:image/png;base64,${
+                              mask.contours && processedMaskImages[mask.id] 
+                                ? processedMaskImages[mask.id] 
+                                : mask.base64
+                            }`}
+                            alt={`Segment ${mask.id + 1}`}
+                            className="w-full h-full object-contain"
+                            onLoad={() => {
+                              // Ensure loading state is cleared when image loads
+                              if (maskImagesLoading[mask.id]) {
+                                setMaskImagesLoading(prev => ({
+                                  ...prev,
+                                  [mask.id]: false
+                                }));
+                              }
+                            }}
+                          />
+                        </div>
                       )}
-                      <div className="absolute inset-0">
-                        <img
-                          src={`data:image/png;base64,${
-                            mask.contours && processedMaskImages[mask.id] 
-                              ? processedMaskImages[mask.id] 
-                              : mask.base64
-                          }`}
-                          alt={`Segment ${mask.id + 1}`}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
                       <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
                         <div className="flex items-center gap-1.5">
                           <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs">
@@ -1867,6 +2029,48 @@ const ImageViewerWithPrompting = () => {
         >
           <span>Reset Selection</span>
         </button>
+      </div>
+
+      {/* Tools Panel - Add mask generation button */}
+      <div className="tools-panel">
+        {/* ... existing buttons ... */}
+        
+        <button
+          className={`tool-button ${showMaskGenerationPanel ? 'active' : ''}`}
+          onClick={handleToggleMaskGeneration}
+          title="Mask Generation"
+        >
+          <Layers size={20} />
+        </button>
+        
+        {/* ... remaining buttons ... */}
+      </div>
+      
+      {/* Main Content Area */}
+      <div className="content-area">
+        {/* ... existing content ... */}
+        
+        {/* Mask Generation Panel */}
+        {showMaskGenerationPanel && selectedImageId && (
+          <MaskGenerationPanel
+            imageId={selectedImageId}
+            selectedImage={imageObject}
+            onMaskSelected={handleMaskSelected}
+            onAddToFinalMask={handleAddToFinalMask}
+            onFinalMaskUpdated={handleFinalMaskUpdated}
+            className="mask-generation-panel"
+          />
+        )}
+        
+        {/* Contour Editor - Shown when editing a mask */}
+        {editingMask && (
+          <ContourEditor
+            mask={editingMask}
+            image={imageObject}
+            onMaskUpdated={handleMaskUpdated}
+            onCancel={() => setEditingMask(null)}
+          />
+        )}
       </div>
     </div>
   );

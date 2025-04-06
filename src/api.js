@@ -389,6 +389,61 @@ export const getMask = async (maskId) => {
   }
 };
 
+// Get final mask for an image
+export const getFinalMask = async (imageId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/masks/get_final_mask/${imageId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error getting final mask:", error);
+    throw error;
+  }
+};
+
+// Update a mask with new contours
+export const updateMask = async (maskId, contours) => {
+  try {
+    const requestData = {
+      mask_id: maskId,
+      contours: contours
+    };
+
+    const response = await fetch(`${API_BASE_URL}/masks/update_mask`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error updating mask:", error);
+    throw error;
+  }
+};
+
+// Add contours to final mask
+export const addContoursToFinalMask = async (imageId, contours) => {
+  try {
+    const requestData = {
+      image_id: imageId,
+      contours: contours
+    };
+
+    const response = await fetch(`${API_BASE_URL}/masks/add_contours_to_final_mask`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error adding contours to final mask:", error);
+    throw error;
+  }
+};
+
 // Delete a mask
 export const deleteMask = async (maskId) => {
   try {
@@ -439,6 +494,9 @@ const API = {
   saveMask,
   getMasksForImage,
   getMask,
+  getFinalMask,
+  updateMask,
+  addContoursToFinalMask,
   deleteMask,
   createCutouts,
 };
