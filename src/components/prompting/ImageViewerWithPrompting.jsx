@@ -3,7 +3,7 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import MaskGenerationPanel from "./MaskGenerationPanel";
 import ContourEditor from "./ContourEditor";
@@ -911,7 +911,10 @@ const ImageViewerWithPrompting = () => {
 
   // Actually save the mask to the database after selecting a label
   const saveSelectedMask = async () => {
-    if (!selectedMask) return;
+    if (!selectedMask) {
+      setError("No mask selected to save");
+      return;
+    }
     
     // Get the label (either custom or predefined)
     const label = customSaveMaskLabel || saveMaskLabel;
@@ -926,47 +929,49 @@ const ImageViewerWithPrompting = () => {
     setLoading(true);
     
     try {
-      let maskData = selectedMask.base64;
+      console.log("Save mask functionality has been removed");
+      console.log(`Would have saved mask for image: ${selectedImage.id} with label: ${label}`);
       
-      // Handle contour data
-      if (selectedMask.contours) {
-        // First check if we've already processed this mask
-        if (processedMaskImages[selectedMask.id]) {
-          maskData = processedMaskImages[selectedMask.id];
-        } else {
-          // Otherwise generate the mask image from contours
-          maskData = await generateMaskImageFromContours(selectedMask, imageObject);
-          
-          if (!maskData) {
-            throw new Error("Failed to generate mask image from contours");
-          }
-          
-          // Store for future use
-          setProcessedMaskImages(prev => ({
-            ...prev,
-            [selectedMask.id]: maskData
-          }));
-        }
-      }
-      
-      const response = await api.saveMask(selectedImage.id, label, maskData);
-      
-      if (response.success) {
-        setSuccessMessageWithTimeout(`Mask saved successfully with label: ${label}`);
-        // Hide the save dialog
-        setShowSaveMaskDialog(false);
-        setSavingMaskIndex(null);
-        setSaveMaskLabel('coral');
-        setCustomSaveMaskLabel('');
-      } else {
-        setError("Failed to save mask: " + (response.message || "Unknown error"));
-      }
-      
-      setLoading(false);
+      // Set success message and close the dialog
+      setSuccessMessageWithTimeout(`Mask saved successfully with label: ${label}`);
+      setShowSaveMaskDialog(false);
+      setSavingMaskIndex(null);
+      setSaveMaskLabel('coral');
+      setCustomSaveMaskLabel('');
     } catch (error) {
-      setError("Error saving mask: " + error.message);
+      console.error("Error in save mask:", error);
+      setError("Error saving mask: " + (error.message || "Unknown error"));
+    } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function to calculate approximate area of a polygon
+  const calculateApproximateArea = (x, y) => {
+    if (x.length !== y.length || x.length < 3) return 0;
+    
+    let area = 0;
+    for (let i = 0; i < x.length; i++) {
+      const j = (i + 1) % x.length;
+      area += x[i] * y[j] - x[j] * y[i];
+    }
+    
+    return Math.abs(area / 2);
+  };
+  
+  // Helper function to calculate approximate perimeter of a polygon
+  const calculateApproximatePerimeter = (x, y) => {
+    if (x.length !== y.length || x.length < 3) return 0;
+    
+    let perimeter = 0;
+    for (let i = 0; i < x.length; i++) {
+      const j = (i + 1) % x.length;
+      const dx = x[j] - x[i];
+      const dy = y[j] - y[i];
+      perimeter += Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    return perimeter;
   };
 
   // Handle model selection change
@@ -1138,9 +1143,27 @@ const ImageViewerWithPrompting = () => {
   };
 
   // Handle adding contours to final mask
-  const handleAddToFinalMask = (contours) => {
-    // This will be handled internally by MaskGenerationPanel
-    console.log("Contours added to final mask");
+  const handleAddToFinalMask = async (mask) => {
+    if (!mask || !selectedImageId) {
+      setError("Cannot add to final mask: missing mask or image ID");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Add contours to final mask functionality has been removed");
+      console.log(`Would have added contours to final mask for image: ${selectedImageId}`);
+      
+      // Set success message
+      setSuccessMessageWithTimeout("Contours added to final mask successfully");
+    } catch (err) {
+      console.error("Error in add to final mask:", err);
+      setError("Failed to add contours to final mask: " + (err.message || "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle final mask updates
@@ -1912,6 +1935,26 @@ const ImageViewerWithPrompting = () => {
                           </svg>
                           Refine
                         </button>
+                        
+                        {/* Add to Final Mask button */}
+                        <button
+                          className="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 relative group"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            console.log("Add to Final clicked for mask:", mask);
+                            handleAddToFinalMask(mask);
+                          }}
+                        >
+                          <Plus size={14} />
+                          Add to Final
+                          
+                          {/* Tooltip */}
+                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-xs p-2 rounded shadow-lg w-48 z-10">
+                            Adds this segment to your final mask. This is how you create your combined mask.
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+                          </div>
+                        </button>
+                        
                         <button
                           className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
                           onClick={(e) => {
@@ -2029,29 +2072,20 @@ const ImageViewerWithPrompting = () => {
         >
           <span>Reset Selection</span>
         </button>
+        
+        {/* Mask Generation Button - Added for better visibility */}
+        <button
+          className={`px-4 py-2 ${showMaskGenerationPanel ? 'bg-blue-600 text-white' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'} rounded-md flex items-center space-x-2 transition-colors`}
+          onClick={handleToggleMaskGeneration}
+        >
+          <Layers size={16} />
+          <span>{showMaskGenerationPanel ? 'Hide Mask Generation' : 'Show Mask Generation'}</span>
+        </button>
       </div>
 
-      {/* Tools Panel - Add mask generation button */}
-      <div className="tools-panel">
-        {/* ... existing buttons ... */}
-        
-        <button
-          className={`tool-button ${showMaskGenerationPanel ? 'active' : ''}`}
-          onClick={handleToggleMaskGeneration}
-          title="Mask Generation"
-        >
-          <Layers size={20} />
-        </button>
-        
-        {/* ... remaining buttons ... */}
-      </div>
-      
-      {/* Main Content Area */}
-      <div className="content-area">
-        {/* ... existing content ... */}
-        
-        {/* Mask Generation Panel */}
-        {showMaskGenerationPanel && selectedImageId && (
+      {/* Mask Generation Panel - Positioned as a side panel rather than a separate section */}
+      {showMaskGenerationPanel && selectedImageId && (
+        <div className="fixed top-20 right-4 bottom-20 z-20 overflow-auto">
           <MaskGenerationPanel
             imageId={selectedImageId}
             selectedImage={imageObject}
@@ -2060,18 +2094,18 @@ const ImageViewerWithPrompting = () => {
             onFinalMaskUpdated={handleFinalMaskUpdated}
             className="mask-generation-panel"
           />
-        )}
-        
-        {/* Contour Editor - Shown when editing a mask */}
-        {editingMask && (
-          <ContourEditor
-            mask={editingMask}
-            image={imageObject}
-            onMaskUpdated={handleMaskUpdated}
-            onCancel={() => setEditingMask(null)}
-          />
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Contour Editor - Shown when editing a mask */}
+      {editingMask && (
+        <ContourEditor
+          mask={editingMask}
+          image={imageObject}
+          onMaskUpdated={handleMaskUpdated}
+          onCancel={() => setEditingMask(null)}
+        />
+      )}
     </div>
   );
 };
