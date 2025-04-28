@@ -1318,6 +1318,7 @@ const ImageViewerWithPrompting = () => {
                     onChange={handleModelChange}
                     disabled={isRefinementMode || loading}
                   >
+                    <option value="Mockup">Mockup (For Testing)</option>
                     <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
                     <option value="SAM2Small">SAM2 Small</option>
                     <option value="SAM2Large">SAM2 Large</option>
