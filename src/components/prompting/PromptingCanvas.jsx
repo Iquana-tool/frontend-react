@@ -12,6 +12,7 @@ import {
   Download,
   Save,
   Trash2,
+  Move,
 } from "lucide-react";
 
 // This component allows users to add different types of prompts to an image for segmentation tasks.
@@ -46,6 +47,7 @@ const PromptingCanvas = forwardRef(({
   const [cursorPos, setCursorPos] = useState(null);
   const [selectedMask, setSelectedMask] = useState(null);
   const [isProcessingMask, setIsProcessingMask] = useState(false);
+  const [activeTool, setActiveTool] = useState("point");
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -61,6 +63,10 @@ const PromptingCanvas = forwardRef(({
       // Update the selected mask and redraw
       setSelectedMask(mask);
       redrawCanvas();
+    },
+    // Add setActiveTool method to control from parent
+    setActiveTool: (tool) => {
+      setActiveTool(tool);
     }
   }));
 
@@ -684,36 +690,83 @@ const PromptingCanvas = forwardRef(({
 
   // Handle mouse down event
   const handleMouseDown = (e) => {
-    if (!image || isDrawing) return;
+    if (loading || !image) return;
 
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { offsetX, offsetY } = e.nativeEvent;
+    
+    // If drag tool is active or middle mouse button or holding Alt key, initiate panning
+    if (activeTool === "drag" || e.button === 1 || e.altKey) {
+      handlePanStart(e);
+      return;
+    }
 
-    // Convert to image coordinates
-    const imageCoords = canvasToImageCoords(x, y);
-    if (!imageCoords) return;
-
-    setIsDrawing(true);
-    setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
-
-    if (promptType === "point") {
-      // For point prompts, add them immediately
-      const newPrompt = {
-        type: "point",
-        coordinates: {
-          x: imageCoords.x,
-          y: imageCoords.y,
-        },
-        label: currentLabel,
-      };
-      setPrompts((prev) => [...prev, newPrompt]);
-    } else if (promptType === "polygon") {
-      // For polygon prompts, start a new polygon or add a point to existing one
-      if (!currentPolygon) {
-        setCurrentPolygon([{ x: imageCoords.x, y: imageCoords.y }]);
-      } else {
-        setCurrentPolygon((prev) => [...prev, { x: imageCoords.x, y: imageCoords.y }]);
+    // Handle normal drawing operations
+    if (e.button === 0) { // Left mouse button
+      setIsDrawing(true);
+      
+      const imageCoords = canvasToImageCoords(offsetX, offsetY);
+      
+      // Only proceed with drawing if we're not in panning mode
+      if (!isPanning) {
+        switch (promptType) {
+          case "point":
+            setCurrentPrompt({
+              type: "point",
+              coordinates: { x: imageCoords.x, y: imageCoords.y },
+              label: currentLabel
+            });
+            // Add point immediately
+            setPrompts([...prompts, {
+              type: "point",
+              coordinates: { x: imageCoords.x, y: imageCoords.y },
+              label: currentLabel
+            }]);
+            break;
+          case "box":
+            setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
+            setCurrentShape({
+              type: "box",
+              coordinates: {
+                startX: imageCoords.x,
+                startY: imageCoords.y,
+                endX: imageCoords.x,
+                endY: imageCoords.y
+              },
+              label: currentLabel
+            });
+            break;
+          case "circle":
+            setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
+            setCurrentShape({
+              type: "circle",
+              coordinates: {
+                centerX: imageCoords.x,
+                centerY: imageCoords.y,
+                radius: 0
+              },
+              label: currentLabel
+            });
+            break;
+          case "polygon":
+            if (!currentPolygon) {
+              // Start a new polygon
+              setCurrentPolygon({
+                type: "polygon",
+                coordinates: [{ x: imageCoords.x, y: imageCoords.y }],
+                label: currentLabel
+              });
+            } else {
+              // Add a point to the existing polygon
+              const newPolygon = {
+                ...currentPolygon,
+                coordinates: [...currentPolygon.coordinates, { x: imageCoords.x, y: imageCoords.y }]
+              };
+              setCurrentPolygon(newPolygon);
+            }
+            break;
+          default:
+            break;
+        }
       }
     }
   };
@@ -902,79 +955,84 @@ const PromptingCanvas = forwardRef(({
     return true;
   };
 
+  // Update canvas cursor based on active tool
+  useEffect(() => {
+    if (containerRef.current) {
+      if (activeTool === "drag" || isPanning) {
+        containerRef.current.style.cursor = isPanning ? "grabbing" : "grab";
+      } else {
+        containerRef.current.style.cursor = "crosshair";
+      }
+    }
+  }, [activeTool, isPanning]);
+
   return (
-    <div className="relative w-full h-full">
-      <canvas
-        ref={canvasRef}
-        className="cursor-crosshair"
+    <div className="flex flex-col h-full">
+      <div 
+        ref={containerRef}
+        className="relative flex-1 overflow-hidden border border-gray-200 rounded"
+        style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
         onDoubleClick={handleDoubleClick}
-        style={{
-          width: "100%",
-          height: "100%",
-          touchAction: "none"
-        }}
-      />
-      
-      {/* Navigation hints - top left */}
-      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg text-sm text-gray-600 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span>Pan:</span>
-          <kbd className="px-2 py-0.5 bg-gray-100 rounded text-xs">Alt + Drag</kbd>
-          <span>or</span>
-          <kbd className="px-2 py-0.5 bg-gray-100 rounded text-xs">Middle Mouse</kbd>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span>Zoom:</span>
-          <kbd className="px-2 py-0.5 bg-gray-100 rounded text-xs">Mouse Wheel</kbd>
-        </div>
-      </div>
-
-      {/* Zoom level indicator - top right */}
-      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full text-sm font-medium shadow-sm">
-        {Math.round(zoomLevel * 100)}%
-      </div>
-
-      {/* Drawing instructions - only show when no prompts are present */}
-      {!isDrawing && !currentPolygon && prompts.length === 0 && (
-        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-lg text-center shadow-sm">
-          <p className="text-sm font-medium text-gray-900 mb-1">
-            {promptType === "point" && "Click anywhere to add point prompts"}
-            {promptType === "box" && "Click and drag to create a box"}
-            {promptType === "circle" && "Click and drag to create a circle"}
-            {promptType === "polygon" && "Click to add points, double-click to complete the polygon"}
-          </p>
-        </div>
-      )}
-
-      {/* Action buttons - bottom right */}
-      <div className="absolute bottom-4 right-4 flex gap-2">
-        <button
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm flex items-center space-x-2"
-          onClick={handleComplete}
-          disabled={prompts.length === 0}
-        >
-          <span>Start Segmentation</span>
-          {prompts.length > 0 && (
-            <span className="bg-blue-500 px-2 py-0.5 rounded-full text-sm">
-              {prompts.length}
-            </span>
-          )}
-        </button>
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
+            <div className="spinner"></div>
+          </div>
+        )}
         
+        <canvas
+          ref={canvasRef}
+          width={canvasSize.width}
+          height={canvasSize.height}
+          className="touch-none"
+        />
+        
+        {/* Minimalist info panel */}
+        <div className="absolute top-2 left-2 bg-white bg-opacity-90 p-2 rounded-md shadow-sm text-xs max-w-xs">
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-gray-600">
+              <span className="font-medium">Pan:</span> Alt/Option + Drag
+            </div>
+            <div className="ml-3 px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
+              {Math.round(zoomLevel * 100)}%
+            </div>
+          </div>
+          {cursorPos && (
+            <div className="text-gray-500 text-xs">
+              Position: {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
+            </div>
+          )}
+        </div>
+        
+        {/* Status messages */}
+        {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.coordinates && currentPolygon.coordinates.length > 0 && (
+          <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 rounded-md text-xs">
+            Double-click to finish polygon
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-between mt-3">
         <button
-          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors shadow-sm"
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
           onClick={() => {
             setPrompts([]);
             setCurrentPolygon(null);
             setCurrentShape(null);
-            setDrawStartPos(null);
-            redrawCanvas();
           }}
         >
           Clear
+        </button>
+        <button
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleComplete}
+          disabled={prompts.length === 0}
+        >
+          Complete {prompts.length > 0 && `(${prompts.length})`}
         </button>
       </div>
     </div>

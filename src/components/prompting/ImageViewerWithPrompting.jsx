@@ -3,7 +3,7 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus, Move } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import MaskGenerationPanel from "./MaskGenerationPanel";
 import ContourEditor from "./ContourEditor";
@@ -79,6 +79,7 @@ const ImageViewerWithPrompting = () => {
   const [showMaskGenerationPanel, setShowMaskGenerationPanel] = useState(false);
   const [editingMask, setEditingMask] = useState(null);
   const [finalMask, setFinalMask] = useState(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // State for sidebar collapse
 
   // Add CSS for animations
   useEffect(() => {
@@ -1235,123 +1236,153 @@ const ImageViewerWithPrompting = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Image Selection Panel */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4 flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-            Select Image
-          </h2>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload New Image:
-            </label>
-            <div 
-              className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors duration-200 bg-gray-50 group"
-              style={{ minHeight: "120px" }}
-            >
-              <input
-                type="file"
-                accept="image/*"
-                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
-                onChange={handleFileUpload}
-                disabled={isRefinementMode || loading}
-              />
-              <div className="text-center flex flex-col items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 group-hover:text-blue-500 transition-colors mb-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+      <div className={`grid grid-cols-1 ${isSidebarCollapsed ? 'md:grid-cols-6' : 'md:grid-cols-3'} gap-6`}>
+        {/* Image Selection Panel with Collapse Toggle */}
+        <div className={`bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${isSidebarCollapsed ? 'md:col-span-1 w-16 overflow-hidden p-2' : 'md:col-span-1 p-6'}`}>
+          <div className={`flex ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} items-center mb-4`}>
+            {!isSidebarCollapsed && (
+              <h2 className="text-lg font-semibold flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
                 </svg>
-                <div className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors">
-                  <span className="block font-medium mb-1">
-                    Click to upload or drag and drop
-                  </span>
-                  <span className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">
-                    JPEG, PNG, or other image formats
-                  </span>
+                Select Image
+              </h2>
+            )}
+            
+            {/* Toggle Button */}
+            <button 
+              onClick={() => setIsSidebarCollapsed(prev => !prev)}
+              className={`p-1.5 rounded-md ${isSidebarCollapsed ? 'bg-blue-500 hover:bg-blue-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'} transition-colors ${isSidebarCollapsed ? 'mt-1' : ''}`}
+              title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isSidebarCollapsed ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Only show these components when sidebar is expanded */}
+          {!isSidebarCollapsed && (
+            <>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload New Image:
+                </label>
+                <div 
+                  className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors duration-200 bg-gray-50 group"
+                  style={{ minHeight: "120px" }}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer"
+                    onChange={handleFileUpload}
+                    disabled={isRefinementMode || loading}
+                  />
+                  <div className="text-center flex flex-col items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 group-hover:text-blue-500 transition-colors mb-2" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                    </svg>
+                    <div className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors">
+                      <span className="block font-medium mb-1">
+                        Click to upload or drag and drop
+                      </span>
+                      <span className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">
+                        JPEG, PNG, or other image formats
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Model Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M13 7H7v6h6V7z" />
-                <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 010-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
-              </svg>
-              Segmentation Model:
-            </label>
-            <div className="relative">
-              <select
-                className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
-                value={selectedModel}
-                onChange={handleModelChange}
-                disabled={isRefinementMode || loading}
-              >
-                <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
-                <option value="SAM2Small">SAM2 Small</option>
-                <option value="SAM2Large">SAM2 Large</option>
-                <option value="SAM2BasePlus">SAM2 Base Plus</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
+              {/* Model Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13 7H7v6h6V7z" />
+                    <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 010-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
+                  </svg>
+                  Segmentation Model:
+                </label>
+                <div className="relative">
+                  <select
+                    className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    disabled={isRefinementMode || loading}
+                  >
+                    <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
+                    <option value="SAM2Small">SAM2 Small</option>
+                    <option value="SAM2Large">SAM2 Large</option>
+                    <option value="SAM2BasePlus">SAM2 Base Plus</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2 italic">
+                  Larger models may be more accurate but will take longer to process.
+                </p>
               </div>
-            </div>
-            <p className="text-xs text-gray-500 mt-2 italic">
-              Larger models may be more accurate but will take longer to process.
-            </p>
-          </div>
 
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-medium text-sm text-gray-700 flex items-center">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-              </svg>
-              Available Images:
-            </h3>
-            
-            <div className="flex space-x-1">
-              <button 
-                className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
-                onClick={() => setViewMode('grid')}
-                title="Grid View"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button 
-                className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
-                onClick={() => setViewMode('list')}
-                title="List View"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
-              </button>
-            </div>
-          </div>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="font-medium text-sm text-gray-700 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                  </svg>
+                  Available Images:
+                </h3>
+                
+                <div className="flex space-x-1">
+                  <button 
+                    className={`p-1.5 rounded-md ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                    onClick={() => setViewMode('grid')}
+                    title="Grid View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                  </button>
+                  <button 
+                    className={`p-1.5 rounded-md ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-100'}`}
+                    onClick={() => setViewMode('list')}
+                    title="List View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
-          <div className="max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
+          {/* Update the available images section to support collapsed state */}
+          <div className={`${isSidebarCollapsed ? 'max-h-[calc(100vh-150px)]' : 'max-h-96'} overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100`}>
             {loading && !selectedImage ? (
               <div className="flex justify-center items-center py-8">
                 <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
               </div>
             ) : availableImages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 text-center bg-gray-50 rounded-lg border border-gray-100">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500 text-sm font-medium">No images available</p>
-                <p className="text-gray-400 text-xs mt-1">Upload an image to get started</p>
-              </div>
-            ) : viewMode === 'grid' ? (
+              !isSidebarCollapsed && (
+                <div className="flex flex-col items-center justify-center py-6 text-center bg-gray-50 rounded-lg border border-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-500 text-sm font-medium">No images available</p>
+                  <p className="text-gray-400 text-xs mt-1">Upload an image to get started</p>
+                </div>
+              )
+            ) : viewMode === 'grid' && !isSidebarCollapsed ? (
               <div className="grid grid-cols-2 gap-2">
                 {availableImages.map((image) => (
                   <div
@@ -1422,14 +1453,15 @@ const ImageViewerWithPrompting = () => {
                 ))}
               </div>
             ) : (
-              <div className="space-y-2">
+              // List view or collapsed sidebar view
+              <div className={`${isSidebarCollapsed ? 'space-y-2' : 'space-y-1'}`}>
                 {availableImages.map((image) => (
                   <div
                     key={`image-${image.id}-${selectedImageId === image.id ? 'selected' : 'unselected'}`}
-                    className={`flex items-center space-x-3 p-2 rounded-lg cursor-pointer transition-all duration-200 border ${
+                    className={`${isSidebarCollapsed ? 'p-1' : 'p-2'} rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border hover:shadow-md ${
                       selectedImageId === image.id
                         ? "border-blue-500 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        : "border-gray-200 hover:bg-gray-50"
                     } ${
                       isRefinementMode || loading
                         ? "opacity-50 pointer-events-none"
@@ -1437,69 +1469,72 @@ const ImageViewerWithPrompting = () => {
                     }`}
                     onClick={() => {
                       if (!isRefinementMode && !loading) {
-                        console.log("Clicked on image:", image.id);
-                        // Set selected ID immediately for visual feedback
                         setSelectedImageId(image.id);
-                        // Don't clear previous image until new one loads
                         handleImageSelect(image);
                       }
                     }}
                   >
-                    <div className="w-14 h-14 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
-                      {!image.isFromAPI && image.url ? (
-                        <img
-                          src={image.url}
-                          alt={image.name}
-                          className="w-full h-full object-cover"
-                          style={{ display: 'block' }}
-                        />
-                      ) : image.isFromAPI && image.thumbnailUrl ? (
-                        <img
-                          src={image.thumbnailUrl}
-                          alt={image.name}
-                          className="w-full h-full object-cover"
-                          style={{ display: 'block' }}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          {image.id}
+                    <div className={`flex ${isSidebarCollapsed ? 'justify-center' : 'items-center'}`}>
+                      {/* Thumbnail - always visible */}
+                      <div className={`${isSidebarCollapsed ? 'w-10 h-10' : 'w-16 h-16'} bg-gray-100 relative overflow-hidden rounded-md flex-shrink-0`}>
+                        {!image.isFromAPI && image.url ? (
+                          <img 
+                            src={image.url} 
+                            alt={image.name || `Sample ${image.id}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : image.thumbnailUrl ? (
+                          <img 
+                            src={image.thumbnailUrl} 
+                            alt={image.name || `Image ${image.id}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error(`Error loading thumbnail for image ${image.id}`);
+                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlZWVlZWUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEycHgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkVycm9yPC90ZXh0Pjwvc3ZnPg==';
+                            }}
+                          />
+                        ) : image.isLoading ? (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-t-blue-500 border-blue-200 rounded-full animate-spin"></div>
+                          </div>
+                        ) : image.loadError ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        )}
+                        
+                        {/* Selection indicator */}
+                        {selectedImageId === image.id && (
+                          <div className="absolute bottom-0.5 right-0.5 bg-blue-500 rounded-full p-0.5 border border-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Only show text info when sidebar is expanded */}
+                      {!isSidebarCollapsed && (
+                        <div className="ml-2 flex-grow min-w-0">
+                          <p className="text-xs font-medium text-gray-800 truncate">
+                            {image.name || `Image ${image.id}`}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {image.width && image.height ? 
+                              `${image.width} × ${image.height}` : 
+                              image.isLoading ? "Loading..." : "Unknown size"}
+                          </p>
                         </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate text-gray-700">
-                        {image.name}
-                      </p>
-                      <div className="flex items-center mt-1">
-                        {image.isFromAPI ? (
-                          <span className="text-xs text-blue-600 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                            </svg>
-                            Server
-                          </span>
-                        ) : (
-                          <span className="text-xs text-orange-600 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-0.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
-                            </svg>
-                            Sample
-                          </span>
-                        )}
-                        {image.width && image.height && (
-                          <p className="text-xs text-gray-500 ml-3">
-                            {image.width} × {image.height}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {selectedImageId === image.id && (
-                      <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1507,8 +1542,8 @@ const ImageViewerWithPrompting = () => {
           </div>
         </div>
 
-        {/* Image Viewer and Prompting Canvas */}
-        <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+        {/* Image Viewer and Prompting Canvas - expand when sidebar is collapsed */}
+        <div className={`${isSidebarCollapsed ? 'md:col-span-5' : 'md:col-span-2'} bg-white p-6 rounded-lg shadow-sm border border-gray-100`}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
               {isRefinementMode ? (
@@ -1548,13 +1583,38 @@ const ImageViewerWithPrompting = () => {
                 <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
                   {/* Tool Selection */}
                   <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
+                    {/* Add Drag tool as the first button */}
+                    <button
+                      className={`p-2 transition-colors ${
+                        promptType === "drag"
+                          ? "bg-blue-500 text-white"
+                          : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => {
+                        setPromptType("drag");
+                        // Also tell the canvas component to use drag mode
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("drag");
+                        }
+                      }}
+                      title="Drag Tool (Pan image)"
+                    >
+                      <Move className="w-4 h-4" />
+                    </button>
+                    
                     <button
                       className={`p-2 transition-colors ${
                         promptType === "point"
                           ? "bg-blue-500 text-white"
                           : "hover:bg-gray-100"
                       }`}
-                      onClick={() => setPromptType("point")}
+                      onClick={() => {
+                        setPromptType("point");
+                        // Tell canvas to use point tool
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("point");
+                        }
+                      }}
                       title="Point Tool"
                     >
                       <MousePointer className="w-4 h-4" />
@@ -1565,7 +1625,13 @@ const ImageViewerWithPrompting = () => {
                           ? "bg-blue-500 text-white"
                           : "hover:bg-gray-100"
                       }`}
-                      onClick={() => setPromptType("box")}
+                      onClick={() => {
+                        setPromptType("box");
+                        // Tell canvas to use point tool
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("point");
+                        }
+                      }}
                       title="Box Tool"
                     >
                       <Square className="w-4 h-4" />
@@ -1576,7 +1642,13 @@ const ImageViewerWithPrompting = () => {
                           ? "bg-blue-500 text-white"
                           : "hover:bg-gray-100"
                       }`}
-                      onClick={() => setPromptType("circle")}
+                      onClick={() => {
+                        setPromptType("circle");
+                        // Tell canvas to use point tool
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("point");
+                        }
+                      }}
                       title="Circle Tool"
                     >
                       <Circle className="w-4 h-4" />
@@ -1587,7 +1659,13 @@ const ImageViewerWithPrompting = () => {
                           ? "bg-blue-500 text-white"
                           : "hover:bg-gray-100"
                       }`}
-                      onClick={() => setPromptType("polygon")}
+                      onClick={() => {
+                        setPromptType("polygon");
+                        // Tell canvas to use point tool
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("point");
+                        }
+                      }}
                       title="Polygon Tool"
                     >
                       <Pentagon className="w-4 h-4" />
@@ -1616,6 +1694,14 @@ const ImageViewerWithPrompting = () => {
                     >
                       Background (0)
                     </button>
+                  </div>
+                  
+                  {/* Add help text about Alt/Option key */}
+                  <div className="text-sm text-gray-600 flex items-center ml-auto">
+                    <span className="hidden sm:inline">Pan with:</span>
+                    <kbd className="px-1.5 py-0.5 mx-1 bg-gray-100 rounded text-xs border border-gray-300">Alt/Option</kbd>
+                    <span>+</span>
+                    <kbd className="px-1.5 py-0.5 ml-1 bg-gray-100 rounded text-xs border border-gray-300">Drag</kbd>
                   </div>
                 </div>
 
