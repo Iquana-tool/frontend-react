@@ -230,6 +230,18 @@ const ImageViewerWithPrompting = () => {
   const [canvasImage, setCanvasImage] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [finalMasks, setFinalMasks] = useState([]); // Add this state for tracking final masks
+  const [selectedFinalMaskContour, setSelectedFinalMaskContour] = useState(null); // Track selected contour in FMV
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomCenter, setZoomCenter] = useState({ x: 0.5, y: 0.5 }); // Default center
+  const finalMaskCanvasRef = useRef(null);
+  // Add a new state for collapsed annotation viewer
+  const [annotationViewerCollapsed, setAnnotationViewerCollapsed] = useState(false);
+  // Add ref for the second PromptingCanvas in annotation viewer
+  const annotationPromptingCanvasRef = useRef(null);
+  // Add state to track if we're in prompting mode in the annotation viewer
+  const [annotationPromptingMode, setAnnotationPromptingMode] = useState(false);
+  // Add state to track prompts for the annotation viewer
+  const [annotationPrompts, setAnnotationPrompts] = useState([]);
 
   // Add CSS for animations
   useEffect(() => {
@@ -1431,7 +1443,7 @@ const ImageViewerWithPrompting = () => {
       setFinalMasks(prev => [...prev, newFinalMask]);
       
       setSuccessMessageWithTimeout("Selected contours added to final mask");
-      setShowAnnotationViewer(false); // Hide annotation viewer after adding
+      // Keep annotation viewer visible, just clear selection
       setSelectedContours([]); // Clear selection
     } catch (err) {
       console.error("Error adding contours to final mask:", err);
@@ -1454,6 +1466,41 @@ const ImageViewerWithPrompting = () => {
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Check if there's a selected contour from Final Mask Viewer that matches a contour in bestMask
+    let annotationViewerZoom = false;
+    let selectedAnnotationContourIndex = -1;
+    
+    if (selectedFinalMaskContour && selectedContours.length === 1) {
+      selectedAnnotationContourIndex = selectedContours[0];
+      
+      // Check if we should zoom on this contour
+      if (selectedAnnotationContourIndex >= 0 && selectedAnnotationContourIndex < bestMask.contours.length) {
+        annotationViewerZoom = true;
+      }
+    }
+
+    // Save context for zoom if needed
+    ctx.save();
+    
+    // Apply zoom if a contour is selected
+    if (annotationViewerZoom) {
+      const contour = bestMask.contours[selectedAnnotationContourIndex];
+      
+      // Calculate center point for zooming
+      let centerX = 0, centerY = 0;
+      for (let i = 0; i < contour.x.length; i++) {
+        centerX += contour.x[i] * canvas.width;
+        centerY += contour.y[i] * canvas.height;
+      }
+      centerX /= contour.x.length;
+      centerY /= contour.y.length;
+      
+      // Apply zoom transform
+      ctx.translate(centerX, centerY);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-centerX, -centerY);
+    }
 
     // Draw the original image
     ctx.drawImage(canvasImage, 0, 0);
@@ -1482,39 +1529,56 @@ const ImageViewerWithPrompting = () => {
         ctx.fill();
         ctx.stroke();
 
-        // Add label
-        ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
-        ctx.font = "bold 14px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
+        // Add label if not zoomed in too far
+        if (zoomLevel < 5) {
+          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+          ctx.font = "bold 14px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
 
-        // Calculate center for label
-        let centerX = 0, centerY = 0;
-        for (let i = 0; i < contour.x.length; i++) {
-          centerX += contour.x[i] * canvas.width;
-          centerY += contour.y[i] * canvas.height;
+          // Calculate center for label
+          let centerX = 0, centerY = 0;
+          for (let i = 0; i < contour.x.length; i++) {
+            centerX += contour.x[i] * canvas.width;
+            centerY += contour.y[i] * canvas.height;
+          }
+          centerX /= contour.x.length;
+          centerY /= contour.y.length;
+
+          // Draw white background for text
+          const text = `#${index + 1}`;
+          const metrics = ctx.measureText(text);
+          const padding = 4;
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.fillRect(
+            centerX - metrics.width/2 - padding,
+            centerY - 7 - padding,
+            metrics.width + padding * 2,
+            14 + padding * 2
+          );
+
+          // Draw text
+          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+          ctx.fillText(text, centerX, centerY);
         }
-        centerX /= contour.x.length;
-        centerY /= contour.y.length;
-
-        // Draw white background for text
-        const text = `#${index + 1}`;
-        const metrics = ctx.measureText(text);
-        const padding = 4;
-        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-        ctx.fillRect(
-          centerX - metrics.width/2 - padding,
-          centerY - 7 - padding,
-          metrics.width + padding * 2,
-          14 + padding * 2
-        );
-
-        // Draw text
-        ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
-        ctx.fillText(text, centerX, centerY);
       }
     });
-  }, [bestMask, canvasImage, selectedContours]);
+    
+    // Restore context
+    ctx.restore();
+    
+    // Add zoom controls if zoomed
+    if (annotationViewerZoom) {
+      // Draw the controls outside the transformed context
+      ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.fillRect(canvas.width - 100, 10, 90, 30);
+      
+      ctx.font = "12px Arial";
+      ctx.fillStyle = "#000";
+      ctx.textAlign = "left";
+      ctx.fillText(`Zoom: ${zoomLevel}x`, canvas.width - 90, 30);
+    }
+  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, zoomLevel]);
 
   const isPointInContour = (x, y, contour, canvas) => {
     const points = [];
@@ -1535,16 +1599,116 @@ const ImageViewerWithPrompting = () => {
     return inside;
   };
 
+  // Helper function to find matching contour in the annotation viewer
+  const findMatchingContour = (targetContour, contours) => {
+    if (!targetContour || !contours || contours.length === 0) return -1;
+    
+    // This is a simplified approach to match contours - may need more sophisticated matching
+    // based on your specific contour data structure
+    for (let i = 0; i < contours.length; i++) {
+      const contour = contours[i];
+      
+      // Check if contours have similar coordinates
+      if (contour.x && contour.y && 
+          targetContour.x && targetContour.y &&
+          contour.x.length === targetContour.x.length &&
+          contour.y.length === targetContour.y.length) {
+          
+        // Check if points are similar
+        let match = true;
+        for (let j = 0; j < contour.x.length; j++) {
+          if (Math.abs(contour.x[j] - targetContour.x[j]) > 0.001 ||
+              Math.abs(contour.y[j] - targetContour.y[j]) > 0.001) {
+            match = false;
+            break;
+          }
+        }
+        
+        if (match) return i;
+      }
+    }
+    
+    return -1; // No match found
+  };
+
+  // Handle contour selection in the Final Mask Viewer
+  const handleFinalMaskContourSelect = (mask, contourIndex) => {
+    // If same contour is clicked again, deselect it
+    if (selectedFinalMaskContour && 
+        selectedFinalMaskContour.maskId === mask.id && 
+        selectedFinalMaskContour.contourIndex === contourIndex) {
+      setSelectedFinalMaskContour(null);
+      setZoomLevel(1); // Reset zoom
+      return;
+    }
+    
+    // Select new contour
+    setSelectedFinalMaskContour({
+      maskId: mask.id,
+      contourIndex: contourIndex,
+      contour: mask.contours[contourIndex]
+    });
+    
+    // Calculate contour center for zooming
+    const contour = mask.contours[contourIndex];
+    if (contour && contour.x && contour.y && contour.x.length > 0) {
+      // Calculate center point of contour
+      let centerX = 0, centerY = 0;
+      for (let i = 0; i < contour.x.length; i++) {
+        centerX += contour.x[i];
+        centerY += contour.y[i];
+      }
+      centerX /= contour.x.length;
+      centerY /= contour.y.length;
+      
+      // Set zoom center and level
+      setZoomCenter({ x: centerX, y: centerY });
+      setZoomLevel(3); // Zoom in 3x
+      
+      // Also show and zoom the same contour in annotation viewer if it exists
+      if (bestMask && showAnnotationViewer) {
+        // Find matching contour in annotation viewer (may need adjustment based on your contour data structure)
+        const matchingContourIndex = findMatchingContour(contour, bestMask.contours);
+        if (matchingContourIndex !== -1) {
+          setSelectedContours([matchingContourIndex]);
+        }
+      }
+    }
+  };
+
   const handleAnnotationCanvasClick = useCallback((event) => {
-    if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer) return;
+    // Don't handle clicks if in prompting mode
+    if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer || annotationPromptingMode) return;
 
     const canvas = annotationCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    const x = (event.clientX - rect.left) * scaleX;
-    const y = (event.clientY - rect.top) * scaleY;
+    // Get click coordinates
+    let x = (event.clientX - rect.left) * scaleX;
+    let y = (event.clientY - rect.top) * scaleY;
+    
+    // Adjust coordinates if zoomed
+    if (selectedFinalMaskContour && selectedContours.length === 1) {
+      const selectedContourIndex = selectedContours[0];
+      const contour = bestMask.contours[selectedContourIndex];
+      
+      if (contour) {
+        // Calculate center point used for zooming
+        let centerX = 0, centerY = 0;
+        for (let i = 0; i < contour.x.length; i++) {
+          centerX += contour.x[i] * canvas.width;
+          centerY += contour.y[i] * canvas.height;
+        }
+        centerX /= contour.x.length;
+        centerY /= contour.y.length;
+        
+        // Adjust coordinates for zoom
+        x = (x - centerX) / zoomLevel + centerX;
+        y = (y - centerY) / zoomLevel + centerY;
+      }
+    }
 
     // Check each contour for intersection
     let clickedContourIndex = -1;
@@ -1560,10 +1724,36 @@ const ImageViewerWithPrompting = () => {
         const newSelection = prev.includes(clickedContourIndex)
           ? prev.filter(i => i !== clickedContourIndex)
           : [...prev, clickedContourIndex];
+        
+        // If clicked on a new contour while zoomed in, update the final mask viewer selection as well
+        if (!prev.includes(clickedContourIndex) && newSelection.length === 1) {
+          // Find matching contour in final masks
+          if (finalMasks.length > 0) {
+            for (const mask of finalMasks) {
+              const matchingContourIndex = findMatchingContour(bestMask.contours[clickedContourIndex], mask.contours);
+              if (matchingContourIndex !== -1) {
+                handleFinalMaskContourSelect(mask, matchingContourIndex);
+                break;
+              }
+            }
+          }
+        }
+        
+        // If deselected the last contour, also reset zoom
+        if (newSelection.length === 0) {
+          setZoomLevel(1);
+          setSelectedFinalMaskContour(null);
+        }
+        
         return newSelection;
       });
+    } else if (selectedContours.length > 0 && zoomLevel > 1) {
+      // Clicked outside contours, reset zoom and selection if zoomed in
+      setSelectedContours([]);
+      setZoomLevel(1);
+      setSelectedFinalMaskContour(null);
     }
-  }, [bestMask, showAnnotationViewer]);
+  }, [bestMask, showAnnotationViewer, selectedFinalMaskContour, zoomLevel, finalMasks, annotationPromptingMode]);
 
   // Update annotation canvas when bestMask changes
   useEffect(() => {
@@ -1679,6 +1869,278 @@ const ImageViewerWithPrompting = () => {
     
     updateMaskImages();
   }, [segmentationMasks, finalMasks, imageObject]);
+
+  // Draw the final mask canvas with selectable contours
+  const drawFinalMaskCanvas = useCallback((mask) => {
+    if (!finalMaskCanvasRef.current || !mask || !canvasImage) return;
+
+    const canvas = finalMaskCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas dimensions to match the image
+    canvas.width = canvasImage.width;
+    canvas.height = canvasImage.height;
+
+    // Calculate zoom transform
+    const zoomTransform = () => {
+      const centerX = zoomCenter.x * canvas.width;
+      const centerY = zoomCenter.y * canvas.height;
+      
+      ctx.translate(centerX, centerY);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-centerX, -centerY);
+    };
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Apply zoom if there's a selected contour
+    ctx.save();
+    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+      zoomTransform();
+    }
+
+    // Draw the original image
+    ctx.drawImage(canvasImage, 0, 0);
+    
+    // If zoomed, add a semi-transparent overlay except for the selected contour area
+    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+      // Add semi-transparent overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    // Draw contours
+    mask.contours.forEach((contour, index) => {
+      const isSelected = selectedFinalMaskContour && 
+                          selectedFinalMaskContour.maskId === mask.id && 
+                          selectedFinalMaskContour.contourIndex === index;
+
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.strokeStyle = isSelected ? "#2563eb" : "#10b981";
+      ctx.fillStyle = isSelected ? "rgba(37, 99, 235, 0.3)" : "rgba(16, 185, 129, 0.2)";
+
+      if (contour.x && contour.y && contour.x.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(contour.x[0] * canvas.width, contour.y[0] * canvas.height);
+
+        for (let i = 1; i < contour.x.length; i++) {
+          ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
+        }
+
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Add label if not zoomed in too far
+        if (zoomLevel < 5) {
+          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+          ctx.font = "bold 14px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          // Calculate center for label
+          let centerX = 0, centerY = 0;
+          for (let i = 0; i < contour.x.length; i++) {
+            centerX += contour.x[i] * canvas.width;
+            centerY += contour.y[i] * canvas.height;
+          }
+          centerX /= contour.x.length;
+          centerY /= contour.y.length;
+
+          // Draw white background for text
+          const text = `#${index + 1}`;
+          const metrics = ctx.measureText(text);
+          const padding = 4;
+          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.fillRect(
+            centerX - metrics.width/2 - padding,
+            centerY - 7 - padding,
+            metrics.width + padding * 2,
+            14 + padding * 2
+          );
+
+          // Draw text
+          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+          ctx.fillText(text, centerX, centerY);
+        }
+      }
+    });
+    
+    ctx.restore();
+  }, [canvasImage, selectedFinalMaskContour, zoomLevel, zoomCenter]);
+
+  const handleFinalMaskCanvasClick = useCallback((event, mask) => {
+    if (!finalMaskCanvasRef.current || !mask) return;
+
+    const canvas = finalMaskCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Get click coordinates
+    let x = (event.clientX - rect.left) * scaleX;
+    let y = (event.clientY - rect.top) * scaleY;
+
+    // Adjust coordinates for zoom
+    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+      const centerX = zoomCenter.x * canvas.width;
+      const centerY = zoomCenter.y * canvas.height;
+      
+      // Reverse the zoom transform
+      x = (x - centerX) / zoomLevel + centerX;
+      y = (y - centerY) / zoomLevel + centerY;
+    }
+
+    // Check each contour for intersection
+    let clickedContourIndex = -1;
+    for (let i = 0; i < mask.contours.length; i++) {
+      if (isPointInContour(x, y, mask.contours[i], canvas)) {
+        clickedContourIndex = i;
+        break;
+      }
+    }
+
+    if (clickedContourIndex !== -1) {
+      // Handle contour selection
+      handleFinalMaskContourSelect(mask, clickedContourIndex);
+    } else {
+      // Clicked outside contours, reset zoom if zoomed in
+      if (zoomLevel > 1) {
+        setSelectedFinalMaskContour(null);
+        setZoomLevel(1);
+      }
+    }
+  }, [selectedFinalMaskContour, zoomLevel, zoomCenter]);
+  
+  // Update final mask canvas when zoom or selected contour changes
+  useEffect(() => {
+    // Find the mask that needs to be redrawn
+    if (selectedFinalMaskContour && finalMasks.length > 0) {
+      const mask = finalMasks.find(m => m.id === selectedFinalMaskContour.maskId);
+      if (mask && canvasImage) {
+        setTimeout(() => {
+          // Use setTimeout to ensure the canvas ref is ready
+          drawFinalMaskCanvas(mask);
+        }, 0);
+      }
+    }
+  }, [selectedFinalMaskContour, zoomLevel, zoomCenter, canvasImage, finalMasks, drawFinalMaskCanvas]);
+
+  // Effect to update final mask canvases when canvasImage or processedMaskImages change
+  useEffect(() => {
+    if (finalMasks.length > 0 && canvasImage && finalMaskCanvasRef.current) {
+      finalMasks.forEach(mask => {
+        if (processedMaskImages[mask.id]) {
+          setTimeout(() => {
+            // Use setTimeout to ensure the canvas has been rendered
+            drawFinalMaskCanvas(mask);
+          }, 0);
+        }
+      });
+    }
+  }, [canvasImage, processedMaskImages, finalMasks, drawFinalMaskCanvas]);
+
+  // Update annotation canvas when zoom or selected contour changes 
+  useEffect(() => {
+    if (showAnnotationViewer && bestMask && canvasImage) {
+      drawAnnotationCanvas();
+    }
+  }, [showAnnotationViewer, bestMask, canvasImage, selectedContours, selectedFinalMaskContour, zoomLevel, drawAnnotationCanvas]);
+
+  // Add effect for zooming in the annotation viewer based on final mask selection
+  useEffect(() => {
+    if (selectedFinalMaskContour && bestMask && showAnnotationViewer) {
+      // Find matching contour in annotation viewer
+      const matchingContourIndex = findMatchingContour(selectedFinalMaskContour.contour, bestMask.contours);
+      if (matchingContourIndex !== -1) {
+        setSelectedContours([matchingContourIndex]);
+      }
+    }
+  }, [selectedFinalMaskContour, bestMask, showAnnotationViewer]);
+
+  // Handle prompting in the annotation viewer
+  const handleAnnotationPromptingComplete = useCallback(async (prompts) => {
+    if (!prompts || prompts.length === 0) {
+      setError("Please add at least one prompt for segmentation.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+    setIsSegmenting(true);
+    setSuccessMessageWithTimeout("Processing iterative segmentation...");
+
+    try {
+      // Store the current image ID
+      const currentImageId = selectedImageId;
+      
+      // Process the segmentation with the new prompts
+      const segmentationResponse = await api.segmentImage(
+        currentImageId,
+        selectedModel,
+        prompts,
+        { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }, // Full image
+        currentLabel
+      );
+
+      let newMasks = [];
+      if (segmentationResponse.original_masks) {
+        newMasks = segmentationResponse.original_masks.map((mask, index) => ({
+          id: index,
+          base64: segmentationResponse.base64_masks[index],
+          quality: segmentationResponse.quality[index],
+          contours: mask.contours,
+          contour: mask.contours.length > 0 ? mask.contours[0] : null,
+          quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null,
+          isLoading: true
+        }));
+
+        // Update masks
+        setSegmentationMasks(newMasks);
+        
+        // Find and set the best mask
+        if (newMasks.length > 0) {
+          const highestConfidenceMask = [...newMasks].sort((a, b) => b.quality - a.quality)[0];
+          setBestMask(highestConfidenceMask);
+        }
+        
+        // Clear annotation prompts
+        setAnnotationPrompts([]);
+        // Exit prompting mode
+        setAnnotationPromptingMode(false);
+        
+        setSuccessMessageWithTimeout(`Iterative segmentation complete! Found ${newMasks.length} segments.`);
+      }
+    } catch (error) {
+      setError("Failed to generate segmentation: " + error.message);
+    } finally {
+      setIsSegmenting(false);
+      setLoading(false);
+    }
+  }, [api, selectedImageId, selectedModel, currentLabel, setAnnotationPrompts, setAnnotationPromptingMode, setError, setLoading, setIsSegmenting, setSuccessMessageWithTimeout, setSegmentationMasks, setBestMask]);
+  
+  // Toggle annotation prompting mode
+  const toggleAnnotationPromptingMode = useCallback(() => {
+    const newMode = !annotationPromptingMode;
+    setAnnotationPromptingMode(newMode);
+    
+    if (newMode) {
+      // Entering prompting mode
+      // Clear selected contours when entering prompting mode
+      setSelectedContours([]);
+      // Reset zoom level if zoomed in
+      if (zoomLevel > 1) {
+        setZoomLevel(1);
+      }
+    } else {
+      // Exiting prompting mode
+      // Clear annotation prompts
+      setAnnotationPrompts([]);
+      // Ensure the annotation canvas is redrawn
+      drawAnnotationCanvas();
+    }
+  }, [annotationPromptingMode, zoomLevel, setSelectedContours, setZoomLevel, setAnnotationPrompts, drawAnnotationCanvas]);
 
   return (
     <div className="container mx-auto p-4">
@@ -2204,7 +2666,7 @@ const ImageViewerWithPrompting = () => {
                 <div className="dual-viewer-container mb-6">
                   {/* Annotation Viewer (AV) */}
                   <div className="viewer-panel">
-                    <div className="viewer-header">Annotation Viewer</div>
+                    <div className="viewer-header">Annotation Drawing Area</div>
                     <div className="h-[500px]">
                       {/* Use the PromptingCanvas for adding annotations */}
                       <PromptingCanvas
@@ -2225,7 +2687,7 @@ const ImageViewerWithPrompting = () => {
                     <div className="p-4">
                       {finalMasks.length === 0 ? (
                         <div className="text-center text-gray-500 py-8">
-                          No masks added to final view yet. Select contours from the Annotation Viewer to add them here.
+                          No masks added to final view yet. Select contours from the Annotation Drawing Area to add them here.
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -2239,26 +2701,98 @@ const ImageViewerWithPrompting = () => {
                                 <button
                                   onClick={() => {
                                     setFinalMasks(prev => prev.filter(m => m.id !== mask.id));
+                                    // Reset selection if this mask is selected
+                                    if (selectedFinalMaskContour?.maskId === mask.id) {
+                                      setSelectedFinalMaskContour(null);
+                                      setZoomLevel(1);
+                                    }
                                   }}
                                   className="text-red-600 hover:text-red-700"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
                               </div>
-                              {/* Display mask preview */}
+                              {/* Display mask canvas for interaction */}
                               <div className="relative h-40 bg-gray-50 rounded overflow-hidden">
-                                {processedMaskImages[mask.id] && (
-                                  <img
-                                    src={`data:image/png;base64,${processedMaskImages[mask.id]}`}
-                                    alt={`Final mask ${index + 1}`}
-                                    className="w-full h-full object-contain"
-                                  />
-                                )}
-                                {!processedMaskImages[mask.id] && (
+                                {processedMaskImages[mask.id] ? (
+                                  <>
+                                    <canvas
+                                      ref={el => {
+                                        // Set the ref when the element is rendered
+                                        if (el) {
+                                          finalMaskCanvasRef.current = el;
+                                          // Draw the canvas when the ref is set
+                                          drawFinalMaskCanvas(mask);
+                                        }
+                                      }}
+                                      onClick={(e) => handleFinalMaskCanvasClick(e, mask)}
+                                      className="w-full h-full object-contain"
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                    {/* Overlay with zoom controls if zoomed in */}
+                                    {selectedFinalMaskContour?.maskId === mask.id && zoomLevel > 1 && (
+                                      <div className="absolute bottom-2 right-2 flex space-x-1">
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setZoomLevel(prev => Math.min(prev + 1, 5));
+                                            drawFinalMaskCanvas(mask);
+                                          }}
+                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                          </svg>
+                                        </button>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (zoomLevel > 1) {
+                                              setZoomLevel(prev => prev - 1);
+                                              if (zoomLevel === 2) {
+                                                setSelectedFinalMaskContour(null);
+                                                setZoomLevel(1);
+                                              } else {
+                                                drawFinalMaskCanvas(mask);
+                                              }
+                                            }
+                                          }}
+                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                          </svg>
+                                        </button>
+                                        <button 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedFinalMaskContour(null);
+                                            setZoomLevel(1);
+                                          }}
+                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    )}
+                                    {/* Add info badge when a contour is selected */}
+                                    {selectedFinalMaskContour?.maskId === mask.id && (
+                                      <div className="absolute top-2 left-2 bg-blue-100 text-blue-800 text-xs font-medium rounded px-2 py-1 shadow-sm">
+                                        Contour #{selectedFinalMaskContour.contourIndex + 1} selected
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
                                   <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="w-8 h-8 border-t-2 border-blue-500 rounded-full animate-spin"></div>
                                   </div>
                                 )}
+                              </div>
+                              {/* User instructions tooltip */}
+                              <div className="mt-2 text-xs text-gray-500 italic">
+                                Click on a contour to select and zoom it
                               </div>
                               {/* Display quantifications if available */}
                               {mask.contour && mask.contour.quantifications && (
@@ -2350,42 +2884,51 @@ const ImageViewerWithPrompting = () => {
             </div>
           )}
 
-          {/* Segmentation Results Header */}
-          {segmentationMasks.length > 0 && (
-            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-lg font-medium">Segmentation Results</h2>
-                  <span className="text-sm text-gray-500">
-                    Found {segmentationMasks.length} segments
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowAnnotationViewer(!showAnnotationViewer)}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm flex items-center transition-colors"
-                  >
-                    {showAnnotationViewer ? 'Hide' : 'Show'} Annotation Viewer
-                  </button>
-                  <button
-                    onClick={() => setShowExpandedQuantifications(!showExpandedQuantifications)}
-                    className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-md text-sm flex items-center transition-colors"
-                  >
-                    {showExpandedQuantifications ? 'Collapse' : 'Expand'} Details
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          
 
           {/* Add Annotation Viewer after segmentation */}
           {showAnnotationViewer && bestMask && (
             <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-medium text-gray-800">
-                  Annotation Viewer - Best Mask (Confidence: {(bestMask.quality * 100).toFixed(1)}%)
+                  Annotation Viewer - Mask (Confidence: {(bestMask.quality * 100).toFixed(1)}%)
                 </h3>
                 <div className="flex space-x-2">
+                  {/* Toggle prompting mode button */}
+                  <button
+                    onClick={toggleAnnotationPromptingMode}
+                    className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
+                      annotationPromptingMode
+                        ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                        : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                    }`}
+                    title={annotationPromptingMode ? "Exit Prompting Mode" : "Enter Prompting Mode"}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+                    </svg>
+                    {annotationPromptingMode ? "Exit Prompting" : "Prompt Again"}
+                  </button>
+                  
+                  {/* Segment button (only visible in prompting mode) */}
+                  {annotationPromptingMode && (
+                    <button
+                      onClick={() => {
+                        if (annotationPromptingCanvasRef.current) {
+                          annotationPromptingCanvasRef.current.getPrompts();
+                        }
+                      }}
+                      disabled={loading}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm flex items-center transition-colors"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                      </svg>
+                      Segment Again
+                    </button>
+                  )}
+                  
                   <button
                     onClick={handleAddSelectedContoursToFinalMask}
                     disabled={selectedContours.length === 0 || loading}
@@ -2400,32 +2943,139 @@ const ImageViewerWithPrompting = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setShowAnnotationViewer(false);
-                      setSelectedContours([]);
+                      setAnnotationViewerCollapsed(prev => !prev);
                     }}
                     className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md text-sm flex items-center transition-colors"
+                    title={annotationViewerCollapsed ? "Expand" : "Collapse"}
                   >
-                    <X className="w-4 h-4 mr-1.5" />
-                    Close
+                    {annotationViewerCollapsed ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="18 15 12 9 6 15"></polyline>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    )}
+                    {annotationViewerCollapsed ? "Expand" : "Collapse"}
                   </button>
                 </div>
               </div>
               
-              <div className="flex flex-col mb-2">
-                <div className="text-sm text-gray-600 mb-2">
-                  Click on contours to select/deselect them for the final mask. Selected: {selectedContours.length}
+              {!annotationViewerCollapsed && (
+                <div className="flex flex-col mb-2">
+                  {/* Add prompting controls when in prompting mode */}
+                  {annotationPromptingMode && (
+                    <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
+                        <button
+                          className={`p-2 transition-colors ${
+                            promptType === "point"
+                              ? "bg-blue-500 text-white"
+                              : "hover:bg-gray-100"
+                          }`}
+                          onClick={() => {
+                            setPromptType("point");
+                            if (annotationPromptingCanvasRef.current) {
+                              annotationPromptingCanvasRef.current.setActiveTool("point");
+                            }
+                          }}
+                          title="Point Tool"
+                        >
+                          <MousePointer className="w-4 h-4" />
+                        </button>
+                        <button
+                          className={`p-2 transition-colors ${
+                            promptType === "box"
+                              ? "bg-blue-500 text-white"
+                              : "hover:bg-gray-100"
+                          }`}
+                          onClick={() => {
+                            setPromptType("box");
+                            if (annotationPromptingCanvasRef.current) {
+                              annotationPromptingCanvasRef.current.setActiveTool("box");
+                            }
+                          }}
+                          title="Box Tool"
+                        >
+                          <Square className="w-4 h-4" />
+                        </button>
+                        <button
+                          className={`p-2 transition-colors ${
+                            promptType === "circle"
+                              ? "bg-blue-500 text-white"
+                              : "hover:bg-gray-100"
+                          }`}
+                          onClick={() => {
+                            setPromptType("circle");
+                            if (annotationPromptingCanvasRef.current) {
+                              annotationPromptingCanvasRef.current.setActiveTool("circle");
+                            }
+                          }}
+                          title="Circle Tool"
+                        >
+                          <Circle className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <button
+                          className={`p-2 rounded-md ${
+                            currentLabel === 1
+                              ? "bg-green-500 text-white"
+                              : "bg-white border border-green-500 text-green-500"
+                          }`}
+                          onClick={() => setCurrentLabel(1)}
+                        >
+                          Foreground (1)
+                        </button>
+                        <button
+                          className={`p-2 rounded-md ${
+                            currentLabel === 0
+                              ? "bg-red-500 text-white"
+                              : "bg-white border border-red-500 text-red-500"
+                          }`}
+                          onClick={() => setCurrentLabel(0)}
+                        >
+                          Background (0)
+                        </button>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600">
+                        Add prompts for iterative segmentation
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="text-sm text-gray-600 mb-2">
+                    {annotationPromptingMode 
+                      ? "Add prompts to refine segmentation" 
+                      : "Click on contours to select/deselect them for the final mask. Selected: " + selectedContours.length}
+                  </div>
+                  <div className="relative border border-gray-300 rounded-md overflow-hidden" style={{height: "500px"}}>
+                    {/* Show prompting canvas if in prompting mode, otherwise show annotation canvas */}
+                    {annotationPromptingMode ? (
+                      <PromptingCanvas
+                        ref={annotationPromptingCanvasRef}
+                        image={imageObject}
+                        onPromptingComplete={handleAnnotationPromptingComplete}
+                        promptType={promptType}
+                        currentLabel={currentLabel}
+                        initialActiveTool={promptType}
+                      />
+                    ) : (
+                      <canvas 
+                        ref={annotationCanvasRef}
+                        onClick={handleAnnotationCanvasClick}
+                        width={selectedImage?.width || 800}
+                        height={selectedImage?.height || 600}
+                        className="w-full h-full object-contain"
+                        style={{ cursor: 'pointer' }}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="relative border border-gray-300 rounded-md overflow-hidden" style={{height: "500px"}}>
-                  <canvas 
-                    ref={annotationCanvasRef}
-                    onClick={handleAnnotationCanvasClick}
-                    width={selectedImage?.width || 800}
-                    height={selectedImage?.height || 600}
-                    className="w-full h-full object-contain"
-                    style={{ cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
+              )}
             </div>
           )}
 
