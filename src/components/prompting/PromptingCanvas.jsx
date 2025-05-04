@@ -22,7 +22,10 @@ const PromptingCanvas = forwardRef(({
   isRefinementMode = false,
   selectedMask: selectedMaskProp,
   promptType,
-  currentLabel
+  currentLabel,
+  zoomLevel: externalZoomLevel,
+  zoomCenter: externalZoomCenter,
+  selectedContour
 }, ref) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
@@ -32,7 +35,7 @@ const PromptingCanvas = forwardRef(({
   const [prompts, setPrompts] = useState([]);
 
   // View state
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(externalZoomLevel || 1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
@@ -48,6 +51,7 @@ const PromptingCanvas = forwardRef(({
   const [selectedMask, setSelectedMask] = useState(null);
   const [isProcessingMask, setIsProcessingMask] = useState(false);
   const [activeTool, setActiveTool] = useState("point");
+  const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
@@ -91,6 +95,52 @@ const PromptingCanvas = forwardRef(({
   useEffect(() => {
     setSelectedMask(selectedMaskProp);
   }, [selectedMaskProp]);
+
+  // Initialize based on selected contour if provided
+  useEffect(() => {
+    if (selectedContour && image && zoomLevel > 1) {
+      // We have a selected contour, we can use it to help with initial positioning
+      console.log("Initializing with selected contour");
+      
+      // Calculate the center position of the contour in normalized coordinates
+      let avgX = 0, avgY = 0;
+      for (let i = 0; i < selectedContour.x.length; i++) {
+        avgX += selectedContour.x[i];
+        avgY += selectedContour.y[i];
+      }
+      avgX /= selectedContour.x.length;
+      avgY /= selectedContour.y.length;
+      
+      // Calculate how much to adjust pan offset to center on this point
+      const scale = initialScale * zoomLevel;
+      const imageWidth = image.width * scale;
+      const imageHeight = image.height * scale;
+      
+      // Calculate the offset needed to center on the contour
+      // This is based on the difference between the contour center and the image center
+      const offsetX = (0.5 - avgX) * imageWidth;
+      const offsetY = (0.5 - avgY) * imageHeight;
+      
+      console.log(`Setting pan offset to center on contour: x=${offsetX}, y=${offsetY}`);
+      setPanOffset({ 
+        x: offsetX, 
+        y: offsetY 
+      });
+    }
+  }, [selectedContour, image, zoomLevel, initialScale]);
+
+  // Update when external zoom props change
+  useEffect(() => {
+    if (externalZoomLevel) {
+      setZoomLevel(externalZoomLevel);
+    }
+  }, [externalZoomLevel]);
+
+  useEffect(() => {
+    if (externalZoomCenter) {
+      setZoomCenter(externalZoomCenter);
+    }
+  }, [externalZoomCenter]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -330,8 +380,17 @@ const PromptingCanvas = forwardRef(({
     const scaledHeight = image.height * scale * zoomLevel;
 
     // Calculate centering offsets
-    const centerX = (canvasSize.width - scaledWidth) / 2;
-    const centerY = (canvasSize.height - scaledHeight) / 2;
+    let centerX = (canvasSize.width - scaledWidth) / 2;
+    let centerY = (canvasSize.height - scaledHeight) / 2;
+    
+    // If zoomCenter is provided, adjust centering to focus on that point
+    if (zoomCenter && zoomLevel > 1) {
+      // Calculate how much to offset the center based on zoomCenter
+      const zoomCenterOffsetX = (zoomCenter.x - 0.5) * scaledWidth;
+      const zoomCenterOffsetY = (zoomCenter.y - 0.5) * scaledHeight;
+      centerX -= zoomCenterOffsetX;
+      centerY -= zoomCenterOffsetY;
+    }
 
     // Apply transformations: first panOffset, then zoom
     ctx.translate(panOffset.x + centerX, panOffset.y + centerY);
@@ -555,6 +614,14 @@ const PromptingCanvas = forwardRef(({
     // Calculate new zoom level
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoomLevel = Math.max(0.1, Math.min(10, zoomLevel * zoomFactor));
+
+    // Update zoom center to the point where mouse is hovering
+    if (beforeZoom) {
+      setZoomCenter({
+        x: beforeZoom.x / image.width,
+        y: beforeZoom.y / image.height
+      });
+    }
 
     // Convert the same mouse position to image coordinates after zoom
     setZoomLevel(newZoomLevel);
@@ -879,15 +946,26 @@ const PromptingCanvas = forwardRef(({
   // Canvas control functions
   const handleZoomIn = () => {
     setZoomLevel((prev) => Math.min(prev * 1.2, 5));
+    
+    // If no specific zoom center is set, use the center of the image
+    if (!zoomCenter) {
+      setZoomCenter({ x: 0.5, y: 0.5 });
+    }
   };
 
   const handleZoomOut = () => {
     setZoomLevel((prev) => Math.max(prev / 1.2, 0.5));
+    
+    // If no specific zoom center is set, use the center of the image
+    if (!zoomCenter) {
+      setZoomCenter({ x: 0.5, y: 0.5 });
+    }
   };
 
   const handleResetView = () => {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
+    setZoomCenter(null);
   };
 
   const handleToggleExpand = () => {
