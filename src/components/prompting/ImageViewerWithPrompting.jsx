@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus, Move } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus, Move, Download, X, Save } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import MaskGenerationPanel from "./MaskGenerationPanel";
 import ContourEditor from "./ContourEditor";
@@ -43,7 +43,150 @@ const customStyles = `
   [data-segment-results="true"] {
     margin-top: 1.5rem !important;
   }
+
+  /* Styles for the dual viewer layout */
+  .dual-viewer-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .viewer-panel {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background: white;
+  }
+
+  .viewer-header {
+    padding: 0.75rem 1rem;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+  }
+
+  .selected-contour-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+  }
 `;
+
+// Add a new function to handle exporting quantifications
+const exportQuantificationsAsCsv = (masks) => {
+  if (!masks || masks.length === 0) return;
+  
+  // Prepare CSV header
+  let csvContent = "ID,Label,Area,Perimeter,Circularity,Confidence\n";
+  
+  // Add data for each mask
+  masks.forEach((mask, index) => {
+    const q = mask.quantifications || {};
+    const row = [
+      index + 1,
+      mask.label || "unlabeled",
+      q.area?.toFixed(2) || 0,
+      q.perimeter?.toFixed(2) || 0,
+      q.circularity?.toFixed(2) || 0,
+      (mask.quality * 100).toFixed(2) || 0
+    ].join(",");
+    csvContent += row + "\n";
+  });
+  
+  // Create and trigger download
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", "quantifications.csv");
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// Add this helper function at the top level
+const createMaskImage = async (mask, originalImage) => {
+  return new Promise((resolve, reject) => {
+    const maskImg = new Image();
+    maskImg.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = originalImage.width;
+        canvas.height = originalImage.height;
+        const ctx = canvas.getContext('2d');
+
+        // Draw original image
+        ctx.drawImage(originalImage, 0, 0);
+
+        // Draw mask with transparency
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(maskImg, 0, 0);
+        ctx.globalAlpha = 1;
+
+        // Get the processed image as base64
+        const processedBase64 = canvas.toDataURL('image/png').split(',')[1];
+        resolve(processedBase64);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    maskImg.onerror = () => reject(new Error('Failed to load mask image'));
+    maskImg.src = `data:image/png;base64,${mask.base64}`;
+  });
+};
+
+// Add this function at the top level
+const generateMaskPreview = async (mask, originalImage) => {
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = originalImage.width;
+      canvas.height = originalImage.height;
+      const ctx = canvas.getContext('2d');
+
+      // Draw original image
+      ctx.drawImage(originalImage, 0, 0);
+
+      // Draw contours
+      if (mask.contours && mask.contours.length > 0) {
+        ctx.fillStyle = 'rgba(0, 127, 255, 0.3)';
+        ctx.strokeStyle = 'rgba(0, 127, 255, 0.8)';
+        ctx.lineWidth = 2;
+
+        mask.contours.forEach(contour => {
+          if (contour.x && contour.y && contour.x.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(
+              contour.x[0] * originalImage.width,
+              contour.y[0] * originalImage.height
+            );
+
+            for (let i = 1; i < contour.x.length; i++) {
+              ctx.lineTo(
+                contour.x[i] * originalImage.width,
+                contour.y[i] * originalImage.height
+              );
+            }
+
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          }
+        });
+      }
+
+      resolve(canvas.toDataURL('image/png'));
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
 
 const ImageViewerWithPrompting = () => {
   const [selectedImage, setSelectedImage] = useState(null);
@@ -80,6 +223,13 @@ const ImageViewerWithPrompting = () => {
   const [editingMask, setEditingMask] = useState(null);
   const [finalMask, setFinalMask] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // State for sidebar collapse
+  const [bestMask, setBestMask] = useState(null);
+  const [selectedContours, setSelectedContours] = useState([]);
+  const [showAnnotationViewer, setShowAnnotationViewer] = useState(false);
+  const annotationCanvasRef = useRef(null);
+  const [canvasImage, setCanvasImage] = useState(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [finalMasks, setFinalMasks] = useState([]); // Add this state for tracking final masks
 
   // Add CSS for animations
   useEffect(() => {
@@ -665,55 +815,93 @@ const ImageViewerWithPrompting = () => {
           currentLabel
         );
 
-        // Handle the new response format
         let newMasks = [];
         if (segmentationResponse.original_masks) {
-          // Create masks from the new format
           newMasks = segmentationResponse.original_masks.map((mask, index) => ({
             id: index,
             base64: segmentationResponse.base64_masks[index],
             quality: segmentationResponse.quality[index],
-            contours: mask.contours, // Store all contours
-            // Store the first contour for visualization and its quantifications
+            contours: mask.contours,
             contour: mask.contours.length > 0 ? mask.contours[0] : null,
-            quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
+            quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null,
+            isLoading: true
           }));
-        } else {
-          // Fallback to the old format if needed
-          newMasks = segmentationResponse.base64_masks.map((mask, index) => ({
-            id: index,
-            base64: mask,
-            quality: segmentationResponse.quality[index]
-          }));
-        }
-        
-        // Set initial loading states for all the new masks
-        const newMaskLoadingStates = {};
-        newMasks.forEach(mask => {
-          newMaskLoadingStates[mask.id] = true;
-        });
-        
-        // Update the loading states first
-        setMaskImagesLoading(prev => ({
-          ...prev,
-          ...newMaskLoadingStates
-        }));
-        
-        // Then update the segmentation masks
-        setSegmentationMasks(newMasks);
 
-        // Show success message for regular segmentation
-        const masksCount = segmentationResponse.original_masks 
-          ? segmentationResponse.original_masks.length 
-          : segmentationResponse.base64_masks.length;
-        setSuccessMessageWithTimeout(`Segmentation complete! Found ${masksCount} segments.`);
-        
-        // Scroll to segmentation results after a short delay
-        setTimeout(() => {
-          if (segmentationResultsRef.current) {
-            segmentationResultsRef.current.scrollIntoView({ behavior: 'smooth' });
+          // Set initial masks
+          setSegmentationMasks(newMasks);
+
+          // Process each mask
+          for (const mask of newMasks) {
+            try {
+              // Create a canvas for the mask
+              const canvas = document.createElement('canvas');
+              canvas.width = imageObject.width;
+              canvas.height = imageObject.height;
+              const ctx = canvas.getContext('2d');
+
+              // Draw original image
+              ctx.drawImage(imageObject, 0, 0);
+
+              // Draw mask overlay
+              if (mask.contours && mask.contours.length > 0) {
+                ctx.fillStyle = 'rgba(0, 127, 255, 0.3)';
+                ctx.strokeStyle = 'rgba(0, 127, 255, 0.8)';
+                ctx.lineWidth = 2;
+
+                mask.contours.forEach(contour => {
+                  if (contour.x && contour.y && contour.x.length > 0) {
+                    ctx.beginPath();
+                    ctx.moveTo(
+                      contour.x[0] * imageObject.width,
+                      contour.y[0] * imageObject.height
+                    );
+
+                    for (let i = 1; i < contour.x.length; i++) {
+                      ctx.lineTo(
+                        contour.x[i] * imageObject.width,
+                        contour.y[i] * imageObject.height
+                      );
+                    }
+
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                  }
+                });
+              }
+
+              // Update the mask with the preview
+              const preview = canvas.toDataURL('image/png');
+              setSegmentationMasks(prev => 
+                prev.map(m => 
+                  m.id === mask.id 
+                    ? { ...m, preview, isLoading: false }
+                    : m
+                )
+              );
+            } catch (error) {
+              console.error(`Failed to process mask ${mask.id}:`, error);
+              setSegmentationMasks(prev => 
+                prev.map(m => 
+                  m.id === mask.id 
+                    ? { ...m, isLoading: false, loadError: true }
+                    : m
+                )
+              );
+            }
           }
-        }, 200);
+
+          // Find and set the best mask
+          if (newMasks.length > 0) {
+            const highestConfidenceMask = [...newMasks].sort((a, b) => b.quality - a.quality)[0];
+            setBestMask(highestConfidenceMask);
+            setShowAnnotationViewer(true);
+          }
+        }
+
+        // Show success message
+        const masksCount = newMasks.length;
+        setSuccessMessageWithTimeout(`Segmentation complete! Found ${masksCount} segments.`);
       }
 
       setIsSegmenting(false);
@@ -1017,52 +1205,49 @@ const ImageViewerWithPrompting = () => {
       canvas.height = originalImg.height;
       const ctx = canvas.getContext('2d');
       
-      // Draw the original image first (semi-transparent)
+      // Draw the original image
       ctx.drawImage(originalImg, 0, 0);
       
-      // Semi-transparent overlay to dim the original image
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      // Add semi-transparent overlay
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Get color for this mask based on index
-      const maskColor = getMaskColor(mask.id % 10);
-      
-      // Set up for drawing filled contours with color
-      ctx.fillStyle = maskColor;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      
+      // Draw each contour
       mask.contours.forEach(contour => {
         if (!contour.x || !contour.y || contour.x.length < 3) return;
         
-        // Start a new path for this contour
+        // Start a new path
         ctx.beginPath();
         
-        // Convert normalized coordinates to actual pixel positions
-        const startX = contour.x[0] * originalImg.width;
-        const startY = contour.y[0] * originalImg.height;
-        
+        // Move to first point
+        const startX = contour.x[0] * canvas.width;
+        const startY = contour.y[0] * canvas.height;
         ctx.moveTo(startX, startY);
         
-        // Draw each point of the contour
+        // Draw the contour
         for (let i = 1; i < contour.x.length; i++) {
-          const x = contour.x[i] * originalImg.width;
-          const y = contour.y[i] * originalImg.height;
+          const x = contour.x[i] * canvas.width;
+          const y = contour.y[i] * canvas.height;
           ctx.lineTo(x, y);
         }
         
         // Close the path
         ctx.closePath();
         
-        // Fill with color and add white border
+        // Fill with semi-transparent color
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
         ctx.fill();
+        
+        // Add stroke
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.lineWidth = 2;
         ctx.stroke();
       });
       
-      // Get the base64 data (remove the data:image/png;base64, prefix)
+      // Return base64 data
       return canvas.toDataURL('image/png').split(',')[1];
     } catch (error) {
-      console.error('Error generating mask image from contours:', error);
+      console.error('Error generating mask image:', error);
       return null;
     }
   };
@@ -1195,6 +1380,305 @@ const ImageViewerWithPrompting = () => {
     // Close editor
     setEditingMask(null);
   };
+  
+  // Handle contour selection in the Annotation Viewer
+  const handleContourSelect = (contourIndex) => {
+    setSelectedContours(prevSelected => {
+      // If contour is already selected, remove it
+      if (prevSelected.includes(contourIndex)) {
+        return prevSelected.filter(index => index !== contourIndex);
+      }
+      // Otherwise add it to selection
+      return [...prevSelected, contourIndex];
+    });
+  };
+  
+  // Add selected contours to final mask
+  const handleAddSelectedContoursToFinalMask = async () => {
+    if (!bestMask || selectedContours.length === 0) {
+      setError("No contours selected to add to final mask");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Create a new mask with only the selected contours
+      const selectedContoursData = selectedContours.map(index => bestMask.contours[index]);
+      
+      // Create a new final mask
+      const newFinalMask = {
+        ...bestMask,
+        id: `final-${Date.now()}`, // Ensure unique ID
+        is_final: true,
+        contours: selectedContoursData,
+      };
+      
+      // Process the mask image before adding it
+      if (imageObject) {
+        const base64Image = await generateMaskImageFromContours(newFinalMask, imageObject);
+        if (base64Image) {
+          // Update processed mask images
+          setProcessedMaskImages(prev => ({
+            ...prev,
+            [newFinalMask.id]: base64Image
+          }));
+        }
+      }
+      
+      // Add to final masks array
+      setFinalMasks(prev => [...prev, newFinalMask]);
+      
+      setSuccessMessageWithTimeout("Selected contours added to final mask");
+      setShowAnnotationViewer(false); // Hide annotation viewer after adding
+      setSelectedContours([]); // Clear selection
+    } catch (err) {
+      console.error("Error adding contours to final mask:", err);
+      setError("Failed to add contours to final mask: " + (err.message || "Unknown error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Draw the annotation canvas with selectable contours
+  const drawAnnotationCanvas = useCallback(() => {
+    if (!annotationCanvasRef.current || !bestMask || !canvasImage) return;
+
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas dimensions to match the image
+    canvas.width = canvasImage.width;
+    canvas.height = canvasImage.height;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw the original image
+    ctx.drawImage(canvasImage, 0, 0);
+
+    // Add semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw contours
+    bestMask.contours.forEach((contour, index) => {
+      const isSelected = selectedContours.includes(index);
+
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.strokeStyle = isSelected ? "#2563eb" : "#10b981";
+      ctx.fillStyle = isSelected ? "rgba(37, 99, 235, 0.3)" : "rgba(16, 185, 129, 0.2)";
+
+      if (contour.x && contour.y && contour.x.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(contour.x[0] * canvas.width, contour.y[0] * canvas.height);
+
+        for (let i = 1; i < contour.x.length; i++) {
+          ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
+        }
+
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Add label
+        ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+        ctx.font = "bold 14px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Calculate center for label
+        let centerX = 0, centerY = 0;
+        for (let i = 0; i < contour.x.length; i++) {
+          centerX += contour.x[i] * canvas.width;
+          centerY += contour.y[i] * canvas.height;
+        }
+        centerX /= contour.x.length;
+        centerY /= contour.y.length;
+
+        // Draw white background for text
+        const text = `#${index + 1}`;
+        const metrics = ctx.measureText(text);
+        const padding = 4;
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fillRect(
+          centerX - metrics.width/2 - padding,
+          centerY - 7 - padding,
+          metrics.width + padding * 2,
+          14 + padding * 2
+        );
+
+        // Draw text
+        ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+        ctx.fillText(text, centerX, centerY);
+      }
+    });
+  }, [bestMask, canvasImage, selectedContours]);
+
+  const isPointInContour = (x, y, contour, canvas) => {
+    const points = [];
+    for (let i = 0; i < contour.x.length; i++) {
+      points.push([contour.x[i] * canvas.width, contour.y[i] * canvas.height]);
+    }
+
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i][0], yi = points[i][1];
+      const xj = points[j][0], yj = points[j][1];
+
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+
+    return inside;
+  };
+
+  const handleAnnotationCanvasClick = useCallback((event) => {
+    if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer) return;
+
+    const canvas = annotationCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = (event.clientX - rect.left) * scaleX;
+    const y = (event.clientY - rect.top) * scaleY;
+
+    // Check each contour for intersection
+    let clickedContourIndex = -1;
+    for (let i = 0; i < bestMask.contours.length; i++) {
+      if (isPointInContour(x, y, bestMask.contours[i], canvas)) {
+        clickedContourIndex = i;
+        break;
+      }
+    }
+
+    if (clickedContourIndex !== -1) {
+      setSelectedContours(prev => {
+        const newSelection = prev.includes(clickedContourIndex)
+          ? prev.filter(i => i !== clickedContourIndex)
+          : [...prev, clickedContourIndex];
+        return newSelection;
+      });
+    }
+  }, [bestMask, showAnnotationViewer]);
+
+  // Update annotation canvas when bestMask changes
+  useEffect(() => {
+    if (showAnnotationViewer && bestMask && canvasImage) {
+      drawAnnotationCanvas();
+    }
+  }, [showAnnotationViewer, bestMask, canvasImage, selectedContours, drawAnnotationCanvas]);
+
+  // Initialize image on component mount
+  useEffect(() => {
+    if (imageObject && imageObject.src) {
+      const img = new Image();
+      img.onload = () => {
+        setCanvasImage(img);
+        setImageLoaded(true);
+      };
+      img.src = imageObject.src;
+    }
+  }, [imageObject]);
+
+  // Initialize canvas when image is loaded
+  useEffect(() => {
+    if (imageLoaded && annotationCanvasRef.current && canvasImage) {
+      const canvas = annotationCanvasRef.current;
+      canvas.width = canvasImage.width;
+      canvas.height = canvasImage.height;
+    }
+  }, [imageLoaded, canvasImage]);
+
+  // Add cleanup effect for state management
+  useEffect(() => {
+    // Cleanup function to prevent state issues
+    return () => {
+      setShowAnnotationViewer(false);
+      setBestMask(null);
+      setSelectedContours([]);
+      setCanvasImage(null);
+    };
+  }, []); // Empty dependency array means this runs on unmount
+
+  // Update the useEffect for canvas redraw to be more stable
+  useEffect(() => {
+    let mounted = true;
+
+    const drawCanvas = () => {
+      if (!mounted || !showAnnotationViewer || !bestMask || !canvasImage || !annotationCanvasRef.current) return;
+      drawAnnotationCanvas();
+    };
+
+    drawCanvas();
+
+    // Add a small delay to ensure canvas is properly rendered
+    const timer = setTimeout(drawCanvas, 100);
+
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
+  }, [showAnnotationViewer, bestMask, canvasImage, drawAnnotationCanvas]);
+
+  // Add state persistence for selected contours
+  useEffect(() => {
+    if (!showAnnotationViewer) {
+      // Don't clear selected contours when hiding the viewer
+      // This allows the selection to persist when the viewer is toggled
+      return;
+    }
+  }, [showAnnotationViewer]);
+
+  // Update the useEffect for mask image processing to include final masks
+  useEffect(() => {
+    const updateMaskImages = async () => {
+      if (!imageObject) return;
+      
+      const allMasks = [...segmentationMasks, ...finalMasks];
+      if (!allMasks.length) return;
+      
+      const newProcessedMasks = { ...processedMaskImages };
+      const newMaskImagesLoading = { ...maskImagesLoading };
+      
+      for (const mask of allMasks) {
+        // Skip if we already processed this mask
+        if (newProcessedMasks[mask.id]) {
+          newMaskImagesLoading[mask.id] = false;
+          continue;
+        }
+        
+        // Set loading state for this mask
+        newMaskImagesLoading[mask.id] = true;
+        
+        // Process contour-based masks
+        if (mask.contours) {
+          try {
+            const base64Image = await generateMaskImageFromContours(mask, imageObject);
+            if (base64Image) {
+              newProcessedMasks[mask.id] = base64Image;
+            }
+          } catch (error) {
+            console.error(`Error processing mask ${mask.id}:`, error);
+          } finally {
+            newMaskImagesLoading[mask.id] = false;
+          }
+        } else if (mask.base64) {
+          // For masks that already have base64 data
+          newProcessedMasks[mask.id] = mask.base64;
+          newMaskImagesLoading[mask.id] = false;
+        }
+      }
+      
+      setProcessedMaskImages(newProcessedMasks);
+      setMaskImagesLoading(newMaskImagesLoading);
+    };
+    
+    updateMaskImages();
+  }, [segmentationMasks, finalMasks, imageObject]);
 
   return (
     <div className="container mx-auto p-4">
@@ -1229,7 +1713,7 @@ const ImageViewerWithPrompting = () => {
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
+              </svg>
             </button>
           </div>
           <div className="h-1 bg-gradient-to-r from-green-400 to-green-500 loading-progress"></div>
@@ -1697,6 +2181,16 @@ const ImageViewerWithPrompting = () => {
                     </button>
                   </div>
                   
+                  {/* Export Button */}
+                  <button
+                    className="p-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
+                    onClick={() => exportQuantificationsAsCsv(segmentationMasks)}
+                    title="Export quantifications as CSV"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Export</span>
+                  </button>
+                  
                   {/* Add help text about Alt/Option key */}
                   <div className="text-sm text-gray-600 flex items-center ml-auto">
                     <span className="hidden sm:inline">Pan with:</span>
@@ -1706,16 +2200,85 @@ const ImageViewerWithPrompting = () => {
                   </div>
                 </div>
 
-                <div className="h-[500px]">
-                  <PromptingCanvas
-                    ref={promptingCanvasRef}
-                    image={imageObject}
-                    onPromptingComplete={handlePromptingComplete}
-                    isRefinementMode={isRefinementMode}
-                    selectedMask={selectedMask}
-                    promptType={promptType}
-                    currentLabel={currentLabel}
-                  />
+                {/* Dual Viewer Container */}
+                <div className="dual-viewer-container mb-6">
+                  {/* Annotation Viewer (AV) */}
+                  <div className="viewer-panel">
+                    <div className="viewer-header">Annotation Viewer</div>
+                    <div className="h-[500px]">
+                      {/* Use the PromptingCanvas for adding annotations */}
+                      <PromptingCanvas
+                        ref={promptingCanvasRef}
+                        image={imageObject}
+                        onPromptingComplete={handlePromptingComplete}
+                        isRefinementMode={isRefinementMode}
+                        selectedMask={selectedMask}
+                        promptType={promptType}
+                        currentLabel={currentLabel}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Final Mask Viewer (FMV) */}
+                  <div className="viewer-panel">
+                    <div className="viewer-header">Final Mask Viewer</div>
+                    <div className="p-4">
+                      {finalMasks.length === 0 ? (
+                        <div className="text-center text-gray-500 py-8">
+                          No masks added to final view yet. Select contours from the Annotation Viewer to add them here.
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {finalMasks.map((mask, index) => (
+                            <div
+                              key={mask.id}
+                              className="border rounded-lg p-4 bg-white shadow-sm"
+                            >
+                              <div className="flex justify-between items-center mb-2">
+                                <h3 className="font-medium">Final Mask {index + 1}</h3>
+                                <button
+                                  onClick={() => {
+                                    setFinalMasks(prev => prev.filter(m => m.id !== mask.id));
+                                  }}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              {/* Display mask preview */}
+                              <div className="relative h-40 bg-gray-50 rounded overflow-hidden">
+                                {processedMaskImages[mask.id] && (
+                                  <img
+                                    src={`data:image/png;base64,${processedMaskImages[mask.id]}`}
+                                    alt={`Final mask ${index + 1}`}
+                                    className="w-full h-full object-contain"
+                                  />
+                                )}
+                                {!processedMaskImages[mask.id] && (
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-8 h-8 border-t-2 border-blue-500 rounded-full animate-spin"></div>
+                                  </div>
+                                )}
+                              </div>
+                              {/* Display quantifications if available */}
+                              {mask.contour && mask.contour.quantifications && (
+                                <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                  <div>
+                                    <span className="font-medium">Area:</span>{" "}
+                                    {mask.contour.quantifications.area?.toFixed(2) || "N/A"}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Perimeter:</span>{" "}
+                                    {mask.contour.quantifications.perimeter?.toFixed(2) || "N/A"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (
@@ -1787,277 +2350,81 @@ const ImageViewerWithPrompting = () => {
             </div>
           )}
 
-          {/* Segmentation Results */}
-          {segmentationMasks.length > 0 && !isRefinementMode && (
-            <div 
-              ref={segmentationResultsRef}
-              className="mt-6 bg-white rounded-lg shadow-lg overflow-hidden"
-              data-segment-results="true"
-            >
-              <div className="bg-blue-600 px-6 py-4" data-header="true">
-                <div className="flex items-center" data-content="true">
-                  <div className="bg-white/20 rounded-full w-10 h-10 flex items-center justify-center">
-                    <span className="font-semibold text-white text-xl">{segmentationMasks.length}</span>
-                  </div>
-                  <span className="text-white text-lg font-medium ml-3" data-text="segments-found">
-                    segments found
+          {/* Segmentation Results Header */}
+          {segmentationMasks.length > 0 && (
+            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-100 p-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-medium">Segmentation Results</h2>
+                  <span className="text-sm text-gray-500">
+                    Found {segmentationMasks.length} segments
                   </span>
                 </div>
-              </div>
-
-              {selectedMask && (
-                <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="bg-blue-100 rounded-full w-10 h-10 flex items-center justify-center mt-1">
-                        <span className="font-semibold text-blue-600 text-lg">{selectedMask.id + 1}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-blue-900">Selected Segment</p>
-                        <div className="flex items-center mt-2">
-                          <div className="w-32 h-1.5 bg-gray-200 rounded-full mr-3">
-                            <div 
-                              className={`h-1.5 rounded-full ${
-                                selectedMask.quality >= 0.7 ? 'bg-green-500' : 
-                                selectedMask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                              }`}
-                              style={{ width: `${Math.round(selectedMask.quality * 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-sm text-blue-700 font-medium">{Math.round(selectedMask.quality * 100)}% confidence</span>
-                        </div>
-                        <div className="mt-2 mb-3">
-                          {selectedMask.quantifications && (
-                            <div>
-                              <div className="flex justify-between items-center mb-1">
-                                <h3 className="text-xs font-medium text-gray-700">Measurements & Analysis</h3>
-                                <button 
-                                  onClick={() => setShowExpandedQuantifications(!showExpandedQuantifications)}
-                                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center"
-                                >
-                                  {showExpandedQuantifications ? (
-                                    <>
-                                      <span className="mr-1">Hide Details</span>
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M14xx.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                                      </svg>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <span className="mr-1">Show Details</span>
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                      </svg>
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              <QuantificationDisplay 
-                                quantifications={selectedMask.quantifications}
-                                contour={selectedMask.contour}
-                                expanded={showExpandedQuantifications}
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex gap-2 mt-3">
-                          <button
-                            className="flex-1 py-1.5 px-3 bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 rounded-md text-sm font-medium shadow-sm flex items-center justify-center gap-1.5 transition-colors"
-                            onClick={handleStartRefinement}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
-                              <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                            Refine
-                          </button>
-                          <button
-                            className="flex-1 py-1.5 px-3 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm font-medium shadow-sm flex items-center justify-center gap-1.5 transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSaveMask(selectedMask.id);
-                            }}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                            Save
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="relative w-24 h-24 border border-blue-200 rounded-md overflow-hidden shadow-sm">
-                      {selectedImage && (
-                        <img 
-                          src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                          className="absolute inset-0 w-full h-full object-cover" 
-                          alt=""
-                        />
-                      )}
-                      {maskImagesLoading[selectedMask.id] ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-50">
-                          <div className="w-6 h-6 border-2 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
-                        </div>
-                      ) : (
-                        <img 
-                          src={`data:image/png;base64,${
-                            selectedMask.contours && processedMaskImages[selectedMask.id] 
-                              ? processedMaskImages[selectedMask.id] 
-                              : selectedMask.base64
-                          }`}
-                          className="absolute inset-0 w-full h-full object-contain" 
-                          alt="Selected segment"
-                          onLoad={() => {
-                            // Ensure loading state is cleared when image loads
-                            if (maskImagesLoading[selectedMask.id]) {
-                              setMaskImagesLoading(prev => ({
-                                ...prev,
-                                [selectedMask.id]: false
-                              }));
-                            }
-                          }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 p-5">
-                {segmentationMasks.map((mask, index) => (
-                  <div
-                    key={index}
-                    className={`bg-white rounded-lg overflow-hidden transition-all duration-200 cursor-pointer shadow-sm ${
-                      selectedMask && selectedMask.id === mask.id
-                        ? "ring-2 ring-blue-500 shadow-lg"
-                        : "border border-gray-200 hover:border-blue-200 hover:shadow"
-                    }`}
-                    onClick={() => handleMaskSelect(mask)}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowAnnotationViewer(!showAnnotationViewer)}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm flex items-center transition-colors"
                   >
-                    <div className="relative aspect-square bg-gray-50">
-                      {/* {selectedImage && (
-                        <div className="absolute inset-0">
-                          <img
-                            src={`data:image/jpeg;base64,${selectedImage.thumbnailUrl || selectedImage.base64}`}
-                            className="w-full h-full object-cover"
-                            alt=""
-                          />
-                        </div>
-                      )} */}
-                      {maskImagesLoading[mask.id] ? (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="flex flex-col items-center">
-                            <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
-                            <p className="text-sm text-gray-500">Loading mask...</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="absolute inset-0">
-                          <img
-                            src={`data:image/png;base64,${
-                              mask.contours && processedMaskImages[mask.id] 
-                                ? processedMaskImages[mask.id] 
-                                : mask.base64
-                            }`}
-                            alt={`Segment ${mask.id + 1}`}
-                            className="w-full h-full object-contain"
-                            onLoad={() => {
-                              // Ensure loading state is cleared when image loads
-                              if (maskImagesLoading[mask.id]) {
-                                setMaskImagesLoading(prev => ({
-                                  ...prev,
-                                  [mask.id]: false
-                                }));
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
-                      <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500 text-white text-xs">
-                            {index + 1}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium shadow-sm">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${
-                            mask.quality >= 0.7 ? 'bg-green-500' : 
-                            mask.quality >= 0.5 ? 'bg-yellow-500' : 'bg-orange-500'
-                          }`}></div>
-                          {Math.round(mask.quality * 100)}%
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 border-t border-gray-100">
-                      {mask.quantifications && (
-                        <div className="py-1.5 px-2 border-b border-gray-100">
-                          <h4 className="text-[10px] uppercase tracking-wide font-medium text-gray-500 mb-1">Measurements</h4>
-                          <div className="grid grid-cols-2 gap-x-1 gap-y-0.5 text-xs">
-                            <div className="text-gray-500">Area:</div>
-                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.area.toFixed(2)}</div>
-                            
-                            <div className="text-gray-500">Perimeter:</div>
-                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.perimeter.toFixed(2)}</div>
-                            
-                            <div className="text-gray-500">Circularity:</div>
-                            <div className="text-gray-900 font-medium text-right">{mask.quantifications.circularity.toFixed(2)}</div>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          className="flex-1 py-1.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMaskSelect(mask);
-                            handleStartRefinement();
-                          }}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793z" />
-                            <path d="M11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                          Refine
-                        </button>
-                        
-                        {/* Add to Final Mask button */}
-                        <button
-                          className="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 relative group"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log("Add to Final clicked for mask:", mask);
-                            handleAddToFinalMask(mask);
-                          }}
-                        >
-                          <Plus size={14} />
-                          Add to Final
-                          
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-xs p-2 rounded shadow-lg w-48 z-10">
-                            Adds this segment to your final mask. This is how you create your combined mask.
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
-                          </div>
-                        </button>
-                        
-                        <button
-                          className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSaveMask(mask.id);
-                          }}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                          Save
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    {showAnnotationViewer ? 'Hide' : 'Show'} Annotation Viewer
+                  </button>
+                  <button
+                    onClick={() => setShowExpandedQuantifications(!showExpandedQuantifications)}
+                    className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-md text-sm flex items-center transition-colors"
+                  >
+                    {showExpandedQuantifications ? 'Collapse' : 'Expand'} Details
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add Annotation Viewer after segmentation */}
+          {showAnnotationViewer && bestMask && (
+            <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-800">
+                  Annotation Viewer - Best Mask (Confidence: {(bestMask.quality * 100).toFixed(1)}%)
+                </h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={handleAddSelectedContoursToFinalMask}
+                    disabled={selectedContours.length === 0 || loading}
+                    className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
+                      selectedContours.length === 0 || loading
+                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }`}
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    Add Selected to Final Mask ({selectedContours.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAnnotationViewer(false);
+                      setSelectedContours([]);
+                    }}
+                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md text-sm flex items-center transition-colors"
+                  >
+                    <X className="w-4 h-4 mr-1.5" />
+                    Close
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex flex-col mb-2">
+                <div className="text-sm text-gray-600 mb-2">
+                  Click on contours to select/deselect them for the final mask. Selected: {selectedContours.length}
+                </div>
+                <div className="relative border border-gray-300 rounded-md overflow-hidden" style={{height: "500px"}}>
+                  <canvas 
+                    ref={annotationCanvasRef}
+                    onClick={handleAnnotationCanvasClick}
+                    width={selectedImage?.width || 800}
+                    height={selectedImage?.height || 600}
+                    className="w-full h-full object-contain"
+                    style={{ cursor: 'pointer' }}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -2158,6 +2525,15 @@ const ImageViewerWithPrompting = () => {
           onClick={handleReset}
         >
           <span>Reset Selection</span>
+        </button>
+        
+        {/* Export button */}
+        <button
+          className="px-4 py-2 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-md flex items-center space-x-2 transition-colors"
+          onClick={() => exportQuantificationsAsCsv(segmentationMasks)}
+        >
+          <Download className="h-4 w-4 mr-1" />
+          <span>Export Quantifications</span>
         </button>
         
         {/* Mask Generation Button - Added for better visibility */}
