@@ -492,10 +492,17 @@ export const getFinalMask = async (imageId) => {
 };
 
 // Update a mask with new contours
-export const updateMask = async (maskId, contours) => {
+export const updateMask = async (mask) => {
   try {
+    // Get the mask ID from the mask object
+    const maskId = mask.id;
+    
+    if (!maskId) {
+      throw new Error("Mask ID is required");
+    }
+    
     // Ensure contours are in the correct format: x/y arrays, label, and quantifications
-    const formattedContours = contours.map(contour => {
+    const formattedContours = mask.contours.map(contour => {
       // Make sure each contour has the required properties
       return {
         x: contour.x,
@@ -510,7 +517,8 @@ export const updateMask = async (maskId, contours) => {
 
     const requestData = {
       mask_id: maskId,
-      contours: formattedContours
+      contours: formattedContours,
+      is_final: mask.is_final || false
     };
 
     const response = await fetch(`${API_BASE_URL}/masks/update_mask`, {
@@ -586,6 +594,47 @@ export const createCutouts = async (imageId, base64Mask, options = {}) => {
   }
 };
 
+// Fetch all available labels
+export const fetchLabels = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/labels/get_labels`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error fetching labels:", error);
+    throw error;
+  }
+};
+
+// Create a new label (class)
+export const createLabel = async (labelData) => {
+  try {
+    // Extract values from the label data object
+    const { name, parent_id = null } = labelData;
+    
+    if (!name) {
+      throw new Error("Label name is required");
+    }
+    
+    const url = new URL(`${API_BASE_URL}/labels/create_label`);
+    url.searchParams.append('label_name', name);
+    
+    if (parent_id) {
+      url.searchParams.append('parent_label_id', parent_id);
+    } else {
+      url.searchParams.append('parent_label_id', 0);
+    }
+    
+    const response = await fetch(url, {
+      method: 'POST'
+    });
+    
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error creating label:", error);
+    throw error;
+  }
+};
+
 const API = {
   fetchImages,
   uploadImage,
@@ -600,6 +649,8 @@ const API = {
   addContoursToFinalMask,
   deleteMask,
   createCutouts,
+  fetchLabels,
+  createLabel,
 };
 
 export default API;

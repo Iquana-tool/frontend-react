@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
@@ -7,6 +7,7 @@ import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit
 import QuantificationDisplay from "./QuantificationDisplay";
 import MaskGenerationPanel from "./MaskGenerationPanel";
 import ContourEditor from "./ContourEditor";
+import axios from "axios";
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -47,23 +48,19 @@ const customStyles = `
   /* Styles for the dual viewer layout */
   .dual-viewer-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(500px, 1fr) minmax(500px, 1fr);
     gap: 1rem;
+    max-width: 100%;
+    margin: 0; /* Remove negative margin */
   }
 
   .viewer-panel {
-    border: 1px solid #e5e7eb;
-    border-radius: 0.5rem;
+    position: relative;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    background: white;
-  }
-
-  .viewer-header {
-    padding: 0.75rem 1rem;
-    background: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
-    font-weight: 600;
+    min-height: 550px; /* Ensure consistent height */
   }
 
   .selected-contour-overlay {
@@ -74,6 +71,65 @@ const customStyles = `
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.4);
     pointer-events: none;
+  }
+  
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  .slider-label {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  .loading-progress {
+    animation: loading-progress 5s linear;
+    width: 0;
+  }
+  
+  @keyframes loading-progress {
+    from { width: 0; }
+    to { width: 100%; }
+  }
+  
+  .viewer-panel {
+    position: relative;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+  }
+  
+  .viewer-header {
+    background: #f3f4f6;
+    padding: 10px 15px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+    color: #374151;
+  }
+  
+  /* Loading animation styles */
+  @keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 0.4; }
+    100% { transform: scale(0.8); opacity: 0.8; }
+  }
+  
+  .pulse-ring {
+    animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  
+  .shimmer {
+    background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
   }
 `;
 
@@ -244,6 +300,10 @@ const ImageViewerWithPrompting = () => {
   const [annotationPrompts, setAnnotationPrompts] = useState([]);
   const [finalMaskCanvasRefs, setFinalMaskCanvasRefs] = useState({});
   const [previousViewState, setPreviousViewState] = useState(null);
+  const [errorMessages, setErrorMessages] = useState([]);
+  const [currentImage, setCurrentImage] = useState(null);
+  const [refinementImage, setRefinementImage] = useState(null);
+  const [finalMaskContours, setFinalMaskContours] = useState([]);
 
   // Add CSS for animations
   useEffect(() => {
@@ -712,113 +772,81 @@ const ImageViewerWithPrompting = () => {
 
   // Handle prompting
   const handlePromptingComplete = async (prompts) => {
-    // If we're in refinement mode, we need to adjust the prompts to the
-    // coordinates relative to the original image
     if (!prompts || prompts.length === 0) {
       setError("Please add at least one prompt for segmentation.");
+      setLoading(false);
       return;
     }
 
-    setError(null);
-    setLoading(true);
-    setIsSegmenting(true);
-    setSuccessMessage(null);
-
     try {
+      setLoading(true);
+      setIsSegmenting(true);
+      setError(null);
+      setSuccessMessage(null);
+
+      // Make a local copy of the prompts
+      const promptsCopy = [...prompts];
+
+      // Adjust prompt coordinates when in refinement mode
+      let adjustedPrompts = promptsCopy;
       if (isRefinementMode) {
-        // Adjust prompts from cutout coordinates to original image coordinates
-        const { x: offsetX, y: offsetY } = cutoutPosition;
-
-        // Deep clone the prompts to avoid modifying the original
-        const adjustedPrompts = JSON.parse(JSON.stringify(prompts));
-
-        // Adjust each prompt based on its type
-        adjustedPrompts.forEach((prompt) => {
-          if (prompt.type === "point") {
-            prompt.coordinates.x = (prompt.coordinates.x * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
-            prompt.coordinates.y = (prompt.coordinates.y * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
-          } else if (prompt.type === "box") {
-            prompt.coordinates.startX = (prompt.coordinates.startX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
-            prompt.coordinates.startY = (prompt.coordinates.startY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
-            prompt.coordinates.endX = (prompt.coordinates.endX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
-            prompt.coordinates.endY = (prompt.coordinates.endY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
-          } else if (prompt.type === "circle") {
-            prompt.coordinates.centerX = (prompt.coordinates.centerX * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
-            prompt.coordinates.centerY = (prompt.coordinates.centerY * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
-            prompt.coordinates.radius = prompt.coordinates.radius * cutoutImage.width / originalImage.width;
-          } else if (prompt.type === "polygon") {
-            prompt.coordinates.forEach((point) => {
-              point.x = (point.x * cutoutImage.width / originalImage.width) + (offsetX / originalImage.width);
-              point.y = (point.y * cutoutImage.height / originalImage.height) + (offsetY / originalImage.height);
-            });
-          }
+        // Adjust coordinates according to the cutout position
+        adjustedPrompts = promptsCopy.map((prompt) => {
+          return {
+            ...prompt,
+            coords: {
+              x: prompt.coords.x + cutoutPosition.x,
+              y: prompt.coords.y + cutoutPosition.y,
+            },
+          };
         });
 
-        const segmentationResponse = await api.segmentImage(
-          selectedImage.id,
-          selectedModel,
-          adjustedPrompts,
-          {
-            min_x: cutoutPosition.x / originalImage.width,
-            min_y: cutoutPosition.y / originalImage.height,
-            max_x: (cutoutPosition.x + cutoutPosition.width) / originalImage.width,
-            max_y: (cutoutPosition.y + cutoutPosition.height) / originalImage.height
-          },
-          selectedMask ? selectedMask.label || 0 : 0
-        );
+        // Process segmentation in refinement mode
+        try {
+          // Use the existing api methods imported from "../../api"
+          const segmentationResponse = await api.segmentImage(
+            selectedImage.id,
+            selectedModel,
+            adjustedPrompts,
+            {
+              min_x: cutoutPosition.x / originalImage.width,
+              min_y: cutoutPosition.y / originalImage.height,
+              max_x: (cutoutPosition.x + cutoutPosition.width) / originalImage.width,
+              max_y: (cutoutPosition.y + cutoutPosition.height) / originalImage.height
+            },
+            selectedMask ? selectedMask.label || 0 : 0
+          );
+        
+          // Introduce an artificial delay to make the loading screen more visible
+          await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Handle the new response format
-        let newMasks = [];
-        if (segmentationResponse.original_masks) {
-          // Create masks from the new format
-          newMasks = segmentationResponse.original_masks.map((mask, index) => ({
-            id: index,
-            base64: segmentationResponse.base64_masks[index],
-            quality: segmentationResponse.quality[index],
-            contours: mask.contours, // Store all contours
-            // Store the first contour for visualization and its quantifications
-            contour: mask.contours.length > 0 ? mask.contours[0] : null,
-            quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
-          }));
-        } else {
-          // Fallback to the old format if needed
-          newMasks = segmentationResponse.base64_masks.map((mask, index) => ({
-            id: index,
-            base64: mask,
-            quality: segmentationResponse.quality[index]
-          }));
+          // Handle the response as in the original code
+          if (segmentationResponse.original_masks) {
+            // Create masks from the response
+            const newMasks = segmentationResponse.original_masks.map((mask, index) => ({
+              id: index,
+              base64: segmentationResponse.base64_masks[index],
+              quality: segmentationResponse.quality[index],
+              contours: mask.contours,
+              contour: mask.contours.length > 0 ? mask.contours[0] : null,
+              quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null
+            }));
+            
+            // Update segmentation masks
+            setSegmentationMasks(newMasks);
+            
+            // Return to full image view after refinement
+            handleCancelRefinement();
+            
+            // Show success message
+            const masksCount = newMasks.length;
+            setSuccessMessageWithTimeout(`Refinement complete! Found ${masksCount} segments.`);
+          }
+        } catch (error) {
+          console.error("Error in refinement mode:", error);
+          setError("Failed to generate segmentation in refinement mode: " + error.message);
+          throw error;
         }
-        
-        // Set initial loading states for all the new masks
-        const newMaskLoadingStates = {};
-        newMasks.forEach(mask => {
-          newMaskLoadingStates[mask.id] = true;
-        });
-        
-        // Update the loading states first
-        setMaskImagesLoading(prev => ({
-          ...prev,
-          ...newMaskLoadingStates
-        }));
-        
-        // Then update the segmentation masks
-        setSegmentationMasks(newMasks);
-
-        // Return to full image view after refinement
-        handleCancelRefinement();
-        
-        // Show success message for refinement
-        const masksCount = segmentationResponse.original_masks 
-          ? segmentationResponse.original_masks.length 
-          : segmentationResponse.base64_masks.length;
-        setSuccessMessageWithTimeout(`Refinement complete! Found ${masksCount} segments.`);
-        
-        // Scroll to segmentation results after a short delay
-        setTimeout(() => {
-          if (segmentationResultsRef.current) {
-            segmentationResultsRef.current.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 200);
       } else {
         // Regular segmentation
         const segmentationResponse = await api.segmentImage(
@@ -828,6 +856,9 @@ const ImageViewerWithPrompting = () => {
           { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
           currentLabel
         );
+
+        // Add an artificial delay to make the loading screen more visible
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         let newMasks = [];
         if (segmentationResponse.original_masks) {
@@ -1729,8 +1760,8 @@ const ImageViewerWithPrompting = () => {
   };
 
   const handleAnnotationCanvasClick = useCallback((event) => {
-    // Don't handle clicks if in prompting mode or if required components are not available
-    if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer || annotationPromptingMode) return;
+    // Don't handle clicks if required components are not available
+    if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer) return;
 
     const canvas = annotationCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -1826,7 +1857,7 @@ const ImageViewerWithPrompting = () => {
       setZoomLevel(1);
       setSelectedFinalMaskContour(null);
     }
-  }, [bestMask, showAnnotationViewer, selectedFinalMaskContour, zoomLevel, finalMasks, annotationPromptingMode, handleFinalMaskContourSelect]);
+  }, [bestMask, showAnnotationViewer, selectedFinalMaskContour, zoomLevel, finalMasks, handleFinalMaskContourSelect]);
 
   // Update annotation canvas when bestMask changes
   useEffect(() => {
@@ -1944,13 +1975,12 @@ const ImageViewerWithPrompting = () => {
   }, [segmentationMasks, finalMasks, imageObject]);
 
   // Draw the final mask canvas with selectable contours
-  const drawFinalMaskCanvas = useCallback((mask) => {
-    const canvasRef = finalMaskCanvasRefs[mask.id];
-    if (!canvasRef || !mask || !canvasImage) return;
+  const drawFinalMaskCanvas = useCallback(() => {
+    if (!finalMaskCanvasRef.current || !canvasImage || finalMasks.length === 0) return;
 
-    const canvas = canvasRef;
+    const canvas = finalMaskCanvasRef.current;
     const ctx = canvas.getContext('2d');
-
+    
     // Set canvas dimensions to match the image
     canvas.width = canvasImage.width;
     canvas.height = canvasImage.height;
@@ -1970,7 +2000,7 @@ const ImageViewerWithPrompting = () => {
     
     // Apply zoom if there's a selected contour
     ctx.save();
-    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+    if (selectedFinalMaskContour) {
       zoomTransform();
     }
 
@@ -1978,77 +2008,84 @@ const ImageViewerWithPrompting = () => {
     ctx.drawImage(canvasImage, 0, 0);
     
     // If zoomed, add a semi-transparent overlay except for the selected contour area
-    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+    if (selectedFinalMaskContour) {
       // Add semi-transparent overlay
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Draw contours
-    mask.contours.forEach((contour, index) => {
-      const isSelected = selectedFinalMaskContour && 
-                          selectedFinalMaskContour.maskId === mask.id && 
-                          selectedFinalMaskContour.contourIndex === index;
+    // Draw all contours from all masks
+    let contourCount = 0;
+    finalMasks.forEach((mask) => {
+      if (!mask.contours) return;
+      
+      mask.contours.forEach((contour, maskContourIndex) => {
+        const currentContourIndex = contourCount;
+        const isSelected = selectedFinalMaskContour && 
+                         selectedFinalMaskContour.maskId === mask.id && 
+                         selectedFinalMaskContour.contourIndex === maskContourIndex;
 
-      ctx.lineWidth = isSelected ? 3 : 2;
-      ctx.strokeStyle = isSelected ? "#2563eb" : "#10b981";
-      ctx.fillStyle = isSelected ? "rgba(37, 99, 235, 0.3)" : "rgba(16, 185, 129, 0.2)";
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.strokeStyle = isSelected ? "#2563eb" : "#10b981";
+        ctx.fillStyle = isSelected ? "rgba(37, 99, 235, 0.3)" : "rgba(16, 185, 129, 0.2)";
 
-      if (contour.x && contour.y && contour.x.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(contour.x[0] * canvas.width, contour.y[0] * canvas.height);
+        if (contour.x && contour.y && contour.x.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(contour.x[0] * canvas.width, contour.y[0] * canvas.height);
 
-        for (let i = 1; i < contour.x.length; i++) {
-          ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
-        }
-
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Add label if not zoomed in too far
-        if (zoomLevel < 5) {
-          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
-          ctx.font = "bold 14px Arial";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-
-          // Calculate center for label
-          let centerX = 0, centerY = 0;
-          for (let i = 0; i < contour.x.length; i++) {
-            centerX += contour.x[i] * canvas.width;
-            centerY += contour.y[i] * canvas.height;
+          for (let i = 1; i < contour.x.length; i++) {
+            ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
           }
-          centerX /= contour.x.length;
-          centerY /= contour.y.length;
 
-          // Draw white background for text
-          const text = `#${index + 1}`;
-          const metrics = ctx.measureText(text);
-          const padding = 4;
-          ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
-          ctx.fillRect(
-            centerX - metrics.width/2 - padding,
-            centerY - 7 - padding,
-            metrics.width + padding * 2,
-            14 + padding * 2
-          );
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
 
-          // Draw text
-          ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
-          ctx.fillText(text, centerX, centerY);
+          // Add label if not zoomed in too far
+          if (zoomLevel < 5) {
+            ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+            ctx.font = "bold 14px Arial";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            // Calculate center for label
+            let centerX = 0, centerY = 0;
+            for (let i = 0; i < contour.x.length; i++) {
+              centerX += contour.x[i] * canvas.width;
+              centerY += contour.y[i] * canvas.height;
+            }
+            centerX /= contour.x.length;
+            centerY /= contour.y.length;
+
+            // Draw white background for text
+            const text = `#${currentContourIndex + 1}`;
+            const metrics = ctx.measureText(text);
+            const padding = 4;
+            ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+            ctx.fillRect(
+              centerX - metrics.width/2 - padding,
+              centerY - 7 - padding,
+              metrics.width + padding * 2,
+              14 + padding * 2
+            );
+
+            // Draw text
+            ctx.fillStyle = isSelected ? "#2563eb" : "#10b981";
+            ctx.fillText(text, centerX, centerY);
+          }
         }
-      }
+        
+        contourCount++;
+      });
     });
     
     ctx.restore();
-  }, [canvasImage, selectedFinalMaskContour, zoomLevel, zoomCenter, finalMaskCanvasRefs]);
+  }, [canvasImage, selectedFinalMaskContour, zoomLevel, zoomCenter, finalMasks]);
 
-  const handleFinalMaskCanvasClick = useCallback((event, mask) => {
-    const canvasRef = finalMaskCanvasRefs[mask.id];
-    if (!canvasRef || !mask) return;
+  const handleFinalMaskCanvasClick = useCallback((event) => {
+    if (!finalMaskCanvasRef.current || finalMasks.length === 0) return;
 
-    const canvas = canvasRef;
+    const canvas = finalMaskCanvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
@@ -2058,7 +2095,7 @@ const ImageViewerWithPrompting = () => {
     let y = (event.clientY - rect.top) * scaleY;
 
     // Adjust coordinates for zoom
-    if (selectedFinalMaskContour && selectedFinalMaskContour.maskId === mask.id) {
+    if (selectedFinalMaskContour) {
       const centerX = zoomCenter.x * canvas.width;
       const centerY = zoomCenter.y * canvas.height;
       
@@ -2067,18 +2104,29 @@ const ImageViewerWithPrompting = () => {
       y = (y - centerY) / zoomLevel + centerY;
     }
 
-    // Check each contour for intersection
-    let clickedContourIndex = -1;
-    for (let i = 0; i < mask.contours.length; i++) {
-      if (isPointInContour(x, y, mask.contours[i], canvas)) {
-        clickedContourIndex = i;
-        break;
+    // Check each contour across all masks for intersection
+    let foundMask = null;
+    let foundContourIndex = -1;
+    let contourCount = 0;
+    
+    for (const mask of finalMasks) {
+      if (!mask.contours) continue;
+      
+      for (let i = 0; i < mask.contours.length; i++) {
+        if (isPointInContour(x, y, mask.contours[i], canvas)) {
+          foundMask = mask;
+          foundContourIndex = i;
+          break;
+        }
+        contourCount++;
       }
+      
+      if (foundMask) break;
     }
 
-    if (clickedContourIndex !== -1) {
+    if (foundMask && foundContourIndex !== -1) {
       // Handle contour selection
-      handleFinalMaskContourSelect(mask, clickedContourIndex);
+      handleFinalMaskContourSelect(foundMask, foundContourIndex);
     } else {
       // Clicked outside contours, reset zoom if zoomed in
       if (zoomLevel > 1) {
@@ -2086,34 +2134,27 @@ const ImageViewerWithPrompting = () => {
         setZoomLevel(1);
       }
     }
-  }, [selectedFinalMaskContour, zoomLevel, zoomCenter, finalMaskCanvasRefs]);
-  
-  // Update final mask canvas when zoom or selected contour changes
+  }, [selectedFinalMaskContour, zoomLevel, zoomCenter, finalMasks, isPointInContour, handleFinalMaskContourSelect]);
+
+  // Update the useEffect for drawing the finalMaskCanvas
   useEffect(() => {
-    // Find the mask that needs to be redrawn
-    if (selectedFinalMaskContour && finalMasks.length > 0) {
-      const mask = finalMasks.find(m => m.id === selectedFinalMaskContour.maskId);
-      if (mask && canvasImage && finalMaskCanvasRefs[mask.id]) {
-        drawFinalMaskCanvas(mask);
-      }
+    if (canvasImage && finalMaskCanvasRef.current) {
+      drawFinalMaskCanvas();
     }
-    
+
     // Also draw annotation canvas when needed
     if (showAnnotationViewer && bestMask && canvasImage) {
       drawAnnotationCanvas();
     }
   }, [
-    selectedFinalMaskContour, 
-    zoomLevel, 
-    zoomCenter, 
+    drawFinalMaskCanvas, 
     canvasImage, 
     finalMasks, 
-    drawFinalMaskCanvas, 
-    finalMaskCanvasRefs,
+    selectedFinalMaskContour, 
+    zoomLevel,
     showAnnotationViewer,
     bestMask,
-    drawAnnotationCanvas,
-    selectedContours
+    drawAnnotationCanvas
   ]);
 
   // Handle prompting in the annotation viewer
@@ -2147,6 +2188,9 @@ const ImageViewerWithPrompting = () => {
         { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }, // Full image
         currentLabel
       );
+
+      // Add an artificial delay to make the loading screen more visible
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       let newMasks = [];
       if (segmentationResponse.original_masks) {
@@ -2254,69 +2298,49 @@ const ImageViewerWithPrompting = () => {
 
   // Add a new useEffect to handle drawing canvases after refs are updated
   useEffect(() => {
-    // Draw canvases after refs are updated
-    finalMasks.forEach(mask => {
-      if (processedMaskImages[mask.id] && finalMaskCanvasRefs[mask.id]) {
-        drawFinalMaskCanvas(mask);
-      }
-    });
-  }, [finalMaskCanvasRefs, processedMaskImages, finalMasks, drawFinalMaskCanvas]);
-
-  useEffect(() => {
-    // Draw final mask canvases after refs are updated
-    finalMasks.forEach(mask => {
-      if (processedMaskImages[mask.id] && finalMaskCanvasRefs[mask.id]) {
-        drawFinalMaskCanvas(mask);
-      }
-    });
-    
+    // Draw canvas with the combined final masks
+    if (canvasImage && finalMaskCanvasRef.current && finalMasks.length > 0) {
+      drawFinalMaskCanvas();
+    }
+      
     // Also draw annotation canvas when needed
     if (showAnnotationViewer && bestMask && canvasImage) {
       drawAnnotationCanvas();
     }
   }, [
-    finalMaskCanvasRefs, 
-    processedMaskImages, 
-    finalMasks, 
     drawFinalMaskCanvas, 
+    finalMasks, 
     showAnnotationViewer, 
     bestMask, 
     canvasImage, 
     drawAnnotationCanvas,
     selectedContours,
-    selectedFinalMaskContour
+    selectedFinalMaskContour,
+    zoomLevel
   ]);
 
-  // Add effect for zooming in the annotation viewer based on final mask selection
-  useEffect(() => {
-    if (selectedFinalMaskContour && bestMask && showAnnotationViewer) {
-      // Find matching contour in annotation viewer
-      const matchingContourIndex = findMatchingContour(selectedFinalMaskContour.contour, bestMask.contours);
-      
-      // Only update if different from current selection to avoid unnecessary re-renders
-      if (matchingContourIndex !== -1 && 
-         (selectedContours.length !== 1 || selectedContours[0] !== matchingContourIndex)) {
-        setSelectedContours([matchingContourIndex]);
-      }
-    }
-  }, [selectedFinalMaskContour, bestMask, showAnnotationViewer, selectedContours, findMatchingContour]);
-
   return (
-    <div className="container mx-auto p-4">
+    <div className="w-full">
       {/* Add style tag */}
       <style>{customStyles}</style>
       
-      <h1 className="text-2xl font-bold mb-4">
-        Coral Segmentation - Image Viewer with Prompting
+      <h1 className="text-2xl font-bold mb-4 text-gray-800">
+        Image Viewer with Prompting
       </h1>
-
+      
       {/* Error Message */}
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4">
-          <p>{error}</p>
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-md mb-4 flex items-center justify-between">
+          <p className="flex-grow">{error}</p>
+          <button 
+            onClick={() => setError(null)} 
+            className="ml-2 text-red-700 hover:text-red-800"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
-      
+
       {/* Success Message Toast */}
       {successMessage && (
         <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-xl overflow-hidden max-w-md w-full z-50 animate-slide-up border border-green-100">
@@ -2341,7 +2365,7 @@ const ImageViewerWithPrompting = () => {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 ${isSidebarCollapsed ? 'md:grid-cols-6' : 'md:grid-cols-3'} gap-6`}>
+      <div className={`grid grid-cols-1 ${isSidebarCollapsed ? 'md:grid-cols-6' : 'md:grid-cols-3'} gap-4 mb-6`}>
         {/* Image Selection Panel with Collapse Toggle */}
         <div className={`bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${isSidebarCollapsed ? 'md:col-span-1 w-16 overflow-hidden p-2' : 'md:col-span-1 p-6'}`}>
           <div className={`flex ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} items-center mb-4`}>
@@ -2649,7 +2673,7 @@ const ImageViewerWithPrompting = () => {
         </div>
 
         {/* Image Viewer and Prompting Canvas - expand when sidebar is collapsed */}
-        <div className={`${isSidebarCollapsed ? 'md:col-span-5' : 'md:col-span-2'} bg-white p-6 rounded-lg shadow-sm border border-gray-100`}>
+        <div className={`${isSidebarCollapsed ? 'md:col-span-5' : 'md:col-span-2'} bg-white p-4 rounded-lg shadow-sm border border-gray-100`}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
               {isRefinementMode ? (
@@ -2822,26 +2846,92 @@ const ImageViewerWithPrompting = () => {
                 </div>
 
                 {/* Dual Viewer Container */}
-                <div className="dual-viewer-container mb-6">
+                <div className="flex flex-row gap-3 mb-4">
                   {/* Annotation Viewer (AV) */}
-                  <div className="viewer-panel">
-                    <div className="viewer-header">Annotation Drawing Area</div>
-                    <div className="h-[500px]">
-                      {/* Use the PromptingCanvas for adding annotations */}
-                      <PromptingCanvas
-                        ref={promptingCanvasRef}
-                        image={imageObject}
-                        onPromptingComplete={handlePromptingComplete}
-                        isRefinementMode={isRefinementMode}
-                        selectedMask={selectedMask}
-                        promptType={promptType}
-                        currentLabel={currentLabel}
-                      />
+                  {showAnnotationViewer && (
+                    <div className="viewer-panel flex-1 min-w-[450px]">
+                      {isSegmenting ? (
+                        /* Loading screen for annotation viewer */
+                        <>
+                          <div className="viewer-header">Annotation Viewer - Processing...</div>
+                          <div className="p-4 flex flex-col items-center justify-center h-[500px] bg-gray-50">
+                            {/* Enhanced loading animation */}
+                            <div className="relative w-16 h-16 mb-6">
+                              <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-100 rounded-full pulse-ring"></div>
+                              <div className="absolute top-0 left-0 w-full h-full border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full animate-spin"></div>
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                              </div>
+                            </div>
+                            <p className="text-gray-700 text-lg font-medium text-center">Processing segmentation masks...</p>
+                            <p className="text-gray-500 text-sm text-center mt-2">This may take a few moments depending on the image size and complexity.</p>
+                            
+                            {/* Progress bar animation */}
+                            <div className="w-64 h-1.5 bg-gray-200 rounded-full mt-6 overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full animate-progress shimmer"></div>
+                            </div>
+                          </div>
+                        </>
+                      ) : bestMask && (
+                        <>
+                          <div className="viewer-header">Annotation Viewer - Mask (Confidence: {(bestMask.quality * 100).toFixed(1)}%)</div>
+                          <div className="p-4">
+                            <div className="flex space-x-2 mb-4">
+                              {/* Remove Prompt Again button and keep only the Add Selected button */}
+                              <button
+                                onClick={handleAddSelectedContoursToFinalMask}
+                                disabled={selectedContours.length === 0 || loading}
+                                className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
+                                  selectedContours.length === 0 || loading
+                                    ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                                }`}
+                              >
+                                <Plus className="w-4 h-4 mr-1.5" />
+                                Add Selected to Final Mask ({selectedContours.length})
+                              </button>
+                            </div>
+                            
+                            <div className="text-sm text-gray-600 mb-2">
+                              Click on contours to select/deselect them for the final mask. Selected: {selectedContours.length}
+                            </div>
+                            <div className="relative border border-gray-300 rounded-md overflow-hidden" style={{height: "400px"}}>
+                              {/* Show only the annotation canvas and remove the prompting canvas alternative */}
+                              <canvas 
+                                ref={annotationCanvasRef}
+                                onClick={handleAnnotationCanvasClick}
+                                width={selectedImage?.width || 800}
+                                height={selectedImage?.height || 600}
+                                className="w-full h-full object-contain"
+                                style={{ cursor: 'pointer' }}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  </div>
+                  )}
+                  
+                  {!showAnnotationViewer && (
+                    <div className="viewer-panel flex-1 min-w-[450px]">
+                      <div className="viewer-header">Annotation Drawing Area</div>
+                      <div className="h-[500px]">
+                        {/* Use the PromptingCanvas for adding annotations */}
+                        <PromptingCanvas
+                          ref={promptingCanvasRef}
+                          image={imageObject}
+                          onPromptingComplete={handlePromptingComplete}
+                          isRefinementMode={isRefinementMode}
+                          selectedMask={selectedMask}
+                          promptType={promptType}
+                          currentLabel={currentLabel}
+                        />
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Final Mask Viewer (FMV) */}
-                  <div className="viewer-panel">
+                  <div className="viewer-panel flex-1 min-w-[450px]">
                     <div className="viewer-header">Final Mask Viewer</div>
                     <div className="p-4">
                       {finalMasks.length === 0 ? (
@@ -2850,125 +2940,190 @@ const ImageViewerWithPrompting = () => {
                         </div>
                       ) : (
                         <div className="space-y-4">
-                          {finalMasks.map((mask, index) => (
-                            <div
-                              key={mask.id}
-                              className="border rounded-lg p-4 bg-white shadow-sm"
-                            >
-                              <div className="flex justify-between items-center mb-2">
-                                <h3 className="font-medium">Final Mask {index + 1}</h3>
-                                <button
-                                  onClick={() => {
-                                    setFinalMasks(prev => prev.filter(m => m.id !== mask.id));
-                                    // Reset selection if this mask is selected
-                                    if (selectedFinalMaskContour?.maskId === mask.id) {
+                          {/* Single combined mask view */}
+                          <div className="border rounded-lg p-4 bg-white shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                              <h3 className="font-medium">Combined Final Mask</h3>
+                            </div>
+                            {/* Display combined mask canvas for interaction - Increased height from h-40 to h-80 */}
+                            <div className="relative h-80 bg-gray-50 rounded overflow-hidden">
+                              <canvas
+                                ref={finalMaskCanvasRef}
+                                onClick={(e) => handleFinalMaskCanvasClick(e)}
+                                className="w-full h-full object-contain"
+                                style={{ cursor: 'pointer' }}
+                              />
+                              {/* Overlay with zoom controls if zoomed in */}
+                              {zoomLevel > 1 && (
+                                <div className="absolute bottom-2 right-2 flex space-x-1">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setZoomLevel(prev => Math.min(prev + 1, 5));
+                                    }}
+                                    className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (zoomLevel > 1) {
+                                        setZoomLevel(prev => prev - 1);
+                                        if (zoomLevel === 2) {
+                                          setSelectedFinalMaskContour(null);
+                                          setZoomLevel(1);
+                                        }
+                                      }
+                                    }}
+                                    className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       setSelectedFinalMaskContour(null);
                                       setZoomLevel(1);
-                                    }
+                                    }}
+                                    className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              )}
+                              
+                              {/* Persistent zoom controls for better usability */}
+                              <div className="absolute bottom-2 right-2 flex bg-white/80 p-1 rounded-md shadow-md backdrop-blur-sm z-10">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setZoomLevel(prev => Math.min(prev + 1, 5));
                                   }}
-                                  className="text-red-600 hover:text-red-700"
+                                  className="p-1 hover:bg-gray-100 rounded-md"
+                                  title="Zoom in"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                                  </svg>
                                 </button>
-                              </div>
-                              {/* Display mask canvas for interaction */}
-                              <div className="relative h-40 bg-gray-50 rounded overflow-hidden">
-                                {processedMaskImages[mask.id] ? (
+                                {zoomLevel > 1 && (
                                   <>
-                                    <canvas
-                                      ref={el => {
-                                        // Only set the ref when the element changes
-                                        if (el && !finalMaskCanvasRefs[mask.id]) {
-                                          setFinalMaskCanvasRefs(prev => ({
-                                            ...prev,
-                                            [mask.id]: el
-                                          }));
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setZoomLevel(prev => Math.max(prev - 1, 1));
+                                        if (zoomLevel === 2) {
+                                          setSelectedFinalMaskContour(null);
                                         }
                                       }}
-                                      onClick={(e) => handleFinalMaskCanvasClick(e, mask)}
-                                      className="w-full h-full object-contain"
-                                      style={{ cursor: 'pointer' }}
-                                    />
-                                    {/* Overlay with zoom controls if zoomed in */}
-                                    {selectedFinalMaskContour?.maskId === mask.id && zoomLevel > 1 && (
-                                      <div className="absolute bottom-2 right-2 flex space-x-1">
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setZoomLevel(prev => Math.min(prev + 1, 5));
-                                            drawFinalMaskCanvas(mask);
-                                          }}
-                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                                          </svg>
-                                        </button>
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (zoomLevel > 1) {
-                                              setZoomLevel(prev => prev - 1);
-                                              if (zoomLevel === 2) {
-                                                setSelectedFinalMaskContour(null);
-                                                setZoomLevel(1);
-                                              } else {
-                                                drawFinalMaskCanvas(mask);
-                                              }
-                                            }
-                                          }}
-                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
-                                          </svg>
-                                        </button>
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedFinalMaskContour(null);
-                                            setZoomLevel(1);
-                                          }}
-                                          className="bg-white p-1 rounded-full shadow-md hover:bg-gray-100"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                          </svg>
-                                        </button>
-                                      </div>
-                                    )}
-                                    {/* Add info badge when a contour is selected */}
-                                    {selectedFinalMaskContour?.maskId === mask.id && (
-                                      <div className="absolute top-2 left-2 bg-blue-100 text-blue-800 text-xs font-medium rounded px-2 py-1 shadow-sm">
-                                        Contour #{selectedFinalMaskContour.contourIndex + 1} selected
-                                      </div>
-                                    )}
+                                      className="p-1 hover:bg-gray-100 rounded-md"
+                                      title="Zoom out"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
+                                    <div className="border-r border-gray-300 mx-1 h-5 my-auto"></div>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedFinalMaskContour(null);
+                                        setZoomLevel(1);
+                                      }}
+                                      className="p-1 hover:bg-gray-100 rounded-md"
+                                      title="Reset view"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                      </svg>
+                                    </button>
                                   </>
-                                ) : (
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-8 h-8 border-t-2 border-blue-500 rounded-full animate-spin"></div>
-                                  </div>
                                 )}
+                                <span className="mx-1 px-1 text-xs font-medium bg-gray-100 rounded flex items-center">
+                                  {zoomLevel}x
+                                </span>
                               </div>
-                              {/* User instructions tooltip */}
-                              <div className="mt-2 text-xs text-gray-500 italic">
-                                Click on a contour to select and zoom it
-                              </div>
-                              {/* Display quantifications if available */}
-                              {mask.contour && mask.contour.quantifications && (
-                                <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                  <div>
-                                    <span className="font-medium">Area:</span>{" "}
-                                    {mask.contour.quantifications.area?.toFixed(2) || "N/A"}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Perimeter:</span>{" "}
-                                    {mask.contour.quantifications.perimeter?.toFixed(2) || "N/A"}
-                                  </div>
+                              
+                              {/* Add info badge when a contour is selected */}
+                              {selectedFinalMaskContour && (
+                                <div className="absolute top-2 left-2 bg-blue-100 text-blue-800 text-xs font-medium rounded px-2 py-1 shadow-sm">
+                                  Contour #{selectedFinalMaskContour.contourIndex + 1} selected
                                 </div>
                               )}
                             </div>
-                          ))}
+                            {/* User instructions tooltip */}
+                            <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200 flex items-center space-x-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                              <div className="text-sm text-gray-700">
+                                <span className="font-medium">Interact with the mask: </span>
+                                Click on a contour to select and zoom it. Use the zoom controls to examine details.
+                              </div>
+                            </div>
+                            {/* Show mask list with remove buttons in a more compact layout */}
+                            <div className="mt-4">
+                              <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-sm font-medium">Included Masks:</h4>
+                                <div className="text-xs text-gray-500">
+                                  {finalMasks.length} mask{finalMasks.length !== 1 ? 's' : ''} total
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {finalMasks.map((mask, index) => (
+                                  <div key={mask.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                                    <span>Mask {index + 1}</span>
+                                    <button
+                                      onClick={() => {
+                                        setFinalMasks(prev => prev.filter(m => m.id !== mask.id));
+                                        // Reset selection if this mask contains the selected contour
+                                        if (selectedFinalMaskContour?.maskId === mask.id) {
+                                          setSelectedFinalMaskContour(null);
+                                          setZoomLevel(1);
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            {/* Display combined quantifications if available */}
+                            {finalMasks.length > 0 && finalMasks.some(mask => mask.contour?.quantifications) && (
+                              <div className="mt-4 bg-blue-50 p-3 rounded-md">
+                                <h4 className="text-sm font-medium mb-2 text-blue-800">Mask Quantifications</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="bg-white rounded p-2 shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Total Area</div>
+                                    <div className="text-lg font-semibold text-blue-700">
+                                      {finalMasks.reduce((sum, mask) => sum + (mask.contour?.quantifications?.area || 0), 0).toFixed(2)}
+                                    </div>
+                                  </div>
+                                  <div className="bg-white rounded p-2 shadow-sm">
+                                    <div className="text-xs text-gray-500 mb-1">Total Perimeter</div>
+                                    <div className="text-lg font-semibold text-blue-700">
+                                      {finalMasks.reduce((sum, mask) => sum + (mask.contour?.quantifications?.perimeter || 0), 0).toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="mt-2 text-xs text-blue-600 flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                  <span>Click on individual contours to see detailed measurements</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -3045,221 +3200,6 @@ const ImageViewerWithPrompting = () => {
           )}
 
           
-
-          {/* Add Annotation Viewer after segmentation */}
-          {showAnnotationViewer && bestMask && (
-            <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-800">
-                  Annotation Viewer - Mask (Confidence: {(bestMask.quality * 100).toFixed(1)}%)
-                </h3>
-                <div className="flex space-x-2">
-                  {/* Toggle prompting mode button */}
-                  <button
-                    onClick={toggleAnnotationPromptingMode}
-                    className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
-                      annotationPromptingMode
-                        ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-800"
-                    }`}
-                    title={annotationPromptingMode ? "Exit Prompting Mode" : "Enter Prompting Mode"}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
-                    </svg>
-                    {annotationPromptingMode ? "Exit Prompting" : "Prompt Again"}
-                  </button>
-                  
-                  {/* Remove the Segment button when in prompting mode as it's handled by the Complete button */}
-                  {!annotationPromptingMode && (
-                    <button
-                      onClick={handleAddSelectedContoursToFinalMask}
-                      disabled={selectedContours.length === 0 || loading}
-                      className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
-                        selectedContours.length === 0 || loading
-                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
-                      }`}
-                    >
-                      <Plus className="w-4 h-4 mr-1.5" />
-                      Add Selected to Final Mask ({selectedContours.length})
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setAnnotationViewerCollapsed(prev => !prev);
-                    }}
-                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md text-sm flex items-center transition-colors"
-                    title={annotationViewerCollapsed ? "Expand" : "Collapse"}
-                  >
-                    {annotationViewerCollapsed ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="18 15 12 9 6 15"></polyline>
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                      </svg>
-                    )}
-                    {annotationViewerCollapsed ? "Expand" : "Collapse"}
-                  </button>
-                </div>
-              </div>
-              
-              {!annotationViewerCollapsed && (
-                <div className="flex flex-col mb-2">
-                  {/* Add prompting controls when in prompting mode */}
-                  {annotationPromptingMode && (
-                    <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                      <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
-                        {/* Add Drag tool as the first button */}
-                        <button
-                          className={`p-2 transition-colors ${
-                            promptType === "drag"
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setPromptType("drag");
-                            // Also tell the canvas component to use drag mode
-                            if (annotationPromptingCanvasRef.current) {
-                              annotationPromptingCanvasRef.current.setActiveTool("drag");
-                            }
-                          }}
-                          title="Drag Tool (Pan image)"
-                        >
-                          <Move className="w-4 h-4" />
-                        </button>
-                        
-                        <button
-                          className={`p-2 transition-colors ${
-                            promptType === "point"
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setPromptType("point");
-                            if (annotationPromptingCanvasRef.current) {
-                              annotationPromptingCanvasRef.current.setActiveTool("point");
-                            }
-                          }}
-                          title="Point Tool"
-                        >
-                          <MousePointer className="w-4 h-4" />
-                        </button>
-                        <button
-                          className={`p-2 transition-colors ${
-                            promptType === "box"
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setPromptType("box");
-                            if (annotationPromptingCanvasRef.current) {
-                              annotationPromptingCanvasRef.current.setActiveTool("box");
-                            }
-                          }}
-                          title="Box Tool"
-                        >
-                          <Square className="w-4 h-4" />
-                        </button>
-                        <button
-                          className={`p-2 transition-colors ${
-                            promptType === "circle"
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setPromptType("circle");
-                            if (annotationPromptingCanvasRef.current) {
-                              annotationPromptingCanvasRef.current.setActiveTool("circle");
-                            }
-                          }}
-                          title="Circle Tool"
-                        >
-                          <Circle className="w-4 h-4" />
-                        </button>
-                        <button
-                          className={`p-2 transition-colors ${
-                            promptType === "polygon"
-                              ? "bg-blue-500 text-white"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={() => {
-                            setPromptType("polygon");
-                            if (annotationPromptingCanvasRef.current) {
-                              annotationPromptingCanvasRef.current.setActiveTool("polygon");
-                            }
-                          }}
-                          title="Polygon Tool"
-                        >
-                          <Pentagon className="w-4 h-4" />
-                        </button>
-                      </div>
-                      
-                      <div className="flex space-x-2">
-                        <button
-                          className={`p-2 rounded-md ${
-                            currentLabel === 1
-                              ? "bg-green-500 text-white"
-                              : "bg-white border border-green-500 text-green-500"
-                          }`}
-                          onClick={() => setCurrentLabel(1)}
-                        >
-                          Foreground (1)
-                        </button>
-                        <button
-                          className={`p-2 rounded-md ${
-                            currentLabel === 0
-                              ? "bg-red-500 text-white"
-                              : "bg-white border border-red-500 text-red-500"
-                          }`}
-                          onClick={() => setCurrentLabel(0)}
-                        >
-                          Background (0)
-                        </button>
-                      </div>
-                      
-                      <div className="text-sm text-gray-600">
-                        Add prompts for iterative segmentation
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="text-sm text-gray-600 mb-2">
-                    {annotationPromptingMode 
-                      ? "Add prompts to refine segmentation" 
-                      : "Click on contours to select/deselect them for the final mask. Selected: " + selectedContours.length}
-                  </div>
-                  <div className="relative border border-gray-300 rounded-md overflow-hidden" style={{height: "500px"}}>
-                    {/* Show prompting canvas if in prompting mode, otherwise show annotation canvas */}
-                    {annotationPromptingMode ? (
-                      <PromptingCanvas
-                        ref={annotationPromptingCanvasRef}
-                        image={canvasImage}
-                        selectedMask={selectedContours.length > 0 ? { contours: [bestMask.contours[selectedContours[0]]] } : null}
-                        onPromptingComplete={handleAnnotationPromptingComplete}
-                        promptType={promptType}
-                        currentLabel={currentLabel}
-                        zoomLevel={zoomLevel}
-                        zoomCenter={zoomCenter}
-                        selectedContour={selectedContours.length > 0 ? bestMask.contours[selectedContours[0]] : null}
-                      />
-                    ) : (
-                      <canvas 
-                        ref={annotationCanvasRef}
-                        onClick={handleAnnotationCanvasClick}
-                        width={selectedImage?.width || 800}
-                        height={selectedImage?.height || 600}
-                        className="w-full h-full object-contain"
-                        style={{ cursor: 'pointer' }}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Refinement Mode Indicator */}
           {isRefinementMode && (

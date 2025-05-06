@@ -46,7 +46,7 @@ const PromptingCanvas = forwardRef(({
   const [initialScale, setInitialScale] = useState(1);
   const [drawStartPos, setDrawStartPos] = useState(null);
   const [currentShape, setCurrentShape] = useState(null);
-  const [currentPolygon, setCurrentPolygon] = useState(null);
+  const [currentPolygon, setCurrentPolygon] = useState([]);
   const [cursorPos, setCursorPos] = useState(null);
   const [selectedMask, setSelectedMask] = useState(null);
   const [isProcessingMask, setIsProcessingMask] = useState(false);
@@ -57,7 +57,7 @@ const PromptingCanvas = forwardRef(({
   useImperativeHandle(ref, () => ({
     clearPrompts: () => {
       setPrompts([]);
-      setCurrentPolygon(null);
+      setCurrentPolygon([]);
       setCurrentShape(null);
       setDrawStartPos(null);
       redrawCanvas();
@@ -78,7 +78,7 @@ const PromptingCanvas = forwardRef(({
   useEffect(() => {
     if (isRefinementMode) {
       setPrompts([]);
-      setCurrentPolygon(null);
+      setCurrentPolygon([]);
       setCurrentShape(null);
       setDrawStartPos(null);
     }
@@ -301,16 +301,21 @@ const PromptingCanvas = forwardRef(({
   };
 
   const drawPolygon = (ctx, points, label, isInProgress = false) => {
-    if (!points || points.length < 2) return;
-
+    if (!points || !Array.isArray(points) || points.length < 2) return;
+    
+    // Make sure all points have valid x and y coordinates
+    const validPoints = points.filter(point => point && typeof point.x === 'number' && typeof point.y === 'number');
+    
+    if (validPoints.length < 2) return;
+    
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    ctx.moveTo(validPoints[0].x, validPoints[0].y);
 
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(points[i].x, points[i].y);
+    for (let i = 1; i < validPoints.length; i++) {
+      ctx.lineTo(validPoints[i].x, validPoints[i].y);
     }
 
-    if (points.length > 2 && !isInProgress) {
+    if (validPoints.length > 2 && !isInProgress) {
       ctx.closePath();
     }
 
@@ -318,7 +323,7 @@ const PromptingCanvas = forwardRef(({
     ctx.lineWidth = 2 / (initialScale * zoomLevel);
     ctx.stroke();
 
-    if (points.length > 2 && !isInProgress) {
+    if (validPoints.length > 2 && !isInProgress) {
       // Fill with transparent color
       ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
       ctx.fill();
@@ -326,7 +331,7 @@ const PromptingCanvas = forwardRef(({
 
     // Draw vertices for polygons
     const vertexSize = 3 / (initialScale * zoomLevel);
-    points.forEach((point) => {
+    validPoints.forEach((point) => {
       ctx.beginPath();
       ctx.arc(point.x, point.y, vertexSize, 0, Math.PI * 2);
       ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.8)" : "rgba(239, 68, 68, 0.8)";
@@ -524,39 +529,51 @@ const PromptingCanvas = forwardRef(({
   // Draw all prompts
   const drawAllPrompts = (ctx) => {
     prompts.forEach((prompt) => {
-      switch (prompt.type) {
-        case "point":
-          drawPoint(
-            ctx, 
-            prompt.coordinates.x, 
-            prompt.coordinates.y, 
-            prompt.label
-          );
-          break;
-        case "box":
-          drawBox(
-            ctx,
-            prompt.coordinates.startX,
-            prompt.coordinates.startY,
-            prompt.coordinates.endX,
-            prompt.coordinates.endY,
-            prompt.label
-          );
-          break;
-        case "circle":
-          drawCircle(
-            ctx,
-            prompt.coordinates.centerX,
-            prompt.coordinates.centerY,
-            prompt.coordinates.radius,
-            prompt.label
-          );
-          break;
-        case "polygon":
-          drawPolygon(ctx, prompt.coordinates, prompt.label);
-          break;
-        default:
-          break;
+      try {
+        switch (prompt.type) {
+          case "point":
+            if (prompt.coordinates && typeof prompt.coordinates.x === 'number' && typeof prompt.coordinates.y === 'number') {
+              drawPoint(
+                ctx, 
+                prompt.coordinates.x, 
+                prompt.coordinates.y, 
+                prompt.label
+              );
+            }
+            break;
+          case "box":
+            if (prompt.coordinates && typeof prompt.coordinates.startX === 'number') {
+              drawBox(
+                ctx,
+                prompt.coordinates.startX,
+                prompt.coordinates.startY,
+                prompt.coordinates.endX,
+                prompt.coordinates.endY,
+                prompt.label
+              );
+            }
+            break;
+          case "circle":
+            if (prompt.coordinates && typeof prompt.coordinates.centerX === 'number') {
+              drawCircle(
+                ctx,
+                prompt.coordinates.centerX,
+                prompt.coordinates.centerY,
+                prompt.coordinates.radius,
+                prompt.label
+              );
+            }
+            break;
+          case "polygon":
+            if (prompt.coordinates && Array.isArray(prompt.coordinates)) {
+              drawPolygon(ctx, prompt.coordinates, prompt.label);
+            }
+            break;
+          default:
+            break;
+        }
+      } catch (error) {
+        console.error("Error drawing prompt:", error, prompt);
       }
     });
 
@@ -583,17 +600,24 @@ const PromptingCanvas = forwardRef(({
     }
 
     // Draw current in-progress polygon
-    if (currentPolygon && currentPolygon.length > 0) {
-      drawPolygon(ctx, currentPolygon, currentLabel, true);
-      
-      // Draw line from last point to cursor if we have a cursor position
-      if (cursorPos && currentPolygon.length > 0) {
-        ctx.beginPath();
-        ctx.moveTo(currentPolygon[currentPolygon.length - 1].x, currentPolygon[currentPolygon.length - 1].y);
-        ctx.lineTo(cursorPos.x, cursorPos.y);
-        ctx.strokeStyle = currentLabel === 1 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+    if (currentPolygon && Array.isArray(currentPolygon) && currentPolygon.length > 0) {
+      try {
+        drawPolygon(ctx, currentPolygon, currentLabel, true);
+        
+        // Draw line from last point to cursor if we have a cursor position
+        if (cursorPos && currentPolygon.length > 0) {
+          const lastPoint = currentPolygon[currentPolygon.length - 1];
+          if (lastPoint && typeof lastPoint.x === 'number') {
+            ctx.beginPath();
+            ctx.moveTo(lastPoint.x, lastPoint.y);
+            ctx.lineTo(cursorPos.x, cursorPos.y);
+            ctx.strokeStyle = currentLabel === 1 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        }
+      } catch (error) {
+        console.error("Error drawing current polygon:", error);
       }
     }
   };
@@ -817,17 +841,10 @@ const PromptingCanvas = forwardRef(({
           case "polygon":
             if (!currentPolygon) {
               // Start a new polygon
-              setCurrentPolygon({
-                type: "polygon",
-                coordinates: [{ x: imageCoords.x, y: imageCoords.y }],
-                label: currentLabel
-              });
+              setCurrentPolygon([{ x: imageCoords.x, y: imageCoords.y }]);
             } else {
               // Add a point to the existing polygon
-              const newPolygon = {
-                ...currentPolygon,
-                coordinates: [...currentPolygon.coordinates, { x: imageCoords.x, y: imageCoords.y }]
-              };
+              const newPolygon = [...currentPolygon, { x: imageCoords.x, y: imageCoords.y }];
               setCurrentPolygon(newPolygon);
             }
             break;
@@ -926,18 +943,19 @@ const PromptingCanvas = forwardRef(({
 
   // Handle double click for completing polygons
   const handleDoubleClick = (e) => {
-    if (!image || promptType !== "polygon" || !currentPolygon || currentPolygon.length < 3) return;
+    if (!image || promptType !== "polygon") return;
+    if (!currentPolygon || !Array.isArray(currentPolygon) || currentPolygon.length < 3) return;
 
     // Add the polygon prompt
     const newPrompt = {
       type: "polygon",
-      coordinates: currentPolygon,
+      coordinates: [...currentPolygon], // Create a copy to avoid reference issues
       label: currentLabel,
     };
     setPrompts((prev) => [...prev, newPrompt]);
 
     // Reset the current polygon
-    setCurrentPolygon(null);
+    setCurrentPolygon([]);
 
     // Force redraw
     redrawCanvas();
@@ -977,55 +995,71 @@ const PromptingCanvas = forwardRef(({
   const handleDownload = () => {
     if (!canvasRef.current) return;
 
-    // Create a temporary canvas at the image's full resolution
-    const canvas = document.createElement("canvas");
-    canvas.width = image.width;
-    canvas.height = image.height;
+    try {
+      // Create a temporary canvas at the image's full resolution
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
 
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(image, 0, 0);
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0);
 
-    // Draw all prompts adjusted to original image dimensions
-    prompts.forEach((prompt) => {
-      switch (prompt.type) {
-        case "point":
-          drawPoint(ctx, prompt.x, prompt.y, prompt.label);
-          break;
-        case "box":
-          drawBox(
-            ctx,
-            prompt.startX,
-            prompt.startY,
-            prompt.endX,
-            prompt.endY,
-            prompt.label
-          );
-          break;
-        case "circle":
-          drawCircle(
-            ctx,
-            prompt.centerX,
-            prompt.centerY,
-            prompt.radius,
-            prompt.label
-          );
-          break;
-        case "polygon":
-          drawPolygon(ctx, prompt.points, prompt.label);
-          break;
-        default:
-          break;
-      }
-    });
+      // Draw all prompts adjusted to original image dimensions
+      prompts.forEach((prompt) => {
+        try {
+          switch (prompt.type) {
+            case "point":
+              if (prompt.coordinates && typeof prompt.coordinates.x === 'number') {
+                drawPoint(ctx, prompt.coordinates.x, prompt.coordinates.y, prompt.label);
+              }
+              break;
+            case "box":
+              if (prompt.coordinates && typeof prompt.coordinates.startX === 'number') {
+                drawBox(
+                  ctx,
+                  prompt.coordinates.startX,
+                  prompt.coordinates.startY,
+                  prompt.coordinates.endX,
+                  prompt.coordinates.endY,
+                  prompt.label
+                );
+              }
+              break;
+            case "circle":
+              if (prompt.coordinates && typeof prompt.coordinates.centerX === 'number') {
+                drawCircle(
+                  ctx,
+                  prompt.coordinates.centerX,
+                  prompt.coordinates.centerY,
+                  prompt.coordinates.radius,
+                  prompt.label
+                );
+              }
+              break;
+            case "polygon":
+              if (prompt.coordinates && Array.isArray(prompt.coordinates)) {
+                drawPolygon(ctx, prompt.coordinates, prompt.label);
+              }
+              break;
+            default:
+              break;
+          }
+        } catch (error) {
+          console.error("Error drawing prompt for download:", error, prompt);
+        }
+      });
 
-    // Convert to data URL and trigger download
-    const dataUrl = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = "coral_segmentation.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Convert to data URL and trigger download
+      const dataUrl = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = "coral_segmentation.png";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error downloading image:", error);
+    }
   };
 
   const shouldRedraw = (prevContours, newContours) => {
@@ -1087,7 +1121,7 @@ const PromptingCanvas = forwardRef(({
         </div>
         
         {/* Status messages */}
-        {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.coordinates && currentPolygon.coordinates.length > 0 && (
+        {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.length > 0 && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 rounded-md text-xs">
             Double-click to finish polygon
           </div>
@@ -1099,7 +1133,7 @@ const PromptingCanvas = forwardRef(({
           className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
           onClick={() => {
             setPrompts([]);
-            setCurrentPolygon(null);
+            setCurrentPolygon([]);
             setCurrentShape(null);
           }}
         >

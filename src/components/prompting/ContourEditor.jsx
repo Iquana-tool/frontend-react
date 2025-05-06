@@ -2,6 +2,74 @@ import React, { useState, useRef, useEffect } from "react";
 import { Edit, Save, Trash2, Plus, X, CheckCircle, Tag } from "lucide-react";
 import * as api from "../../api";
 
+// Add these styles for the toast notification
+const toastStyles = `
+  .toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 350px;
+    background-color: white;
+    color: #111827;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 9999;
+    overflow: hidden;
+    animation: slide-in 0.3s ease-out forwards;
+  }
+  
+  .toast-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    background-color: #f9fafb;
+  }
+  
+  .toast-content {
+    padding: 12px 16px;
+  }
+  
+  .toast-progress {
+    height: 3px;
+    background: linear-gradient(to right, #34d399, #10b981);
+    width: 100%;
+    animation: shrink 5s linear forwards;
+  }
+  
+  @keyframes slide-in {
+    0% {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slide-out {
+    0% {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+  
+  @keyframes shrink {
+    from { width: 100%; }
+    to { width: 0%; }
+  }
+  
+  .toast-exit {
+    animation: slide-out 0.3s ease-in forwards;
+  }
+`;
+
 const ContourEditor = ({
   mask,
   image,
@@ -18,12 +86,70 @@ const ContourEditor = ({
   const [currentPolygon, setCurrentPolygon] = useState([]);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
-  const [availableLabels, setAvailableLabels] = useState([
-    { id: 1, name: 'petri_dish' },
-    { id: 2, name: 'coral' },
-    { id: 3, name: 'polyp' }
-  ]);
+  const [availableLabels, setAvailableLabels] = useState([]);
   const [showLabelSelector, setShowLabelSelector] = useState(false);
+  const [selectedLabel, setSelectedLabel] = useState(null);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [isAddingLabel, setIsAddingLabel] = useState(false);
+
+  // Add effect for toast animations
+  useEffect(() => {
+    // Create a style element for toast animations
+    const styleEl = document.createElement('style');
+    styleEl.textContent = toastStyles;
+    document.head.appendChild(styleEl);
+    
+    // Clean up
+    return () => {
+      document.head.removeChild(styleEl);
+    };
+  }, []);
+
+  // Update setSuccessMessage to include timeout and animation
+  const setSuccessMessageWithTimeout = (message, timeout = 5000) => {
+    setSuccessMessage(message);
+    
+    // Clear any existing timers
+    if (window.successMessageTimer) {
+      clearTimeout(window.successMessageTimer);
+    }
+    
+    // Set a timer to clear the message
+    window.successMessageTimer = setTimeout(() => {
+      // Add exit animation class
+      const toastElement = document.querySelector('.toast-notification');
+      if (toastElement) {
+        toastElement.classList.add('toast-exit');
+        
+        // Clear message after animation completes
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 300); // Match animation duration
+      } else {
+        setSuccessMessage(null);
+      }
+    }, timeout);
+  };
+
+  // Fetch all available labels when component mounts
+  useEffect(() => {
+    const fetchLabels = async () => {
+      try {
+        const labels = await api.fetchLabels();
+        setAvailableLabels(labels);
+      } catch (err) {
+        console.error("Error fetching labels:", err);
+        // Fallback to default labels if API fails
+        setAvailableLabels([
+          { id: 1, name: 'Coral' },
+          { id: 2, name: 'Ruler' },
+          { id: 3, name: 'Petri dish' }
+        ]);
+      }
+    };
+    
+    fetchLabels();
+  }, []);
 
   // Handle polygon editing with different backend data formats
   const normalizeContour = (contour) => {
@@ -283,37 +409,39 @@ const ContourEditor = ({
   // Complete the current polygon
   const handleCompletePolygon = () => {
     if (currentPolygon.length < 3) {
-      setError("A polygon must have at least 3 points");
+      setError("Please add at least 3 points to create a valid polygon.");
       return;
     }
     
-    // Create a new contour from the current polygon with x and y arrays for backend compatibility
+    // Convert screen coordinates to normalized canvas coordinates
+    const x = currentPolygon.map(p => p.x / canvasRef.current.width);
+    const y = currentPolygon.map(p => p.y / canvasRef.current.height);
+    
+    // Add new contour
     const newContour = {
-      // Convert points array to separate x and y arrays as required by backend
-      x: currentPolygon.map(point => point.x),
-      y: currentPolygon.map(point => point.y),
-      label: 2, // Default label (coral=2 based on the available labels)
+      x,
+      y,
+      label: 2, // Default to coral
       type: "polygon",
-      // Add empty quantifications if needed by the backend
       quantifications: {
         area: 0,
-        perimeter: 0
+        perimeter: 0,
+        circularity: 0
       }
     };
     
-    // Add the new contour to the edited contours
-    setEditedContours(prev => [...prev, newContour]);
+    // Add to edited contours
+    setEditedContours([...editedContours, newContour]);
     
-    // Show success message with the default label
-    setError(null);
-    setSuccessMessage(`New contour created with label: ${getLabelName(2)}`);
+    // Select the newly created contour
+    setSelectedContourIndex(editedContours.length);
     
-    // Clear success message after 3 seconds
-    setTimeout(() => setSuccessMessage(null), 3000);
-    
-    // Reset the current polygon
+    // Reset the current drawing state
     setCurrentPolygon([]);
     setIsDrawing(false);
+    
+    // Show success message
+    setSuccessMessageWithTimeout(`New contour created with label: ${getLabelName(2)}`);
   };
 
   // Cancel the current polygon
@@ -337,6 +465,13 @@ const ContourEditor = ({
   const handleUpdateContourLabel = (labelId) => {
     if (selectedContourIndex === null) return;
     
+    // Check if the label has children - if so, it can't be selected directly
+    if (availableLabels.some(label => label.parent_id === labelId)) {
+      setSelectedLabel(labelId); // Just navigate to the children instead
+      return;
+    }
+    
+    // Update the contour with the selected label
     setEditedContours(prev => 
       prev.map((contour, index) => 
         index === selectedContourIndex
@@ -345,53 +480,91 @@ const ContourEditor = ({
       )
     );
     
+    // Close the label selector
     setShowLabelSelector(false);
+    setSelectedLabel(null);
   };
 
   // Get label name from id
   const getLabelName = (labelId) => {
+    if (!labelId) return 'Unlabeled';
+    
     const label = availableLabels.find(label => label.id === labelId);
-    return label ? label.name : 'unknown';
+    if (!label) return `Unknown (${labelId})`;
+    
+    return label.name;
   };
 
   // Save changes to the mask
   const handleSaveChanges = async () => {
-    if (!mask || !mask.id) {
-      setError("Cannot save changes: No valid mask ID found");
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Prepare the updated mask data
+      const updatedMask = {
+        ...mask,
+        contours: editedContours.map(contour => ({
+          ...contour,
+          // Ensure there's a valid label
+          label: contour.label || 2
+        }))
+      };
+      
+      // Make API call to update the mask
+      await api.updateMask(updatedMask);
+      
+      // Show success message
+      setSuccessMessageWithTimeout("Mask updated successfully!");
+      
+      // Notify parent component about the update
+      if (onMaskUpdated) {
+        onMaskUpdated(updatedMask);
+      }
+    } catch (err) {
+      console.error("Error saving mask:", err);
+      setError("There was an error saving the mask. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle creating a new label
+  const handleCreateNewLabel = async (parentId = null) => {
+    if (!newLabelName.trim()) {
+      setError("Please enter a valid label name");
       return;
     }
     
-    setLoading(true);
-    setError(null);
-    
     try {
-      // Format the contours correctly for the backend
-      const formattedContours = editedContours.map(contour => ({
-        x: contour.x || [],
-        y: contour.y || [],
-        label: contour.label || 2,
-        quantifications: contour.quantifications || { area: 0, perimeter: 0 }
-      }));
+      setLoading(true);
       
-      // Call API to update the mask with edited contours
-      const response = await api.updateMask(mask.id, formattedContours);
+      // Create new label through API
+      const newLabel = await api.createLabel({
+        name: newLabelName.trim(),
+        parent_id: parentId
+      });
       
-      if (response && response.success) {
-        // Notify parent component of the update
-        setSuccessMessage("Mask updated successfully!");
-        onMaskUpdated({
-          ...mask,
-          contours: formattedContours
-        });
-      } else {
-        setError("Failed to save changes: " + (response?.message || "Unknown error"));
+      // Add to available labels
+      setAvailableLabels([...availableLabels, newLabel]);
+      
+      // Reset state
+      setNewLabelName('');
+      setIsAddingLabel(false);
+      
+      // If contour is selected, set this label
+      if (selectedContourIndex !== null) {
+        handleUpdateContourLabel(newLabel.id);
       }
       
-      setLoading(false);
+      // Show success message
+      setSuccessMessageWithTimeout("Label created successfully!");
+      
     } catch (err) {
-      setError("Failed to save changes: " + (err.message || "Unknown error"));
+      console.error("Error creating label:", err);
+      setError("There was an error creating the label. Please try again.");
+    } finally {
       setLoading(false);
-      console.error("Error saving mask changes:", err);
     }
   };
 
@@ -431,9 +604,26 @@ const ContourEditor = ({
         </div>
       )}
       
+      {/* Updated Success Message Toast */}
       {successMessage && (
-        <div className="success-message p-3 text-sm text-green-600 bg-green-50 border-b border-green-100">
-          {successMessage}
+        <div className="toast-notification">
+          <div className="toast-header">
+            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center mr-2">
+              <CheckCircle className="w-4 h-4 text-green-500" />
+            </div>
+            <h4 className="font-medium text-gray-800">Success</h4>
+            <button 
+              className="ml-auto text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={() => setSuccessMessage(null)}
+              aria-label="Close notification"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="toast-content">
+            <p className="text-sm text-gray-600">{successMessage}</p>
+          </div>
+          <div className="toast-progress"></div>
         </div>
       )}
       
@@ -467,31 +657,174 @@ const ContourEditor = ({
         
         {/* Label selector popup */}
         {showLabelSelector && selectedContourIndex !== null && (
-          <div className="label-selector absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-lg shadow-xl border border-blue-200 w-60">
+          <div className="label-selector absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-4 rounded-lg shadow-xl border border-blue-200 w-80">
             <h4 className="text-sm font-medium mb-2 text-blue-800 border-b border-blue-100 pb-2">Select a Label</h4>
-            <div className="label-options space-y-2 mb-3">
-              {availableLabels.map(label => (
-                <button
-                  key={label.id}
-                  className={`w-full text-left p-2 px-3 rounded text-sm flex items-center gap-2 transition-colors ${
-                    editedContours[selectedContourIndex].label === label.id
-                      ? 'bg-blue-100 text-blue-700 font-medium'
-                      : 'hover:bg-gray-100'
-                  }`}
-                  onClick={() => handleUpdateContourLabel(label.id)}
-                >
-                  <span className={`w-3 h-3 rounded-full ${
-                    label.name === 'petri_dish' ? 'bg-purple-500' : 
-                    label.name === 'coral' ? 'bg-blue-500' : 
-                    'bg-green-500'
-                  }`}></span>
-                  {label.name}
-                </button>
-              ))}
+            <div className="label-options space-y-2 mb-3 max-h-60 overflow-y-auto">
+              {/* Hierarchical Label Selection */}
+              {selectedLabel ? (
+                <>
+                  <div className="selected-label-path mb-2 flex items-center gap-1 text-xs">
+                    <button 
+                      className="px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded"
+                      onClick={() => setSelectedLabel(null)}
+                    >
+                      Root
+                    </button>
+                    <span>&gt;</span>
+                    <span className="px-2 py-1 bg-blue-100 rounded font-medium">{getLabelName(selectedLabel)}</span>
+                  </div>
+                  
+                  {/* Children of selected label */}
+                  {availableLabels
+                    .filter(label => label.parent_id === selectedLabel)
+                    .map(label => (
+                      <button
+                        key={label.id}
+                        className={`w-full text-left p-2 px-3 rounded text-sm flex items-center justify-between gap-2 transition-colors ${
+                          editedContours[selectedContourIndex].label === label.id
+                            ? 'bg-blue-100 text-blue-700 font-medium'
+                            : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => handleUpdateContourLabel(label.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-blue-500"></span>
+                          {label.name}
+                        </div>
+                        {availableLabels.some(childLabel => childLabel.parent_id === label.id) && (
+                          <span className="text-xs text-gray-400">(not selectable)</span>
+                        )}
+                      </button>
+                    ))}
+                    
+                  {/* Add New Subclass option */}
+                  <div className="mt-4 pt-2 border-t border-gray-100">
+                    {isAddingLabel ? (
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-blue-200 rounded text-sm mb-2"
+                          placeholder="New subclass name"
+                          value={newLabelName}
+                          onChange={(e) => setNewLabelName(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            className="flex-1 p-1.5 bg-blue-500 text-white rounded text-xs"
+                            onClick={() => handleCreateNewLabel(selectedLabel)}
+                            disabled={loading}
+                          >
+                            {loading ? "Creating..." : "Create"}
+                          </button>
+                          <button
+                            className="flex-1 p-1.5 bg-gray-200 rounded text-xs"
+                            onClick={() => {
+                              setIsAddingLabel(false);
+                              setNewLabelName('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button 
+                        className="w-full text-left p-2 px-3 rounded text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50"
+                        onClick={() => setIsAddingLabel(true)}
+                      >
+                        <Plus size={14} />
+                        + New subclass of {getLabelName(selectedLabel)}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Root level labels */}
+                  {availableLabels
+                    .filter(label => !label.parent_id)
+                    .map(label => (
+                      <button
+                        key={label.id}
+                        className={`w-full text-left p-2 px-3 rounded text-sm flex items-center justify-between gap-2 transition-colors ${
+                          editedContours[selectedContourIndex].label === label.id
+                            ? 'bg-blue-100 text-blue-700 font-medium'
+                            : 'hover:bg-gray-100'
+                        }`}
+                        onClick={() => {
+                          // If label has children, set it as selected to navigate to its children
+                          if (availableLabels.some(childLabel => childLabel.parent_id === label.id)) {
+                            setSelectedLabel(label.id);
+                          } else {
+                            // If no children, directly select the label
+                            handleUpdateContourLabel(label.id);
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-3 h-3 rounded-full ${
+                            label.name.toLowerCase().includes('petri') ? 'bg-purple-500' : 
+                            label.name.toLowerCase().includes('coral') ? 'bg-blue-500' : 
+                            label.name.toLowerCase().includes('ruler') ? 'bg-yellow-500' :
+                            'bg-green-500'
+                          }`}></span>
+                          {label.name}
+                        </div>
+                        {availableLabels.some(childLabel => childLabel.parent_id === label.id) && (
+                          <span className="text-xs text-gray-400">▶</span>
+                        )}
+                      </button>
+                    ))}
+                    
+                  {/* Add New Class option */}
+                  <div className="mt-4 pt-2 border-t border-gray-100">
+                    {isAddingLabel ? (
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          className="w-full p-2 border border-blue-200 rounded text-sm mb-2"
+                          placeholder="New class name"
+                          value={newLabelName}
+                          onChange={(e) => setNewLabelName(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            className="flex-1 p-1.5 bg-blue-500 text-white rounded text-xs"
+                            onClick={() => handleCreateNewLabel()}
+                            disabled={loading}
+                          >
+                            {loading ? "Creating..." : "Create"}
+                          </button>
+                          <button
+                            className="flex-1 p-1.5 bg-gray-200 rounded text-xs"
+                            onClick={() => {
+                              setIsAddingLabel(false);
+                              setNewLabelName('');
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button 
+                        className="w-full text-left p-2 px-3 rounded text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50"
+                        onClick={() => setIsAddingLabel(true)}
+                      >
+                        <Plus size={14} />
+                        + New class
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             <button 
               className="mt-2 text-sm bg-gray-100 hover:bg-gray-200 w-full py-2 rounded text-gray-700 transition-colors"
-              onClick={() => setShowLabelSelector(false)}
+              onClick={() => {
+                setShowLabelSelector(false);
+                setSelectedLabel(null);
+              }}
             >
               Cancel
             </button>
