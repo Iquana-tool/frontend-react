@@ -269,9 +269,9 @@ const PromptingCanvas = forwardRef(({
     const pointSize = 5 / (initialScale * zoomLevel);
     ctx.beginPath();
     ctx.arc(x, y, pointSize, 0, Math.PI * 2);
-    ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
+    ctx.fillStyle = "rgba(16, 185, 129, 0.6)"; // Always use green
     ctx.fill();
-    ctx.strokeStyle = label === 1 ? "rgba(5, 150, 105, 1)" : "rgba(220, 38, 38, 1)";
+    ctx.strokeStyle = "rgba(5, 150, 105, 1)"; // Always use green
     ctx.lineWidth = 1.5 / (initialScale * zoomLevel);
     ctx.stroke();
   };
@@ -279,24 +279,24 @@ const PromptingCanvas = forwardRef(({
   const drawBox = (ctx, startX, startY, endX, endY, label) => {
     ctx.beginPath();
     ctx.rect(startX, startY, endX - startX, endY - startY);
-    ctx.strokeStyle = label === 1 ? "rgba(16, 185, 129, 0.9)" : "rgba(239, 68, 68, 0.9)";
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.9)"; // Always use green
     ctx.lineWidth = 2 / (initialScale * zoomLevel);
     ctx.stroke();
 
     // Fill with transparent color
-    ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
+    ctx.fillStyle = "rgba(16, 185, 129, 0.1)"; // Always use green
     ctx.fill();
   };
 
   const drawCircle = (ctx, centerX, centerY, radius, label) => {
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = label === 1 ? "rgba(16, 185, 129, 0.9)" : "rgba(239, 68, 68, 0.9)";
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.9)"; // Always use green
     ctx.lineWidth = 2 / (initialScale * zoomLevel);
     ctx.stroke();
 
     // Fill with transparent color
-    ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
+    ctx.fillStyle = "rgba(16, 185, 129, 0.1)"; // Always use green
     ctx.fill();
   };
 
@@ -319,13 +319,13 @@ const PromptingCanvas = forwardRef(({
       ctx.closePath();
     }
 
-    ctx.strokeStyle = label === 1 ? "rgba(16, 185, 129, 0.9)" : "rgba(239, 68, 68, 0.9)";
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.9)"; // Always use green
     ctx.lineWidth = 2 / (initialScale * zoomLevel);
     ctx.stroke();
 
     if (validPoints.length > 2 && !isInProgress) {
       // Fill with transparent color
-      ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)";
+      ctx.fillStyle = "rgba(16, 185, 129, 0.1)"; // Always use green
       ctx.fill();
     }
 
@@ -334,7 +334,7 @@ const PromptingCanvas = forwardRef(({
     validPoints.forEach((point) => {
       ctx.beginPath();
       ctx.arc(point.x, point.y, vertexSize, 0, Math.PI * 2);
-      ctx.fillStyle = label === 1 ? "rgba(16, 185, 129, 0.8)" : "rgba(239, 68, 68, 0.8)";
+      ctx.fillStyle = "rgba(16, 185, 129, 0.8)"; // Always use green
       ctx.fill();
     });
   };

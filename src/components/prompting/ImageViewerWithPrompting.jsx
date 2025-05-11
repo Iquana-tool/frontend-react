@@ -3,11 +3,13 @@ import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours } from "./utils";
-import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus, Move, Download, X, Save } from "lucide-react";
+import { MousePointer, Square, Circle, Pentagon, Layers, List, CheckCircle, Edit, Plus, Move, Download, X, Save, Trash2, ZoomIn, ZoomOut, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Check, RefreshCw, PenTool } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import MaskGenerationPanel from "./MaskGenerationPanel";
 import ContourEditor from "./ContourEditor";
 import axios from "axios";
+import LabelSelector from "./LabelSelector"; // Import the new LabelSelector component
+import './ImageViewerWithPrompting.css';
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -305,6 +307,12 @@ const ImageViewerWithPrompting = () => {
   const [refinementImage, setRefinementImage] = useState(null);
   const [finalMaskContours, setFinalMaskContours] = useState([]);
 
+  // Update: Adding state for available labels and changing how we track the current label
+  const [labelOptions, setLabelOptions] = useState([
+    { id: 1, name: 'coral' },
+    { id: 2, name: 'petri dish' }
+  ]);
+
   // Add CSS for animations
   useEffect(() => {
     // Create a style element
@@ -344,6 +352,33 @@ const ImageViewerWithPrompting = () => {
       setImageObject(null);
       setAvailableImages([]);
     };
+  }, []);
+
+  // Add a useEffect to fetch labels from the backend
+  useEffect(() => {
+    const fetchLabels = async () => {
+      try {
+        const labels = await api.fetchLabels();
+        if (labels && labels.length > 0) {
+          // Transform the labels into the format we need
+          const formattedLabels = labels.map(label => ({
+            id: label.id,
+            name: label.name
+          }));
+          setLabelOptions(formattedLabels);
+          
+          // Set the first label as the default selected one
+          if (formattedLabels.length > 0) {
+            setCurrentLabel(formattedLabels[0].id);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch labels:", error);
+        // Keep the default labels if fetching fails
+      }
+    };
+
+    fetchLabels();
   }, []);
 
   const fetchImagesFromAPI = async () => {
@@ -814,7 +849,7 @@ const ImageViewerWithPrompting = () => {
               max_x: (cutoutPosition.x + cutoutPosition.width) / originalImage.width,
               max_y: (cutoutPosition.y + cutoutPosition.height) / originalImage.height
             },
-            selectedMask ? selectedMask.label || 0 : 0
+            currentLabel // Use the selected label ID instead of a hardcoded value
           );
         
           // Introduce an artificial delay to make the loading screen more visible
@@ -854,7 +889,7 @@ const ImageViewerWithPrompting = () => {
           selectedModel,
           prompts,
           { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
-          currentLabel
+          currentLabel // This is where we use the label, it should work as-is with the selected label ID
         );
 
         // Add an artificial delay to make the loading screen more visible
@@ -2802,28 +2837,12 @@ const ImageViewerWithPrompting = () => {
                     </button>
                   </div>
 
-                  {/* Foreground/Background buttons - Keep these */}
-                  <div className="flex space-x-2">
-                    <button
-                      className={`p-2 rounded-md ${
-                        currentLabel === 1
-                          ? "bg-green-500 text-white"
-                          : "bg-white border border-green-500 text-green-500"
-                      }`}
-                      onClick={() => setCurrentLabel(1)}
-                    >
-                      Foreground (1)
-                    </button>
-                    <button
-                      className={`p-2 rounded-md ${
-                        currentLabel === 0
-                          ? "bg-red-500 text-white"
-                          : "bg-white border border-red-500 text-red-500"
-                      }`}
-                      onClick={() => setCurrentLabel(0)}
-                    >
-                      Background (0)
-                    </button>
+                  {/* Label Selection - Enhanced styling and now the only label selector */}
+                  <div className="flex-grow max-w-xs">
+                    <LabelSelector 
+                      currentLabel={currentLabel}
+                      setCurrentLabel={setCurrentLabel}
+                    />
                   </div>
                   
                   {/* Export Button */}
