@@ -218,7 +218,7 @@ const PromptingCanvas = forwardRef(({
         // Draw line from last point to cursor if we have a cursor position
         if (cursorPos && currentPolygon.length > 0) {
           const lastPoint = currentPolygon[currentPolygon.length - 1];
-          if (lastPoint && typeof lastPoint.x === 'number') {
+          if (lastPoint && typeof lastPoint.x === 'number' && cursorPos && typeof cursorPos.x === 'number') {
             ctx.beginPath();
             ctx.moveTo(lastPoint.x, lastPoint.y);
             ctx.lineTo(cursorPos.x, cursorPos.y);
@@ -407,11 +407,13 @@ const PromptingCanvas = forwardRef(({
   useImperativeHandle(ref, () => ({
     getPrompts: () => prompts,
     clearPrompts: () => {
+      console.log("PromptingCanvas: clearPrompts called");
       setPrompts([]);
       setCurrentPolygon([]);
       redrawCanvas();
     },
     updateSelectedMask: (mask) => {
+      console.log("PromptingCanvas: updateSelectedMask called", mask?.id);
       // Only update if mask is null or different
       if (!selectedMask || mask === null || selectedMask.id !== mask?.id) {
         setSelectedMask(mask);
@@ -419,17 +421,53 @@ const PromptingCanvas = forwardRef(({
         setTimeout(() => {
           redrawCanvas();
         }, 0);
+      } else {
+        console.log("PromptingCanvas: Skipping mask update as it's the same mask");
       }
     },
     setActiveTool: (tool) => {
-      setCurrentShape(tool);
+      console.log("PromptingCanvas: setActiveTool called with", tool);
+      setActiveTool(tool);
     },
     getSelectedContours: () => selectedContours,
     clearSelectedContours: () => {
+      console.log("PromptingCanvas: clearSelectedContours called");
       setSelectedContours([]);
       setTimeout(() => {
         redrawCanvas();
       }, 0);
+    },
+    setZoomParameters: (level, center) => {
+      console.log("PromptingCanvas: setZoomParameters called with level=", level, "center=", center);
+      
+      // Store current values for debugging
+      const prevZoomLevel = zoomLevel;
+      const prevZoomCenter = zoomCenter;
+      
+      // Use stable state updates to ensure they're applied correctly
+      if (typeof level === 'number' && level > 0) {
+        setZoomLevel(level);
+        console.log(`PromptingCanvas: Zoom level changed from ${prevZoomLevel} to ${level}`);
+      }
+      
+      if (center && typeof center.x === 'number' && typeof center.y === 'number') {
+        setZoomCenter({...center}); // Clone to avoid reference issues
+        console.log("PromptingCanvas: Zoom center updated to", center);
+      }
+      
+      // Force multiple redraws to ensure updates are applied
+      const redrawDelays = [20, 100, 200];
+      redrawDelays.forEach(delay => {
+        setTimeout(() => {
+          console.log(`PromptingCanvas: Forced redraw at ${delay}ms after zoom parameter update`);
+          redrawCanvas();
+        }, delay);
+      });
+      
+      return {
+        appliedLevel: level,
+        appliedCenter: center
+      };
     }
   }));
 
@@ -1005,7 +1043,7 @@ const PromptingCanvas = forwardRef(({
 
   // Handle mouse move event
   const handleMouseMove = useCallback((e) => {
-    if (!image) return;
+    if (!image || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -1018,21 +1056,29 @@ const PromptingCanvas = forwardRef(({
     // Update cursor position for all cases
     setCursorPos({ x: imageCoords.x, y: imageCoords.y });
 
+    // Handle panning if active
+    if (isPanning) {
+      handlePanMove(e);
+      return;
+    }
+
     if (!isDrawing) return;
 
     if (promptType === "box" || promptType === "circle") {
       // For box and circle prompts, update the current shape
-      setCurrentShape({
-        startX: drawStartPos.x,
-        startY: drawStartPos.y,
-        endX: imageCoords.x,
-        endY: imageCoords.y,
-      });
+      if (drawStartPos) {
+        setCurrentShape({
+          startX: drawStartPos.x,
+          startY: drawStartPos.y,
+          endX: imageCoords.x,
+          endY: imageCoords.y,
+        });
+      }
     }
 
     // Force redraw
     redrawCanvas();
-  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords, redrawCanvas]);
+  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords, redrawCanvas, isPanning, handlePanMove]);
 
   // Handle mouse up event
   const handleMouseUp = useCallback((e) => {
