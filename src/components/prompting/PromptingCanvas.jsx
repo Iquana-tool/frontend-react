@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import {
   MousePointer,
   Square,
@@ -25,7 +25,9 @@ const PromptingCanvas = forwardRef(({
   currentLabel,
   zoomLevel: externalZoomLevel,
   zoomCenter: externalZoomCenter,
-  selectedContour
+  selectedContour,
+  onContourSelect,
+  onAddToFinalMask,
 }, ref) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
@@ -52,27 +54,7 @@ const PromptingCanvas = forwardRef(({
   const [isProcessingMask, setIsProcessingMask] = useState(false);
   const [activeTool, setActiveTool] = useState("point");
   const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
-
-  // Expose methods to parent component via ref
-  useImperativeHandle(ref, () => ({
-    clearPrompts: () => {
-      setPrompts([]);
-      setCurrentPolygon([]);
-      setCurrentShape(null);
-      setDrawStartPos(null);
-      redrawCanvas();
-    },
-    getPrompts: () => prompts,
-    updateSelectedMask: (mask) => {
-      // Update the selected mask and redraw
-      setSelectedMask(mask);
-      redrawCanvas();
-    },
-    // Add setActiveTool method to control from parent
-    setActiveTool: (tool) => {
-      setActiveTool(tool);
-    }
-  }));
+  const [selectedContours, setSelectedContours] = useState([]);
 
   // Reset prompts when switching to refinement mode
   useEffect(() => {
@@ -83,186 +65,6 @@ const PromptingCanvas = forwardRef(({
       setDrawStartPos(null);
     }
   }, [isRefinementMode]);
-
-  // Update canvas when image or selected mask changes
-  useEffect(() => {
-    if (image) {
-      redrawCanvas();
-    }
-  }, [image, selectedMask, prompts, currentPolygon, currentShape, panOffset, zoomLevel]);
-
-  // Update internal selectedMask state when prop changes
-  useEffect(() => {
-    setSelectedMask(selectedMaskProp);
-  }, [selectedMaskProp]);
-
-  // Initialize based on selected contour if provided
-  useEffect(() => {
-    if (selectedContour && image && zoomLevel > 1) {
-      // We have a selected contour, we can use it to help with initial positioning
-      console.log("Initializing with selected contour");
-      
-      // Calculate the center position of the contour in normalized coordinates
-      let avgX = 0, avgY = 0;
-      for (let i = 0; i < selectedContour.x.length; i++) {
-        avgX += selectedContour.x[i];
-        avgY += selectedContour.y[i];
-      }
-      avgX /= selectedContour.x.length;
-      avgY /= selectedContour.y.length;
-      
-      // Calculate how much to adjust pan offset to center on this point
-      const scale = initialScale * zoomLevel;
-      const imageWidth = image.width * scale;
-      const imageHeight = image.height * scale;
-      
-      // Calculate the offset needed to center on the contour
-      // This is based on the difference between the contour center and the image center
-      const offsetX = (0.5 - avgX) * imageWidth;
-      const offsetY = (0.5 - avgY) * imageHeight;
-      
-      console.log(`Setting pan offset to center on contour: x=${offsetX}, y=${offsetY}`);
-      setPanOffset({ 
-        x: offsetX, 
-        y: offsetY 
-      });
-    }
-  }, [selectedContour, image, zoomLevel, initialScale]);
-
-  // Update when external zoom props change
-  useEffect(() => {
-    if (externalZoomLevel) {
-      setZoomLevel(externalZoomLevel);
-    }
-  }, [externalZoomLevel]);
-
-  useEffect(() => {
-    if (externalZoomCenter) {
-      setZoomCenter(externalZoomCenter);
-    }
-  }, [externalZoomCenter]);
-
-  // Handle completing prompting
-  const handleComplete = () => {
-    if (prompts.length === 0) {
-      console.warn("No prompts to complete");
-      return;
-    }
-
-    // Format prompts for the API
-    const formattedPrompts = prompts.map(prompt => {
-      switch (prompt.type) {
-        case "point":
-          return {
-            type: "point",
-            coordinates: {
-              x: prompt.coordinates.x / image.width,
-              y: prompt.coordinates.y / image.height
-            },
-            label: prompt.label
-          };
-        case "box":
-          return {
-            type: "box",
-            coordinates: {
-              startX: prompt.coordinates.startX / image.width,
-              startY: prompt.coordinates.startY / image.height,
-              endX: prompt.coordinates.endX / image.width,
-              endY: prompt.coordinates.endY / image.height
-            },
-            label: prompt.label
-          };
-        case "circle":
-          return {
-            type: "circle",
-            coordinates: {
-              centerX: prompt.coordinates.centerX / image.width,
-              centerY: prompt.coordinates.centerY / image.height,
-              radius: prompt.coordinates.radius / Math.max(image.width, image.height)
-            },
-            label: prompt.label
-          };
-        case "polygon":
-          return {
-            type: "polygon",
-            coordinates: prompt.coordinates.map(point => ({
-              x: point.x / image.width,
-              y: point.y / image.height
-            })),
-            label: prompt.label
-          };
-        default:
-          return null;
-      }
-    }).filter(Boolean);
-
-    // Call the completion handler with normalized coordinates
-    onPromptingComplete(formattedPrompts);
-  };
-
-  // Initialize canvas when image changes
-  useEffect(() => {
-    if (!image) return;
-
-    setLoading(true);
-
-    // Reset view state
-    setZoomLevel(1);
-    setPanOffset({ x: 0, y: 0 });
-    setPrompts([]);
-    setCurrentPrompt(null);
-
-    // Get image dimensions
-    setImageInfo({ width: image.width, height: image.height });
-
-    // Update after a slight delay to ensure the container has been measured
-    setTimeout(() => {
-      updateCanvasSize();
-      setLoading(false);
-    }, 100);
-  }, [image]);
-
-  // Monitor container size changes for responsive behavior
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateCanvasSize();
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      if (containerRef.current) {
-        resizeObserver.unobserve(containerRef.current);
-      }
-    };
-  }, []);
-
-  // Update canvas based on container size
-  const updateCanvasSize = () => {
-    if (!containerRef.current || !image) return;
-
-    const container = containerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-
-    // Set canvas to container size
-    setCanvasSize({
-      width: containerWidth,
-      height: containerHeight,
-    });
-
-    // Calculate scale to fit image in canvas
-    const scaleX = containerWidth / image.width;
-    const scaleY = containerHeight / image.height;
-    const scale = Math.min(scaleX, scaleY) * 0.9; // 10% margin
-
-    setInitialScale(scale);
-
-    // Redraw canvas with new dimensions
-    redrawCanvas(scale);
-  };
 
   // Drawing utility functions
   const drawPoint = (ctx, x, y, label) => {
@@ -339,22 +141,99 @@ const PromptingCanvas = forwardRef(({
     });
   };
 
-  // Add useEffect to watch for selectedMask changes
-  useEffect(() => {
-    if (canvasRef.current && image) {
-      // Clear existing timeouts to prevent multiple redraws
-      if (window.redrawTimeout) {
-        clearTimeout(window.redrawTimeout);
+  // Function to draw all prompts on the canvas
+  const drawAllPrompts = (ctx) => {
+    // Draw all saved prompts
+    prompts.forEach((prompt) => {
+      try {
+        switch (prompt.type) {
+          case "point":
+            if (prompt.coordinates && typeof prompt.coordinates.x === 'number') {
+              drawPoint(ctx, prompt.coordinates.x, prompt.coordinates.y, prompt.label);
+            }
+            break;
+          case "box":
+            if (prompt.coordinates && typeof prompt.coordinates.startX === 'number') {
+              drawBox(
+                ctx,
+                prompt.coordinates.startX,
+                prompt.coordinates.startY,
+                prompt.coordinates.endX,
+                prompt.coordinates.endY,
+                prompt.label
+              );
+            }
+            break;
+          case "circle":
+            if (prompt.coordinates && typeof prompt.coordinates.centerX === 'number') {
+              drawCircle(
+                ctx,
+                prompt.coordinates.centerX,
+                prompt.coordinates.centerY,
+                prompt.coordinates.radius,
+                prompt.label
+              );
+            }
+            break;
+          case "polygon":
+            if (prompt.coordinates && Array.isArray(prompt.coordinates)) {
+              drawPolygon(ctx, prompt.coordinates, prompt.label);
+            }
+            break;
+          default:
+            break;
+        }
+      } catch (error) {
+        console.error("Error drawing prompt:", error, prompt);
       }
-      
-      // Use a small timeout to ensure canvas is ready
-      window.redrawTimeout = setTimeout(() => {
-        redrawCanvas();
-      }, 100);
-    }
-  }, [selectedMask]);
+    });
 
-  // Draw all content to canvas
+    // Draw current in-progress shape
+    if (currentShape) {
+      if (promptType === "box") {
+        drawBox(
+          ctx,
+          currentShape.startX,
+          currentShape.startY,
+          currentShape.endX,
+          currentShape.endY,
+          currentLabel
+        );
+      } else if (promptType === "circle") {
+        const centerX = (currentShape.startX + currentShape.endX) / 2;
+        const centerY = (currentShape.startY + currentShape.endY) / 2;
+        const radius = Math.sqrt(
+          Math.pow(currentShape.endX - currentShape.startX, 2) +
+          Math.pow(currentShape.endY - currentShape.startY, 2)
+        ) / 2;
+        drawCircle(ctx, centerX, centerY, radius, currentLabel);
+      }
+    }
+
+    // Draw current in-progress polygon
+    if (currentPolygon && Array.isArray(currentPolygon) && currentPolygon.length > 0) {
+      try {
+        drawPolygon(ctx, currentPolygon, currentLabel, true);
+        
+        // Draw line from last point to cursor if we have a cursor position
+        if (cursorPos && currentPolygon.length > 0) {
+          const lastPoint = currentPolygon[currentPolygon.length - 1];
+          if (lastPoint && typeof lastPoint.x === 'number') {
+            ctx.beginPath();
+            ctx.moveTo(lastPoint.x, lastPoint.y);
+            ctx.lineTo(cursorPos.x, cursorPos.y);
+            ctx.strokeStyle = "rgba(16, 185, 129, 0.6)";  // green color
+            ctx.lineWidth = 2 / (initialScale * zoomLevel);
+            ctx.stroke();
+          }
+        }
+      } catch (error) {
+        console.error("Error drawing current polygon:", error);
+      }
+    }
+  };
+
+  // Function to redraw the canvas
   const redrawCanvas = (initialScaleOverride = null) => {
     if (!canvasRef.current || !image) return;
 
@@ -441,12 +320,10 @@ const PromptingCanvas = forwardRef(({
             ctx.fill();
           });
 
-          // Draw yellow border around the contours
+          // Draw borders around all contours
           ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = '#FFD700';
-          ctx.lineWidth = 2 / (scale * zoomLevel);
           
-          selectedMask.contours.forEach(contour => {
+          selectedMask.contours.forEach((contour, index) => {
             if (!contour.x || !contour.y || contour.x.length < 3) return;
             
             ctx.beginPath();
@@ -463,61 +340,299 @@ const PromptingCanvas = forwardRef(({
             }
             
             ctx.closePath();
+            
+            // Use different styling for selected vs unselected contours
+            if (selectedContours.includes(index)) {
+              // Selected contour - use a bright highlight color and thicker line
+              ctx.strokeStyle = '#FF5500';  // Bright orange
+              ctx.lineWidth = 4 / (scale * zoomLevel);  // Thicker line
+              ctx.fillStyle = 'rgba(255, 85, 0, 0.4)';  // More visible fill
+              ctx.fill();
+              
+              // Add a glow effect to make selection more visible
+              ctx.shadowColor = '#FF5500';
+              ctx.shadowBlur = 8 / (scale * zoomLevel);
             ctx.stroke();
+              ctx.shadowBlur = 0;
+              
+              // Draw selection handles at the corners of bounding box
+              const contourPoints = [];
+              for (let i = 0; i < contour.x.length; i++) {
+                contourPoints.push({
+                  x: contour.x[i] * image.width,
+                  y: contour.y[i] * image.height
+                });
+              }
+              
+              // Find bounding box
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              contourPoints.forEach(pt => {
+                minX = Math.min(minX, pt.x);
+                minY = Math.min(minY, pt.y);
+                maxX = Math.max(maxX, pt.x);
+                maxY = Math.max(maxY, pt.y);
+              });
+              
+              // Draw corner handles
+              const handleSize = 6 / (scale * zoomLevel);
+              ctx.fillStyle = '#FF5500';
+              ctx.fillRect(minX - handleSize/2, minY - handleSize/2, handleSize, handleSize);
+              ctx.fillRect(maxX - handleSize/2, minY - handleSize/2, handleSize, handleSize);
+              ctx.fillRect(maxX - handleSize/2, maxY - handleSize/2, handleSize, handleSize);
+              ctx.fillRect(minX - handleSize/2, maxY - handleSize/2, handleSize, handleSize);
+            } else {
+              // Unselected contour - use a more subtle styling
+              ctx.strokeStyle = '#FFD700';  // Gold color
+        ctx.lineWidth = 2 / (scale * zoomLevel);
+              ctx.stroke();
+            }
           });
         } catch (error) {
-          console.error('Error rendering contours:', error);
-        }
-      } else if (selectedMask.base64) {
-        // Handle base64 image masks (legacy format)
-        const maskImg = new Image();
-        maskImg.src = `data:image/png;base64,${selectedMask.base64}`;
-        
-        // Use the mask to clear the darkened area
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.drawImage(maskImg, 0, 0);
-        
-        // Reset composite operation and draw yellow border
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 2 / (scale * zoomLevel);
-        
-        // Calculate and draw the bounding box
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = image.width;
-        maskCanvas.height = image.height;
-        const maskCtx = maskCanvas.getContext('2d');
-        maskCtx.drawImage(maskImg, 0, 0);
-        
-        const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
-        let minX = maskCanvas.width, minY = maskCanvas.height, maxX = 0, maxY = 0;
-        
-        for (let y = 0; y < maskCanvas.height; y++) {
-          for (let x = 0; x < maskCanvas.width; x++) {
-            const idx = (y * maskCanvas.width + x) * 4;
-            if (maskData[idx + 3] > 0) {
-              minX = Math.min(minX, x);
-              minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x);
-              maxY = Math.max(maxY, y);
-            }
-          }
+          console.error("Error drawing mask:", error);
         }
         
-        // Draw the bounding box
-        ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
-      }
-
-      // Restore the original context state
+        // Restore the context state
       ctx.restore();
+      }
     }
 
-    // Draw all prompts
+    // Draw all prompts on top
     drawAllPrompts(ctx);
 
-    // Restore original context state
+    // Restore the canvas context
     ctx.restore();
   };
+
+  // Expose methods to parent component via ref
+  useImperativeHandle(ref, () => ({
+    getPrompts: () => prompts,
+    clearPrompts: () => {
+      setPrompts([]);
+      setCurrentPolygon([]);
+      redrawCanvas();
+    },
+    updateSelectedMask: (mask) => {
+      // Only update if mask is null or different
+      if (!selectedMask || mask === null || selectedMask.id !== mask?.id) {
+        setSelectedMask(mask);
+        // Use setTimeout to break update loop
+        setTimeout(() => {
+          redrawCanvas();
+        }, 0);
+      }
+    },
+    setActiveTool: (tool) => {
+      setCurrentShape(tool);
+    },
+    getSelectedContours: () => selectedContours,
+    clearSelectedContours: () => {
+      setSelectedContours([]);
+      setTimeout(() => {
+        redrawCanvas();
+      }, 0);
+    }
+  }));
+
+  // Update canvas when image or selected mask changes
+  useEffect(() => {
+    if (canvasRef.current && image) {
+      redrawCanvas();
+    }
+  }, [image, selectedMask, prompts, currentPolygon, currentShape, zoomLevel, panOffset, canvasSize, initialScale]);
+
+  // Update internal selectedMask state when prop changes
+  useEffect(() => {
+    // Only update if the new mask is different from the current one
+    // This prevents infinite update loops
+    if (selectedMaskProp && (!selectedMask || selectedMaskProp.id !== selectedMask.id)) {
+      setSelectedMask(selectedMaskProp);
+    } else if (!selectedMaskProp && selectedMask) {
+      setSelectedMask(null);
+    }
+  }, [selectedMaskProp]);
+
+  // Initialize based on selected contour if provided
+  useEffect(() => {
+    if (selectedContour && image && zoomLevel > 1) {
+      // We have a selected contour, we can use it to help with initial positioning
+      console.log("Initializing with selected contour");
+      
+      // Calculate the center position of the contour in normalized coordinates
+      let avgX = 0, avgY = 0;
+      for (let i = 0; i < selectedContour.x.length; i++) {
+        avgX += selectedContour.x[i];
+        avgY += selectedContour.y[i];
+      }
+      avgX /= selectedContour.x.length;
+      avgY /= selectedContour.y.length;
+      
+      // Calculate how much to adjust pan offset to center on this point
+      const scale = initialScale * zoomLevel;
+      const imageWidth = image.width * scale;
+      const imageHeight = image.height * scale;
+      
+      // Calculate the offset needed to center on the contour
+      // This is based on the difference between the contour center and the image center
+      const offsetX = (0.5 - avgX) * imageWidth;
+      const offsetY = (0.5 - avgY) * imageHeight;
+      
+      console.log(`Setting pan offset to center on contour: x=${offsetX}, y=${offsetY}`);
+      setPanOffset({ 
+        x: offsetX, 
+        y: offsetY 
+      });
+    }
+  }, [selectedContour, image, zoomLevel, initialScale]);
+
+  // Update when external zoom props change
+  useEffect(() => {
+    if (externalZoomLevel) {
+      setZoomLevel(externalZoomLevel);
+    }
+  }, [externalZoomLevel]);
+
+  useEffect(() => {
+    if (externalZoomCenter) {
+      setZoomCenter(externalZoomCenter);
+    }
+  }, [externalZoomCenter]);
+
+  // Handle completing prompting
+  const handleComplete = () => {
+    if (prompts.length === 0) {
+      console.warn("No prompts to complete");
+      return;
+    }
+
+    // Format prompts for the API
+    const formattedPrompts = prompts.map(prompt => {
+        switch (prompt.type) {
+          case "point":
+          return {
+            type: "point",
+            coordinates: {
+              x: prompt.coordinates.x / image.width,
+              y: prompt.coordinates.y / image.height
+            },
+            label: prompt.label
+          };
+          case "box":
+          return {
+            type: "box",
+            coordinates: {
+              startX: prompt.coordinates.startX / image.width,
+              startY: prompt.coordinates.startY / image.height,
+              endX: prompt.coordinates.endX / image.width,
+              endY: prompt.coordinates.endY / image.height
+            },
+            label: prompt.label
+          };
+          case "circle":
+          return {
+            type: "circle",
+            coordinates: {
+              centerX: prompt.coordinates.centerX / image.width,
+              centerY: prompt.coordinates.centerY / image.height,
+              radius: prompt.coordinates.radius / Math.max(image.width, image.height)
+            },
+            label: prompt.label
+          };
+          case "polygon":
+          return {
+            type: "polygon",
+            coordinates: prompt.coordinates.map(point => ({
+              x: point.x / image.width,
+              y: point.y / image.height
+            })),
+            label: prompt.label
+          };
+          default:
+          return null;
+      }
+    }).filter(Boolean);
+
+    // Call the completion handler with normalized coordinates
+    onPromptingComplete(formattedPrompts);
+  };
+
+  // Initialize canvas when image changes
+  useEffect(() => {
+    if (!image) return;
+
+    setLoading(true);
+
+    // Reset view state
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+    setPrompts([]);
+    setCurrentPrompt(null);
+
+    // Get image dimensions
+    setImageInfo({ width: image.width, height: image.height });
+
+    // Update after a slight delay to ensure the container has been measured
+    setTimeout(() => {
+      updateCanvasSize();
+      setLoading(false);
+    }, 100);
+  }, [image]);
+
+  // Monitor container size changes for responsive behavior
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+    };
+  }, []);
+
+  // Update canvas based on container size
+  const updateCanvasSize = () => {
+    if (!containerRef.current || !image) return;
+
+    const container = containerRef.current;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    // Set canvas to container size
+    setCanvasSize({
+      width: containerWidth,
+      height: containerHeight,
+    });
+
+    // Calculate scale to fit image in canvas
+    const scaleX = containerWidth / image.width;
+    const scaleY = containerHeight / image.height;
+    const scale = Math.min(scaleX, scaleY) * 0.9; // 10% margin
+
+    setInitialScale(scale);
+
+    // Redraw canvas with new dimensions
+    redrawCanvas(scale);
+  };
+
+  // Add useEffect to watch for selectedMask changes
+  useEffect(() => {
+    if (canvasRef.current && image) {
+      // Clear existing timeouts to prevent multiple redraws
+      if (window.redrawTimeout) {
+        clearTimeout(window.redrawTimeout);
+      }
+      
+      // Use a small timeout to ensure canvas is ready
+      window.redrawTimeout = setTimeout(() => {
+        redrawCanvas();
+      }, 100);
+    }
+  }, [selectedMask]);
 
   // Update canvas when view parameters change
   useEffect(() => {
@@ -525,102 +640,6 @@ const PromptingCanvas = forwardRef(({
       redrawCanvas();
     }
   }, [zoomLevel, panOffset, prompts, canvasSize, initialScale, selectedMask, image]);
-
-  // Draw all prompts
-  const drawAllPrompts = (ctx) => {
-    prompts.forEach((prompt) => {
-      try {
-        switch (prompt.type) {
-          case "point":
-            if (prompt.coordinates && typeof prompt.coordinates.x === 'number' && typeof prompt.coordinates.y === 'number') {
-              drawPoint(
-                ctx, 
-                prompt.coordinates.x, 
-                prompt.coordinates.y, 
-                prompt.label
-              );
-            }
-            break;
-          case "box":
-            if (prompt.coordinates && typeof prompt.coordinates.startX === 'number') {
-              drawBox(
-                ctx,
-                prompt.coordinates.startX,
-                prompt.coordinates.startY,
-                prompt.coordinates.endX,
-                prompt.coordinates.endY,
-                prompt.label
-              );
-            }
-            break;
-          case "circle":
-            if (prompt.coordinates && typeof prompt.coordinates.centerX === 'number') {
-              drawCircle(
-                ctx,
-                prompt.coordinates.centerX,
-                prompt.coordinates.centerY,
-                prompt.coordinates.radius,
-                prompt.label
-              );
-            }
-            break;
-          case "polygon":
-            if (prompt.coordinates && Array.isArray(prompt.coordinates)) {
-              drawPolygon(ctx, prompt.coordinates, prompt.label);
-            }
-            break;
-          default:
-            break;
-        }
-      } catch (error) {
-        console.error("Error drawing prompt:", error, prompt);
-      }
-    });
-
-    // Draw current in-progress shape
-    if (currentShape) {
-      if (promptType === "box") {
-        drawBox(
-          ctx,
-          currentShape.startX,
-          currentShape.startY,
-          currentShape.endX,
-          currentShape.endY,
-          currentLabel
-        );
-      } else if (promptType === "circle") {
-        const centerX = (currentShape.startX + currentShape.endX) / 2;
-        const centerY = (currentShape.startY + currentShape.endY) / 2;
-        const radius = Math.sqrt(
-          Math.pow(currentShape.endX - currentShape.startX, 2) +
-          Math.pow(currentShape.endY - currentShape.startY, 2)
-        ) / 2;
-        drawCircle(ctx, centerX, centerY, radius, currentLabel);
-      }
-    }
-
-    // Draw current in-progress polygon
-    if (currentPolygon && Array.isArray(currentPolygon) && currentPolygon.length > 0) {
-      try {
-        drawPolygon(ctx, currentPolygon, currentLabel, true);
-        
-        // Draw line from last point to cursor if we have a cursor position
-        if (cursorPos && currentPolygon.length > 0) {
-          const lastPoint = currentPolygon[currentPolygon.length - 1];
-          if (lastPoint && typeof lastPoint.x === 'number') {
-            ctx.beginPath();
-            ctx.moveTo(lastPoint.x, lastPoint.y);
-            ctx.lineTo(cursorPos.x, cursorPos.y);
-            ctx.strokeStyle = currentLabel === 1 ? "rgba(16, 185, 129, 0.6)" : "rgba(239, 68, 68, 0.6)";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
-        }
-      } catch (error) {
-        console.error("Error drawing current polygon:", error);
-      }
-    }
-  };
 
   // Handle wheel event for zooming
   const handleWheel = (e) => {
@@ -728,18 +747,12 @@ const PromptingCanvas = forwardRef(({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.addEventListener("wheel", handleWheel, { passive: false });
-    canvas.addEventListener("mousedown", handlePanStart);
-    canvas.addEventListener("mousemove", handlePanMove);
-    canvas.addEventListener("mouseup", handlePanEnd);
-    canvas.addEventListener("mouseleave", handlePanEnd);
-
     return () => {
-      canvas.removeEventListener("wheel", handleWheel);
-      canvas.removeEventListener("mousedown", handlePanStart);
-      canvas.removeEventListener("mousemove", handlePanMove);
-      canvas.removeEventListener("mouseup", handlePanEnd);
-      canvas.removeEventListener("mouseleave", handlePanEnd);
+      // canvas.removeEventListener("wheel", handleWheel);
+      // canvas.removeEventListener("mousedown", handlePanStart);
+      // canvas.removeEventListener("mousemove", handlePanMove);
+      // canvas.removeEventListener("mouseup", handlePanEnd);
+      // canvas.removeEventListener("mouseleave", handlePanEnd);
     };
   }, [image, isPanning, panStart, panOffset, zoomLevel, initialScale]);
 
@@ -779,11 +792,126 @@ const PromptingCanvas = forwardRef(({
     };
   }, [image]);
 
-  // Handle mouse down event
-  const handleMouseDown = (e) => {
-    if (loading || !image) return;
+  // Add function to check if a point is inside a contour
+  const isPointInContour = (x, y, contour) => {
+    if (!contour || !contour.x || !contour.y || contour.x.length < 3) return false;
+    
+    let inside = false;
+    const n = contour.x.length;
+    
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const xi = contour.x[i] * image.width;
+      const yi = contour.y[i] * image.height;
+      const xj = contour.x[j] * image.width;
+      const yj = contour.y[j] * image.height;
+      
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    
+    return inside;
+  };
 
-    const { offsetX, offsetY } = e.nativeEvent;
+  // Handle point prompt creation
+  const addPointPrompt = useCallback((x, y, label) => {
+    console.log('Adding point prompt at:', x, y);
+    const newPrompt = {
+      type: "point",
+      coordinates: { x, y },
+      label
+    };
+    
+    setPrompts(prev => [...prev, newPrompt]);
+  }, []);
+
+  // Handle mouse down event
+  const handleMouseDown = useCallback((e) => {
+    if (!canvasRef.current || !image) return;
+    
+    // Get canvas-relative coordinates
+    const rect = canvasRef.current.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const canvasY = e.clientY - rect.top;
+    
+    // Convert to image coordinates
+    const imageCoords = canvasToImageCoords(canvasX, canvasY);
+    if (!imageCoords) return;
+    
+    // Check if user clicked on a contour (when a mask is displayed)
+    if (selectedMask && selectedMask.contours && selectedMask.contours.length > 0) {
+      // In selection mode, check if we clicked on a contour
+      let foundContourIndex = -1;
+      
+      // First check if we clicked on any already selected contour for better UX
+      if (selectedContours.length > 0) {
+        for (let i = 0; i < selectedContours.length; i++) {
+          const contourIndex = selectedContours[i];
+          const contour = selectedMask.contours[contourIndex];
+          if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
+            foundContourIndex = contourIndex;
+            console.log(`Clicked on already selected contour at index ${contourIndex}`);
+            break;
+          }
+        }
+      }
+      
+      // If no selected contour was clicked, check all contours
+      if (foundContourIndex === -1) {
+        for (let i = 0; i < selectedMask.contours.length; i++) {
+          const contour = selectedMask.contours[i];
+          if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
+            foundContourIndex = i;
+            console.log(`Found new contour at index ${i}`);
+            break;
+          }
+        }
+      }
+      
+      if (foundContourIndex !== -1) {
+        // Toggle selection state of this contour
+        const newSelectedContours = [...selectedContours];
+        const contourIndex = newSelectedContours.indexOf(foundContourIndex);
+        
+        if (contourIndex !== -1) {
+          // Remove it if already selected
+          newSelectedContours.splice(contourIndex, 1);
+          console.log(`Deselected contour ${foundContourIndex}, new selection: ${newSelectedContours}`);
+        } else {
+          // Add it if not already selected
+          newSelectedContours.push(foundContourIndex);
+          console.log(`Selected contour ${foundContourIndex}, new selection: ${newSelectedContours}`);
+        }
+        
+        // Set new selection
+        setSelectedContours(newSelectedContours);
+        
+        // Notify parent component if callback provided
+        if (onContourSelect) {
+          // Pass the entire array of selected contours to the parent
+          onContourSelect(newSelectedContours);
+        }
+        
+        // Use setTimeout to break potential update cycles
+        setTimeout(() => {
+          redrawCanvas();
+        }, 0);
+        return; // Don't proceed with other drawing operations
+      } else {
+        console.log("Clicked, but no contour found at this position");
+      }
+    }
+    
+    // If Alt/Option key is pressed, start panning
+    if (e.altKey) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: canvasX, y: canvasY });
+      return;
+    }
+    
+    // Handle drawing based on the active tool
+    if (loading || !image) return;
     
     // If drag tool is active or middle mouse button or holding Alt key, initiate panning
     if (activeTool === "drag" || e.button === 1 || e.altKey) {
@@ -795,51 +923,50 @@ const PromptingCanvas = forwardRef(({
     if (e.button === 0) { // Left mouse button
       setIsDrawing(true);
       
-      const imageCoords = canvasToImageCoords(offsetX, offsetY);
-      
       // Only proceed with drawing if we're not in panning mode
       if (!isPanning) {
+        console.log('Drawing with promptType:', promptType);
         switch (promptType) {
           case "point":
-            setCurrentPrompt({
-              type: "point",
-              coordinates: { x: imageCoords.x, y: imageCoords.y },
-              label: currentLabel
-            });
-            // Add point immediately
-            setPrompts([...prompts, {
-              type: "point",
-              coordinates: { x: imageCoords.x, y: imageCoords.y },
-              label: currentLabel
-            }]);
+            // Log actual creation of point
+            console.log('Creating point at:', imageCoords.x, imageCoords.y);
+            
+            // Immediately add the point prompt to the state
+            addPointPrompt(imageCoords.x, imageCoords.y, currentLabel);
+            
+            // Force a redraw to show the new point
+            setTimeout(() => {
+              redrawCanvas();
+            }, 0);
             break;
           case "box":
             setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
             setCurrentShape({
-              type: "box",
-              coordinates: {
                 startX: imageCoords.x,
                 startY: imageCoords.y,
                 endX: imageCoords.x,
                 endY: imageCoords.y
-              },
-              label: currentLabel
             });
+            // Force a redraw to show the start of the box
+            setTimeout(() => {
+              redrawCanvas();
+            }, 0);
             break;
           case "circle":
             setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
             setCurrentShape({
-              type: "circle",
-              coordinates: {
-                centerX: imageCoords.x,
-                centerY: imageCoords.y,
-                radius: 0
-              },
-              label: currentLabel
+              startX: imageCoords.x,
+              startY: imageCoords.y,
+              endX: imageCoords.x,
+              endY: imageCoords.y
             });
+            // Force a redraw to show the start of the circle
+            setTimeout(() => {
+              redrawCanvas();
+            }, 0);
             break;
           case "polygon":
-            if (!currentPolygon) {
+            if (!currentPolygon || currentPolygon.length === 0) {
               // Start a new polygon
               setCurrentPolygon([{ x: imageCoords.x, y: imageCoords.y }]);
             } else {
@@ -847,16 +974,37 @@ const PromptingCanvas = forwardRef(({
               const newPolygon = [...currentPolygon, { x: imageCoords.x, y: imageCoords.y }];
               setCurrentPolygon(newPolygon);
             }
+            // Force a redraw to show the updated polygon
+            setTimeout(() => {
+              redrawCanvas();
+            }, 0);
             break;
           default:
             break;
         }
       }
     }
-  };
+  }, [
+    image, 
+    isPanning, 
+    isDrawing, 
+    selectedMask, 
+    selectedContours, 
+    promptType, 
+    currentLabel, 
+    activeTool, 
+    loading, 
+    isPointInContour, 
+    canvasToImageCoords, 
+    handlePanStart,
+    addPointPrompt,
+    redrawCanvas,
+    currentPolygon,
+    onContourSelect
+  ]);
 
   // Handle mouse move event
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (!image) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
@@ -884,10 +1032,10 @@ const PromptingCanvas = forwardRef(({
 
     // Force redraw
     redrawCanvas();
-  };
+  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords, redrawCanvas]);
 
   // Handle mouse up event
-  const handleMouseUp = (e) => {
+  const handleMouseUp = useCallback((e) => {
     if (!image || !isDrawing) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
@@ -939,10 +1087,10 @@ const PromptingCanvas = forwardRef(({
 
     // Force redraw
     redrawCanvas();
-  };
+  }, [image, isDrawing, promptType, drawStartPos, currentLabel, canvasToImageCoords, redrawCanvas]);
 
   // Handle double click for completing polygons
-  const handleDoubleClick = (e) => {
+  const handleDoubleClick = useCallback((e) => {
     if (!image || promptType !== "polygon") return;
     if (!currentPolygon || !Array.isArray(currentPolygon) || currentPolygon.length < 3) return;
 
@@ -959,7 +1107,7 @@ const PromptingCanvas = forwardRef(({
 
     // Force redraw
     redrawCanvas();
-  };
+  }, [image, promptType, currentPolygon, currentLabel, redrawCanvas]);
 
   // Canvas control functions
   const handleZoomIn = () => {
@@ -1078,17 +1226,45 @@ const PromptingCanvas = forwardRef(({
     }
   }, [activeTool, isPanning]);
 
+  // Attach event listeners to canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleCanvasMouseDown = (e) => handleMouseDown(e);
+    const handleCanvasMouseMove = (e) => handleMouseMove(e);
+    const handleCanvasMouseUp = (e) => handleMouseUp(e);
+    const handleCanvasMouseLeave = (e) => handleMouseUp(e);
+    const handleCanvasDoubleClick = (e) => handleDoubleClick(e);
+    const handleCanvasWheel = (e) => handleWheel(e);
+
+    canvas.addEventListener('mousedown', handleCanvasMouseDown);
+    canvas.addEventListener('mousemove', handleCanvasMouseMove);
+    canvas.addEventListener('mouseup', handleCanvasMouseUp);
+    canvas.addEventListener('mouseleave', handleCanvasMouseLeave);
+    canvas.addEventListener('dblclick', handleCanvasDoubleClick);
+    canvas.addEventListener('wheel', handleCanvasWheel);
+
+    return () => {
+      canvas.removeEventListener('mousedown', handleCanvasMouseDown);
+      canvas.removeEventListener('mousemove', handleCanvasMouseMove);
+      canvas.removeEventListener('mouseup', handleCanvasMouseUp);
+      canvas.removeEventListener('mouseleave', handleCanvasMouseLeave);
+      canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
+      canvas.removeEventListener('wheel', handleCanvasWheel);
+    };
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel]);
+
+  useEffect(() => {
+    console.log('[PromptingCanvas] selectedContours updated:', selectedContours);
+  }, [selectedContours]);
+
   return (
     <div className="flex flex-col h-full">
       <div 
         ref={containerRef}
         className="relative flex-1 overflow-hidden border border-gray-200 rounded"
         style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onDoubleClick={handleDoubleClick}
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
@@ -1124,6 +1300,70 @@ const PromptingCanvas = forwardRef(({
         {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.length > 0 && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 rounded-md text-xs">
             Double-click to finish polygon
+          </div>
+        )}
+
+        {/* Segmentation Controls Overlay - Show when there's a selected mask with contours */}
+        {selectedMask && selectedMask.contours && selectedMask.contours.length > 0 && (
+          <div className="absolute top-2 right-2 bg-white bg-opacity-95 p-3 rounded-lg shadow-md z-20 border border-blue-100">
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-medium text-blue-800 mb-1">
+                Segmentation Results
+                <span className="block text-xs font-normal text-gray-600 mt-0.5">
+                  {selectedMask.contours.length} contour{selectedMask.contours.length !== 1 ? 's' : ''} available
+                </span>
+              </div>
+              
+              {selectedContours && selectedContours.length > 0 ? (
+                <div className="text-xs text-green-600 font-medium">
+                  {selectedContours.length} contour{selectedContours.length !== 1 ? 's' : ''} selected
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500">
+                  Click on a contour to select it
+                </div>
+              )}
+              
+              <div className="flex space-x-2 mt-1">
+                <button
+                  onClick={() => {
+                    console.log("[PromptingCanvas] Add to Final Mask button clicked");
+                    console.log("[PromptingCanvas] Selected contours:", selectedContours);
+                    if (selectedContours && selectedContours.length > 0) {
+                      if (onAddToFinalMask) {
+                        onAddToFinalMask(selectedContours);
+                      }
+                    } else {
+                      console.log("No contours selected - please select a contour first");
+                    }
+                  }}
+                  disabled={!selectedContours || selectedContours.length === 0}
+                  className={`px-2 py-1 rounded-md text-xs flex items-center ${
+                    !selectedContours || selectedContours.length === 0
+                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add to Final Mask
+                </button>
+                
+                <button
+                  onClick={() => {
+                    setSelectedContours([]);
+                    redrawCanvas();
+                  }}
+                  className="px-2 py-1 rounded-md text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 flex items-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                  </svg>
+                  Reset Selection
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
