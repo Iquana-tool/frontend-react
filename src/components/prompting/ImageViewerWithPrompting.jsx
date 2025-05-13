@@ -8,7 +8,7 @@ import React, {
 import PromptingCanvas from "./PromptingCanvas";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
-import { getMaskColor, createMaskPreviewFromContours } from "./utils";
+import { getMaskColor, createMaskPreviewFromContours, remapPromptsToCrop } from "./utils";
 import {
   MousePointer,
   Square,
@@ -39,7 +39,7 @@ import {
 import QuantificationDisplay from "./QuantificationDisplay";
 import ContourEditor from "./ContourEditor";
 import axios from "axios";
-import LabelSelector from "./LabelSelector"; // Import the new LabelSelector component
+import LabelSelector from "./LabelSelector";
 import "./ImageViewerWithPrompting.css";
 
 // Add custom styles to fix the overlapping text issue
@@ -1077,10 +1077,13 @@ const ImageViewerWithPrompting = () => {
         roiUsed: !!roi,
       });
 
+      // Remap prompts to crop range if ROI is used (i.e., cropped segmentation)
+      const promptsForAPI = remapPromptsToCrop(adjustedPrompts, roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 });
+
       const response = await api.segmentImage(
         selectedImage.id,
         selectedModel,
-        adjustedPrompts,
+        promptsForAPI,
         roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
         currentLabel
       );

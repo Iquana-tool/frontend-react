@@ -866,7 +866,6 @@ const PromptingCanvas = forwardRef(({
 
   // Handle point prompt creation
   const addPointPrompt = useCallback((x, y, label) => {
-    console.log('Adding point prompt at:', x, y);
     const newPrompt = {
       type: "point",
       coordinates: { x, y },

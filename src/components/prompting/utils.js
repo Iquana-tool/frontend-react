@@ -393,3 +393,53 @@ export const getMaskColor = (index, opacity = 0.6) => {
   
   return colors[index % colors.length];
 };
+
+/**
+ * Remap prompts to the crop's normalized [0,1] range.
+ * @param {Array} prompts - Array of prompt objects
+ * @param {Object} crop - Crop object with min_x, min_y, max_x, max_y (all in [0,1] relative to image)
+ * @returns {Array} Remapped prompts
+ */
+export const remapPromptsToCrop = (prompts, crop) => {
+  if (!crop || (crop.min_x === 0 && crop.min_y === 0 && crop.max_x === 1 && crop.max_y === 1)) {
+    // No crop, return original prompts
+    return prompts;
+  }
+  const cropWidth = crop.max_x - crop.min_x;
+  const cropHeight = crop.max_y - crop.min_y;
+  return prompts.map((prompt) => {
+    let remapped = { ...prompt };
+    switch (prompt.type) {
+      case "point":
+        remapped.coordinates = {
+          x: (prompt.coordinates.x - crop.min_x) / cropWidth,
+          y: (prompt.coordinates.y - crop.min_y) / cropHeight,
+        };
+        break;
+      case "box":
+        remapped.coordinates = {
+          startX: (prompt.coordinates.startX - crop.min_x) / cropWidth,
+          startY: (prompt.coordinates.startY - crop.min_y) / cropHeight,
+          endX: (prompt.coordinates.endX - crop.min_x) / cropWidth,
+          endY: (prompt.coordinates.endY - crop.min_y) / cropHeight,
+        };
+        break;
+      case "circle":
+        remapped.coordinates = {
+          centerX: (prompt.coordinates.centerX - crop.min_x) / cropWidth,
+          centerY: (prompt.coordinates.centerY - crop.min_y) / cropHeight,
+          radius: prompt.coordinates.radius / Math.max(cropWidth, cropHeight),
+        };
+        break;
+      case "polygon":
+        remapped.coordinates = prompt.coordinates.map((pt) => ({
+          x: (pt.x - crop.min_x) / cropWidth,
+          y: (pt.y - crop.min_y) / cropHeight,
+        }));
+        break;
+      default:
+        break;
+    }
+    return remapped;
+  });
+};
