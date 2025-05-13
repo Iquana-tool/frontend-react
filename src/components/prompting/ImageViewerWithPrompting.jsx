@@ -34,6 +34,7 @@ import {
   RefreshCw,
   PenTool,
   RotateCcw,
+  Pointer, 
 } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import ContourEditor from "./ContourEditor";
@@ -1127,6 +1128,11 @@ const ImageViewerWithPrompting = () => {
             setBestMask(highestConfidenceMask);
             setLoading(false);
             setSuccessMessageWithTimeout("Segmentation complete!");
+            // --- Set Select tool as default after segmentation ---
+            setPromptType("select");
+            if (promptingCanvasRef.current) {
+              promptingCanvasRef.current.setActiveTool("select");
+            }
           }, timerStep);
 
           timerStep += 50;
@@ -2205,13 +2211,6 @@ const ImageViewerWithPrompting = () => {
 
     console.log("DEBUG: Calculated zoom center:", { centerX, centerY });
 
-    // CRITICAL: First make sure the annotation viewer is visible
-    // This is the key fix - we need to show the annotation viewer
-    // before we start applying zooming and selection
-    if (!showAnnotationViewer) {
-      console.log("DEBUG: Showing annotation viewer first");
-      setShowAnnotationViewer(true);
-    }
 
     // Update state in a specific order
     // 1. First set zoom parameters
@@ -2566,10 +2565,10 @@ const ImageViewerWithPrompting = () => {
 
         // Set drawing styles based on selection state
         ctx.lineWidth = isSelected ? 4 : 2;
-        ctx.strokeStyle = isSelected ? "#FF3366" : "#2563eb";
+        ctx.strokeStyle = isSelected ? "#FF3333" : "#FF3333";
         ctx.fillStyle = isSelected
-          ? "rgba(255, 51, 102, 0.3)"
-          : "rgba(37, 99, 235, 0.2)";
+          ? "rgba(255, 51, 51, 0.4)"
+          : "rgba(255, 51, 51, 0.2)";
 
         // Draw the contour path
         if (contour.x && contour.y && contour.x.length > 0) {
@@ -2617,12 +2616,12 @@ const ImageViewerWithPrompting = () => {
             );
 
             // Draw label text
-            ctx.fillStyle = isSelected ? "#FF3366" : "#2563eb";
+            ctx.fillStyle = isSelected ? "#FF3333" : "#FF3333";
             ctx.fillText(text, centerX, centerY);
 
             // Add a highlight pulse if selected
             if (isSelected) {
-              ctx.strokeStyle = "rgba(255, 51, 102, 0.6)";
+              ctx.strokeStyle = "rgba(255, 51, 51, 0.6)";
               ctx.lineWidth = 2;
               ctx.strokeRect(
                 centerX - metrics.width / 2 - padding - 2,
@@ -3916,6 +3915,21 @@ const ImageViewerWithPrompting = () => {
                 <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
                   {/* Tool Selection */}
                   <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
+                    {/* Add Select tool as the first button */}
+                    <button
+                      className={`p-2 transition-colors ${
+                        promptType === "select" ? "bg-blue-500 text-white" : "hover:bg-gray-100"
+                      }`}
+                      onClick={() => {
+                        setPromptType("select");
+                        if (promptingCanvasRef.current) {
+                          promptingCanvasRef.current.setActiveTool("select");
+                        }
+                      }}
+                      title="Select Tool (Contour selection mode)"
+                    >
+                      <Pointer className="w-4 h-4" /> {/* Changed from MousePointer to Pointer */}
+                    </button>
                     {/* Add Drag tool as the first button */}
                     <button
                       className={`p-2 transition-colors ${
@@ -3934,7 +3948,6 @@ const ImageViewerWithPrompting = () => {
                     >
                       <Move className="w-4 h-4" />
                     </button>
-
                     <button
                       className={`p-2 transition-colors ${
                         promptType === "point"
@@ -4128,18 +4141,19 @@ const ImageViewerWithPrompting = () => {
                                 {isZoomedContourRefinement ? (
                                   // Show PromptingCanvas in refinement mode
                                   <PromptingCanvas
-                                    ref={promptingCanvasRef}
-                                    image={imageObject}
-                                    onPromptingComplete={
-                                      handlePromptingComplete
-                                    }
-                                    isRefinementMode={isZoomedContourRefinement}
-                                    promptType={promptType}
-                                    currentLabel={currentLabel}
-                                    initialZoomLevel={zoomLevel}
-                                    initialZoomCenter={zoomCenter}
-                                    preserveZoom={true}
-                                  />
+  ref={promptingCanvasRef}
+  image={imageObject}
+  onPromptingComplete={handlePromptingComplete}
+  isRefinementMode={isZoomedContourRefinement}
+  selectedMask={selectedMask}
+  promptType={promptType}
+  activeTool={promptType}
+  currentLabel={currentLabel}
+  onContourSelect={handleContourSelect}
+  onAddToFinalMask={handleAddSelectedContoursToFinalMask}
+  zoomLevel={zoomLevel}
+  zoomCenter={zoomCenter}
+/>
                                 ) : (
                                   // Show the annotation canvas in normal mode
                                   <canvas
@@ -4182,15 +4196,8 @@ const ImageViewerWithPrompting = () => {
                             );
                             handleAddSelectedContoursToFinalMask(contours);
                           }}
-                          initialZoomLevel={
-                            isZoomedContourRefinement ? zoomLevel : 1
-                          }
-                          initialZoomCenter={
-                            isZoomedContourRefinement
-                              ? zoomCenter
-                              : { x: 0.5, y: 0.5 }
-                          }
-                          preserveZoom={isZoomedContourRefinement}
+                          zoomLevel={zoomLevel}
+                          zoomCenter={zoomCenter}
                         />
 
                         {/* Segmentation complete floating action button */}

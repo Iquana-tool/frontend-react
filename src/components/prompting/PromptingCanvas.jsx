@@ -752,18 +752,35 @@ const PromptingCanvas = forwardRef(({
   // Convert canvas coordinates to image coordinates
   const canvasToImageCoords = (canvasX, canvasY) => {
     if (!image || !canvasRef.current) return null;
-
-    const scale = initialScale * zoomLevel;
+  
+    // Use props if available, fallback to state
+    const scale = initialScale * (typeof zoomLevel === 'number' ? zoomLevel : 1);
+    const center = zoomCenter || { x: 0.5, y: 0.5 };
+  
     const imageWidth = image.width * scale;
     const imageHeight = image.height * scale;
-    const centerX = (canvasSize.width - imageWidth) / 2 + panOffset.x;
-    const centerY = (canvasSize.height - imageHeight) / 2 + panOffset.y;
-
-    // Convert to image coordinates
+  
+    // Calculate the offset to center the image in the canvas
+    let centerX = (canvasSize.width - imageWidth) / 2;
+    let centerY = (canvasSize.height - imageHeight) / 2;
+  
+    // If zoomed, adjust for zoomCenter
+    if (zoomLevel > 1 && center) {
+      // The offset to keep zoomCenter in the center of the canvas
+      const zoomCenterOffsetX = (center.x - 0.5) * imageWidth;
+      const zoomCenterOffsetY = (center.y - 0.5) * imageHeight;
+      centerX -= zoomCenterOffsetX;
+      centerY -= zoomCenterOffsetY;
+    }
+  
+    // Add pan offset
+    centerX += panOffset.x;
+    centerY += panOffset.y;
+  
+    // Now invert the transform
     const imageX = (canvasX - centerX) / scale;
     const imageY = (canvasY - centerY) / scale;
-
-    // Check if point is within image bounds
+  
     if (
       imageX >= 0 &&
       imageX <= image.width &&
@@ -772,7 +789,7 @@ const PromptingCanvas = forwardRef(({
     ) {
       return { x: imageX, y: imageY };
     }
-
+  
     return null;
   };
 
@@ -862,80 +879,47 @@ const PromptingCanvas = forwardRef(({
   // Handle mouse down event
   const handleMouseDown = useCallback((e) => {
     if (!canvasRef.current || !image) return;
-    
+
     // Get canvas-relative coordinates
     const rect = canvasRef.current.getBoundingClientRect();
     const canvasX = e.clientX - rect.left;
     const canvasY = e.clientY - rect.top;
-    
+
     // Convert to image coordinates
     const imageCoords = canvasToImageCoords(canvasX, canvasY);
     if (!imageCoords) return;
-    
-    // Check if user clicked on a contour (when a mask is displayed)
-    if (selectedMask && selectedMask.contours && selectedMask.contours.length > 0) {
-      // In selection mode, check if we clicked on a contour
+
+    // Only do contour selection if activeTool is 'select'
+    if (
+      activeTool === "select" &&
+      selectedMask &&
+      selectedMask.contours &&
+      selectedMask.contours.length > 0
+    ) {
       let foundContourIndex = -1;
-      
-      // First check if we clicked on any already selected contour for better UX
-      if (selectedContours.length > 0) {
-        for (let i = 0; i < selectedContours.length; i++) {
-          const contourIndex = selectedContours[i];
-          const contour = selectedMask.contours[contourIndex];
-          if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
-            foundContourIndex = contourIndex;
-            console.log(`Clicked on already selected contour at index ${contourIndex}`);
-            break;
-          }
+      for (let i = 0; i < selectedMask.contours.length; i++) {
+        const contour = selectedMask.contours[i];
+        if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
+          foundContourIndex = i;
+          break;
         }
       }
-      
-      // If no selected contour was clicked, check all contours
-      if (foundContourIndex === -1) {
-        for (let i = 0; i < selectedMask.contours.length; i++) {
-          const contour = selectedMask.contours[i];
-          if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
-            foundContourIndex = i;
-            console.log(`Found new contour at index ${i}`);
-            break;
-          }
-        }
-      }
-      
       if (foundContourIndex !== -1) {
         // Toggle selection state of this contour
         const newSelectedContours = [...selectedContours];
         const contourIndex = newSelectedContours.indexOf(foundContourIndex);
-        
         if (contourIndex !== -1) {
-          // Remove it if already selected
           newSelectedContours.splice(contourIndex, 1);
-          console.log(`Deselected contour ${foundContourIndex}, new selection: ${newSelectedContours}`);
         } else {
-          // Add it if not already selected
           newSelectedContours.push(foundContourIndex);
-          console.log(`Selected contour ${foundContourIndex}, new selection: ${newSelectedContours}`);
         }
-        
-        // Set new selection
         setSelectedContours(newSelectedContours);
-        
-        // Notify parent component if callback provided
-        if (onContourSelect) {
-          // Pass the entire array of selected contours to the parent
-          onContourSelect(newSelectedContours);
-        }
-        
-        // Use setTimeout to break potential update cycles
-        setTimeout(() => {
-          redrawCanvas();
-        }, 0);
-        return; // Don't proceed with other drawing operations
-      } else {
-        console.log("Clicked, but no contour found at this position");
+        if (onContourSelect) onContourSelect(newSelectedContours);
+        setTimeout(() => redrawCanvas(), 0);
+        return; // Only return if selection mode
       }
     }
-    
+
     // If Alt/Option key is pressed, start panning
     if (e.altKey) {
       e.preventDefault();
@@ -943,48 +927,31 @@ const PromptingCanvas = forwardRef(({
       setPanStart({ x: canvasX, y: canvasY });
       return;
     }
-    
-    // Handle drawing based on the active tool
+
     if (loading || !image) return;
-    
-    // If drag tool is active or middle mouse button or holding Alt key, initiate panning
+
     if (activeTool === "drag" || e.button === 1 || e.altKey) {
       handlePanStart(e);
       return;
     }
 
-    // Handle normal drawing operations
     if (e.button === 0) { // Left mouse button
       setIsDrawing(true);
-      
-      // Only proceed with drawing if we're not in panning mode
       if (!isPanning) {
-        console.log('Drawing with promptType:', promptType);
         switch (promptType) {
           case "point":
-            // Log actual creation of point
-            console.log('Creating point at:', imageCoords.x, imageCoords.y);
-            
-            // Immediately add the point prompt to the state
             addPointPrompt(imageCoords.x, imageCoords.y, currentLabel);
-            
-            // Force a redraw to show the new point
-            setTimeout(() => {
-              redrawCanvas();
-            }, 0);
+            setTimeout(() => redrawCanvas(), 0);
             break;
           case "box":
             setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
             setCurrentShape({
-                startX: imageCoords.x,
-                startY: imageCoords.y,
-                endX: imageCoords.x,
-                endY: imageCoords.y
+              startX: imageCoords.x,
+              startY: imageCoords.y,
+              endX: imageCoords.x,
+              endY: imageCoords.y
             });
-            // Force a redraw to show the start of the box
-            setTimeout(() => {
-              redrawCanvas();
-            }, 0);
+            setTimeout(() => redrawCanvas(), 0);
             break;
           case "circle":
             setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
@@ -994,24 +961,15 @@ const PromptingCanvas = forwardRef(({
               endX: imageCoords.x,
               endY: imageCoords.y
             });
-            // Force a redraw to show the start of the circle
-            setTimeout(() => {
-              redrawCanvas();
-            }, 0);
+            setTimeout(() => redrawCanvas(), 0);
             break;
           case "polygon":
             if (!currentPolygon || currentPolygon.length === 0) {
-              // Start a new polygon
               setCurrentPolygon([{ x: imageCoords.x, y: imageCoords.y }]);
             } else {
-              // Add a point to the existing polygon
-              const newPolygon = [...currentPolygon, { x: imageCoords.x, y: imageCoords.y }];
-              setCurrentPolygon(newPolygon);
+              setCurrentPolygon([...currentPolygon, { x: imageCoords.x, y: imageCoords.y }]);
             }
-            // Force a redraw to show the updated polygon
-            setTimeout(() => {
-              redrawCanvas();
-            }, 0);
+            setTimeout(() => redrawCanvas(), 0);
             break;
           default:
             break;
@@ -1019,22 +977,9 @@ const PromptingCanvas = forwardRef(({
       }
     }
   }, [
-    image, 
-    isPanning, 
-    isDrawing, 
-    selectedMask, 
-    selectedContours, 
-    promptType, 
-    currentLabel, 
-    activeTool, 
-    loading, 
-    isPointInContour, 
-    canvasToImageCoords, 
-    handlePanStart,
-    addPointPrompt,
-    redrawCanvas,
-    currentPolygon,
-    onContourSelect
+    image, isPanning, isDrawing, selectedMask, selectedContours, promptType,
+    currentLabel, activeTool, loading, isPointInContour, canvasToImageCoords,
+    handlePanStart, addPointPrompt, redrawCanvas, currentPolygon, onContourSelect
   ]);
 
   // Handle mouse move event
