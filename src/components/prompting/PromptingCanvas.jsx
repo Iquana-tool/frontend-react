@@ -19,7 +19,6 @@ import {
 const PromptingCanvas = forwardRef(({
   image,
   onPromptingComplete,
-  isRefinementMode = false,
   selectedMask: selectedMaskProp,
   promptType,
   currentLabel,
@@ -56,15 +55,12 @@ const PromptingCanvas = forwardRef(({
   const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
   const [selectedContours, setSelectedContours] = useState([]);
 
-  // Reset prompts when switching to refinement mode
+
   useEffect(() => {
-    if (isRefinementMode) {
-      setPrompts([]);
-      setCurrentPolygon([]);
-      setCurrentShape(null);
-      setDrawStartPos(null);
+    if (selectedMaskProp) {
+      setSelectedMask(selectedMaskProp);
     }
-  }, [isRefinementMode]);
+  }, [selectedMaskProp]);
 
   // Drawing utility functions
   const drawPoint = (ctx, x, y, label) => {
