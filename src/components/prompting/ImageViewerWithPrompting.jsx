@@ -1730,81 +1730,117 @@ const ImageViewerWithPrompting = () => {
 
   // Add selected contours to final mask
   const handleAddSelectedContoursToFinalMask = (passedContours = null) => {
-    // Use passed contours if provided, otherwise use the state
     const contoursToUse = passedContours || selectedContours;
 
-    console.log("handleAddSelectedContoursToFinalMask called! Current state:", {
-      bestMask,
-      contoursToUse,
-      finalMasks: finalMasks.length,
-    });
-
+    // If bestMask and contours are valid, use the old logic
     if (
-      !bestMask ||
-      !bestMask.contours ||
-      !contoursToUse ||
-      contoursToUse.length === 0
+      bestMask &&
+      bestMask.contours &&
+      contoursToUse &&
+      contoursToUse.length > 0 &&
+      contoursToUse.every(idx => idx >= 0 && idx < bestMask.contours.length)
     ) {
-      console.log("No contours selected to add");
-      return;
-    }
-
-    console.log("Adding selected contours to final mask:", contoursToUse);
-    console.log("Source mask (bestMask):", bestMask);
-
-    try {
-      // Get the selected contours from bestMask
-      const contoursToAdd = [];
-      for (const index of contoursToUse) {
-        if (index >= 0 && index < bestMask.contours.length) {
-          contoursToAdd.push({ ...bestMask.contours[index] });
-        } else {
-          console.error(`Invalid contour index: ${index}`);
+      try {
+        const contoursToAdd = [];
+        for (const index of contoursToUse) {
+          if (index >= 0 && index < bestMask.contours.length) {
+            contoursToAdd.push({ ...bestMask.contours[index] });
+          } else {
+            console.error(`Invalid contour index: ${index}`);
+          }
         }
+        if (contoursToAdd.length === 0) {
+          setError("No valid contours found to add");
+          return;
+        }
+        const newMask = {
+          id: `final-mask-${Date.now()}`,
+          contours: contoursToAdd,
+          quality: 1.0,
+          label: currentLabel,
+          is_final: true,
+        };
+        setFinalMasks((prevMasks) => [...prevMasks, newMask]);
+        setSelectedContours([]);
+        if (promptingCanvasRef.current) {
+          promptingCanvasRef.current.clearSelectedContours();
+        }
+        setSuccessMessageWithTimeout("Added to final mask!");
+        setLoading(false);
+        return;
+      } catch (error) {
+        setError("Failed to add to final mask: " + error.message);
+        setLoading(false);
+        return;
       }
-
-      if (contoursToAdd.length === 0) {
-        throw new Error("No valid contours found to add");
-      }
-
-      console.log("Contours to add:", contoursToAdd);
-
-      // Create a new mask with these contours
-      const newMask = {
-        id: `final-mask-${Date.now()}`,
-        contours: contoursToAdd,
-        quality: 1.0,
-        label: currentLabel,
-        is_final: true,
-      };
-
-      console.log("New final mask created:", newMask);
-
-      // Add to final masks
-      setFinalMasks((prevMasks) => {
-        const updatedMasks = [...prevMasks, newMask];
-        console.log("Updated final masks:", updatedMasks);
-        return updatedMasks;
-      });
-
-      // Clear the selected contours
-      setSelectedContours([]);
-
-      // If we have a canvas ref, update it
-      if (promptingCanvasRef.current) {
-        console.log("Clearing selected contours in canvas ref");
-        promptingCanvasRef.current.clearSelectedContours();
-      } else {
-        console.log("promptingCanvasRef.current is null");
-      }
-
-      setSuccessMessageWithTimeout("Added to final mask!");
-    } catch (error) {
-      console.error("Error adding contours to final mask:", error);
-      setError("Failed to add to final mask: " + error.message);
-    } finally {
-      setLoading(false);
     }
+
+    // If not a valid contour index, treat as prompt index
+    const prompts = promptingCanvasRef.current && promptingCanvasRef.current.getPrompts ? promptingCanvasRef.current.getPrompts() : [];
+    if (contoursToUse && contoursToUse.length === 1 && prompts && prompts.length > 0) {
+      try {
+        const promptIdx = contoursToUse[0];
+        if (promptIdx >= 0 && promptIdx < prompts.length) {
+          const prompt = prompts[promptIdx];
+          let contour = null;
+          if (prompt.type === "point") {
+            // Make a small circle around the point
+            const cx = prompt.coordinates.x / imageObject.width;
+            const cy = prompt.coordinates.y / imageObject.height;
+            const r = 8 / Math.max(imageObject.width, imageObject.height); // 8px radius
+            const n = 16;
+            const x = [], y = [];
+            for (let i = 0; i < n; i++) {
+              const theta = (2 * Math.PI * i) / n;
+              x.push(cx + r * Math.cos(theta));
+              y.push(cy + r * Math.sin(theta));
+            }
+            contour = { x, y, label: currentLabel };
+          } else if (prompt.type === "box") {
+            const { startX, startY, endX, endY } = prompt.coordinates;
+            const x = [startX, endX, endX, startX].map(val => val / imageObject.width);
+            const y = [startY, startY, endY, endY].map(val => val / imageObject.height);
+            contour = { x, y, label: currentLabel };
+          } else if (prompt.type === "circle") {
+            const { centerX, centerY, radius } = prompt.coordinates;
+            const cx = centerX / imageObject.width;
+            const cy = centerY / imageObject.height;
+            const r = radius / Math.max(imageObject.width, imageObject.height);
+            const n = 32;
+            const x = [], y = [];
+            for (let i = 0; i < n; i++) {
+              const theta = (2 * Math.PI * i) / n;
+              x.push(cx + r * Math.cos(theta));
+              y.push(cy + r * Math.sin(theta));
+            }
+            contour = { x, y, label: currentLabel };
+          } else if (prompt.type === "polygon") {
+            const x = prompt.coordinates.map(pt => pt.x / imageObject.width);
+            const y = prompt.coordinates.map(pt => pt.y / imageObject.height);
+            contour = { x, y, label: currentLabel };
+          }
+          if (contour) {
+            const newMask = {
+              id: `final-mask-prompt-${Date.now()}`,
+              contours: [contour],
+              quality: 1.0,
+              label: currentLabel,
+              is_final: true,
+            };
+            setFinalMasks((prevMasks) => [...prevMasks, newMask]);
+            setSuccessMessageWithTimeout("Prompt added to final mask!");
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        setError("Failed to add prompt to final mask: " + error.message);
+        setLoading(false);
+        return;
+      }
+    }
+    setError("Failed to add to final mask: invalid selection");
+    setLoading(false);
   };
 
   // Draw the annotation canvas with selectable contours

@@ -54,6 +54,7 @@ const PromptingCanvas = forwardRef(({
   const [activeTool, setActiveTool] = useState("point");
   const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
   const [selectedContours, setSelectedContours] = useState([]);
+  const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
 
 
   useEffect(() => {
@@ -139,9 +140,15 @@ const PromptingCanvas = forwardRef(({
 
   // Function to draw all prompts on the canvas
   const drawAllPrompts = (ctx) => {
-    // Draw all saved prompts
-    prompts.forEach((prompt) => {
+    prompts.forEach((prompt, i) => {
       try {
+        // Highlight if selected
+        if (selectedPromptIndex === i) {
+          ctx.save();
+          ctx.shadowColor = '#2563eb';
+          ctx.shadowBlur = 10;
+          ctx.globalAlpha = 0.7;
+        }
         switch (prompt.type) {
           case "point":
             if (prompt.coordinates && typeof prompt.coordinates.x === 'number') {
@@ -178,6 +185,9 @@ const PromptingCanvas = forwardRef(({
             break;
           default:
             break;
+        }
+        if (selectedPromptIndex === i) {
+          ctx.restore();
         }
       } catch (error) {
         console.error("Error drawing prompt:", error, prompt);
@@ -919,6 +929,67 @@ const PromptingCanvas = forwardRef(({
       }
     }
 
+    // NEW: If select tool is active and no mask/contour is selected, check for prompt selection
+    if (activeTool === "select" && prompts.length > 0) {
+      // Check if click is near any prompt
+      let foundPrompt = -1;
+      for (let i = 0; i < prompts.length; i++) {
+        const prompt = prompts[i];
+        if (prompt.type === "point") {
+          const dx = imageCoords.x - prompt.coordinates.x;
+          const dy = imageCoords.y - prompt.coordinates.y;
+          if (Math.sqrt(dx * dx + dy * dy) < 10) { // 10px radius
+            foundPrompt = i;
+            break;
+          }
+        } else if (prompt.type === "box") {
+          const { startX, startY, endX, endY } = prompt.coordinates;
+          if (
+            imageCoords.x >= Math.min(startX, endX) &&
+            imageCoords.x <= Math.max(startX, endX) &&
+            imageCoords.y >= Math.min(startY, endY) &&
+            imageCoords.y <= Math.max(startY, endY)
+          ) {
+            foundPrompt = i;
+            break;
+          }
+        } else if (prompt.type === "circle") {
+          const { centerX, centerY, radius } = prompt.coordinates;
+          const dx = imageCoords.x - centerX;
+          const dy = imageCoords.y - centerY;
+          if (Math.sqrt(dx * dx + dy * dy) <= radius) {
+            foundPrompt = i;
+            break;
+          }
+        } else if (prompt.type === "polygon") {
+          // Simple point-in-polygon test
+          const pts = prompt.coordinates;
+          let inside = false;
+          for (let j = 0, k = pts.length - 1; j < pts.length; k = j++) {
+            const xi = pts[j].x, yi = pts[j].y;
+            const xj = pts[k].x, yj = pts[k].y;
+            if (
+              ((yi > imageCoords.y) !== (yj > imageCoords.y)) &&
+              (imageCoords.x < (xj - xi) * (imageCoords.y - yi) / (yj - yi + 0.00001) + xi)
+            ) {
+              inside = !inside;
+            }
+          }
+          if (inside) {
+            foundPrompt = i;
+            break;
+          }
+        }
+      }
+      if (foundPrompt !== -1) {
+        setSelectedPromptIndex(foundPrompt);
+        setTimeout(() => redrawCanvas(), 0);
+        return;
+      } else {
+        setSelectedPromptIndex(null);
+      }
+    }
+
     // If Alt/Option key is pressed, start panning
     if (e.altKey) {
       e.preventDefault();
@@ -978,7 +1049,7 @@ const PromptingCanvas = forwardRef(({
   }, [
     image, isPanning, isDrawing, selectedMask, selectedContours, promptType,
     currentLabel, activeTool, loading, isPointInContour, canvasToImageCoords,
-    handlePanStart, addPointPrompt, redrawCanvas, currentPolygon, onContourSelect
+    handlePanStart, addPointPrompt, redrawCanvas, currentPolygon, onContourSelect, prompts
   ]);
 
   // Handle mouse move event
@@ -1350,6 +1421,31 @@ const PromptingCanvas = forwardRef(({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTool === "select" && selectedPromptIndex !== null && prompts[selectedPromptIndex] && (
+          <div className="absolute top-10 left-1/2 transform -translate-x-1/2 bg-white shadow-md rounded-md px-2 py-1 z-50 flex items-center gap-2 border border-blue-100 text-xs" style={{ minWidth: 0 }}>
+            <span className="text-blue-700 font-medium whitespace-nowrap" style={{ fontSize: '0.85rem' }}>Prompt selected</span>
+            <button
+              className="px-2 py-0.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs font-medium"
+              style={{ fontSize: '0.85rem', minWidth: '0', height: '1.7rem' }}
+              onClick={() => {
+                if (onAddToFinalMask) {
+                  onAddToFinalMask([selectedPromptIndex]);
+                }
+                setSelectedPromptIndex(null);
+              }}
+            >
+              Add to Final Mask
+            </button>
+            <button
+              className="ml-1 px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs font-medium"
+              style={{ fontSize: '0.85rem', minWidth: '0', height: '1.7rem' }}
+              onClick={() => setSelectedPromptIndex(null)}
+            >
+              Cancel
+            </button>
           </div>
         )}
       </div>
