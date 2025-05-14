@@ -626,6 +626,17 @@ export const createLabel = async (labelData) => {
   }
 };
 
+// Get quantification data for a given mask_id
+export const getQuantification = async (maskId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/export/get_quantification/${maskId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error fetching quantification:", error);
+    throw error;
+  }
+};
+
 const API = {
   fetchImages,
   uploadImage,
@@ -642,6 +653,7 @@ const API = {
   createCutouts,
   fetchLabels,
   createLabel,
+  getQuantification,
 };
 
 export default API;

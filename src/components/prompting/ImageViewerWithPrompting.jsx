@@ -5,7 +5,9 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
+import { Typography } from '@mui/material';
 import PromptingCanvas from "./PromptingCanvas";
+import QuantificationTable from '../QuantificationTable';
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
 import { getMaskColor, createMaskPreviewFromContours, remapPromptsToCrop } from "./utils";
@@ -41,6 +43,7 @@ import ContourEditor from "./ContourEditor";
 import axios from "axios";
 import LabelSelector from "./LabelSelector";
 import "./ImageViewerWithPrompting.css";
+
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -679,6 +682,22 @@ const ImageViewerWithPrompting = () => {
                 : img
             )
           );
+        }
+
+        // Fetch masks for the image from the backend
+        if (image.id && image.isFromAPI) {
+          try {
+            const masksResponse = await api.getMasksForImage(image.id);
+            if (masksResponse.success && masksResponse.masks.length > 0) {
+              setSegmentationMasks(masksResponse.masks);
+            } else {
+              setSegmentationMasks([]);
+            }
+          } catch (err) {
+            setSegmentationMasks([]);
+          }
+        } else {
+          setSegmentationMasks([]);
         }
       } else {
         throw new Error("Failed to load image");
@@ -4844,6 +4863,19 @@ const ImageViewerWithPrompting = () => {
           onMaskUpdated={handleMaskUpdated}
           onCancel={() => setEditingMask(null)}
         />
+      )}
+
+      {/* Quantification Table Section */}
+      {segmentationMasks.length > 0 ? (
+        <div style={{ marginTop: 24 }}>
+          <Typography variant="h6">Quantification</Typography>
+          <QuantificationTable masks={segmentationMasks} />
+        </div>
+      ) : (
+        <div style={{ marginTop: 24 }}>
+          <Typography variant="h6">Quantification</Typography>
+          <QuantificationTable masks={[]} />
+        </div>
       )}
     </div>
   );
