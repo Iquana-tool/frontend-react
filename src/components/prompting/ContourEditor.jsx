@@ -151,36 +151,38 @@ const ContourEditor = ({
     fetchLabels();
   }, []);
 
+  // Helper to get default label id
+  const getDefaultLabelId = () => {
+    const generic = availableLabels.find(label => label.name === "New class 1");
+    if (generic) return generic.id;
+    return availableLabels.length > 0 ? availableLabels[0].id : null;
+  };
+
   // Handle polygon editing with different backend data formats
   const normalizeContour = (contour) => {
     // If the contour is already in the correct format, return it
     if (contour.x && contour.y && Array.isArray(contour.x) && Array.isArray(contour.y)) {
       return {
         ...contour,
-        label: contour.label || 2, // Default to coral if no label
-        quantifications: contour.quantifications || { area: 0, perimeter: 0 }
+        label: contour.label || getDefaultLabelId() // Default to 'New class 1' or first label
       };
     }
-    
     // If the contour has points in an array of objects format, convert to x/y arrays
     if (contour.points && Array.isArray(contour.points)) {
       return {
         x: contour.points.map(p => p.x),
         y: contour.points.map(p => p.y),
-        label: contour.label || 2,
-        type: "polygon",
-        quantifications: contour.quantifications || { area: 0, perimeter: 0 }
+        label: contour.label || getDefaultLabelId(),
+        type: "polygon"
       };
     }
-    
     // If we can't interpret the format, return a placeholder
     console.warn("Unrecognized contour format:", contour);
     return {
       x: [],
       y: [],
-      label: contour.label || 2,
-      type: "polygon",
-      quantifications: { area: 0, perimeter: 0 }
+      label: contour.label || getDefaultLabelId(),
+      type: "polygon"
     };
   };
 
@@ -412,36 +414,25 @@ const ContourEditor = ({
       setError("Please add at least 3 points to create a valid polygon.");
       return;
     }
-    
     // Convert screen coordinates to normalized canvas coordinates
     const x = currentPolygon.map(p => p.x / canvasRef.current.width);
     const y = currentPolygon.map(p => p.y / canvasRef.current.height);
-    
     // Add new contour
     const newContour = {
       x,
       y,
-      label: 2, // Default to coral
-      type: "polygon",
-      quantifications: {
-        area: 0,
-        perimeter: 0,
-        circularity: 0
-      }
+      label: getDefaultLabelId(), // Default to 'New class 1' or first label
+      type: "polygon"
     };
-    
     // Add to edited contours
     setEditedContours([...editedContours, newContour]);
-    
     // Select the newly created contour
     setSelectedContourIndex(editedContours.length);
-    
     // Reset the current drawing state
     setCurrentPolygon([]);
     setIsDrawing(false);
-    
     // Show success message
-    setSuccessMessageWithTimeout(`New contour created with label: ${getLabelName(2)}`);
+    setSuccessMessageWithTimeout(`New contour created with label: ${getLabelName(newContour.label)}`);
   };
 
   // Cancel the current polygon
@@ -507,7 +498,7 @@ const ContourEditor = ({
         contours: editedContours.map(contour => ({
           ...contour,
           // Ensure there's a valid label
-          label: contour.label || 2
+          label: contour.label || getDefaultLabelId()
         }))
       };
       
@@ -912,13 +903,13 @@ const ContourEditor = ({
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-3 h-3 rounded-full ${
-                        getLabelName(contour.label || 2) === 'petri_dish' ? 'bg-purple-500' : 
-                        getLabelName(contour.label || 2) === 'coral' ? 'bg-blue-500' : 
+                        getLabelName(contour.label || getDefaultLabelId()) === 'petri_dish' ? 'bg-purple-500' : 
+                        getLabelName(contour.label || getDefaultLabelId()) === 'coral' ? 'bg-blue-500' : 
                         'bg-green-500'
                       }`}
                     />
                     <span className="text-sm font-medium">
-                      {index + 1}. {getLabelName(contour.label || 2)}
+                      {index + 1}. {getLabelName(contour.label || getDefaultLabelId())}
                     </span>
                     <span className="text-xs text-gray-500">
                       ({contour.x ? contour.x.length : (contour.points?.length || 0)} points)

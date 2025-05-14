@@ -496,31 +496,22 @@ export const updateMask = async (mask) => {
   try {
     // Get the mask ID from the mask object
     const maskId = mask.id;
-    
     if (!maskId) {
       throw new Error("Mask ID is required");
     }
-    
-    // Ensure contours are in the correct format: x/y arrays, label, and quantifications
+    // Ensure contours are in the correct format: x/y arrays and label only
     const formattedContours = mask.contours.map(contour => {
-      // Make sure each contour has the required properties
       return {
         x: contour.x,
         y: contour.y,
-        label: parseInt(contour.label || 0, 10),  // Ensure it's an integer
-        area: contour.quantifications?.area || 0,
-        perimeter: contour.quantifications?.perimeter || 0,
-        circularity: contour.quantifications?.circularity || 0,
-        diameters: contour.quantifications?.diameters || []
+        label: parseInt(contour.label || 0, 10) // Ensure it's an integer
       };
     });
-
     const requestData = {
       mask_id: maskId,
       contours: formattedContours,
       is_final: mask.is_final || false
     };
-
     const response = await fetch(`${API_BASE_URL}/masks/update_mask`, {
       method: "PUT",
       headers: {
