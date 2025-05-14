@@ -4272,117 +4272,123 @@ const ImageViewerWithPrompting = () => {
                           )}
 
                         {/* Overlay segmentation controls when segmentation is complete and we have masks */}
-                        {segmentationMasks.length > 0 &&
-                          selectedMask &&
-                          !isSegmenting && (
-                            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 border border-blue-200 min-w-[200px]">
-                              <div className="flex flex-col gap-3">
-                                <div className="text-sm font-semibold text-blue-800 flex items-center gap-1.5 border-b border-blue-100 pb-2">
-                                  <Layers className="h-4 w-4 text-blue-600" />
-                                  Segmentation Results
+                        {segmentationMasks.length > 0 && selectedMask && (
+                          <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 border border-blue-200 min-w-[200px]">
+                            <div className="flex flex-col gap-3">
+                              <div className="text-sm font-semibold text-blue-800 flex items-center gap-1.5 border-b border-blue-100 pb-2">
+                                <Layers className="h-4 w-4 text-blue-600" />
+                                Segmentation Results
+                              </div>
+                              {isSegmenting ? (
+                                <div className="flex flex-col items-center justify-center py-6">
+                                  <div className="w-6 h-6 border-4 border-t-blue-500 border-blue-200 rounded-full animate-spin mb-2"></div>
+                                  <span className="text-blue-700 font-medium">Loading segmentation results...</span>
                                 </div>
+                              ) : (
+                                <>
+                                  <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-700">
+                                        Contours available:
+                                      </span>
+                                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                        {selectedMask.contours
+                                          ? selectedMask.contours.length
+                                          : 0}
+                                      </span>
+                                    </div>
 
-                                <div className="space-y-2">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700">
-                                      Contours available:
-                                    </span>
-                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                                      {selectedMask.contours
-                                        ? selectedMask.contours.length
-                                        : 0}
-                                    </span>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-700">
+                                        Contours selected:
+                                      </span>
+                                      <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                                        {selectedContours.length}
+                                      </span>
+                                    </div>
                                   </div>
 
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-gray-700">
-                                      Contours selected:
-                                    </span>
-                                    <span className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                                      {selectedContours.length}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <div className="flex space-x-2 mt-1 pt-2 border-t border-gray-100">
-                                  <button
-                                    onClick={() => {
-                                      alert(
-                                        "Panel Add to Final Mask button clicked"
-                                      );
-                                      console.log(
-                                        "Panel Add to Final Mask button clicked - selectedContours:",
-                                        selectedContours
-                                      );
-                                      if (selectedContours.length > 0) {
-                                        handleAddSelectedContoursToFinalMask(
+                                  <div className="flex space-x-2 mt-1 pt-2 border-t border-gray-100">
+                                    <button
+                                      onClick={() => {
+                                        alert(
+                                          "Panel Add to Final Mask button clicked"
+                                        );
+                                        console.log(
+                                          "Panel Add to Final Mask button clicked - selectedContours:",
                                           selectedContours
                                         );
-                                      } else {
-                                        alert(
-                                          "No contours selected - please select contours first"
-                                        );
+                                        if (selectedContours.length > 0) {
+                                          handleAddSelectedContoursToFinalMask(
+                                            selectedContours
+                                          );
+                                        } else {
+                                          alert(
+                                            "No contours selected - please select contours first"
+                                          );
+                                        }
+                                      }}
+                                      disabled={
+                                        selectedContours.length === 0 || loading
                                       }
-                                    }}
-                                    disabled={
-                                      selectedContours.length === 0 || loading
-                                    }
-                                    className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
-                                      selectedContours.length === 0 || loading
-                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                        : "bg-blue-600 hover:bg-blue-700 text-white"
-                                    }`}
-                                  >
-                                    <Plus className="w-3 h-3 mr-1.5" />
-                                    Add to Final Mask
-                                  </button>
-                                </div>
+                                      className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
+                                        selectedContours.length === 0 || loading
+                                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                                      }`}
+                                    >
+                                      <Plus className="w-3 h-3 mr-1.5" />
+                                      Add to Final Mask
+                                    </button>
+                                  </div>
 
-                                <div className="flex space-x-2">
-                                  <button
-                                    onClick={handleDeleteSelectedContours}
-                                    disabled={
-                                      selectedContours.length === 0 || loading
-                                    }
-                                    className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
-                                      selectedContours.length === 0 || loading
-                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                        : "bg-red-600 hover:bg-red-700 text-white"
-                                    }`}
-                                  >
-                                    <Trash2 className="w-3 h-3 mr-1.5" />
-                                    Delete Selected
-                                  </button>
+                                  <div className="flex space-x-2">
+                                    <button
+                                      onClick={handleDeleteSelectedContours}
+                                      disabled={
+                                        selectedContours.length === 0 || loading
+                                      }
+                                      className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
+                                        selectedContours.length === 0 || loading
+                                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                          : "bg-red-600 hover:bg-red-700 text-white"
+                                      }`}
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1.5" />
+                                      Delete Selected
+                                    </button>
 
-                                  <button
-                                    onClick={() => setSelectedContours([])}
-                                    disabled={
-                                      selectedContours.length === 0 || loading
-                                    }
-                                    className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
-                                      selectedContours.length === 0 || loading
-                                        ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                        : "bg-gray-600 hover:bg-gray-700 text-white"
-                                    }`}
-                                  >
-                                    <RotateCcw className="w-3 h-3 mr-1.5" />
-                                    Reset Selection
-                                  </button>
-                                </div>
+                                    <button
+                                      onClick={() => setSelectedContours([])}
+                                      disabled={
+                                        selectedContours.length === 0 || loading
+                                      }
+                                      className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
+                                        selectedContours.length === 0 || loading
+                                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                          : "bg-gray-600 hover:bg-gray-700 text-white"
+                                      }`}
+                                    >
+                                      <RotateCcw className="w-3 h-3 mr-1.5" />
+                                      Reset Selection
+                                    </button>
+                                  </div>
 
-                                {/* Add a new row with Run Segmentation Again button */}
-                                <div className="pt-2 border-t border-gray-200">
-                                  <button
-                                    onClick={handleRunNewSegmentation}
-                                    className="w-full px-3 py-1.5 rounded-md text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 flex items-center justify-center transition-colors"
-                                  >
-                                    <RefreshCw className="w-3 h-3 mr-1.5" />
-                                    Run Segmentation Again
-                                  </button>
-                                </div>
-                              </div>
+                                  {/* Add a new row with Run Segmentation Again button */}
+                                  <div className="pt-2 border-t border-gray-200">
+                                    <button
+                                      onClick={handleRunNewSegmentation}
+                                      className="w-full px-3 py-1.5 rounded-md text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 flex items-center justify-center transition-colors"
+                                    >
+                                      <RefreshCw className="w-3 h-3 mr-1.5" />
+                                      Run Segmentation Again
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          )}
+                          </div>
+                        )}
 
                         {/* Loading overlay */}
                         {isSegmenting && (
