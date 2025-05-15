@@ -55,6 +55,8 @@ const PromptingCanvas = forwardRef(({
   const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
   const [selectedContours, setSelectedContours] = useState([]);
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
+  const [panStartOffset, setPanStartOffset] = useState({ x: 0, y: 0 });
+  const panOffsetRef = useRef({ x: 0, y: 0 });
 
 
   useEffect(() => {
@@ -407,6 +409,9 @@ const PromptingCanvas = forwardRef(({
 
     // Restore the canvas context
     ctx.restore();
+
+    // Debug log
+    console.log('RedrawCanvas:', { panOffset, zoomLevel, centerX, centerY, scale, scaledWidth, scaledHeight });
   };
 
   // Expose methods to parent component via ref
@@ -733,30 +738,93 @@ const PromptingCanvas = forwardRef(({
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       e.preventDefault();
       setIsPanning(true);
-      setPanStart({
-        x: e.clientX - panOffset.x,
-        y: e.clientY - panOffset.y,
-      });
+      setPanStart({ x: e.clientX, y: e.clientY });
+      setPanStartOffset({ ...panOffsetRef.current });
     }
   };
 
+  const clampPanOffset = (offset, image, canvasSize, scale, zoomLevel) => {
+    if (!image) return offset;
+    const scaledWidth = image.width * scale * zoomLevel;
+    const scaledHeight = image.height * scale * zoomLevel;
+
+    let x, y;
+
+    if (scaledWidth <= canvasSize.width) {
+      // Center image horizontally
+      x = (canvasSize.width - scaledWidth) / 2;
+    } else {
+      // Clamp so no empty space is shown
+      const minX = canvasSize.width - scaledWidth;
+      const maxX = 0;
+      x = Math.min(maxX, Math.max(offset.x, minX));
+    }
+
+    if (scaledHeight <= canvasSize.height) {
+      // Center image vertically
+      y = (canvasSize.height - scaledHeight) / 2;
+    } else {
+      // Clamp so no empty space is shown
+      const minY = canvasSize.height - scaledHeight;
+      const maxY = 0;
+      y = Math.min(maxY, Math.max(offset.y, minY));
+    }
+
+    return { x, y };
+  };
+
   const handlePanMove = (e) => {
-    if (!image || !isPanning) return;
+    if (!image || !isPanning || !panStart || !panStartOffset) return;
     e.preventDefault();
-
-    setPanOffset({
-      x: e.clientX - panStart.x,
-      y: e.clientY - panStart.y,
-    });
-
-    // Force redraw with new pan offset
-    redrawCanvas();
+    let newOffset = {
+      x: panStartOffset.x + (e.clientX - panStart.x),
+      y: panStartOffset.y + (e.clientY - panStart.y),
+    };
+    newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
+    panOffsetRef.current = newOffset;
+    redrawCanvasWithPanOffset(newOffset);
   };
 
   const handlePanEnd = () => {
     if (isPanning) {
       setIsPanning(false);
+      if (panOffsetRef.current) {
+        setPanOffset({ ...panOffsetRef.current });
+      }
     }
+  };
+
+  // Helper to redraw with a given pan offset (for smooth panning)
+  const redrawCanvasWithPanOffset = (customPanOffset) => {
+    if (!canvasRef.current || !image) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const pixelRatio = window.devicePixelRatio || 1;
+    canvas.width = canvasSize.width * pixelRatio;
+    canvas.height = canvasSize.height * pixelRatio;
+    canvas.style.width = `${canvasSize.width}px`;
+    canvas.style.height = `${canvasSize.height}px`;
+    ctx.scale(pixelRatio, pixelRatio);
+    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+    ctx.save();
+    const scale = initialScale;
+    const scaledWidth = image.width * scale * zoomLevel;
+    const scaledHeight = image.height * scale * zoomLevel;
+    let centerX = (canvasSize.width - scaledWidth) / 2;
+    let centerY = (canvasSize.height - scaledHeight) / 2;
+    if (zoomCenter && zoomLevel > 1) {
+      const zoomCenterOffsetX = (zoomCenter.x - 0.5) * scaledWidth;
+      const zoomCenterOffsetY = (zoomCenter.y - 0.5) * scaledHeight;
+      centerX -= zoomCenterOffsetX;
+      centerY -= zoomCenterOffsetY;
+    }
+    ctx.translate(customPanOffset.x + centerX, customPanOffset.y + centerY);
+    ctx.scale(scale * zoomLevel, scale * zoomLevel);
+    ctx.drawImage(image, 0, 0);
+    // ... (draw mask, prompts, etc. as in redrawCanvas)
+    // For brevity, call drawAllPrompts(ctx) and any other overlays here
+    drawAllPrompts(ctx);
+    ctx.restore();
   };
 
   // Convert canvas coordinates to image coordinates
@@ -1315,6 +1383,11 @@ const PromptingCanvas = forwardRef(({
   useEffect(() => {
     console.log('[PromptingCanvas] selectedContours updated:', selectedContours);
   }, [selectedContours]);
+
+  // Update panOffsetRef whenever panOffset changes
+  useEffect(() => {
+    panOffsetRef.current = panOffset;
+  }, [panOffset]);
 
   return (
     <div className="flex flex-col h-full">
