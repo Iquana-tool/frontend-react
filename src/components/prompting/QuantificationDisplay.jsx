@@ -2,6 +2,7 @@ import React from 'react';
 import QuantificationVisualization from './QuantificationVisualization';
 
 const QuantificationDisplay = ({ quantifications, contour, expanded = false }) => {
+  // Handle case when no quantification data is provided
   if (!quantifications) {
     return (
       <div className="text-sm text-gray-500 italic">
@@ -12,12 +13,13 @@ const QuantificationDisplay = ({ quantifications, contour, expanded = false }) =
 
   // Format the values to 2 decimal places
   const formatValue = (value) => {
+    if (value === null || value === undefined) return 'N/A';
     return typeof value === 'number' ? value.toFixed(2) : 'N/A';
   };
 
   // Display diameters as a string
   const formatDiameters = (diameters) => {
-    if (!diameters || !diameters.length) return 'N/A';
+    if (!diameters || !Array.isArray(diameters) || diameters.length === 0) return 'N/A';
     
     if (diameters.length === 1) {
       return formatValue(diameters[0]);
@@ -32,6 +34,13 @@ const QuantificationDisplay = ({ quantifications, contour, expanded = false }) =
     const min = Math.min(...diameters);
     const max = Math.max(...diameters);
     return `${formatValue(min)} - ${formatValue(max)}`;
+  };
+
+  // Calculate average diameter
+  const getAverageDiameter = (diameters) => {
+    if (!diameters || !Array.isArray(diameters) || diameters.length === 0) return null;
+    const sum = diameters.reduce((total, d) => total + d, 0);
+    return sum / diameters.length;
   };
 
   return (
@@ -63,7 +72,12 @@ const QuantificationDisplay = ({ quantifications, contour, expanded = false }) =
             </span>
           </div>
           
-          <div className="text-gray-600">Diameter{quantifications.diameters?.length > 1 ? 's' : ''}:</div>
+          <div className="text-gray-600">Avg Diameter:</div>
+          <div className="text-gray-900 font-medium text-right">
+            {formatValue(getAverageDiameter(quantifications.diameters))}
+          </div>
+          
+          <div className="text-gray-600">Diameter Range:</div>
           <div className="text-gray-900 font-medium text-right">{formatDiameters(quantifications.diameters)}</div>
         </div>
         

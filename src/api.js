@@ -1037,9 +1037,17 @@ export const createLabel = async (labelData) => {
 export const getQuantification = async (maskId) => {
   try {
     const response = await fetch(`${API_BASE_URL}/export/get_quantification/${maskId}`);
-    return handleApiError(response);
+    const data = await handleApiError(response);
+    
+    // Check if the data has the expected structure
+    if (!data || !data.quantifications) {
+      console.warn(`Invalid quantification data format for mask ${maskId}`);
+      return { quantifications: [] };
+    }
+    
+    return data;
   } catch (error) {
-    console.error("Error fetching quantification:", error);
+    console.error(`Error fetching quantification for mask ${maskId}:`, error);
     throw error;
   }
 };
