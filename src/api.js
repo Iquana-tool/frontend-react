@@ -333,11 +333,82 @@ export const saveMask = async (imageId, label, contours) => {
       throw new Error("Contours are required and must be a non-empty array");
     }
     
-    console.log(`Save mask functionality has been removed.`);
-    console.log(`Would have saved mask for image ${imageId} with label ${label} and ${contours.length} contours`);
+    console.log(`Creating mask for image ${imageId} with label "${label}" and ${contours.length} contours`);
     
-    // Return a mock success response
-  
+    // First create a mask to get a mask_id
+    const createMaskUrl = `${API_BASE_URL}/masks/create_mask/${imageId}`;
+    console.log(`Creating base mask at: ${createMaskUrl}`);
+    
+    const createResponse = await fetch(createMaskUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      }
+    });
+    
+    if (!createResponse.ok) {
+      const errorText = await createResponse.text();
+      console.error(`Error creating mask: ${createResponse.status}`, errorText);
+      throw new Error(`Failed to create mask: ${createResponse.status} ${createResponse.statusText}`);
+    }
+    
+    const createResult = await createResponse.json();
+    console.log("Mask creation result:", createResult);
+    
+    if (!createResult || !createResult.mask_id) {
+      throw new Error("Failed to get mask ID from create_mask response");
+    }
+    
+    const maskId = createResult.mask_id;
+    console.log(`Successfully created mask with ID: ${maskId}`);
+    
+    // Now add each contour to the mask
+    const results = [];
+    
+    for (let i = 0; i < contours.length; i++) {
+      const contour = contours[i];
+      console.log(`Adding contour ${i + 1}/${contours.length} to mask ${maskId}`);
+      
+      // Create the query parameters
+      const params = new URLSearchParams();
+      params.append('mask_id', maskId);
+      
+      if (i > 0 && results.length > 0 && results[i-1].contour_id) {
+        // If we have a previous contour, we can set it as parent
+        params.append('parent_contour_id', results[i-1].contour_id);
+      }
+      
+      const addContourUrl = `${API_BASE_URL}/masks/add_contour?${params.toString()}`;
+      
+      const addResponse = await fetch(addContourUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          x: contour.x,
+          y: contour.y,
+          label: contour.label || 0
+        }),
+      });
+      
+      if (!addResponse.ok) {
+        console.error(`Error adding contour ${i + 1}: ${addResponse.status}`);
+        continue; // Try to continue with the next contour
+      }
+      
+      const addResult = await addResponse.json();
+      console.log(`Added contour ${i + 1}, result:`, addResult);
+      results.push(addResult);
+    }
+    
+    // Return information about the mask and contours
+    return {
+      id: maskId,
+      success: true,
+      message: `Created mask with ${results.length} contours`,
+      contours: results.map(r => r.contour_id)
+    };
   } catch (error) {
     console.error("Error in save mask:", error);
     throw error;
@@ -354,16 +425,21 @@ export const getMasksForImage = async (imageId) => {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`,
-        { signal: controller.signal }
-      );
+      // Update to use path parameter format to match backend implementation
+      const url = `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`;
+      
+      console.log(`Making request to: ${url}`);
+      
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        method: 'GET'
+      });
       
       clearTimeout(timeoutId);
       
       // Handle the case where the backend returns 404 (which is expected if no masks exist)
       if (response.status === 404) {
-        console.log("No masks found for image, which is normal before segmentation");
+        console.log(`No masks found for image ID: ${imageId} (normal before segmentation)`);
         return {
           success: true,
           message: "No masks found for this image yet",
@@ -371,7 +447,29 @@ export const getMasksForImage = async (imageId) => {
         };
       }
       
-      const data = await handleApiError(response);
+      // For other error status codes, handle them through structured error responses
+      if (!response.ok) {
+        // Try to parse error response
+        try {
+          const errorData = await response.json();
+          console.error("Error response from get_masks_for_image:", errorData);
+          return {
+            success: false,
+            message: errorData.detail || `Error ${response.status}: ${response.statusText}`,
+            masks: []
+          };
+        } catch (e) {
+          // If we can't parse the error as JSON, use the status text
+          return {
+            success: false,
+            message: `Error ${response.status}: ${response.statusText}`,
+            masks: []
+          };
+        }
+      }
+      
+      const data = await response.json();
+      console.log("Masks for image API response:", data);
       
       // If the response is in unexpected format, normalize it
       if (Array.isArray(data)) {
@@ -400,96 +498,412 @@ export const getMasksForImage = async (imageId) => {
       throw error;
     }
   } catch (error) {
-    console.error("Error getting masks for image:", error);
-    
-    // backend is not fully implemented yet, return a safe fallback
-    if (error.message?.includes("NetworkError") || 
-        error.message?.includes("Failed to fetch") ||
-        error.name === "AbortError") {
-      console.warn("Network error or timeout fetching masks - backend might be unavailable");
-      return {
-        success: false,
-        message: "Cannot connect to mask service",
-        masks: []
-      };
+    // Log appropriately based on error type
+    if (error.name === "AbortError") {
+      console.warn(`Request to get masks for image ${imageId} timed out`);
+    } else if (error.message?.includes("NetworkError") || 
+               error.message?.includes("Failed to fetch")) {
+      console.warn(`Network error fetching masks for image ${imageId} - backend might be unavailable`);
+    } else {
+      console.error(`Error getting masks for image ${imageId}:`, error);
     }
     
-    throw error;
+    // Return a safe response instead of throwing
+    return {
+      success: false,
+      message: "Cannot retrieve masks: " + (error.name === "AbortError" ? 
+        "Request timed out" : 
+        error.message || "Unknown error"),
+      masks: []
+    };
   }
 };
 
-// Get a specific mask
-export const getMask = async (maskId) => {
+// Get a mask with its contours properly loaded
+export const getMaskWithContours = async (maskId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`);
-    return handleApiError(response);
-  } catch (error) {
-    console.error("Error getting mask:", error);
-    throw error;
-  }
-};
-
-// Get final mask for an image
-export const getFinalMask = async (imageId) => {
-  try {
-    console.log(`Fetching final mask for image: ${imageId}`);
-    
     // Add a timeout to avoid hanging on slow requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/masks/get_final_mask/${imageId}`,
-        { signal: controller.signal }
-      );
+      console.log(`Fetching mask details for mask ID: ${maskId}`);
       
-      clearTimeout(timeoutId);
+      // First get the basic mask info
+      const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`, {
+        signal: controller.signal
+      });
       
-      // Handle the case where the backend returns 404 (which is expected if no final mask exists)
+      // Handle 404 and other errors
       if (response.status === 404) {
-        console.log("No final mask found, which is normal before creating one");
+        console.log(`Mask with ID ${maskId} not found`);
         return {
           success: false,
-          message: "No final mask exists yet",
+          message: `Mask not found`,
           mask: null
         };
       }
       
-      const data = await handleApiError(response);
-      
-      // Ensure the response has the expected structure
-      if (data && !data.mask && data.id) {
-        // Backend is returning the mask object directly, not wrapped
+      if (!response.ok) {
         return {
-          success: true,
-          mask: data
+          success: false,
+          message: `Error ${response.status}: ${response.statusText}`,
+          mask: null
         };
       }
       
-      return data;
+      // Parse mask data
+      const maskData = await response.json();
+      
+      // Now fetch the contours for this mask
+      console.log(`Fetching contours for mask ID: ${maskId}`);
+      const contoursResponse = await fetch(`${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`, {
+        signal: controller.signal
+      });
+      
+      // Clear timeout once both requests complete
+      clearTimeout(timeoutId);
+      
+      // Handle 404 for contours request (mask exists but has no contours)
+      if (contoursResponse.status === 404) {
+        console.log(`No contours found for mask ID: ${maskId}`);
+        return {
+          success: true,
+          message: 'Mask found but has no contours',
+          mask: {
+            ...maskData,
+            contours: []
+          }
+        };
+      }
+      
+      // Handle other errors for contours request
+      if (!contoursResponse.ok) {
+        return {
+          success: true,
+          message: `Mask found but error fetching contours: ${contoursResponse.status}`,
+          mask: {
+            ...maskData,
+            contours: []
+          }
+        };
+      }
+      
+      // Parse contours data
+      const contoursData = await contoursResponse.json();
+      
+      // Format contours data for frontend use
+      const formattedContours = contoursData.map(contour => {
+        let coords = {};
+        try {
+          coords = JSON.parse(contour.coords);
+        } catch (e) {
+          console.error("Error parsing contour coordinates:", e);
+          coords = { x: [], y: [] };
+        }
+        
+        return {
+          id: contour.id,
+          x: coords.x || [],
+          y: coords.y || [],
+          label: contour.label || 0,
+          parent_id: contour.parent_id
+        };
+      });
+      
+      // Combine mask data with contours
+      return {
+        success: true,
+        mask: {
+          ...maskData,
+          contours: formattedContours
+        }
+      };
+      
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
     }
   } catch (error) {
-    console.error("Error getting final mask:", error);
-    
-    // If the backend is not fully implemented yet, return a safe fallback
-    if (error.message?.includes("NetworkError") || 
-        error.message?.includes("Failed to fetch") ||
-        error.name === "AbortError") {
-      console.warn("Network error or timeout fetching final mask - backend might be unavailable");
-      return {
-        success: false,
-        message: "Cannot connect to mask service",
-        mask: null
-      };
+    // Log appropriately based on error type
+    if (error.name === "AbortError") {
+      console.warn(`Request to get mask details for mask ID ${maskId} timed out`);
+    } else if (error.message?.includes("NetworkError") || 
+               error.message?.includes("Failed to fetch")) {
+      console.warn(`Network error fetching mask details for mask ID ${maskId}`);
+    } else {
+      console.error(`Error getting mask details for mask ID ${maskId}:`, error);
     }
     
-    throw error;
+    // Return a safe response instead of throwing
+    return {
+      success: false,
+      message: "Cannot retrieve mask details: " + (error.name === "AbortError" ? 
+        "Request timed out" : 
+        error.message || "Unknown error"),
+      mask: null
+    };
   }
 };
+
+/**
+ * Retrieves the final mask for an image directly from the dedicated backend endpoint.
+ * This function uses the specialized endpoint for final masks that includes contours.
+ * 
+ * @param {number} imageId - The ID of the image to get the final mask for.
+ * @returns {Promise<Object>} - A response object containing the final mask with its contours if found.
+ */
+export async function getFinalMask(imageId) {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 1000; // 1 second
+  let attempts = 0;
+
+  while (attempts < MAX_RETRIES) {
+    try {
+      console.log(`Fetching final mask for image ${imageId} (attempt ${attempts + 1})`);
+      const response = await fetch(`${API_BASE_URL}/masks/get_final_mask/${imageId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // If mask not found, return appropriate message
+      if (response.status === 404) {
+        console.log(`No final mask found for image ${imageId}`);
+        return {
+          success: false,
+          message: "No final mask found for this image."
+        };
+      }
+
+      // Handle other errors
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error(`Error fetching final mask: ${errorData.detail || response.statusText}`);
+        return {
+          success: false,
+          message: errorData.detail || "Error fetching final mask."
+        };
+      }
+
+      // Parse and return the successful response
+      const data = await response.json();
+      console.log(`Successfully fetched final mask for image ${imageId}`);
+      return {
+        success: true,
+        mask: data.mask
+      };
+    } catch (error) {
+      console.error(`Network error when fetching final mask: ${error.message}`);
+      attempts++;
+      
+      // If we still have attempts left, wait before retrying
+      if (attempts < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      } else {
+        return {
+          success: false,
+          message: `Network error: ${error.message}`
+        };
+      }
+    }
+  }
+}
+
+/**
+ * Creates a final mask for an image if one doesn't exist yet.
+ * 
+ * @param {number} imageId - The ID of the image to create a final mask for.
+ * @returns {Promise<Object>} - Response with the mask ID and creation status.
+ */
+export async function createFinalMask(imageId) {
+  try {
+    console.log(`Creating final mask for image ${imageId}`);
+    const response = await fetch(`${API_BASE_URL}/masks/create_final_mask/${imageId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`Error creating final mask: ${errorData.detail || response.statusText}`);
+      return {
+        success: false,
+        message: errorData.detail || "Error creating final mask."
+      };
+    }
+
+    const data = await response.json();
+    console.log(`Final mask creation response: ${data.is_new ? 'Created new mask' : 'Using existing mask'} with ID ${data.mask_id}`);
+    return {
+      success: true,
+      maskId: data.mask_id,
+      isNew: data.is_new,
+      message: data.message
+    };
+  } catch (error) {
+    console.error(`Network error when creating final mask: ${error.message}`);
+    return {
+      success: false,
+      message: `Network error: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Adds a contour to the final mask of an image.
+ * Creates the final mask if it doesn't exist yet.
+ * 
+ * @param {number} imageId - The ID of the image.
+ * @param {Object} contour - The contour to add with x, y coordinates and a label.
+ * @returns {Promise<Object>} - Response with the mask ID and contour ID.
+ */
+export async function addContourToFinalMask(imageId, contour) {
+  try {
+    // Validate parameters
+    if (!imageId || typeof imageId !== 'number') {
+      console.error("Invalid imageId provided to addContourToFinalMask");
+      return {
+        success: false,
+        message: "Invalid image ID."
+      };
+    }
+
+    if (!contour || !Array.isArray(contour.x) || !Array.isArray(contour.y) || !contour.label) {
+      console.error("Invalid contour provided to addContourToFinalMask", contour);
+      return {
+        success: false,
+        message: "Invalid contour data. Must include x and y coordinate arrays and a label."
+      };
+    }
+
+    console.log(`Adding contour to final mask for image ${imageId} with label ${contour.label}`);
+    
+    const response = await fetch(`${API_BASE_URL}/masks/add_contour_to_final_mask/${imageId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(contour)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`Error adding contour to final mask: ${errorData.detail || response.statusText}`);
+      return {
+        success: false,
+        message: errorData.detail || "Error adding contour to final mask."
+      };
+    }
+
+    const data = await response.json();
+    console.log(`Successfully added contour to final mask: mask ID ${data.mask_id}, contour ID ${data.contour_id}`);
+    return {
+      success: true,
+      maskId: data.mask_id,
+      contourId: data.contour_id,
+      message: data.message
+    };
+  } catch (error) {
+    console.error(`Network error when adding contour to final mask: ${error.message}`);
+    return {
+      success: false,
+      message: `Network error: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Adds multiple contours to the final mask of an image.
+ * Creates the final mask if it doesn't exist yet.
+ * 
+ * @param {number} imageId - The ID of the image.
+ * @param {Array<Object>} contours - Array of contours to add, each with x, y coordinates and a label.
+ * @returns {Promise<Object>} - Response with the mask ID and array of contour IDs.
+ */
+export async function addContoursToFinalMask(imageId, contours) {
+  try {
+    // Validate parameters
+    if (!imageId || typeof imageId !== 'number') {
+      console.error("Invalid imageId provided to addContoursToFinalMask");
+      return {
+        success: false,
+        message: "Invalid image ID."
+      };
+    }
+
+    if (!Array.isArray(contours) || contours.length === 0) {
+      console.error("Invalid contours provided to addContoursToFinalMask", contours);
+      return {
+        success: false,
+        message: "Invalid contours data. Must provide an array of contours."
+      };
+    }
+
+    // Validate each contour
+    for (const contour of contours) {
+      if (!contour || !Array.isArray(contour.x) || !Array.isArray(contour.y) || !contour.label) {
+        console.error("Invalid contour in array", contour);
+        return {
+          success: false,
+          message: "Invalid contour data. Each contour must include x and y coordinate arrays and a label."
+        };
+      }
+    }
+
+    console.log(`Adding ${contours.length} contours to final mask for image ${imageId}`);
+    
+    // Add debug info about the URL being called
+    const url = `${API_BASE_URL}/masks/add_contours_to_final_mask/${imageId}`;
+    
+    // Create proper request body - wrap contours array in an object with a "contours" key
+    const requestBody = { contours };
+    
+    console.log(`Making API call to: ${url}`);
+    console.log(`Request body: ${JSON.stringify(requestBody)}`);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Error ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail || errorMessage;
+      } catch (e) {
+        // Ignore JSON parsing error
+      }
+      console.error(`Error adding contours to final mask: ${errorMessage}`);
+      return {
+        success: false,
+        message: errorMessage
+      };
+    }
+
+    const data = await response.json();
+    console.log(`Successfully added ${data.contour_ids?.length || 0} contours to final mask: mask ID ${data.mask_id}`);
+    return {
+      success: true,
+      maskId: data.mask_id,
+      contourIds: data.contour_ids || [],
+      message: data.message || "Contours added successfully"
+    };
+  } catch (error) {
+    console.error(`Network error when adding contours to final mask: ${error.message}`);
+    return {
+      success: false,
+      message: `Network error: ${error.message}`
+    };
+  }
+}
 
 // Update a mask with new contours
 export const updateMask = async (mask) => {
@@ -526,20 +940,13 @@ export const updateMask = async (mask) => {
   }
 };
 
-// Add contours to final mask
-export const addContoursToFinalMask = async (imageId, contours) => {
+// Get a specific mask (basic version without contours)
+export const getMask = async (maskId) => {
   try {
-    console.log(`Add contours to final mask functionality has been removed.`);
-    console.log(`Would have added ${contours.length} contours to final mask for image ${imageId}`);
-    
-    // Return a mock success response
-    return {
-      success: true,
-      message: "Add contours to final mask functionality has been removed",
-      mask: { id: 0 }
-    };
+    const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`);
+    return handleApiError(response);
   } catch (error) {
-    console.error("Error in add contours to final mask:", error);
+    console.error("Error getting mask:", error);
     throw error;
   }
 };
@@ -637,6 +1044,35 @@ export const getQuantification = async (maskId) => {
   }
 };
 
+// Get all contours for a mask
+export const getContoursForMask = async (maskId) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`
+    );
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error getting contours for mask:", error);
+    throw error;
+  }
+};
+
+// Delete a contour from a mask
+export const deleteContour = async (contourId) => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/masks/delete_contour/${contourId}`,
+      {
+        method: "DELETE",
+      }
+    );
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error deleting contour:", error);
+    throw error;
+  }
+};
+
 const API = {
   fetchImages,
   uploadImage,
@@ -645,7 +1081,7 @@ const API = {
   segmentImage,
   saveMask,
   getMasksForImage,
-  getMask,
+  getMaskWithContours,
   getFinalMask,
   updateMask,
   addContoursToFinalMask,
@@ -654,6 +1090,9 @@ const API = {
   fetchLabels,
   createLabel,
   getQuantification,
+  getContoursForMask,
+  getMask,
+  deleteContour,
 };
 
 export default API;
