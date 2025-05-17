@@ -5,12 +5,16 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { Typography } from '@mui/material';
+import { Typography } from "@mui/material";
 import PromptingCanvas from "./PromptingCanvas";
-import QuantificationTable from '../QuantificationTable';
+import QuantificationTable from "../QuantificationTable";
 import { sampleImages } from "../../sampleImages";
 import * as api from "../../api";
-import { getMaskColor, createMaskPreviewFromContours, remapPromptsToCrop } from "./utils";
+import {
+  getMaskColor,
+  createMaskPreviewFromContours,
+  remapPromptsToCrop,
+} from "./utils";
 import {
   MousePointer,
   Square,
@@ -36,14 +40,13 @@ import {
   RefreshCw,
   PenTool,
   RotateCcw,
-  Pointer, 
+  Pointer,
 } from "lucide-react";
 import QuantificationDisplay from "./QuantificationDisplay";
 import ContourEditor from "./ContourEditor";
 import axios from "axios";
 import LabelSelector from "./LabelSelector";
 import "./ImageViewerWithPrompting.css";
-
 
 // Add custom styles to fix the overlapping text issue
 const customStyles = `
@@ -354,7 +357,8 @@ const ImageViewerWithPrompting = () => {
   const [userPrompts, setUserPrompts] = useState([]);
   const [refinementPrompts, setRefinementPrompts] = useState([]);
   // Add a flag to track if we're in refine mode for a zoomed contour
-  const [isZoomedContourRefinement, setIsZoomedContourRefinement] = useState(false);
+  const [isZoomedContourRefinement, setIsZoomedContourRefinement] =
+    useState(false);
   // Add state for tracking if final mask is being fetched
   const [fetchingFinalMask, setFetchingFinalMask] = useState(false);
 
@@ -579,7 +583,7 @@ const ImageViewerWithPrompting = () => {
       setSelectedMask(null);
       setDisplayState("original");
       setMaskImages({});
-      
+
       // Reset state for the new image
       setSelectedContours([]);
       setRecentSegmentations([]);
@@ -591,41 +595,46 @@ const ImageViewerWithPrompting = () => {
       setModel("SAM2Tiny");
       setUserPrompts([]);
       setRefinementPrompts([]);
-      
+
       // Fetch the image
       console.log(`Loading image with ID: ${image.id}`);
       const imageResponse = await api.getImageById(image.id);
-      
+
       if (!imageResponse || !imageResponse[image.id]) {
         throw new Error(`Failed to load image data for ID: ${image.id}`);
       }
-      
+
       // Create an actual Image object from the base64 data
       const base64Data = imageResponse[image.id];
       const imageUrl = `data:image/jpeg;base64,${base64Data}`;
-      
+
       const imgObject = new Image();
-      
+
       // Create a promise to handle image loading
       await new Promise((resolve, reject) => {
         imgObject.onload = () => resolve();
-        imgObject.onerror = () => reject(new Error('Failed to load image data'));
+        imgObject.onerror = () =>
+          reject(new Error("Failed to load image data"));
         imgObject.src = imageUrl;
       });
-      
+
       // Update the state with the loaded image
       setImageObject(imgObject);
       setOriginalImage(imgObject);
-      
+
       // Load the final mask if it exists
       await fetchFinalMask(image.id);
-      
+
       // Load any previous masks for this image
       try {
         console.log(`Fetching masks for image: ${image.id}`);
         const masksResponse = await api.getMasksForImage(image.id);
-        
-        if (masksResponse.success && masksResponse.masks && masksResponse.masks.length > 0) {
+
+        if (
+          masksResponse.success &&
+          masksResponse.masks &&
+          masksResponse.masks.length > 0
+        ) {
           setSegmentationMasks(masksResponse.masks);
           console.log(`Loaded ${masksResponse.masks.length} existing masks`);
         } else {
@@ -634,8 +643,10 @@ const ImageViewerWithPrompting = () => {
       } catch (maskErr) {
         console.warn("Error loading masks:", maskErr);
       }
-      
-      setSuccessMessageWithTimeout(`Image "${image.name || `ID: ${image.id}`}" loaded successfully`);
+
+      setSuccessMessageWithTimeout(
+        `Image "${image.name || `ID: ${image.id}`}" loaded successfully`
+      );
     } catch (error) {
       console.error("Error selecting image:", error);
       setError("Failed to load image: " + (error.message || "Unknown error"));
@@ -1024,7 +1035,10 @@ const ImageViewerWithPrompting = () => {
       });
 
       // Remap prompts to crop range if ROI is used (i.e., cropped segmentation)
-      const promptsForAPI = remapPromptsToCrop(adjustedPrompts, roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 });
+      const promptsForAPI = remapPromptsToCrop(
+        adjustedPrompts,
+        roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }
+      );
 
       const response = await api.segmentImage(
         selectedImage.id,
@@ -1575,21 +1589,28 @@ const ImageViewerWithPrompting = () => {
       return false;
     }
 
-    console.log(`Adding contour to final mask for image ID: ${currentImage.id}`);
-    
+    console.log(
+      `Adding contour to final mask for image ID: ${currentImage.id}`
+    );
+
     try {
       // Use the new dedicated endpoint to add contour to final mask
-      const response = await api.addContourToFinalMask(currentImage.id, contourData);
-      
+      const response = await api.addContourToFinalMask(
+        currentImage.id,
+        contourData
+      );
+
       if (response.success) {
         console.log("Successfully added contour to final mask:", response);
-        
+
         // Refresh the final mask to show the new contour
         await fetchFinalMask(currentImage.id);
-        
+
         // Show success message
-        setSuccessMessageWithTimeout("Successfully added contour to final mask");
-        
+        setSuccessMessageWithTimeout(
+          "Successfully added contour to final mask"
+        );
+
         return true;
       } else {
         console.error("Failed to add contour to final mask:", response.message);
@@ -1669,21 +1690,25 @@ const ImageViewerWithPrompting = () => {
       return;
     }
 
-    console.log(`Adding ${selectedContours.length} selected contours to final mask for image ID: ${currentImage.id}`);
-    
+    console.log(
+      `Adding ${selectedContours.length} selected contours to final mask for image ID: ${currentImage.id}`
+    );
+
     try {
       // Format contours for the API
-      const contours = selectedContours.map(contourIndex => {
+      const contours = selectedContours.map((contourIndex) => {
         // Get contour by index from the bestMask contours array
         const contour = bestMask?.contours?.[contourIndex];
         if (!contour) {
-          console.error(`Contour with index ${contourIndex} not found in bestMask contours`);
+          console.error(
+            `Contour with index ${contourIndex} not found in bestMask contours`
+          );
           throw new Error(`Contour with index ${contourIndex} not found`);
         }
         return {
           x: contour.x,
           y: contour.y,
-          label: contour.label || 0
+          label: contour.label || 0,
         };
       });
 
@@ -1696,13 +1721,19 @@ const ImageViewerWithPrompting = () => {
         // Try batch operation first
         response = await api.addContoursToFinalMask(currentImage.id, contours);
       } catch (batchError) {
-        console.error("Batch operation failed, falling back to individual contour adds:", batchError);
-        
+        console.error(
+          "Batch operation failed, falling back to individual contour adds:",
+          batchError
+        );
+
         // Fall back to adding contours one by one
         let successCount = 0;
         for (const contour of contours) {
           try {
-            const individualResponse = await api.addContourToFinalMask(currentImage.id, contour);
+            const individualResponse = await api.addContourToFinalMask(
+              currentImage.id,
+              contour
+            );
             if (individualResponse.success) {
               successCount++;
             }
@@ -1710,26 +1741,31 @@ const ImageViewerWithPrompting = () => {
             console.error("Error adding individual contour:", singleError);
           }
         }
-        
+
         // Create a response object based on individual add results
         response = {
           success: successCount > 0,
           message: `Added ${successCount} out of ${contours.length} contours individually.`,
-          contourIds: []
+          contourIds: [],
         };
       }
-      
+
       if (response.success) {
         console.log(`Successfully added contours to final mask:`, response);
-        
+
         // Refresh the final mask and clear selection
         await fetchFinalMask(currentImage.id);
         setSelectedContours([]);
-        
+
         // Show success message
-        setSuccessMessageWithTimeout(`Successfully added ${contours.length} contour(s) to final mask`);
+        setSuccessMessageWithTimeout(
+          `Successfully added ${contours.length} contour(s) to final mask`
+        );
       } else {
-        console.error("Failed to add contours to final mask:", response.message);
+        console.error(
+          "Failed to add contours to final mask:",
+          response.message
+        );
         setError(`Failed to add contours to final mask: ${response.message}`);
       }
     } catch (error) {
@@ -1740,26 +1776,7 @@ const ImageViewerWithPrompting = () => {
 
   // Draw the annotation canvas with selectable contours
   const drawAnnotationCanvas = useCallback(() => {
-    console.log("DEBUG: drawAnnotationCanvas called with state:", {
-      hasAnnotationCanvasRef: !!annotationCanvasRef.current,
-      hasBestMask: !!bestMask,
-      hasCanvasImage: !!canvasImage,
-      zoomLevel,
-      zoomCenter,
-      selectedContours,
-      hasSelectedFinalMaskContour: !!selectedFinalMaskContour,
-      showAnnotationViewer,
-    });
-
     if (!annotationCanvasRef.current || !bestMask || !canvasImage) {
-      console.log(
-        "DEBUG: Missing requirements for drawing annotation canvas:",
-        {
-          hasAnnotationCanvasRef: !!annotationCanvasRef.current,
-          hasBestMask: !!bestMask,
-          hasCanvasImage: !!canvasImage,
-        }
-      );
       return;
     }
 
@@ -1779,14 +1796,6 @@ const ImageViewerWithPrompting = () => {
     // Case 1: Selected from Final Mask Viewer (priority)
     if (selectedFinalMaskContour && zoomLevel > 1) {
       shouldZoom = true;
-      console.log(
-        "DEBUG: Zooming annotation canvas based on Final Mask Viewer selection",
-        {
-          selectedFinalMaskContour,
-          zoomLevel,
-          zoomCenter,
-        }
-      );
     }
     // Case 2: Selected from Annotation Area
     else if (selectedContours.length === 1 && zoomLevel > 1) {
@@ -1794,26 +1803,8 @@ const ImageViewerWithPrompting = () => {
       const contour = bestMask.contours[selectedContourIndex];
       if (contour && contour.x && contour.y && contour.x.length > 0) {
         shouldZoom = true;
-        console.log(
-          "DEBUG: Zooming annotation canvas based on Annotation Area selection",
-          {
-            selectedContours,
-            zoomLevel,
-            zoomCenter,
-          }
-        );
       }
     }
-
-    console.log("DEBUG: Annotation canvas zoom status:", {
-      shouldZoom,
-      zoomLevel,
-      zoomCenter,
-      hasSelectedFinalMaskContour: !!selectedFinalMaskContour,
-      selectedContours: selectedContours.length,
-      canvasWidth: canvas.width,
-      canvasHeight: canvas.height,
-    });
 
     // Save context for zoom if needed
     ctx.save();
@@ -1829,16 +1820,8 @@ const ImageViewerWithPrompting = () => {
         ctx.translate(centerX, centerY);
         ctx.scale(zoomLevel, zoomLevel);
         ctx.translate(-centerX, -centerY);
-
-        console.log("DEBUG: Applied zoom transform to annotation canvas:", {
-          centerX,
-          centerY,
-          zoomLevel,
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
-        });
       } catch (error) {
-        console.error("DEBUG: Error applying zoom transform:", error);
+        console.error("Error applying zoom transform:", error);
       }
     }
 
@@ -1846,7 +1829,7 @@ const ImageViewerWithPrompting = () => {
     try {
       ctx.drawImage(canvasImage, 0, 0);
     } catch (error) {
-      console.error("DEBUG: Error drawing image on annotation canvas:", error);
+      console.error("Error drawing image on annotation canvas:", error);
     }
 
     // Add semi-transparent overlay
@@ -2055,10 +2038,6 @@ const ImageViewerWithPrompting = () => {
   // Add a useEffect to handle force redraw of annotation canvas after visibility changes
   useEffect(() => {
     if (showAnnotationViewer && selectedFinalMaskContour && zoomLevel > 1) {
-      console.log(
-        "DEBUG: Detected showAnnotationViewer change with active zoom - scheduling forced redraw"
-      );
-
       // Use a series of delayed redraws to ensure the canvas is properly updated
       // after DOM changes have been fully applied
       const redrawDelays = [100, 300, 500];
@@ -2066,18 +2045,9 @@ const ImageViewerWithPrompting = () => {
       redrawDelays.forEach((delay) => {
         setTimeout(() => {
           if (annotationCanvasRef.current && bestMask && canvasImage) {
-            console.log(`DEBUG: Forced redraw at ${delay}ms delay`);
             try {
               const canvas = annotationCanvasRef.current;
               const rect = canvas.getBoundingClientRect();
-
-              console.log(`DEBUG: Canvas state at ${delay}ms:`, {
-                width: rect.width,
-                height: rect.height,
-                isVisible: rect.width > 0 && rect.height > 0,
-                canvasWidth: canvas.width,
-                canvasHeight: canvas.height,
-              });
 
               // Reset canvas dimensions
               canvas.width = canvasImage.width;
@@ -2088,7 +2058,7 @@ const ImageViewerWithPrompting = () => {
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               drawAnnotationCanvas();
             } catch (error) {
-              console.error(`DEBUG: Error in redraw at ${delay}ms:`, error);
+              console.error(`Error in redraw at ${delay}ms:`, error);
             }
           }
         }, delay);
@@ -2105,37 +2075,24 @@ const ImageViewerWithPrompting = () => {
 
   // Handle contour selection in the Final Mask Viewer
   const handleFinalMaskContourSelect = (mask, contourIndex) => {
-    console.log("DEBUG: handleFinalMaskContourSelect called with:", {
-      maskId: mask.id,
-      contourIndex,
-      hasAnnotationCanvasRef: !!annotationCanvasRef.current,
-      currentZoomLevel: zoomLevel,
-      showAnnotationViewer,
-    });
-
     // If same contour is clicked again, deselect it
     if (
       selectedFinalMaskContour &&
       selectedFinalMaskContour.maskId === mask.id &&
       selectedFinalMaskContour.contourIndex === contourIndex
     ) {
-      console.log("DEBUG: Deselecting contour:", selectedFinalMaskContour);
       setSelectedFinalMaskContour(null);
       setZoomLevel(1); // Reset zoom
 
       // Also clear annotation viewer selection if it exists
       if (selectedContours.length > 0) {
         setSelectedContours([]);
-        console.log("DEBUG: Cleared selectedContours state");
       }
 
       // Force redraw of annotation canvas only if it's visible
       if (showAnnotationViewer) {
         setTimeout(() => {
           if (annotationCanvasRef.current && bestMask) {
-            console.log(
-              "DEBUG: Forcing annotation canvas redraw after deselection"
-            );
             drawAnnotationCanvas();
           }
         }, 0);
@@ -2162,9 +2119,6 @@ const ImageViewerWithPrompting = () => {
     centerX /= contour.x.length;
     centerY /= contour.y.length;
 
-    console.log("DEBUG: Calculated zoom center:", { centerX, centerY });
-
-
     // Update state in a specific order
     // 1. First set zoom parameters
     setZoomCenter({ x: centerX, y: centerY });
@@ -2177,28 +2131,15 @@ const ImageViewerWithPrompting = () => {
       contour: contour,
     });
 
-    console.log(
-      "DEBUG: Updated state: showAnnotationViewer=",
-      showAnnotationViewer
-    );
-
     // 3. Look for matching contour in annotation viewer
     if (bestMask) {
-      console.log("DEBUG: Checking for matching contour in annotation viewer");
-
-      // Find matching contour in annotation viewer
       const matchingContourIndex = findMatchingContour(
         contour,
         bestMask.contours
       );
 
-      console.log("DEBUG: matchingContourIndex is", matchingContourIndex);
-
       if (matchingContourIndex !== -1) {
         // Update annotation viewer selection
-        console.log("DEBUG: Setting selectedContours to", [
-          matchingContourIndex,
-        ]);
         setSelectedContours([matchingContourIndex]);
 
         // Force redraw with multiple delayed attempts
@@ -2206,30 +2147,24 @@ const ImageViewerWithPrompting = () => {
 
         delays.forEach((delay) => {
           setTimeout(() => {
-            if (annotationCanvasRef.current && bestMask && canvasImage) {
-              console.log(`DEBUG: Attempting redraw at ${delay}ms delay`);
-              try {
-                // Set canvas dimensions to match the image
-                annotationCanvasRef.current.width = canvasImage.width;
-                annotationCanvasRef.current.height = canvasImage.height;
+            try {
+              // Set canvas dimensions to match the image
+              annotationCanvasRef.current.width = canvasImage.width;
+              annotationCanvasRef.current.height = canvasImage.height;
 
-                // Get context and clear it
-                const ctx = annotationCanvasRef.current.getContext("2d");
-                ctx.clearRect(
-                  0,
-                  0,
-                  annotationCanvasRef.current.width,
-                  annotationCanvasRef.current.height
-                );
+              // Get context and clear it
+              const ctx = annotationCanvasRef.current.getContext("2d");
+              ctx.clearRect(
+                0,
+                0,
+                annotationCanvasRef.current.width,
+                annotationCanvasRef.current.height
+              );
 
-                // Draw annotation canvas
-                drawAnnotationCanvas();
-              } catch (error) {
-                console.error(
-                  `DEBUG: Error during canvas redraw at ${delay}ms:`,
-                  error
-                );
-              }
+              // Draw annotation canvas
+              drawAnnotationCanvas();
+            } catch (error) {
+              console.error(`Error during canvas redraw at ${delay}ms:`, error);
             }
           }, delay);
         });
@@ -2623,8 +2558,6 @@ const ImageViewerWithPrompting = () => {
       let x = (event.clientX - rect.left) * scaleX;
       let y = (event.clientY - rect.top) * scaleY;
 
-      console.log("Click on final mask canvas at:", x, y);
-
       // Adjust coordinates for zoom
       if (zoomLevel > 1 && zoomCenter) {
         const centerX = zoomCenter.x * canvas.width;
@@ -2633,8 +2566,6 @@ const ImageViewerWithPrompting = () => {
         // Reverse the zoom transform
         x = (x - centerX) / zoomLevel + centerX;
         y = (y - centerY) / zoomLevel + centerY;
-
-        console.log("Adjusted coordinates after zoom:", x, y);
       }
 
       // First check if we clicked on the currently selected contour (for deselection)
@@ -2649,7 +2580,6 @@ const ImageViewerWithPrompting = () => {
         ) {
           const contour = mask.contours[selectedFinalMaskContour.contourIndex];
           if (isPointInContour(x, y, contour, canvas)) {
-            console.log("Clicked on already selected contour - deselecting");
             setSelectedFinalMaskContour(null);
             setZoomLevel(1);
 
@@ -2660,9 +2590,6 @@ const ImageViewerWithPrompting = () => {
 
             // Ensure immediate redraw of annotation canvas
             if (annotationCanvasRef.current && bestMask) {
-              console.log(
-                "Deselection - forcing immediate annotation canvas redraw"
-              );
               setTimeout(() => {
                 const ctx = annotationCanvasRef.current.getContext("2d");
                 // Clear the canvas and redraw with reset zoom
@@ -2689,37 +2616,20 @@ const ImageViewerWithPrompting = () => {
       let foundMask = null;
       let foundContourIndex = -1;
 
-      console.log(
-        `Checking ${finalMasks.length} masks for contour intersection`
-      );
-
-      // Loop through all masks to find which contour was clicked
       for (const mask of finalMasks) {
         if (!mask.contours || !Array.isArray(mask.contours)) {
-          console.log("Mask has no valid contours:", mask.id);
           continue;
         }
-
-        console.log(
-          `Checking mask ${mask.id} with ${mask.contours.length} contours`
-        );
 
         for (let i = 0; i < mask.contours.length; i++) {
           const contour = mask.contours[i];
 
           // Skip invalid contours
           if (!contour || !contour.x || !contour.y || contour.x.length < 3) {
-            console.log(
-              "Skipping invalid contour at index",
-              i,
-              "in mask",
-              mask.id
-            );
             continue;
           }
 
           if (isPointInContour(x, y, contour, canvas)) {
-            console.log("Found contour at index", i, "in mask", mask.id);
             foundMask = mask;
             foundContourIndex = i;
             break;
@@ -2730,17 +2640,9 @@ const ImageViewerWithPrompting = () => {
       }
 
       if (foundMask && foundContourIndex !== -1) {
-        console.log(
-          "Selected contour:",
-          foundContourIndex,
-          "in mask:",
-          foundMask.id
-        );
-        // Handle contour selection - this will trigger necessary state updates
         handleFinalMaskContourSelect(foundMask, foundContourIndex);
       } else {
         // Clicked outside contours, reset zoom if zoomed in
-        console.log("No contour found at click position");
         if (zoomLevel > 1) {
           setSelectedFinalMaskContour(null);
           setZoomLevel(1);
@@ -2752,9 +2654,6 @@ const ImageViewerWithPrompting = () => {
 
           // Force immediate redraw of annotation canvas
           if (annotationCanvasRef.current && bestMask) {
-            console.log(
-              "Reset zoom - forcing immediate annotation canvas redraw"
-            );
             setTimeout(() => {
               const ctx = annotationCanvasRef.current.getContext("2d");
               // Clear and redraw with reset zoom
@@ -2789,48 +2688,19 @@ const ImageViewerWithPrompting = () => {
 
   // Update the useEffect for drawing the finalMaskCanvas with more logging
   useEffect(() => {
-    console.log("DEBUG: Canvas redraw useEffect triggered with state:", {
-      hasCanvasImage: !!canvasImage,
-      hasFinalMaskCanvasRef: !!finalMaskCanvasRef.current,
-      hasAnnotationCanvasRef: !!annotationCanvasRef.current,
-      hasBestMask: !!bestMask,
-      finalMasksCount: finalMasks.length,
-      hasSelectedFinalMaskContour: !!selectedFinalMaskContour,
-      selectedContours: selectedContours.length,
-      zoomLevel,
-      showAnnotationViewer,
-    });
-
     // Draw final mask canvas
     if (canvasImage && finalMaskCanvasRef.current) {
-      console.log("DEBUG: Drawing final mask canvas");
       drawFinalMaskCanvas();
     }
 
     // Draw annotation canvas when needed
     if (canvasImage && annotationCanvasRef.current && bestMask) {
-      console.log("DEBUG: Drawing annotation canvas from useEffect");
-
       try {
         // Direct check and logging of annotation canvas DOM state
         const canvas = annotationCanvasRef.current;
-        console.log("DEBUG: Annotation canvas DOM state:", {
-          width: canvas.width,
-          height: canvas.height,
-          offsetWidth: canvas.offsetWidth,
-          offsetHeight: canvas.offsetHeight,
-          clientWidth: canvas.clientWidth,
-          clientHeight: canvas.clientHeight,
-          style: canvas.style?.cssText,
-          visible: canvas.getBoundingClientRect().width > 0,
-        });
-
         drawAnnotationCanvas();
       } catch (error) {
-        console.error(
-          "DEBUG: Error in useEffect drawing annotation canvas:",
-          error
-        );
+        console.error("Error in useEffect drawing annotation canvas:", error);
       }
     }
   }, [
@@ -2854,8 +2724,6 @@ const ImageViewerWithPrompting = () => {
       annotationCanvasRef.current &&
       bestMask
     ) {
-      console.log("Annotation viewer visibility changed, redrawing canvas");
-      // Short timeout to ensure the canvas element is fully mounted
       setTimeout(() => {
         drawAnnotationCanvas();
       }, 50);
@@ -3118,17 +2986,12 @@ const ImageViewerWithPrompting = () => {
       bestMask &&
       canvasImage
     ) {
-      console.log(
-        "DEBUG: Annotation viewer became visible with selected contour, scheduling redraws"
-      );
-
       // Schedule multiple redraws with increasing delays to ensure it works
       // This is necessary because the canvas may not be fully rendered in the DOM yet
       const delays = [50, 150, 300, 600, 1000];
       delays.forEach((delay) => {
         setTimeout(() => {
           if (annotationCanvasRef.current) {
-            console.log(`DEBUG: Redrawing annotation canvas after ${delay}ms`);
             try {
               // Set canvas dimensions to match the image
               annotationCanvasRef.current.width = canvasImage.width;
@@ -3137,10 +3000,7 @@ const ImageViewerWithPrompting = () => {
               // Draw the annotation canvas
               drawAnnotationCanvas();
             } catch (error) {
-              console.error(
-                `DEBUG: Error during canvas redraw at ${delay}ms:`,
-                error
-              );
+              console.error(`Error during canvas redraw at ${delay}ms:`, error);
             }
           }
         }, delay);
@@ -3279,28 +3139,30 @@ const ImageViewerWithPrompting = () => {
   const fetchFinalMask = async (imageId) => {
     // Use the provided imageId parameter if available, otherwise use currentImage.id
     const targetImageId = imageId || currentImage?.id;
-    
+
     if (!targetImageId) {
-      console.log("Cannot fetch final mask: No image ID provided and no current image selected");
+      console.log(
+        "Cannot fetch final mask: No image ID provided and no current image selected"
+      );
       return;
     }
 
     setFetchingFinalMask(true);
     try {
       console.log(`Fetching final mask for image ID: ${targetImageId}`);
-      
+
       // Use the new dedicated endpoint for final masks
       const response = await api.getFinalMask(targetImageId);
-      
+
       if (response.success && response.mask) {
         console.log("Final mask fetched successfully:", response.mask);
-        
+
         // Set the final mask state
         setFinalMask(response.mask);
-        
+
         // Set the finalMasks array with just this mask, since we only show one final mask per image
         setFinalMasks([response.mask]);
-        
+
         // Also update the finalMaskContours for better tracking
         if (response.mask.contours) {
           setFinalMaskContours(response.mask.contours);
@@ -3327,28 +3189,35 @@ const ImageViewerWithPrompting = () => {
       console.error("No contour ID provided for deletion");
       return;
     }
-    
+
     try {
       console.log(`Deleting contour with ID: ${contourId} from final mask`);
       setLoading(true);
-      
+
       const response = await api.deleteContour(contourId);
-      
+
       if (response.success) {
         console.log(`Successfully deleted contour with ID: ${contourId}`);
-        
+
         // Refresh the final mask to update UI
         await fetchFinalMask(currentImage.id);
-        
+
         // Clear selection if the deleted contour was selected
-        if (selectedFinalMaskContour && selectedFinalMaskContour.contourIndex === contourId) {
+        if (
+          selectedFinalMaskContour &&
+          selectedFinalMaskContour.contourIndex === contourId
+        ) {
           setSelectedFinalMaskContour(null);
           setZoomLevel(1);
         }
-        
-        setSuccessMessageWithTimeout("Contour removed from final mask successfully");
+
+        setSuccessMessageWithTimeout(
+          "Contour removed from final mask successfully"
+        );
       } else {
-        setError(`Failed to delete contour: ${response.message || "Unknown error"}`);
+        setError(
+          `Failed to delete contour: ${response.message || "Unknown error"}`
+        );
       }
     } catch (error) {
       console.error("Error deleting contour:", error);
@@ -3364,22 +3233,28 @@ const ImageViewerWithPrompting = () => {
       console.log("No contours to clear");
       return;
     }
-    
+
     // Confirm with the user before proceeding
-    if (!window.confirm(`Are you sure you want to remove all ${finalMask.contours.length} contours from the final mask?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to remove all ${finalMask.contours.length} contours from the final mask?`
+      )
+    ) {
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      console.log(`Clearing all ${finalMask.contours.length} contours from final mask`);
-      
+      console.log(
+        `Clearing all ${finalMask.contours.length} contours from final mask`
+      );
+
       // Delete contours one by one
       let successCount = 0;
       let failCount = 0;
-      
+
       for (const contour of finalMask.contours) {
         try {
           const response = await api.deleteContour(contour.id);
@@ -3387,28 +3262,38 @@ const ImageViewerWithPrompting = () => {
             successCount++;
           } else {
             failCount++;
-            console.error(`Failed to delete contour ${contour.id}: ${response.message || "Unknown error"}`);
+            console.error(
+              `Failed to delete contour ${contour.id}: ${
+                response.message || "Unknown error"
+              }`
+            );
           }
         } catch (contourError) {
           failCount++;
           console.error(`Error deleting contour ${contour.id}:`, contourError);
         }
       }
-      
+
       // Refresh the final mask
       await fetchFinalMask(currentImage.id);
-      
+
       // Reset selection and zoom
       setSelectedFinalMaskContour(null);
       setZoomLevel(1);
-      
+
       // Show success/failure message
       if (failCount === 0) {
-        setSuccessMessageWithTimeout(`Successfully cleared all ${successCount} contours from the final mask`);
+        setSuccessMessageWithTimeout(
+          `Successfully cleared all ${successCount} contours from the final mask`
+        );
       } else if (successCount > 0) {
-        setSuccessMessageWithTimeout(`Cleared ${successCount} contours successfully, but failed to clear ${failCount} contours`);
+        setSuccessMessageWithTimeout(
+          `Cleared ${successCount} contours successfully, but failed to clear ${failCount} contours`
+        );
       } else {
-        setError(`Failed to clear any of the ${failCount} contours from the final mask`);
+        setError(
+          `Failed to clear any of the ${failCount} contours from the final mask`
+        );
       }
     } catch (error) {
       console.error("Error clearing contours:", error);
@@ -3885,9 +3770,6 @@ const ImageViewerWithPrompting = () => {
                             alt={image.name || `Image ${image.id}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              console.error(
-                                `Error loading thumbnail for image ${image.id}`
-                              );
                               e.target.src =
                                 "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9IiNlZWVlZWUiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjEycHgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPkVycm9yPC90ZXh0Pjwvc3ZnPg==";
                             }}
@@ -4010,7 +3892,9 @@ const ImageViewerWithPrompting = () => {
                     {/* Add Select tool as the first button */}
                     <button
                       className={`p-2 transition-colors ${
-                        promptType === "select" ? "bg-blue-500 text-white" : "hover:bg-gray-100"
+                        promptType === "select"
+                          ? "bg-blue-500 text-white"
+                          : "hover:bg-gray-100"
                       }`}
                       onClick={() => {
                         setPromptType("select");
@@ -4020,7 +3904,8 @@ const ImageViewerWithPrompting = () => {
                       }}
                       title="Select Tool (Contour selection mode)"
                     >
-                      <Pointer className="w-4 h-4" /> {/* Changed from MousePointer to Pointer */}
+                      <Pointer className="w-4 h-4" />{" "}
+                      {/* Changed from MousePointer to Pointer */}
                     </button>
                     {/* Add Drag tool as the first button */}
                     <button
@@ -4143,16 +4028,6 @@ const ImageViewerWithPrompting = () => {
                   </div>
                 </div>
 
-                {/* Debug info to help diagnose image loading issues */}
-                {process.env.NODE_ENV === 'development' && (
-                  <div className="mb-2 p-2 bg-gray-100 rounded text-xs">
-                    <div><strong>Debug:</strong> Image loaded successfully</div>
-                    <div>Image ID: {selectedImage.id}</div>
-                    <div>Image dimensions: {imageObject.width}x{imageObject.height}</div>
-                    <div>Image object valid: {imageObject && imageObject.complete ? 'Yes' : 'No'}</div>
-                  </div>
-                )}
-
                 {/* Dual Viewer Container */}
                 <div className="flex flex-row gap-3 mb-4">
                   {/* Annotation Viewer (AV) */}
@@ -4243,19 +4118,23 @@ const ImageViewerWithPrompting = () => {
                                 {isZoomedContourRefinement ? (
                                   // Show PromptingCanvas in refinement mode
                                   <PromptingCanvas
-  ref={promptingCanvasRef}
-  image={imageObject}
-  onPromptingComplete={handlePromptingComplete}
-  isRefinementMode={isZoomedContourRefinement}
-  selectedMask={selectedMask}
-  promptType={promptType}
-  activeTool={promptType}
-  currentLabel={currentLabel}
-  onContourSelect={handleContourSelect}
-  onAddToFinalMask={handleAddSelectedContoursToFinalMask}
-  zoomLevel={zoomLevel}
-  zoomCenter={zoomCenter}
-/>
+                                    ref={promptingCanvasRef}
+                                    image={imageObject}
+                                    onPromptingComplete={
+                                      handlePromptingComplete
+                                    }
+                                    isRefinementMode={isZoomedContourRefinement}
+                                    selectedMask={selectedMask}
+                                    promptType={promptType}
+                                    activeTool={promptType}
+                                    currentLabel={currentLabel}
+                                    onContourSelect={handleContourSelect}
+                                    onAddToFinalMask={
+                                      handleAddSelectedContoursToFinalMask
+                                    }
+                                    zoomLevel={zoomLevel}
+                                    zoomCenter={zoomCenter}
+                                  />
                                 ) : (
                                   // Show the annotation canvas in normal mode
                                   <canvas
@@ -4309,11 +4188,16 @@ const ImageViewerWithPrompting = () => {
                             <div className="absolute bottom-6 right-6 z-30">
                               <button
                                 onClick={() => {
-                                  console.log("Floating action button clicked - selectedContours:", selectedContours);
+                                  console.log(
+                                    "Floating action button clicked - selectedContours:",
+                                    selectedContours
+                                  );
                                   if (selectedContours.length > 0) {
                                     handleAddSelectedContoursToFinalMask();
                                   } else {
-                                    setError("No contours selected - please select contours first");
+                                    setError(
+                                      "No contours selected - please select contours first"
+                                    );
                                   }
                                 }}
                                 disabled={selectedContours.length === 0}
@@ -4354,7 +4238,9 @@ const ImageViewerWithPrompting = () => {
                               {isSegmenting ? (
                                 <div className="flex flex-col items-center justify-center py-6">
                                   <div className="w-6 h-6 border-4 border-t-blue-500 border-blue-200 rounded-full animate-spin mb-2"></div>
-                                  <span className="text-blue-700 font-medium">Loading segmentation results...</span>
+                                  <span className="text-blue-700 font-medium">
+                                    Loading segmentation results...
+                                  </span>
                                 </div>
                               ) : (
                                 <>
@@ -4383,11 +4269,16 @@ const ImageViewerWithPrompting = () => {
                                   <div className="flex space-x-2 mt-1 pt-2 border-t border-gray-100">
                                     <button
                                       onClick={() => {
-                                        console.log("Panel Add to Final Mask button clicked - selectedContours:", selectedContours);
+                                        console.log(
+                                          "Panel Add to Final Mask button clicked - selectedContours:",
+                                          selectedContours
+                                        );
                                         if (selectedContours.length > 0) {
                                           handleAddSelectedContoursToFinalMask();
                                         } else {
-                                          setError("No contours selected - please select contours first");
+                                          setError(
+                                            "No contours selected - please select contours first"
+                                          );
                                         }
                                       }}
                                       disabled={
@@ -4499,8 +4390,15 @@ const ImageViewerWithPrompting = () => {
                                 <Layers className="h-4 w-4 text-blue-600" />
                                 Final Mask
                                 <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-sm rounded-full">
-                                  {finalMasks.length} mask{finalMasks.length !== 1 ? "s" : ""} 
-                                  {finalMask && finalMask.contours ? ` (${finalMask.contours.length} contour${finalMask.contours.length !== 1 ? "s" : ""})` : ""}
+                                  {finalMasks.length} mask
+                                  {finalMasks.length !== 1 ? "s" : ""}
+                                  {finalMask && finalMask.contours
+                                    ? ` (${finalMask.contours.length} contour${
+                                        finalMask.contours.length !== 1
+                                          ? "s"
+                                          : ""
+                                      })`
+                                    : ""}
                                 </span>
                               </h3>
 
@@ -4654,49 +4552,90 @@ const ImageViewerWithPrompting = () => {
                                 </h4>
                                 <div className="flex items-center">
                                   <div className="text-xs text-gray-500 mr-2">
-                                    {finalMask && finalMask.contours ? finalMask.contours.length : 0} contour{finalMask && finalMask.contours && finalMask.contours.length !== 1 ? "s" : ""} total
+                                    {finalMask && finalMask.contours
+                                      ? finalMask.contours.length
+                                      : 0}{" "}
+                                    contour
+                                    {finalMask &&
+                                    finalMask.contours &&
+                                    finalMask.contours.length !== 1
+                                      ? "s"
+                                      : ""}{" "}
+                                    total
                                   </div>
-                                  {finalMask && finalMask.contours && finalMask.contours.length > 0 && (
-                                    <button
-                                      onClick={clearAllFinalMaskContours}
-                                      className="text-xs px-2 py-1 text-red-600 border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
-                                      title="Remove all contours"
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                      Clear All
-                                    </button>
-                                  )}
+                                  {finalMask &&
+                                    finalMask.contours &&
+                                    finalMask.contours.length > 0 && (
+                                      <button
+                                        onClick={clearAllFinalMaskContours}
+                                        className="text-xs px-2 py-1 text-red-600 border border-red-200 rounded hover:bg-red-50 flex items-center gap-1"
+                                        title="Remove all contours"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                        Clear All
+                                      </button>
+                                    )}
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
-                                {finalMask && finalMask.contours && finalMask.contours.map((contour, index) => (
-                                  <div
-                                    key={`contour-${contour.id}-${index}`}
-                                    className={`flex justify-between items-center p-2 ${selectedFinalMaskContour && selectedFinalMaskContour.contourIndex === index ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'} rounded`}
-                                  >
-                                    <span className="text-sm">Contour #{index + 1}</span>
-                                    <div className="flex items-center space-x-1">
-                                      <button
-                                        onClick={() => handleFinalMaskContourSelect(finalMask, index)}
-                                        className="text-blue-600 hover:text-blue-700 p-1"
-                                        title="View this contour"
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                          <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                          <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                                        </svg>
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteFinalMaskContour(contour.id)}
-                                        className="text-red-600 hover:text-red-700 p-1"
-                                        title="Remove this contour"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
+                                {finalMask &&
+                                  finalMask.contours &&
+                                  finalMask.contours.map((contour, index) => (
+                                    <div
+                                      key={`contour-${contour.id}-${index}`}
+                                      className={`flex justify-between items-center p-2 ${
+                                        selectedFinalMaskContour &&
+                                        selectedFinalMaskContour.contourIndex ===
+                                          index
+                                          ? "bg-blue-50 border border-blue-200"
+                                          : "bg-gray-50"
+                                      } rounded`}
+                                    >
+                                      <span className="text-sm">
+                                        Contour #{index + 1}
+                                      </span>
+                                      <div className="flex items-center space-x-1">
+                                        <button
+                                          onClick={() =>
+                                            handleFinalMaskContourSelect(
+                                              finalMask,
+                                              index
+                                            )
+                                          }
+                                          className="text-blue-600 hover:text-blue-700 p-1"
+                                          title="View this contour"
+                                        >
+                                          <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            className="h-4 w-4"
+                                            viewBox="0 0 20 20"
+                                            fill="currentColor"
+                                          >
+                                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                            <path
+                                              fillRule="evenodd"
+                                              d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                                              clipRule="evenodd"
+                                            />
+                                          </svg>
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            handleDeleteFinalMaskContour(
+                                              contour.id
+                                            )
+                                          }
+                                          className="text-red-600 hover:text-red-700 p-1"
+                                          title="Remove this contour"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                                {(!finalMask || !finalMask.contours || finalMask.contours.length === 0) && (
+                                  ))}
+                                {(!finalMask ||
+                                  !finalMask.contours ||
+                                  finalMask.contours.length === 0) && (
                                   <div className="col-span-2 text-center p-4 bg-gray-50 rounded text-gray-500">
                                     No contours added yet
                                   </div>
