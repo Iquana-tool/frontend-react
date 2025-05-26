@@ -191,13 +191,111 @@ export const getPromptTypeDescription = (type) => {
 };
 
 /**
- * Creates a visual preview of a mask without modifying the original mask data
- * @param {HTMLImageElement} originalImage 
- * @param {string} maskBase64 
- * @param {Object} options 
+ * Creates a visual preview of a mask from contour data
+ * @param {HTMLImageElement} originalImage - The original image
+ * @param {Array} contours - Array of contour objects with x, y coordinates
+ * @param {Object} options - Rendering options
  * @returns {Promise<HTMLCanvasElement>} Canvas with the visualization
  */
-export const createMaskPreview = (originalImage, maskBase64, options = {}) => {
+export const createMaskPreviewFromContours = (originalImage, contours, options = {}) => {
+  return new Promise((resolve) => {
+    const {
+      colorOverlay = true,
+      colorIndex = 0,
+      opacity = 0.6
+    } = options;
+    
+    // Create a canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = originalImage.width;
+    canvas.height = originalImage.height;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw the original image
+    ctx.drawImage(originalImage, 0, 0);
+    
+    // Draw all contours
+    ctx.save();
+    
+    // Set up styling
+    ctx.globalAlpha = opacity;
+    if (colorOverlay) {
+      ctx.fillStyle = getMaskColor(colorIndex);
+      ctx.strokeStyle = getMaskColor(colorIndex, 0.9);
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    }
+    ctx.lineWidth = 2;
+    
+    // Process each contour
+    contours.forEach(contour => {
+      if (!contour.x || !contour.y || contour.x.length < 3) return;
+      
+      // Start a new path for this contour
+      ctx.beginPath();
+      
+      // Convert normalized coordinates to actual pixel positions
+      const startX = contour.x[0] * originalImage.width;
+      const startY = contour.y[0] * originalImage.height;
+      
+      ctx.moveTo(startX, startY);
+      
+      // Draw each point of the contour
+      for (let i = 1; i < contour.x.length; i++) {
+        const x = contour.x[i] * originalImage.width;
+        const y = contour.y[i] * originalImage.height;
+        ctx.lineTo(x, y);
+      }
+      
+      // Close the path
+      ctx.closePath();
+      
+      // Fill and stroke the path
+      ctx.fill();
+      ctx.stroke();
+    });
+    
+    ctx.restore();
+    resolve(canvas);
+  });
+};
+
+/**
+ * Parses a string that might contain contour data
+ * @param {string} data - String that might be JSON contour data or base64 image
+ * @returns {Object} Object with isContour flag and parsed contours if available
+ */
+export const parseContourData = (data) => {
+  try {
+    const parsedData = JSON.parse(data);
+    // Check if it looks like contour data (array with x and y properties)
+    if (Array.isArray(parsedData) && parsedData.length > 0 && 
+        parsedData[0].x && parsedData[0].y && 
+        Array.isArray(parsedData[0].x) && Array.isArray(parsedData[0].y)) {
+      return {
+        isContour: true,
+        contours: parsedData
+      };
+    }
+    return { isContour: false };
+  } catch (e) {
+    // Not JSON data, likely base64
+    return { isContour: false };
+  }
+};
+
+// Update the existing createMaskPreview function to support both base64 and contour data
+export const createMaskPreview = (originalImage, maskData, options = {}) => {
+  // Check if maskData is contour data or base64 image
+  const parsedData = parseContourData(maskData);
+  
+  if (parsedData.isContour) {
+    // Use the contour-specific function
+    return createMaskPreviewFromContours(originalImage, parsedData.contours, options);
+  }
+  
+  // Otherwise, use the original base64 implementation
   return new Promise((resolve, reject) => {
     const {
       colorOverlay = true,
@@ -240,7 +338,7 @@ export const createMaskPreview = (originalImage, maskBase64, options = {}) => {
     };
     
     // Important: Use the mask data directly without processing
-    maskImg.src = `data:image/png;base64,${maskBase64}`;
+    maskImg.src = `data:image/png;base64,${maskData}`;
   });
 };
 
@@ -294,4 +392,54 @@ export const getMaskColor = (index, opacity = 0.6) => {
   ];
   
   return colors[index % colors.length];
+};
+
+/**
+ * Remap prompts to the crop's normalized [0,1] range.
+ * @param {Array} prompts - Array of prompt objects
+ * @param {Object} crop - Crop object with min_x, min_y, max_x, max_y (all in [0,1] relative to image)
+ * @returns {Array} Remapped prompts
+ */
+export const remapPromptsToCrop = (prompts, crop) => {
+  if (!crop || (crop.min_x === 0 && crop.min_y === 0 && crop.max_x === 1 && crop.max_y === 1)) {
+    // No crop, return original prompts
+    return prompts;
+  }
+  const cropWidth = crop.max_x - crop.min_x;
+  const cropHeight = crop.max_y - crop.min_y;
+  return prompts.map((prompt) => {
+    let remapped = { ...prompt };
+    switch (prompt.type) {
+      case "point":
+        remapped.coordinates = {
+          x: (prompt.coordinates.x - crop.min_x) / cropWidth,
+          y: (prompt.coordinates.y - crop.min_y) / cropHeight,
+        };
+        break;
+      case "box":
+        remapped.coordinates = {
+          startX: (prompt.coordinates.startX - crop.min_x) / cropWidth,
+          startY: (prompt.coordinates.startY - crop.min_y) / cropHeight,
+          endX: (prompt.coordinates.endX - crop.min_x) / cropWidth,
+          endY: (prompt.coordinates.endY - crop.min_y) / cropHeight,
+        };
+        break;
+      case "circle":
+        remapped.coordinates = {
+          centerX: (prompt.coordinates.centerX - crop.min_x) / cropWidth,
+          centerY: (prompt.coordinates.centerY - crop.min_y) / cropHeight,
+          radius: prompt.coordinates.radius / Math.max(cropWidth, cropHeight),
+        };
+        break;
+      case "polygon":
+        remapped.coordinates = prompt.coordinates.map((pt) => ({
+          x: (pt.x - crop.min_x) / cropWidth,
+          y: (pt.y - crop.min_y) / cropHeight,
+        }));
+        break;
+      default:
+        break;
+    }
+    return remapped;
+  });
 };
