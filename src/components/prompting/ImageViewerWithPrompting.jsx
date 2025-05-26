@@ -1,57 +1,16 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-} from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Typography } from "@mui/material";
 import * as api from "../../api";
 import ContourEditor from "./ContourEditor";
 import PromptingCanvas from "./PromptingCanvas";
 import QuantificationTable from "../QuantificationTable";
-import QuantificationDisplay from "./QuantificationDisplay";
-import LabelSelector from "./LabelSelector";
 import { remapPromptsToCrop } from "./utils";
-import {
-  AlertCircle,
-  CheckCircle,
-  Upload,
-  Image as ImageIcon,
-  Loader,
-} from "lucide-react";
 import ImageUploader from "../ui/ImageUploader";
 import StatusBar from "../ui/StatusBar";
 import ToolsPanel from "../ui/ToolsPanel";
 import ImageDisplay from "../ui/ImageDisplay";
 import "./ImageViewerWithPrompting.css";
 
-// Import modular components
-import {
-  MousePointer,
-  Square,
-  Circle,
-  Pentagon,
-  Layers,
-  List,
-  Edit,
-  Plus,
-  Move,
-  Download,
-  X,
-  Save,
-  Trash2,
-  ZoomIn,
-  ZoomOut,
-  ArrowLeft,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp,
-  Check,
-  RefreshCw,
-  PenTool,
-  RotateCcw,
-  Pointer,
-} from "lucide-react";
 import "./ImageViewerWithPrompting.css";
 
 // Add custom styles to fix the overlapping text issue
@@ -209,84 +168,6 @@ const exportQuantificationsAsCsv = (masks) => {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-};
-
-// Add this helper function at the top level
-const createMaskImage = async (mask, originalImage) => {
-  return new Promise((resolve, reject) => {
-    const maskImg = new Image();
-    maskImg.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = originalImage.width;
-        canvas.height = originalImage.height;
-        const ctx = canvas.getContext("2d");
-
-        // Draw original image
-        ctx.drawImage(originalImage, 0, 0);
-
-        // Draw mask with transparency
-        ctx.globalAlpha = 0.7;
-        ctx.drawImage(maskImg, 0, 0);
-        ctx.globalAlpha = 1;
-
-        // Get the processed image as base64
-        const processedBase64 = canvas.toDataURL("image/png").split(",")[1];
-        resolve(processedBase64);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    maskImg.onerror = () => reject(new Error("Failed to load mask image"));
-    maskImg.src = `data:image/png;base64,${mask.base64}`;
-  });
-};
-
-// Add this function at the top level
-const generateMaskPreview = async (mask, originalImage) => {
-  return new Promise((resolve, reject) => {
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = originalImage.width;
-      canvas.height = originalImage.height;
-      const ctx = canvas.getContext("2d");
-
-      // Draw original image
-      ctx.drawImage(originalImage, 0, 0);
-
-      // Draw contours
-      if (mask.contours && mask.contours.length > 0) {
-        ctx.fillStyle = "rgba(0, 127, 255, 0.3)";
-        ctx.strokeStyle = "rgba(0, 127, 255, 0.8)";
-        ctx.lineWidth = 2;
-
-        mask.contours.forEach((contour) => {
-          if (contour.x && contour.y && contour.x.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(
-              contour.x[0] * originalImage.width,
-              contour.y[0] * originalImage.height
-            );
-
-            for (let i = 1; i < contour.x.length; i++) {
-              ctx.lineTo(
-                contour.x[i] * originalImage.width,
-                contour.y[i] * originalImage.height
-              );
-            }
-
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-          }
-        });
-      }
-
-      resolve(canvas.toDataURL("image/png"));
-    } catch (error) {
-      reject(error);
-    }
-  });
 };
 
 const ImageViewerWithPrompting = () => {
@@ -3406,7 +3287,9 @@ const ImageViewerWithPrompting = () => {
                   promptType={promptType}
                   currentLabel={currentLabel}
                   handleContourSelect={handleContourSelect}
-                  handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
+                  handleAddSelectedContoursToFinalMask={
+                    handleAddSelectedContoursToFinalMask
+                  }
                   zoomLevel={zoomLevel}
                   zoomCenter={zoomCenter}
                   showAnnotationViewer={showAnnotationViewer}
