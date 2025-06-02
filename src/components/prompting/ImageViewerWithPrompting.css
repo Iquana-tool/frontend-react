@@ -1,54 +1,83 @@
-/* ImageViewerWithPrompting component styles */
+/* =========================================================
+   ImageViewerWithPrompting component styles
+   ========================================================= */
 
-/* Custom animations */
+/* ---------- Animations ---------- */
+
+/* progress bar */
 @keyframes loading-progress {
   from { width: 0; }
-  to { width: 100%; }
+  to   { width: 100%; }
 }
 
+/* pulsing circle (e.g. mask quality) */
 @keyframes pulse-ring {
-  0% { transform: scale(0.8); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 0.4; }
+  0%   { transform: scale(0.8); opacity: 0.8; }
+  50%  { transform: scale(1.1); opacity: 0.4; }
   100% { transform: scale(0.8); opacity: 0.8; }
 }
 
+/* skeleton shimmer */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 
-/* Loading spinner animation */
-.loading-spinner {
-  animation: spin 1s linear infinite;
-}
-
+/* generic spinner */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
+  0%   { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-/* Fix for canvas container height */
+/* slide-up utility that was previously injected via JS */
+@keyframes slide-up {
+  0%   { opacity: 0; transform: translate(-50%, 20px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-slide-up { animation: slide-up 0.3s ease-out forwards; }
+
+/* ---------- Utility classes ---------- */
+
+.loading-spinner { animation: spin 1s linear infinite; }
+
+/* Tailwind-escaped height fix for PromptingCanvas container */
 .h-\[500px\] {
   height: 500px !important;
   max-height: 500px !important;
   overflow: hidden;
 }
 
-/* Fix for overlapping text issues */
-[data-segment-results="true"] [data-header="true"] [data-content="true"] [data-text="segments-found"]::after,
-[data-segment-results="true"] [data-header="true"] [data-content="true"] [data-text="segments-found"]::before,
-[data-segment-results="true"] [data-header="true"] [data-content="true"]::after,
-[data-segment-results="true"] [data-header="true"]::after {
-  content: none !important;
+/* Tiny-font helper (because Tailwind doesn’t ship .text-xxs) */
+.text-xxs { font-size: 0.625rem; }
+
+/* Thin, styled scrollbars */
+.scrollbar-thin           ::-webkit-scrollbar { width: 6px; }
+.scrollbar-thumb-gray-400 ::-webkit-scrollbar-thumb {
+  background-color: #9ca3af; border-radius: 3px;
+}
+.scrollbar-track-gray-100 ::-webkit-scrollbar-track { background: #f3f4f6; }
+
+/* Shimmer utility */
+.shimmer {
+  background: linear-gradient(90deg,
+              rgba(255,255,255,0) 0%,
+              rgba(255,255,255,0.2) 50%,
+              rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
 }
 
-/* Styles for the dual viewer layout */
+/* Pulse utility */
+.pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+/* ---------- Layout ---------- */
+
 .dual-viewer-container {
   display: grid;
   grid-template-columns: minmax(500px, 1fr) minmax(500px, 1fr);
   gap: 1rem;
   max-width: 100%;
-  margin: 0;
+  margin: 0;          /* remove negative margin */
 }
 
 .viewer-panel {
@@ -57,33 +86,7 @@
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  min-height: 550px;
-}
-
-.selected-contour-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
-  pointer-events: none;
-}
-
-.grid-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.slider-label {
-  width: 100px;
-  min-width: 100px;
-}
-
-.loading-progress {
-  animation: loading-progress 5s linear;
-  width: 0;
+  min-height: 550px;  /* ensure consistent height */
 }
 
 .viewer-header {
@@ -94,33 +97,47 @@
   color: #374151;
 }
 
-/* Pulse animation */
-.pulse-ring {
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+.selected-contour-overlay {
+  position: absolute; inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  pointer-events: none;
 }
 
-/* Shimmer animation */
-.shimmer {
-  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 2s infinite;
+.grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }
 
-/* Fix tiny font size */
-.text-xxs {
-  font-size: 0.625rem;
+.slider-label   { width: 100px; min-width: 100px; }
+.loading-progress { animation: loading-progress 5s linear; width: 0; }
+
+/* ---------- Fixes for auto-generated dataset markup ---------- */
+
+/* Remove stray “segments-found” pseudo-elements */
+[data-segment-results="true"]
+  [data-header="true"]
+  [data-content="true"]
+  [data-text="segments-found"]::after,
+[data-segment-results="true"]
+  [data-header="true"]
+  [data-content="true"]
+  [data-text="segments-found"]::before,
+[data-segment-results="true"]
+  [data-header="true"]
+  [data-content="true"]::after,
+[data-segment-results="true"]
+  [data-header="true"]::after { content: none !important; }
+
+/* keep container tidy */
+[data-text="segments-found"] {
+  position: relative;
+  overflow: hidden;
 }
 
-/* Scrollbar styles */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
+/* ensure PromptingCanvas doesn’t shift layout */
+[data-segment-results="true"] { margin-top: 1.5rem !important; }
 
-.scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
-  background-color: #9ca3af;
-  border-radius: 3px;
-}
-
-.scrollbar-track-gray-100::-webkit-scrollbar-track {
-  background-color: #f3f4f6;
-} 
+/* globally neutralise any rogue ::before/::after from 3rd-party libs */
+*::before,
+*::after { content: normal !important; }
