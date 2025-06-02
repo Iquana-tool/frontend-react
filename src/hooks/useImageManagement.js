@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
+import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
 
 export const useImageManagement = (fetchFinalMask = null) => {
+  const { currentDataset } = useDataset();
   const [selectedImage, setSelectedImage] = useState(null);
   const [imageObject, setImageObject] = useState(null);
   const [availableImages, setAvailableImages] = useState([]);
@@ -14,9 +16,16 @@ export const useImageManagement = (fetchFinalMask = null) => {
   const [error, setError] = useState(null);
 
   const fetchImagesFromAPI = useCallback(async () => {
+    if (!currentDataset) {
+      setAvailableImages([]);
+      setError("Please select a dataset to load images.");
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await api.fetchImages();
+      setError(null);
+      const response = await api.fetchImages(currentDataset.id);
       if (response.success) {
         const apiImages = response.images.map((img) => ({
           id: img.id,
@@ -56,7 +65,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentDataset]);
 
   const loadImageThumbnail = useCallback(async (image) => {
     if (!image.isFromAPI || image.thumbnailUrl) return;
@@ -172,6 +181,11 @@ export const useImageManagement = (fetchFinalMask = null) => {
   }, [fetchFinalMask]);
 
   const handleFileUpload = useCallback(async (file) => {
+    if (!currentDataset) {
+      setError("Please select a dataset before uploading images.");
+      return;
+    }
+
     if (!file || !file.type.startsWith("image/")) {
       setError("Please upload an image file (JPEG, PNG, etc.)");
       return;
@@ -198,83 +212,44 @@ export const useImageManagement = (fetchFinalMask = null) => {
       };
 
       setImageObject(localPreviewImg);
+      setOriginalImage(localPreviewImg);
+      setCanvasImage(localPreviewImg);
       setSelectedImage(tempImage);
+      setCurrentImage(tempImage);
+      setImageLoaded(true);
 
-      console.log("Uploading image:", file.name);
-      const response = await api.uploadImage(file);
-
-      if (response.success) {
-        console.log("Upload successful, image ID:", response.image_id);
+      // Upload to server with dataset_id
+      const uploadResponse = await api.uploadImage(file, currentDataset.id);
+      
+      if (uploadResponse.success) {
+        console.log("Image uploaded successfully:", uploadResponse);
         
-        const uploadedImagePlaceholder = {
-          id: response.image_id,
+        // Refresh the images list to include the new image
+        await fetchImagesFromAPI();
+        
+        // Find and select the newly uploaded image
+        const newImageId = uploadResponse.image_id;
+        const newImage = {
+          id: newImageId,
           name: file.name,
           isFromAPI: true,
-          thumbnailUrl: localPreviewUrl,
-          isLoading: false,
         };
-
-        setAvailableImages((prev) => [uploadedImagePlaceholder, ...prev]);
-        setSelectedImageId(response.image_id);
-        setSelectedImage(uploadedImagePlaceholder);
-
-        // Fetch actual image data from server
-        try {
-          const imageData = await api.getImageById(response.image_id);
-          if (imageData && imageData[response.image_id]) {
-            const base64Data = imageData[response.image_id];
-            const serverUrl = `data:image/jpeg;base64,${base64Data}`;
-            const serverImg = new Image();
-            serverImg.src = serverUrl;
-
-            await new Promise((resolve, reject) => {
-              serverImg.onload = resolve;
-              serverImg.onerror = reject;
-              setTimeout(reject, 5000);
-            });
-
-            const updatedImage = {
-              ...uploadedImagePlaceholder,
-              thumbnailUrl: serverUrl,
-              width: serverImg.width,
-              height: serverImg.height,
-            };
-
-            setAvailableImages((prev) =>
-              prev.map((img) =>
-                img.id === response.image_id ? updatedImage : img
-              )
-            );
-
-            setSelectedImage(updatedImage);
-            setImageObject(serverImg);
-            setOriginalImage(serverImg);
-            setCanvasImage(serverImg);
-            setCurrentImage(updatedImage);
-
-            URL.revokeObjectURL(localPreviewUrl);
-
-            setTimeout(() => {
-              fetchImagesFromAPI().catch(console.error);
-            }, 1000);
-          }
-        } catch (loadError) {
-          console.error("Error loading server image:", loadError);
-          setError("Image uploaded successfully, but using local preview. Changes may not be saved correctly.");
-        }
+        
+        // Load the actual image data
+        await handleImageSelect(newImage);
       } else {
-        URL.revokeObjectURL(localPreviewUrl);
-        throw new Error("Upload failed: " + (response.message || "Unknown error"));
+        throw new Error(uploadResponse.message || "Upload failed");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setError(`Failed to upload image: ${error.message}`);
+      setError("Failed to upload image: " + (error.message || "Unknown error"));
+      setSelectedImageId(null);
       setSelectedImage(null);
-      setImageObject(null);
+      setImageLoaded(false);
     } finally {
       setLoading(false);
     }
-  }, [fetchImagesFromAPI]);
+  }, [currentDataset, fetchImagesFromAPI]);
 
   const resetImageState = useCallback(() => {
     setSelectedImageId(null);

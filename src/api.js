@@ -39,9 +39,12 @@ const handleApiError = async (response) => {
 };
 
 // Fetch list of available images
-export const fetchImages = async () => {
+export const fetchImages = async (datasetId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/images/list_images`);
+    if (!datasetId) {
+      throw new Error("Dataset ID is required");
+    }
+    const response = await fetch(`${API_BASE_URL}/images/list_images/${datasetId}`);
     return handleApiError(response);
   } catch (error) {
     console.error("Error fetching images:", error);
@@ -50,10 +53,14 @@ export const fetchImages = async () => {
 };
 
 // Upload an image
-export const uploadImage = async (file) => {
+export const uploadImage = async (file, datasetId) => {
   const maxRetries = 2;
   let retryCount = 0;
   let lastError = null;
+
+  if (!datasetId) {
+    throw new Error("Dataset ID is required");
+  }
 
   while (retryCount <= maxRetries) {
     try {
@@ -68,7 +75,10 @@ export const uploadImage = async (file) => {
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       try {
-        const response = await fetch(`${API_BASE_URL}/images/upload_image`, {
+        const url = new URL(`${API_BASE_URL}/images/upload_image`);
+        url.searchParams.append('dataset_id', datasetId);
+        
+        const response = await fetch(url, {
           method: "POST",
           body: formData,
           signal: controller.signal
@@ -689,10 +699,16 @@ export async function getFinalMask(imageId) {
 
       // Parse and return the successful response
       const data = await response.json();
-      console.log(`Successfully fetched final mask for image ${imageId}`);
+      console.log(`Successfully fetched final mask for image ${imageId}`, data);
+      
+      // The backend returns the mask data directly, not nested under a "mask" property
       return {
         success: true,
-        mask: data.mask
+        mask: {
+          id: data.mask_id,
+          image_id: data.image_id,
+          contours: data.contours || []
+        }
       };
     } catch (error) {
       console.error(`Network error when fetching final mask: ${error.message}`);
@@ -993,9 +1009,12 @@ export const createCutouts = async (imageId, base64Mask, options = {}) => {
 };
 
 // Fetch all available labels
-export const fetchLabels = async () => {
+export const fetchLabels = async (datasetId) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/labels/get_labels`);
+    if (!datasetId) {
+      throw new Error("Dataset ID is required");
+    }
+    const response = await fetch(`${API_BASE_URL}/labels/get_labels/${datasetId}`);
     return handleApiError(response);
   } catch (error) {
     console.error("Error fetching labels:", error);
@@ -1004,7 +1023,7 @@ export const fetchLabels = async () => {
 };
 
 // Create a new label (class)
-export const createLabel = async (labelData) => {
+export const createLabel = async (labelData, datasetId) => {
   try {
     // Extract values from the label data object
     const { name, parent_id = null } = labelData;
@@ -1013,8 +1032,13 @@ export const createLabel = async (labelData) => {
       throw new Error("Label name is required");
     }
     
+    if (!datasetId) {
+      throw new Error("Dataset ID is required");
+    }
+    
     const url = new URL(`${API_BASE_URL}/labels/create_label`);
     url.searchParams.append('label_name', name);
+    url.searchParams.append('dataset_id', datasetId);
     
     if (parent_id) {
       url.searchParams.append('parent_label_id', parent_id);
@@ -1081,6 +1105,102 @@ export const deleteContour = async (contourId) => {
   }
 };
 
+// Dataset API functions
+export const fetchDatasets = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/datasets/get_datasets`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error fetching datasets:", error);
+    throw error;
+  }
+};
+
+export const createDataset = async (name, description) => {
+  try {
+    const url = new URL(`${API_BASE_URL}/datasets/create_dataset`);
+    url.searchParams.append('name', name);
+    url.searchParams.append('description', description);
+    
+    const response = await fetch(url, {
+      method: 'POST'
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error creating dataset:", error);
+    throw error;
+  }
+};
+
+export const deleteDataset = async (datasetId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/datasets/delete_dataset/${datasetId}`, {
+      method: 'DELETE'
+    });
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error deleting dataset:", error);
+    throw error;
+  }
+};
+
+export const getDataset = async (datasetId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/datasets/get_dataset/${datasetId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error fetching dataset:", error);
+    throw error;
+  }
+};
+
+// Get annotation progress for a dataset
+export const getAnnotationProgress = async (datasetId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/datasets/get_annotation_progress/${datasetId}`);
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error fetching annotation progress:", error);
+    throw error;
+  }
+};
+
+// Get sample images for a dataset (first few images)
+export const getSampleImages = async (datasetId, limit = 4) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/images/list_images/${datasetId}`);
+    const data = await handleApiError(response);
+    
+    if (data.success && data.images && data.images.length > 0) {
+      // Get the first few images as samples
+      const sampleImages = data.images.slice(0, limit);
+      
+      // Fetch the actual image data for each sample
+      const imagePromises = sampleImages.map(async (image) => {
+        try {
+          const imageData = await getImageById(image.id);
+          return {
+            id: image.id,
+            base64: imageData[image.id],
+            filename: image.filename
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch sample image ${image.id}:`, error);
+          return null;
+        }
+      });
+      
+      const resolvedImages = await Promise.all(imagePromises);
+      return resolvedImages.filter(img => img !== null);
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Error fetching sample images:", error);
+    return [];
+  }
+};
+
 const API = {
   fetchImages,
   uploadImage,
@@ -1101,6 +1221,12 @@ const API = {
   getContoursForMask,
   getMask,
   deleteContour,
+  fetchDatasets,
+  createDataset,
+  deleteDataset,
+  getDataset,
+  getAnnotationProgress,
+  getSampleImages,
 };
 
 export default API;

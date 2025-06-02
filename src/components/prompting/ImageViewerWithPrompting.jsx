@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Typography } from "@mui/material";
+import { useDataset } from "../../contexts/DatasetContext";
 import * as api from "../../api";
 
 // Custom Hooks
@@ -24,6 +25,8 @@ import { exportQuantificationsAsCsv } from "../../utils/exportUtils";
 import "./ImageViewerWithPrompting.css";
 
 const ImageViewerWithPrompting = () => {
+  const { currentDataset } = useDataset();
+
   // UI State
   const [promptType, setPromptType] = useState("point");
   const [currentLabel, setCurrentLabel] = useState(1);
@@ -154,8 +157,10 @@ const ImageViewerWithPrompting = () => {
 
   // Initialize component
   useEffect(() => {
-    fetchImagesFromAPI();
-    fetchLabels();
+    if (currentDataset) {
+      fetchImagesFromAPI();
+      fetchLabels();
+    }
 
     // Add CSS animations
     const styleEl = document.createElement("style");
@@ -177,12 +182,20 @@ const ImageViewerWithPrompting = () => {
       resetContourState();
       resetCanvasState();
     };
-  }, []);
+  }, [currentDataset]);
 
   // Fetch labels from backend
   const fetchLabels = useCallback(async () => {
+    if (!currentDataset) {
+      setLabelOptions([
+        { id: 1, name: "coral" },
+        { id: 2, name: "petri dish" },
+      ]);
+      return;
+    }
+
     try {
-      const labels = await api.fetchLabels();
+      const labels = await api.fetchLabels(currentDataset.id);
       if (labels && labels.length > 0) {
         const formattedLabels = labels.map((label) => ({
           id: label.id,
@@ -192,11 +205,22 @@ const ImageViewerWithPrompting = () => {
         if (formattedLabels.length > 0) {
           setCurrentLabel(formattedLabels[0].id);
         }
+      } else {
+        // Set default labels if none exist
+        setLabelOptions([
+          { id: 1, name: "coral" },
+          { id: 2, name: "petri dish" },
+        ]);
       }
     } catch (error) {
       console.error("Failed to fetch labels:", error);
+      // Set default labels on error
+      setLabelOptions([
+        { id: 1, name: "coral" },
+        { id: 2, name: "petri dish" },
+      ]);
     }
-  }, []);
+  }, [currentDataset]);
 
   // Enhanced prompting complete handler
   const handlePromptingComplete = useCallback(async (prompts, promptType) => {
@@ -575,6 +599,22 @@ const ImageViewerWithPrompting = () => {
     link.click();
     document.body.removeChild(link);
   }, []);
+
+  // Show dataset selection message if no dataset is selected
+  if (!currentDataset) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center p-8 bg-white rounded-lg border">
+          <Typography variant="h6" className="text-gray-600 mb-2">
+            No Dataset Selected
+          </Typography>
+          <Typography variant="body2" className="text-gray-500">
+            Please select a dataset from the dropdown above to start working with images and labels.
+          </Typography>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
