@@ -74,7 +74,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-teal-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-[98%] mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold">AquaMorph</h1>
@@ -94,7 +94,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-[98%] mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-3xl font-bold text-gray-900">Datasets</h2>

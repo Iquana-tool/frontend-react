@@ -1439,9 +1439,6 @@ const PromptingCanvas = forwardRef(({
             <div className="flex flex-col gap-2">
               <div className="text-sm font-medium text-blue-800 mb-1">
                 Segmentation Results
-                <span className="block text-xs font-normal text-gray-600 mt-0.5">
-                  {selectedMask.contours.length} contour{selectedMask.contours.length !== 1 ? 's' : ''} available
-                </span>
               </div>
               
               {selectedContours && selectedContours.length > 0 ? (

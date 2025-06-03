@@ -659,7 +659,7 @@ const ImageViewerWithPrompting = () => {
         <div
           className={`${
             isSidebarCollapsed ? "md:col-span-5" : "md:col-span-2"
-          } bg-white p-4 rounded-lg shadow-sm border border-gray-100`}
+          } bg-white p-4 rounded-lg shadow-sm border border-gray-200`}
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
@@ -667,7 +667,7 @@ const ImageViewerWithPrompting = () => {
                 <>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2 text-blue-600"
+                    className="h-5 w-5 mr-2 text-teal-600"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -741,7 +741,7 @@ const ImageViewerWithPrompting = () => {
             ) : (
               <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
                 <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
+                  <div className="w-8 h-8 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner mb-2"></div>
                   <p>Loading image...</p>
                 </div>
               </div>
@@ -754,7 +754,7 @@ const ImageViewerWithPrompting = () => {
 
           {/* Help text */}
           {!selectedImage && !loading && (
-            <div className="mt-4 p-4 bg-blue-50 text-blue-700 rounded-md">
+            <div className="mt-4 p-4 bg-teal-50 text-teal-700 rounded-md">
               <h3 className="font-medium mb-2">How to use:</h3>
               <ol className="list-decimal list-inside text-sm">
                 <li className="mb-1">Select or upload an image from the left panel</li>
@@ -772,10 +772,10 @@ const ImageViewerWithPrompting = () => {
             <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center max-w-md w-full transform transition-all">
                 <div className="relative w-20 h-20 mb-4">
-                  <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+                  <div className="absolute inset-0 border-4 border-teal-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-teal-600 rounded-full animate-pulse"></div>
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-1">Processing</h3>
@@ -785,7 +785,7 @@ const ImageViewerWithPrompting = () => {
                     : "Loading..."}
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1 overflow-hidden">
-                  <div className="bg-blue-500 h-1.5 rounded-full loading-progress"></div>
+                  <div className="bg-teal-600 h-1.5 rounded-full loading-progress"></div>
                 </div>
                 <p className="text-xs text-gray-500">This may take a few moments...</p>
               </div>
@@ -859,7 +859,7 @@ const ImageViewerWithPrompting = () => {
                 </div>
               </div>
 
-              <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded">
+              <div className="mt-2 p-2 bg-teal-50 text-teal-700 rounded">
                 Saving mask as:{" "}
                 <strong>{customSaveMaskLabel.trim() || saveMaskLabel}</strong>
               </div>
@@ -877,7 +877,7 @@ const ImageViewerWithPrompting = () => {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

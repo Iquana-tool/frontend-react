@@ -91,7 +91,7 @@ const ToolsPanel = ({
               key={tool.id}
               className={`p-2 rounded flex flex-col items-center justify-center text-xs transition-colors duration-200 ${
                 selectedTool === tool.id
-                  ? "bg-blue-100 text-blue-700"
+                  ? "bg-teal-100 text-teal-700"
                   : "text-gray-700 hover:bg-gray-100"
               } ${
                 disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
