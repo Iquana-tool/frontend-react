@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import { uploadImages } from '../../api';
 
 const AddDatasetModal = ({ isOpen, onClose }) => {
-  const { createDataset } = useDataset();
+  const { createDataset, fetchDatasets } = useDataset();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -70,36 +70,118 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
             const uploadResponse = await uploadImages(files, datasetId);
             
             if (uploadResponse.success) {
-              console.log(`Successfully uploaded ${files.length} files:`, uploadResponse.image_ids);
-              setUploadProgress({ current: files.length, total: files.length });
+              console.log(`Upload response:`, uploadResponse);
               
-              // Close modal immediately after successful upload
-              setFormData({ title: '', description: '', datasetType: 'images' });
-              setFiles([]);
-              setUploadProgress({ current: 0, total: 0 });
-              setUploadErrors([]);
-              onClose();
+              // Handle different upload scenarios
+              if (uploadResponse.failed_count > 0) {
+                // Some files failed to upload
+                setUploadErrors([
+                  `Successfully processed ${uploadResponse.uploaded_count} out of ${files.length} files.`,
+                  `${uploadResponse.failed_count} files could not be uploaded.`,
+                  'This may be because some images already exist in the system.',
+                  'The dataset has been created successfully.'
+                ]);
+                
+                // Show partial success message
+                setUploadProgress({ current: uploadResponse.uploaded_count, total: files.length });
+                
+                // Refresh datasets and close modal after showing message
+                try {
+                  await fetchDatasets();
+                  console.log('Dataset list refreshed after partial upload success');
+                } catch (refreshError) {
+                  console.error('Failed to refresh datasets:', refreshError);
+                }
+                
+                setTimeout(() => {
+                  setFormData({ title: '', description: '', datasetType: 'images' });
+                  setFiles([]);
+                  setUploadProgress({ current: 0, total: 0 });
+                  setUploadErrors([]);
+                  onClose();
+                }, 3000);
+                
+              } else {
+                // All files uploaded successfully
+                setUploadProgress({ current: files.length, total: files.length });
+                
+                // Wait for the dataset context to refresh and fetch the new dataset data
+                await fetchDatasets();
+                
+                // Add a small delay to ensure UI updates
+                setTimeout(() => {
+                  setFormData({ title: '', description: '', datasetType: 'images' });
+                  setFiles([]);
+                  setUploadProgress({ current: 0, total: 0 });
+                  setUploadErrors([]);
+                  onClose();
+                }, 300); // Small delay to ensure refresh completes
+              }
               return;
             } else {
               throw new Error(uploadResponse.message || 'Upload failed');
             }
           } catch (error) {
             console.error('Failed to upload files:', error);
-            setUploadErrors([`Upload failed: ${error.message}`]);
-            // Don't close the modal if there were errors, let user see them
+            
+            // Check if it's a duplicate image error or similar issue
+            const isDuplicateError = error.message.includes('already exist in the system') || 
+                                   error.message.includes('Invalid file or upload failed') ||
+                                   error.message.includes('UNIQUE constraint failed');
+            
+            if (isDuplicateError) {
+              setUploadErrors([
+                'Some images could not be uploaded because they already exist in the system.',
+                'Each image can only be uploaded once across all datasets.',
+                'The dataset has been created successfully. You can add different images later.'
+              ]);
+              
+              // Ensure dataset refresh happens and wait for it to complete
+              try {
+                await fetchDatasets();
+                console.log('Dataset list refreshed after duplicate image handling');
+              } catch (refreshError) {
+                console.error('Failed to refresh datasets:', refreshError);
+              }
+              
+              // Close modal after showing the message briefly
+              setTimeout(() => {
+                setFormData({ title: '', description: '', datasetType: 'images' });
+                setFiles([]);
+                setUploadProgress({ current: 0, total: 0 });
+                setUploadErrors([]);
+                onClose();
+              }, 3000); // Show message for 3 seconds then close
+              
+            } else {
+              // For other errors, keep the modal open so user can retry
+              setUploadErrors([`Upload failed: ${error.message}`]);
+            }
             return;
           }
         } else {
-          // No files to upload, close modal immediately after dataset creation
-          setFormData({ title: '', description: '', datasetType: 'images' });
-          setFiles([]);
-          setUploadProgress({ current: 0, total: 0 });
-          setUploadErrors([]);
-          onClose();
+          // No files to upload, dataset has been created successfully
+          // Ensure dataset refresh happens
+          try {
+            await fetchDatasets();
+            console.log('Dataset list refreshed after creating dataset without files');
+          } catch (refreshError) {
+            console.error('Failed to refresh datasets:', refreshError);
+          }
+          
+          // Add a small delay to ensure UI updates
+          setTimeout(() => {
+            setFormData({ title: '', description: '', datasetType: 'images' });
+            setFiles([]);
+            setUploadProgress({ current: 0, total: 0 });
+            setUploadErrors([]);
+            onClose();
+          }, 500);
         }
       }
     } catch (err) {
       console.error('Failed to create dataset:', err);
+      setUploadErrors([`Failed to create dataset: ${err.message}`]);
     } finally {
       setIsCreating(false);
     }
@@ -300,20 +382,53 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
 
               {/* Upload Errors */}
               {uploadErrors.length > 0 && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <h4 className="text-sm font-semibold text-red-800 mb-2">Upload Errors:</h4>
-                  <ul className="text-sm text-red-700 space-y-1">
+                <div className={`mt-4 p-4 border rounded-lg ${
+                  uploadErrors.some(error => 
+                    error.includes('already exist in the system') || 
+                    error.includes('dataset has been created successfully')
+                  ) ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'
+                }`}>
+                  <h4 className={`text-sm font-semibold mb-2 ${
+                    uploadErrors.some(error => 
+                      error.includes('already exist in the system') || 
+                      error.includes('dataset has been created successfully')
+                    ) ? 'text-yellow-800' : 'text-red-800'
+                  }`}>
+                    {uploadErrors.some(error => 
+                      error.includes('already exist in the system') || 
+                      error.includes('dataset has been created successfully')
+                    ) ? 'Upload Notice:' : 'Upload Errors:'}
+                  </h4>
+                  <ul className={`text-sm space-y-1 ${
+                    uploadErrors.some(error => 
+                      error.includes('already exist in the system') || 
+                      error.includes('dataset has been created successfully')
+                    ) ? 'text-yellow-700' : 'text-red-700'
+                  }`}>
                     {uploadErrors.map((error, index) => (
                       <li key={index} className="break-words">{error}</li>
                     ))}
                   </ul>
-                  <button
-                    type="button"
-                    onClick={() => setUploadErrors([])}
-                    className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-                  >
-                    Dismiss errors
-                  </button>
+                  {uploadErrors.some(error => 
+                    error.includes('already exist in the system') || 
+                    error.includes('dataset has been created successfully')
+                  ) && (
+                    <p className="text-xs text-yellow-600 mt-2 italic">
+                      This modal will close automatically in a few seconds...
+                    </p>
+                  )}
+                  {!uploadErrors.some(error => 
+                    error.includes('already exist in the system') || 
+                    error.includes('dataset has been created successfully')
+                  ) && (
+                    <button
+                      type="button"
+                      onClick={() => setUploadErrors([])}
+                      className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
+                    >
+                      Dismiss errors
+                    </button>
+                  )}
                 </div>
               )}
             </form>

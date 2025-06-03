@@ -29,10 +29,13 @@ export const DatasetProvider = ({ children }) => {
         if (!currentDataset && response.datasets.length > 0) {
           setCurrentDataset(response.datasets[0]);
         }
+        return response.datasets;
       }
+      return [];
     } catch (err) {
       setError('Failed to fetch datasets');
       console.error('Error fetching datasets:', err);
+      return [];
     } finally {
       setLoading(false);
     }
@@ -74,7 +77,8 @@ export const DatasetProvider = ({ children }) => {
     try {
       const response = await api.createDataset(name, description);
       if (response.success) {
-        await fetchDatasets(); // Refresh the list
+        // Refresh the list and wait for it to complete
+        await fetchDatasets();
         return response;
       }
       throw new Error(response.message || 'Failed to create dataset');
