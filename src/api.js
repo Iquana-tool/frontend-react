@@ -52,6 +52,131 @@ export const fetchImages = async (datasetId) => {
   }
 };
 
+// Upload multiple images at once
+export const uploadImages = async (files, datasetId) => {
+  const maxRetries = 2;
+  let retryCount = 0;
+  let lastError = null;
+
+  if (!datasetId) {
+    throw new Error("Dataset ID is required");
+  }
+
+  if (!files || files.length === 0) {
+    throw new Error("No files provided");
+  }
+
+  while (retryCount <= maxRetries) {
+    try {
+      console.log(`Uploading ${files.length} files to: ${API_BASE_URL}/images/upload_images (attempt ${retryCount + 1}/${maxRetries + 1})`);
+      
+      // Create a new FormData for each attempt
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+
+      // Use a timeout to abort the request if it takes too long
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for multiple files
+      
+      try {
+        const url = new URL(`${API_BASE_URL}/images/upload_images`);
+        url.searchParams.append('dataset_id', datasetId);
+        
+        const response = await fetch(url, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal
+        });
+        
+        // Clear the timeout since the request completed
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          console.error("Upload failed with status:", response.status);
+          const responseText = await response.text();
+          console.error("Response:", responseText);
+          
+          // Specific handling for different error codes
+          if (response.status === 413) {
+            throw new Error("Files are too large. Maximum total size exceeded.");
+          } else if (response.status === 415) {
+            throw new Error("Unsupported file type. Please upload valid image files.");
+          } else if (response.status === 401 || response.status === 403) {
+            throw new Error("Unauthorized. Please try again or refresh the page.");
+          } else if (response.status === 500) {
+            // Check if it's a duplicate image error
+            if (responseText.includes("UNIQUE constraint failed") || 
+                responseText.includes("Invalid file or upload failed")) {
+              throw new Error("Some images already exist in the system. Each image can only be uploaded once across all datasets. Please select different images or remove duplicates.");
+            }
+            // Server errors are worth retrying for other cases
+            throw new Error(`Server error (${response.status}). Retrying...`);
+          } else if (response.status === 400) {
+            // Handle duplicate image errors specifically
+            if (responseText.includes("Invalid file or upload failed")) {
+              throw new Error("Some images already exist in the system. Each image can only be uploaded once across all datasets. Please select different images or remove duplicates.");
+            }
+            throw new Error("Bad request. Please check your files and try again.");
+          }
+          
+          throw new Error(`Upload failed with status ${response.status}`);
+        }
+        
+        // Parse the response
+        const data = await response.json();
+        return data;
+      } catch (fetchError) {
+        // Clear the timeout if we got an error
+        clearTimeout(timeoutId);
+        
+        // Handle abort errors specially
+        if (fetchError.name === 'AbortError') {
+          console.warn("Upload request timed out");
+          throw new Error("Upload timed out. Please try again with smaller files or check your connection.");
+        }
+        
+        throw fetchError;
+      }
+    } catch (error) {
+      console.error(`Upload attempt ${retryCount + 1} failed:`, error);
+      lastError = error;
+      
+      // Don't retry duplicate image errors or client errors
+      const isDuplicateError = error.message.includes("already exist in the system") ||
+                              error.message.includes("Invalid file or upload failed");
+      const isClientError = error.message.includes("Files are too large") ||
+                           error.message.includes("Unsupported file type") ||
+                           error.message.includes("Unauthorized") ||
+                           error.message.includes("Bad request");
+      
+      if (isDuplicateError || isClientError || retryCount >= maxRetries) {
+        break; // Don't retry these types of errors
+      }
+      
+      // Only retry on network errors and server errors (5xx) that aren't duplicate errors
+      const isRetryableError = error.message.includes("Server error") || 
+                               error.message.includes("network") ||
+                               error.message.includes("failed to fetch");
+      
+      if (!isRetryableError) {
+        break;
+      }
+      
+      // Wait before retrying
+      const delay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      retryCount++;
+    }
+  }
+  
+  // If we got here, all retries failed
+  throw lastError || new Error("Failed to upload images after multiple attempts");
+};
+
 // Upload an image
 export const uploadImage = async (file, datasetId) => {
   const maxRetries = 2;
@@ -99,9 +224,20 @@ export const uploadImage = async (file, datasetId) => {
             throw new Error("Unsupported file type. Please upload a valid image file.");
           } else if (response.status === 401 || response.status === 403) {
             throw new Error("Unauthorized. Please try again or refresh the page.");
-          } else if (response.status >= 500) {
-            // Server errors are worth retrying
+          } else if (response.status === 500) {
+            // Check if it's a duplicate image error
+            if (responseText.includes("UNIQUE constraint failed") || 
+                responseText.includes("Invalid file or upload failed")) {
+              throw new Error("This image already exists in the system. Each image can only be uploaded once across all datasets.");
+            }
+            // Server errors are worth retrying for other cases
             throw new Error(`Server error (${response.status}). Retrying...`);
+          } else if (response.status === 400) {
+            // Handle duplicate image errors specifically
+            if (responseText.includes("Invalid file or upload failed")) {
+              throw new Error("This image already exists in the system. Each image can only be uploaded once across all datasets.");
+            }
+            throw new Error("Bad request. Please check your file and try again.");
           }
           
           throw new Error(`Upload failed with status ${response.status}`);
@@ -126,13 +262,25 @@ export const uploadImage = async (file, datasetId) => {
       console.error(`Upload attempt ${retryCount + 1} failed:`, error);
       lastError = error;
       
-      // Only retry on network errors and server errors (5xx)
-      const isServerError = error.message.includes("Server error") || 
-                           error.message.includes("network") ||
-                           error.message.includes("failed to fetch");
+      // Don't retry duplicate image errors or client errors
+      const isDuplicateError = error.message.includes("already exists in the system") ||
+                              error.message.includes("Invalid file or upload failed");
+      const isClientError = error.message.includes("File is too large") ||
+                           error.message.includes("Unsupported file type") ||
+                           error.message.includes("Unauthorized") ||
+                           error.message.includes("Bad request");
       
-      if (!isServerError || retryCount >= maxRetries) {
-        break; // Don't retry client errors or if we've hit the retry limit
+      if (isDuplicateError || isClientError || retryCount >= maxRetries) {
+        break; // Don't retry these types of errors
+      }
+      
+      // Only retry on network errors and server errors (5xx) that aren't duplicate errors
+      const isRetryableError = error.message.includes("Server error") || 
+                               error.message.includes("network") ||
+                               error.message.includes("failed to fetch");
+      
+      if (!isRetryableError) {
+        break;
       }
       
       // Wait before retrying
@@ -1204,6 +1352,7 @@ export const getSampleImages = async (datasetId, limit = 4) => {
 const API = {
   fetchImages,
   uploadImage,
+  uploadImages,
   getImageById,
   deleteImage,
   segmentImage,
