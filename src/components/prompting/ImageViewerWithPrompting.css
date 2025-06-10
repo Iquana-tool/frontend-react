@@ -109,6 +109,12 @@
   gap: 1rem;
 }
 
+.col-span-2 {
+  grid-column: span 2;
+}
+
+
+
 .slider-label   { width: 100px; min-width: 100px; }
 .loading-progress { animation: loading-progress 5s linear; width: 0; }
 

@@ -27,6 +27,8 @@ const PromptingCanvas = forwardRef(({
   selectedContour,
   onContourSelect,
   onAddToFinalMask,
+  selectedFinalMaskContour,
+  finalMasks,
 }, ref) => {
   // Canvas and drawing state
   const canvasRef = useRef(null);
@@ -64,6 +66,26 @@ const PromptingCanvas = forwardRef(({
       setSelectedMask(selectedMaskProp);
     }
   }, [selectedMaskProp]);
+
+  // Redraw when selectedFinalMaskContour changes
+  useEffect(() => {
+    if (image) {
+      redrawCanvas();
+    }
+  }, [selectedFinalMaskContour]);
+
+  // Update zoom level and center when external props change
+  useEffect(() => {
+    if (externalZoomLevel !== undefined && externalZoomLevel !== zoomLevel) {
+      setZoomLevel(externalZoomLevel);
+    }
+  }, [externalZoomLevel, zoomLevel]);
+
+  useEffect(() => {
+    if (externalZoomCenter !== undefined) {
+      setZoomCenter(externalZoomCenter);
+    }
+  }, [externalZoomCenter]);
 
   // Drawing utility functions
   const drawPoint = (ctx, x, y, label) => {
@@ -402,6 +424,61 @@ const PromptingCanvas = forwardRef(({
         // Restore the context state
       ctx.restore();
       }
+    }
+
+    // Draw selected final mask contour if available
+    if (finalMasks && finalMasks.length > 0 && finalMasks[0].contours && selectedFinalMaskContour) {
+      ctx.save();
+      
+      const selectedIndex = selectedFinalMaskContour.contourIndex;
+      const contour = finalMasks[0].contours[selectedIndex];
+      
+      if (contour && contour.x && contour.y && contour.x.length >= 3) {
+        ctx.beginPath();
+        
+        // Convert normalized coordinates to actual pixel positions
+        const startX = contour.x[0] * image.width;
+        const startY = contour.y[0] * image.height;
+        
+        ctx.moveTo(startX, startY);
+        
+        // Draw each point of the contour
+        for (let i = 1; i < contour.x.length; i++) {
+          const x = contour.x[i] * image.width;
+          const y = contour.y[i] * image.height;
+          ctx.lineTo(x, y);
+        }
+        
+        ctx.closePath();
+        
+        // Selected final mask contour - highlight with red
+        ctx.strokeStyle = '#FF0066';  // Pink/red color
+        ctx.lineWidth = 4 / (scale * zoomLevel);
+        ctx.fillStyle = 'rgba(255, 0, 102, 0.3)';
+        ctx.fill();
+        
+        // Add glow effect
+        ctx.shadowColor = '#FF0066';
+        ctx.shadowBlur = 10 / (scale * zoomLevel);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        
+        // Draw a center indicator for selected contour
+        const centerX = contour.x.reduce((sum, x) => sum + x, 0) / contour.x.length * image.width;
+        const centerY = contour.y.reduce((sum, y) => sum + y, 0) / contour.y.length * image.height;
+        
+        ctx.fillStyle = '#FF0066';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 8 / (scale * zoomLevel), 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Add white border to center indicator
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2 / (scale * zoomLevel);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
     }
 
     // Draw all prompts on top
@@ -1459,6 +1536,10 @@ const PromptingCanvas = forwardRef(({
                     if (selectedContours && selectedContours.length > 0) {
                       if (onAddToFinalMask) {
                         onAddToFinalMask(selectedContours);
+                        // Clear the selected mask to close the popup
+                        setSelectedMask(null);
+                        setSelectedContours([]);
+                        redrawCanvas();
                       }
                     } else {
                       console.log("No contours selected - please select a contour first");

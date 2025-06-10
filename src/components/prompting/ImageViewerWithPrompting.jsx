@@ -790,6 +790,50 @@ const ImageViewerWithPrompting = () => {
               </div>
             </div>
           )}
+
+          {/* Quantification Table */}
+          <div style={{ marginTop: 24 }}>
+            {finalMasks.length > 0 ? (
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable 
+                  masks={finalMasks} 
+                  onContourSelect={(row) => {
+                    // Find the corresponding contour and trigger zoom
+                    if (finalMasks.length > 0 && finalMasks[0].contours) {
+                      const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
+                      if (contourIndex !== -1) {
+                        const finalMask = finalMasks[0];
+                        const selectedContour = finalMask.contours[contourIndex];
+                        
+                        // Create the updated final mask contour object
+                        const updatedFinalMaskContour = {
+                          mask: finalMask,
+                          contour: selectedContour,
+                          contourIndex: contourIndex
+                        };
+                        
+                        // Call the main function to update zoom and final mask viewer
+                        handleFinalMaskContourSelect(finalMask, contourIndex);
+                        
+                        // Force a redraw of the annotation canvas with the updated contour
+                        setTimeout(() => {
+                          if (bestMask && canvasImage) {
+                            drawAnnotationCanvas(bestMask, canvasImage, selectedContours, updatedFinalMaskContour);
+                          }
+                        }, 150);
+                      }
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable masks={[]} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -891,19 +935,6 @@ const ImageViewerWithPrompting = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Quantification Table */}
-      {segmentationMasks.length > 0 ? (
-        <div style={{ marginTop: 24 }}>
-          <Typography variant="h6">Quantification</Typography>
-          <QuantificationTable masks={segmentationMasks} />
-        </div>
-      ) : (
-        <div style={{ marginTop: 24 }}>
-          <Typography variant="h6">Quantification</Typography>
-          <QuantificationTable masks={[]} />
         </div>
       )}
     </div>

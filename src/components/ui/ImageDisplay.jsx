@@ -193,6 +193,8 @@ const ImageDisplay = ({
               }}
               zoomLevel={zoomLevel}
               zoomCenter={zoomCenter}
+              selectedFinalMaskContour={selectedFinalMaskContour}
+              finalMasks={finalMasks}
             />
 
             {/* Segmentation complete floating action button */}
