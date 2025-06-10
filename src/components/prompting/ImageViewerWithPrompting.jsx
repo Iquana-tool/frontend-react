@@ -123,6 +123,7 @@ const ImageViewerWithPrompting = () => {
     handleDeleteSelectedContours: contourDeleteSelected,
     fetchFinalMask,
     handleDeleteFinalMaskContour,
+    handleDeleteContourFromTable,
     clearAllFinalMaskContours,
     findMatchingContour,
     isPointInContour,
@@ -440,7 +441,7 @@ const ImageViewerWithPrompting = () => {
 
   // Draw final mask canvas when final mask data changes
   useEffect(() => {
-    if (finalMasks.length > 0 && canvasImage) {
+    if (canvasImage) {
       setTimeout(() => {
         drawFinalMaskCanvasWrapper();
       }, 100);
@@ -824,6 +825,9 @@ const ImageViewerWithPrompting = () => {
                         }, 150);
                       }
                     }
+                  }}
+                  onContourDelete={(contourId) => {
+                    return handleDeleteContourFromTable(contourId);
                   }}
                 />
               </div>

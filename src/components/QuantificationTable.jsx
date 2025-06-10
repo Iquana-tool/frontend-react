@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress } from '@mui/material';
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton } from '@mui/material';
+import DeleteIcon from '@mui/icons-material/Delete';
 import * as api from '../api';
 
-const QuantificationTable = ({ masks, onContourSelect }) => {
+const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
   const [quantRows, setQuantRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deletingContours, setDeletingContours] = useState(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -95,6 +97,88 @@ const QuantificationTable = ({ masks, onContourSelect }) => {
     fetchQuantifications();
     return () => { isMounted = false; };
   }, [masks]);
+
+  // Handle delete contour
+  const handleDeleteContour = async (contourId, event) => {
+    // Stop event propagation to prevent row click
+    event.stopPropagation();
+    
+    if (!contourId) {
+      console.error("No contour ID provided for deletion");
+      alert('Error: No contour ID provided');
+      return;
+    }
+    
+    if (!window.confirm('Are you sure you want to delete this contour? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingContours(prev => new Set([...prev, contourId]));
+    
+    try {
+      const response = await api.deleteContour(contourId);
+      
+      // Check if the response indicates success
+      const isSuccess = response && (response.success === true);
+      
+      if (isSuccess) {
+        // Remove the contour from local state immediately for UI responsiveness
+        setQuantRows(prevRows => prevRows.filter(row => row.contour_id !== contourId));
+        
+        // Call parent callback if provided to handle final mask updates
+        if (onContourDelete) {
+          try {
+            await onContourDelete(contourId);
+          } catch (callbackError) {
+            console.warn("Parent callback failed:", callbackError);
+            // Don't throw here since the deletion was successful
+          }
+        }
+        
+      } else {
+        // Handle error response
+        const errorMessage = response.message || 'Unexpected response format';
+        throw new Error(errorMessage);
+      }
+      
+    } catch (error) {
+      console.error('Error deleting contour:', {
+        contourId,
+        error: error.message
+      });
+      
+      // Check if it's a "contour not found" error and handle gracefully
+      if (error.message && (error.message.includes('Error deleting contour') || error.message.includes('not found'))) {
+        // The contour might have been already deleted
+        console.log("Contour was already deleted, removing from table");
+        
+        // Remove from local state anyway
+        setQuantRows(prevRows => prevRows.filter(row => row.contour_id !== contourId));
+        
+        // Still call parent callback to update final mask viewer
+        if (onContourDelete) {
+          try {
+            await onContourDelete(contourId);
+          } catch (callbackError) {
+            console.warn("Parent callback failed:", callbackError);
+          }
+        }
+        
+        alert('This contour was already deleted. The table has been updated.');
+      } else {
+        // Provide more specific error message
+        const errorMessage = error.message || 'Unknown error occurred';
+        alert(`Failed to delete contour: ${errorMessage}`);
+      }
+      
+    } finally {
+      setDeletingContours(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(contourId);
+        return newSet;
+      });
+    }
+  };
 
   // Format numeric values for display
   const formatValue = (value) => {
@@ -227,31 +311,35 @@ const QuantificationTable = ({ masks, onContourSelect }) => {
               {displayColumns.map((column) => (
                 <TableCell key={column.id}>{column.label}</TableCell>
               ))}
+              <TableCell align="center">Actions</TableCell>
             </TableRow>
           </TableHead>
         <TableBody>
           {quantRows.map((row, idx) => {
             const labelColors = getLabelColor(row.label_name);
+            const isDeleting = deletingContours.has(row.contour_id);
+            
             return (
               <TableRow 
                 key={idx}
                 onClick={() => {
                   // Handle row click for zoom functionality
-                  if (onContourSelect && row.contour_id) {
+                  if (onContourSelect && row.contour_id && !isDeleting) {
                     onContourSelect(row);
                   }
                 }}
                 sx={{ 
                   backgroundColor: labelColors.backgroundColor,
-                  cursor: onContourSelect ? 'pointer' : 'default',
+                  cursor: onContourSelect && !isDeleting ? 'pointer' : 'default',
+                  opacity: isDeleting ? 0.6 : 1,
                   '&:hover': { 
                     backgroundColor: labelColors.backgroundColor, 
-                    opacity: 0.8,
-                    transform: onContourSelect ? 'scale(1.02)' : 'none'
+                    opacity: isDeleting ? 0.6 : 0.8,
+                    transform: onContourSelect && !isDeleting ? 'scale(1.02)' : 'none'
                   },
                   transition: 'all 0.2s ease-in-out'
                 }}
-                title={onContourSelect ? "Click to zoom to this contour" : ""}
+                title={onContourSelect && !isDeleting ? "Click to zoom to this contour" : ""}
               >
                 {displayColumns.map((column) => (
                   <TableCell 
@@ -264,6 +352,26 @@ const QuantificationTable = ({ masks, onContourSelect }) => {
                     {column.format(row[column.id])}
                   </TableCell>
                 ))}
+                <TableCell align="center">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={(event) => handleDeleteContour(row.contour_id, event)}
+                    disabled={isDeleting}
+                    title="Delete contour"
+                    sx={{ 
+                      color: '#dc2626',
+                      '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
+                      '&:disabled': { color: '#9ca3af' }
+                    }}
+                  >
+                    {isDeleting ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <DeleteIcon fontSize="small" />
+                    )}
+                  </IconButton>
+                </TableCell>
               </TableRow>
             );
           })}
