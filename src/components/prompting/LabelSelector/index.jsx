@@ -1,28 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../../api';
+import * as api from '../../../api';
+import { useDataset } from '../../../contexts/DatasetContext';
 
 const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
-  // Initial state with hierarchical structure
-  const [classStructure, setClassStructure] = useState([
-    {
-      id: 1,
-      name: 'Coral',
-      subclasses: [
-        { id: 11, name: 'Polyp' },
-        { id: 12, name: 'Skeleton' }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Ruler',
-      subclasses: []
-    },
-    {
-      id: 3,
-      name: 'Petri dish',
-      subclasses: []
-    }
-  ]);
+  // Get current dataset context
+  const { currentDataset } = useDataset();
+  
+  // Dynamic state from backend API
+  const [classStructure, setClassStructure] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // State to track if a contour is selected (for demonstration purposes)
   const [contourSelected, setContourSelected] = useState(false);
@@ -38,6 +25,104 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   
   // Click outside handler
   const dropdownRef = useRef(null);
+
+  // Fetch labels from backend when dataset changes
+  useEffect(() => {
+    const fetchLabelsFromBackend = async () => {
+      if (!currentDataset) {
+        // Set default labels when no dataset is selected
+        setClassStructure([
+          {
+            id: 1,
+            name: 'Coral',
+            subclasses: [
+              { id: 11, name: 'Polyp' },
+              { id: 12, name: 'Skeleton' }
+            ]
+          },
+          {
+            id: 2,
+            name: 'Ruler',
+            subclasses: []
+          },
+          {
+            id: 3,
+            name: 'Petri dish',
+            subclasses: []
+          }
+        ]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const labels = await api.fetchLabels(currentDataset.id);
+        
+        if (labels && labels.length > 0) {
+          // Transform backend labels into hierarchical structure
+          const transformedLabels = transformLabelsToHierarchy(labels);
+          setClassStructure(transformedLabels);
+          
+          // Auto-select first label if none is selected
+          if (!currentLabel && transformedLabels.length > 0) {
+            setCurrentLabel(transformedLabels[0].id);
+          }
+        } else {
+          // No labels found, use defaults
+          setClassStructure([
+            {
+              id: 1,
+              name: 'Coral',
+              subclasses: []
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching labels:', err);
+        setError(err.message);
+        // Fall back to default labels
+        setClassStructure([
+          {
+            id: 1,
+            name: 'Coral',
+            subclasses: []
+          },
+          {
+            id: 2,
+            name: 'Ruler',
+            subclasses: []
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLabelsFromBackend();
+  }, [currentDataset, currentLabel]);
+
+  // Transform flat backend labels into hierarchical structure
+  const transformLabelsToHierarchy = (labels) => {
+    // Root labels have parent_id = null or undefined
+    const rootLabels = labels.filter(label => !label.parent_id || label.parent_id === null);
+    // Child labels have a valid parent_id
+    const childLabels = labels.filter(label => label.parent_id && label.parent_id > 0);
+    
+    return rootLabels.map(rootLabel => ({
+      id: rootLabel.id,
+      name: rootLabel.name,
+      value: rootLabel.value,
+      subclasses: childLabels
+        .filter(child => child.parent_id === rootLabel.id)
+        .map(child => ({
+          id: child.id,
+          name: child.name,
+          value: child.value
+        }))
+    }));
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -82,48 +167,63 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   };
 
   // Handle adding a new class
-  const handleAddNewClass = () => {
-    if (!newItemName || newItemName.trim() === '') return;
+  const handleAddNewClass = async () => {
+    if (!newItemName || newItemName.trim() === '' || !currentDataset) return;
     
-    const newClassId = Math.max(...classStructure.map(c => c.id)) + 1;
-    const newClass = {
-      id: newClassId,
-      name: newItemName.trim(),
-      subclasses: []
-    };
-    
-    setClassStructure(prev => [...prev, newClass]);
-    setCurrentLabel(newClassId);
-    setSelectedParentClass(newClass);
-    setShowAddModal(false);
+    setLoading(true);
+    try {
+      const result = await api.createLabel(
+        { name: newItemName.trim(), parent_id: 0 }, // 0 for top-level class
+        currentDataset.id
+      );
+      
+      if (result.success) {
+        // Refresh the labels from backend
+        const labels = await api.fetchLabels(currentDataset.id);
+        const transformedLabels = transformLabelsToHierarchy(labels);
+        setClassStructure(transformedLabels);
+        
+        // Select the new class
+        setCurrentLabel(result.class_id);
+        setShowAddModal(false);
+        setNewItemName('');
+      }
+    } catch (err) {
+      console.error('Error creating new class:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle adding a new subclass
-  const handleAddNewSubclass = () => {
-    if (!newItemName || newItemName.trim() === '' || !targetParentClass) return;
+  const handleAddNewSubclass = async () => {
+    if (!newItemName || newItemName.trim() === '' || !targetParentClass || !currentDataset) return;
     
-    // Generate a new ID for the subclass, using the parent class ID as prefix
-    const subclassBaseId = targetParentClass.id * 10;
-    const existingSubclassIds = targetParentClass.subclasses.map(sub => sub.id);
-    const newSubclassId = existingSubclassIds.length > 0 
-      ? Math.max(...existingSubclassIds) + 1 
-      : subclassBaseId + 1;
-    
-    const newSubclass = {
-      id: newSubclassId,
-      name: newItemName.trim()
-    };
-    
-    // Update the class structure with the new subclass
-    setClassStructure(prev => prev.map(c => 
-      c.id === targetParentClass.id 
-        ? {...c, subclasses: [...c.subclasses, newSubclass]} 
-        : c
-    ));
-    
-    // Select the new subclass
-    setCurrentLabel(newSubclassId);
-    setShowAddModal(false);
+    setLoading(true);
+    try {
+      const result = await api.createLabel(
+        { name: newItemName.trim(), parent_id: targetParentClass.id }, 
+        currentDataset.id
+      );
+      
+      if (result.success) {
+        // Refresh the labels from backend
+        const labels = await api.fetchLabels(currentDataset.id);
+        const transformedLabels = transformLabelsToHierarchy(labels);
+        setClassStructure(transformedLabels);
+        
+        // Select the new subclass
+        setCurrentLabel(result.class_id);
+        setShowAddModal(false);
+        setNewItemName('');
+      }
+    } catch (err) {
+      console.error('Error creating new subclass:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Find the currently selected class or subclass
@@ -163,18 +263,35 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
       {/* Dropdown Button */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-left bg-white border-2 border-blue-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        disabled={loading}
+        className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-left bg-white border-2 border-blue-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className="block truncate">{getDisplayName()}</span>
-        <svg className={`w-5 h-5 ml-2 transition-transform ${expanded ? 'transform rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
+        <span className="block truncate">
+          {loading ? 'Loading labels...' : getDisplayName()}
+        </span>
+        {loading ? (
+          <div className="w-5 h-5 ml-2 animate-spin">
+            <svg className="w-full h-full" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" fill="none" />
+              <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        ) : (
+          <svg className={`w-5 h-5 ml-2 transition-transform ${expanded ? 'transform rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        )}
       </button>
 
       {/* Expanded Tree View */}
       {expanded && (
         <div className="absolute z-10 w-64 mt-1 bg-white rounded-md shadow-lg border border-gray-200">
           <div className="p-3">
+            {error && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+                Error: {error}
+              </div>
+            )}
             <p className="text-xs text-gray-500 mb-3 font-medium">
               {contourSelected 
                 ? "Coral contour is selected:" 

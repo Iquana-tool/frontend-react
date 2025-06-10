@@ -184,7 +184,8 @@ const ImageViewerWithPrompting = () => {
     };
   }, [currentDataset]);
 
-  // Fetch labels from backend
+  // Fetch labels from backend - Note: This is also handled by LabelSelector
+  // Consider removing this if LabelSelector handles all label management
   const fetchLabels = useCallback(async () => {
     if (!currentDataset) {
       setLabelOptions([
@@ -202,9 +203,7 @@ const ImageViewerWithPrompting = () => {
           name: label.name,
         }));
         setLabelOptions(formattedLabels);
-        if (formattedLabels.length > 0) {
-          setCurrentLabel(formattedLabels[0].id);
-        }
+        // Don't auto-select first label - let LabelSelector handle this
       } else {
         // Set default labels if none exist
         setLabelOptions([

@@ -1171,10 +1171,12 @@ export const fetchLabels = async (datasetId) => {
 };
 
 // Create a new label (class)
+// labelData: { name: string, parent_id: number } 
+// parent_id: 0 for top-level labels, actual ID for subclasses
 export const createLabel = async (labelData, datasetId) => {
   try {
     // Extract values from the label data object
-    const { name, parent_id = null } = labelData;
+    const { name, parent_id = 0 } = labelData;
     
     if (!name) {
       throw new Error("Label name is required");
@@ -1188,11 +1190,9 @@ export const createLabel = async (labelData, datasetId) => {
     url.searchParams.append('label_name', name);
     url.searchParams.append('dataset_id', datasetId);
     
-    if (parent_id) {
-      url.searchParams.append('parent_label_id', parent_id);
-    } else {
-      url.searchParams.append('parent_label_id', 0);
-    }
+    // Always send a valid integer: 0 for top-level, actual ID for subclasses
+    const parentLabelId = (parent_id && parent_id > 0) ? parent_id : 0;
+    url.searchParams.append('parent_label_id', parentLabelId);
     
     const response = await fetch(url, {
       method: 'POST'

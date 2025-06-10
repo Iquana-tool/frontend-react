@@ -236,59 +236,80 @@ const MaskManager = ({
                 <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
                   {finalMask &&
                     finalMask.contours &&
-                    finalMask.contours.map((contour, index) => (
-                      <div
-                        key={`contour-${contour.id}-${index}`}
-                        className={`flex justify-between items-center p-2 ${
-                          selectedFinalMaskContour &&
-                          selectedFinalMaskContour.contourIndex ===
-                            index
-                            ? "bg-blue-50 border border-blue-200"
-                            : "bg-gray-50"
-                        } rounded`}
-                      >
-                        <span className="text-sm">
-                          Contour #{index + 1}
-                        </span>
-                        <div className="flex items-center space-x-1">
-                          <button
-                            onClick={() =>
-                              handleFinalMaskContourSelect(
-                                finalMask,
-                                index
-                              )
-                            }
-                            className="text-blue-600 hover:text-blue-700 p-1"
-                            title="View this contour"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
+                    finalMask.contours.map((contour, index) => {
+                      // Generate display name with disambiguation for duplicate labels
+                      const getDisplayName = () => {
+                        if (!contour.label_name) {
+                          return `Contour #${index + 1}`;
+                        }
+                        
+                        // Count how many contours have the same label_name
+                        const sameLabels = finalMask.contours.filter(c => c.label_name === contour.label_name);
+                        
+                        if (sameLabels.length === 1) {
+                          // Only one contour with this label - show just the label name
+                          return contour.label_name;
+                        } else {
+                          // Multiple contours with same label - add identifier
+                          const labelIndex = sameLabels.findIndex(c => c.id === contour.id) + 1;
+                          return `${contour.label_name} #${labelIndex}`;
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={`contour-${contour.id}-${index}`}
+                          className={`flex justify-between items-center p-2 ${
+                            selectedFinalMaskContour &&
+                            selectedFinalMaskContour.contourIndex ===
+                              index
+                              ? "bg-blue-50 border border-blue-200"
+                              : "bg-gray-50"
+                          } rounded`}
+                        >
+                          <span className="text-sm">
+                            {getDisplayName()}
+                          </span>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() =>
+                                handleFinalMaskContourSelect(
+                                  finalMask,
+                                  index
+                                )
+                              }
+                              className="text-blue-600 hover:text-blue-700 p-1"
+                              title={`View ${getDisplayName()}`}
                             >
-                              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                              <path
-                                fillRule="evenodd"
-                                d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                                clipRule="evenodd"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() =>
-                              handleDeleteFinalMaskContour(
-                                contour.id
-                              )
-                            }
-                            className="text-red-600 hover:text-red-700 p-1"
-                            title="Remove this contour"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path
+                                  fillRule="evenodd"
+                                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDeleteFinalMaskContour(
+                                  contour.id
+                                )
+                              }
+                              className="text-red-600 hover:text-red-700 p-1"
+                              title={`Remove ${getDisplayName()}`}
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   {(!finalMask ||
                     !finalMask.contours ||
                     finalMask.contours.length === 0) && (
@@ -356,7 +377,7 @@ const MaskManager = ({
                         />
                       </svg>
                       <span>
-                        Click on individual contours to see
+                        Click on individual labeled contours to see
                         detailed measurements
                       </span>
                     </div>
