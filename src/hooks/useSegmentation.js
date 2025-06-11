@@ -254,8 +254,8 @@ export const useSegmentation = () => {
     setMaskImagesLoading({});
   }, []);
 
-  const handleModelChange = useCallback((modelName) => {
-    setSelectedModel(modelName);
+  const handleModelChange = useCallback((event) => {
+    setSelectedModel(event.target.value);
   }, []);
 
   return {
