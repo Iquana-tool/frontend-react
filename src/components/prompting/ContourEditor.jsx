@@ -537,7 +537,7 @@ const ContourEditor = ({
       // Create new label through API with dataset_id
       const newLabel = await api.createLabel({
         name: newLabelName.trim(),
-        parent_id: parentId
+        parent_id: parentId || null
       }, currentDataset.id);
       
       // Add to available labels

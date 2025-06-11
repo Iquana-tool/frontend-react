@@ -105,7 +105,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     // Root labels have parent_id = null or undefined
     const rootLabels = labels.filter(label => !label.parent_id || label.parent_id === null);
     // Child labels have a valid parent_id
-    const childLabels = labels.filter(label => label.parent_id && label.parent_id > 0);
+    const childLabels = labels.filter(label => label.parent_id !== null && label.parent_id !== undefined);
     
     return rootLabels.map(rootLabel => ({
       id: rootLabel.id,
@@ -168,7 +168,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     setLoading(true);
     try {
       const result = await api.createLabel(
-        { name: newItemName.trim(), parent_id: 0 }, // 0 for top-level class
+        { name: newItemName.trim(), parent_id: null }, // null for top-level class
         currentDataset.id
       );
       
