@@ -433,7 +433,7 @@ const ImageViewerWithPrompting = () => {
   // Enhanced draw functions that pass proper parameters
   const drawAnnotationCanvasWrapper = useCallback(() => {
     drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour);
-  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour]);
+  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour, zoomLevel, zoomCenter]);
 
   const drawFinalMaskCanvasWrapper = useCallback(() => {
     drawFinalMaskCanvas(canvasImage, finalMasks, selectedFinalMaskContour);
@@ -448,6 +448,19 @@ const ImageViewerWithPrompting = () => {
     }
   }, [finalMasks, canvasImage, drawFinalMaskCanvasWrapper]);
 
+    // Draw annotation canvas automatically when data changes (but not for zoom-triggered updates)
+  // Zoom-triggered updates are handled manually in handleFinalMaskContourSelect
+  useEffect(() => {
+    if (bestMask && canvasImage) {
+      // Only auto-redraw if zoom level is 1 (not zoomed) or if it's an initial load
+      if (zoomLevel === 1) {
+        setTimeout(() => {
+          drawAnnotationCanvasWrapper();
+        }, 100);
+      }
+    }
+  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper]);
+
   // Show annotation viewer and draw canvas when segmentation completes
   useEffect(() => {
     if (bestMask && canvasImage && !showAnnotationViewer) {
@@ -457,15 +470,6 @@ const ImageViewerWithPrompting = () => {
       console.log("Segmentation completed with bestMask, but keeping annotation viewer hidden for continued prompting");
     }
   }, [bestMask, canvasImage, showAnnotationViewer]);
-
-  // Draw annotation canvas when bestMask or showAnnotationViewer changes
-  useEffect(() => {
-    if (bestMask && canvasImage && showAnnotationViewer) {
-      setTimeout(() => {
-        drawAnnotationCanvasWrapper();
-      }, 100);
-    }
-  }, [bestMask, canvasImage, showAnnotationViewer, selectedContours, drawAnnotationCanvasWrapper]);
 
   // Update PromptingCanvas when segmentation completes
   useEffect(() => {
@@ -805,24 +809,10 @@ const ImageViewerWithPrompting = () => {
                       const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
                       if (contourIndex !== -1) {
                         const finalMask = finalMasks[0];
-                        const selectedContour = finalMask.contours[contourIndex];
-                        
-                        // Create the updated final mask contour object
-                        const updatedFinalMaskContour = {
-                          mask: finalMask,
-                          contour: selectedContour,
-                          contourIndex: contourIndex
-                        };
                         
                         // Call the main function to update zoom and final mask viewer
+                        // The annotation canvas will automatically redraw via the useEffect hook
                         handleFinalMaskContourSelect(finalMask, contourIndex);
-                        
-                        // Force a redraw of the annotation canvas with the updated contour
-                        setTimeout(() => {
-                          if (bestMask && canvasImage) {
-                            drawAnnotationCanvas(bestMask, canvasImage, selectedContours, updatedFinalMaskContour);
-                          }
-                        }, 150);
                       }
                     }
                   }}

@@ -442,13 +442,18 @@ export const useCanvasOperations = () => {
         setSelectedContours([]);
       }
 
-      if (showAnnotationViewer) {
-        setTimeout(() => {
-          if (annotationCanvasRef.current && bestMask) {
-            drawAnnotationCanvas(bestMask, canvasImage, [], null);
-          }
-        }, 0);
-      }
+      // Manual redraw for deselection case
+      setTimeout(() => {
+        if (drawAnnotationCanvas && canvasImage && annotationCanvasRef.current && bestMask) {
+          annotationCanvasRef.current.width = canvasImage.width;
+          annotationCanvasRef.current.height = canvasImage.height;
+          
+          const ctx = annotationCanvasRef.current.getContext("2d");
+          ctx.clearRect(0, 0, annotationCanvasRef.current.width, annotationCanvasRef.current.height);
+          
+          drawAnnotationCanvas(bestMask, canvasImage, [], null);
+        }
+      }, 100);
 
       return;
     }
@@ -481,28 +486,26 @@ export const useCanvasOperations = () => {
 
       if (matchingContourIndex !== -1 && setSelectedContours) {
         setSelectedContours([matchingContourIndex]);
-
-        const delays = [50, 200, 500, 1000];
-
-        delays.forEach((delay) => {
-          setTimeout(() => {
-            try {
-              if (annotationCanvasRef.current && canvasImage) {
-                annotationCanvasRef.current.width = canvasImage.width;
-                annotationCanvasRef.current.height = canvasImage.height;
-
-                const ctx = annotationCanvasRef.current.getContext("2d");
-                ctx.clearRect(0, 0, annotationCanvasRef.current.width, annotationCanvasRef.current.height);
-
-                if (drawAnnotationCanvas) {
-                  drawAnnotationCanvas(bestMask, canvasImage, [matchingContourIndex], currentSelectedFinalMaskContour);
-                }
-              }
-            } catch (error) {
-              console.error(`Error during canvas redraw at ${delay}ms:`, error);
-            }
-          }, delay);
-        });
+        
+                // a small delay to ensure state propagation for annotation canvas redraw
+        setTimeout(() => {
+          if (drawAnnotationCanvas && canvasImage && annotationCanvasRef.current) {
+            // Ensure canvas dimensions are correct
+            annotationCanvasRef.current.width = canvasImage.width;
+            annotationCanvasRef.current.height = canvasImage.height;
+            
+            // Clear canvas before redraw
+            const ctx = annotationCanvasRef.current.getContext("2d");
+            ctx.clearRect(0, 0, annotationCanvasRef.current.width, annotationCanvasRef.current.height);
+            
+            // Force redraw with current zoom state
+            drawAnnotationCanvas(bestMask, canvasImage, [matchingContourIndex], {
+              maskId: mask.id,
+              contourIndex: contourIndex,
+              contour: contour,
+            });
+          }
+        }, 200);
       }
     }
   }, [showAnnotationViewer]);
