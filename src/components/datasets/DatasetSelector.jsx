@@ -25,7 +25,7 @@ const DatasetSelector = () => {
 
     setIsCreating(true);
     try {
-      const response = await createDataset(newDatasetName.trim(), newDatasetDescription.trim());
+      const response = await createDataset(newDatasetName.trim(), newDatasetDescription.trim(), 'image');
       if (response.success) {
         setNewDatasetName('');
         setNewDatasetDescription('');

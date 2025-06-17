@@ -9,7 +9,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    datasetType: 'images'
+    datasetType: 'image'
   });
   const [files, setFiles] = useState([]);
   const [isCreating, setIsCreating] = useState(false);
@@ -59,7 +59,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
     setUploadErrors([]);
     
     try {
-      const response = await createDataset(formData.title.trim(), formData.description.trim());
+      const response = await createDataset(formData.title.trim(), formData.description.trim(), formData.datasetType);
       if (response.success) {
         const datasetId = response.dataset_id;
         
@@ -94,7 +94,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                 }
                 
                 setTimeout(() => {
-                  setFormData({ title: '', description: '', datasetType: 'images' });
+                  setFormData({ title: '', description: '', datasetType: 'image' });
                   setFiles([]);
                   setUploadProgress({ current: 0, total: 0 });
                   setUploadErrors([]);
@@ -110,7 +110,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                 
                 // Add a small delay to ensure UI updates
                 setTimeout(() => {
-                  setFormData({ title: '', description: '', datasetType: 'images' });
+                  setFormData({ title: '', description: '', datasetType: 'image' });
                   setFiles([]);
                   setUploadProgress({ current: 0, total: 0 });
                   setUploadErrors([]);
@@ -146,7 +146,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
               
               // Close modal after showing the message briefly
               setTimeout(() => {
-                setFormData({ title: '', description: '', datasetType: 'images' });
+                setFormData({ title: '', description: '', datasetType: 'image' });
                 setFiles([]);
                 setUploadProgress({ current: 0, total: 0 });
                 setUploadErrors([]);
@@ -171,7 +171,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
           
           // Add a small delay to ensure UI updates
           setTimeout(() => {
-            setFormData({ title: '', description: '', datasetType: 'images' });
+            setFormData({ title: '', description: '', datasetType: 'image' });
             setFiles([]);
             setUploadProgress({ current: 0, total: 0 });
             setUploadErrors([]);
@@ -188,7 +188,7 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
   };
 
   const handleDiscard = () => {
-    setFormData({ title: '', description: '', datasetType: 'images' });
+    setFormData({ title: '', description: '', datasetType: 'image' });
     setFiles([]);
     setUploadProgress({ current: 0, total: 0 });
     setUploadErrors([]);
@@ -262,9 +262,9 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                     <input
                       type="radio"
                       name="datasetType"
-                      value="images"
-                      checked={formData.datasetType === 'images'}
-                      onChange={() => handleDatasetTypeChange('images')}
+                      value="image"
+                      checked={formData.datasetType === 'image'}
+                      onChange={() => handleDatasetTypeChange('image')}
                       className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
                       disabled={isCreating}
                     />
@@ -274,25 +274,25 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                     <input
                       type="radio"
                       name="datasetType"
-                      value="video"
-                      checked={formData.datasetType === 'video'}
-                      onChange={() => handleDatasetTypeChange('video')}
+                      value="scan"
+                      checked={formData.datasetType === 'scan'}
+                      onChange={() => handleDatasetTypeChange('scan')}
                       className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
                       disabled={isCreating}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Compressed video or video data</span>
+                    <span className="ml-2 text-sm text-gray-700">Scans</span>
                   </label>
                   <label className="flex items-center">
                     <input
                       type="radio"
                       name="datasetType"
-                      value="scans"
-                      checked={formData.datasetType === 'scans'}
-                      onChange={() => handleDatasetTypeChange('scans')}
+                      value="DICOM"
+                      checked={formData.datasetType === 'DICOM'}
+                      onChange={() => handleDatasetTypeChange('DICOM')}
                       className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
                       disabled={isCreating}
                     />
-                    <span className="ml-2 text-sm text-gray-700">Scans</span>
+                    <span className="ml-2 text-sm text-gray-700">DICOM</span>
                   </label>
                 </div>
               </div>

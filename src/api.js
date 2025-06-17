@@ -1265,11 +1265,12 @@ export const fetchDatasets = async () => {
   }
 };
 
-export const createDataset = async (name, description) => {
+export const createDataset = async (name, description, datasetType) => {
   try {
     const url = new URL(`${API_BASE_URL}/datasets/create_dataset`);
     url.searchParams.append('name', name);
     url.searchParams.append('description', description);
+    url.searchParams.append('dataset_type', datasetType);
     
     const response = await fetch(url, {
       method: 'POST'

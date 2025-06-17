@@ -71,11 +71,11 @@ export const DatasetProvider = ({ children }) => {
   };
 
   // Create a new dataset
-  const createDataset = async (name, description) => {
+  const createDataset = async (name, description, datasetType = 'image') => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.createDataset(name, description);
+      const response = await api.createDataset(name, description, datasetType);
       if (response.success) {
         // Refresh the list and wait for it to complete
         await fetchDatasets();
