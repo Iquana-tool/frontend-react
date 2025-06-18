@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import * as api from '../api';
 
 export const useContourOperations = () => {
@@ -152,7 +153,7 @@ export const useContourOperations = () => {
     }
   }, []);
 
-  const handleDeleteFinalMaskContour = useCallback(async (contourId) => {
+  const handleDeleteFinalMaskContour = useCallback(async (contourId, currentImageId = null) => {
     if (!contourId) {
       console.error("No contour ID provided for deletion");
       return;
@@ -165,15 +166,37 @@ export const useContourOperations = () => {
       if (response.success) {
         console.log(`Successfully deleted contour with ID: ${contourId}`);
         
-        // We need to get the current image ID to refresh the final mask
-        // For now, we'll fetch the final mask for all images or handle this differently
-        // This is a limitation of the current hook structure
+        // Update local state immediately by removing the contour
+        setFinalMasks(prevMasks => 
+          prevMasks.map(mask => ({
+            ...mask,
+            contours: mask.contours.filter(contour => contour.id !== contourId)
+          }))
+        );
+
+        setFinalMask(prevMask => 
+          prevMask ? {
+            ...prevMask,
+            contours: prevMask.contours.filter(contour => contour.id !== contourId)
+          } : prevMask
+        );
         
+        // Clear selected contour if it was the deleted one
         if (
           selectedFinalMaskContour &&
-          selectedFinalMaskContour.contourIndex === contourId
+          selectedFinalMaskContour.contour &&
+          selectedFinalMaskContour.contour.id === contourId
         ) {
           setSelectedFinalMaskContour(null);
+        }
+
+        // Optionally refresh from server if currentImageId is provided
+        if (currentImageId) {
+          try {
+            await fetchFinalMask(currentImageId);
+          } catch (refreshError) {
+            console.warn("Failed to refresh final mask after deletion:", refreshError);
+          }
         }
 
         return { success: true, message: "Contour removed from final mask successfully" };
@@ -184,7 +207,50 @@ export const useContourOperations = () => {
       console.error("Error deleting contour:", error);
       throw new Error(`Error deleting contour: ${error.message}`);
     }
-  }, [selectedFinalMaskContour]);
+  }, [selectedFinalMaskContour, fetchFinalMask]);
+
+  // New function specifically for handling deletion from quantification table
+  const handleDeleteContourFromTable = useCallback(async (contourId) => {
+    if (!contourId) {
+      console.error("No contour ID provided for deletion");
+      return;
+    }
+
+    try {
+      // Update local state immediately for better UX
+      flushSync(() => {
+        setFinalMasks(prevMasks => {
+          const updatedMasks = prevMasks.map(mask => ({
+            ...mask,
+            contours: mask.contours ? mask.contours.filter(contour => contour.id !== contourId) : []
+          }));
+          return updatedMasks;
+        });
+
+        // Also update the current final mask if it contains this contour
+        setFinalMask(prevMask => {
+          if (prevMask && prevMask.contours) {
+            const updatedMask = {
+              ...prevMask,
+              contours: prevMask.contours.filter(contour => contour.id !== contourId)
+            };
+            return updatedMask;
+          }
+          return prevMask;
+        });
+
+        // Clear selected contour if it was the deleted one
+        if (selectedFinalMaskContour && selectedFinalMaskContour.id === contourId) {
+          setSelectedFinalMaskContour(null);
+        }
+      });
+
+      return { success: true, message: "Contour deleted successfully" };
+    } catch (error) {
+      console.error(`Error deleting contour from table:`, error);
+      throw error;
+    }
+  }, [selectedFinalMaskContour, setFinalMasks, setFinalMask, setSelectedFinalMaskContour]);
 
   const clearAllFinalMaskContours = useCallback(async (finalMask, currentImage) => {
     if (!finalMask || !finalMask.contours || finalMask.contours.length === 0) {
@@ -352,6 +418,7 @@ export const useContourOperations = () => {
     handleDeleteSelectedContours,
     fetchFinalMask,
     handleDeleteFinalMaskContour,
+    handleDeleteContourFromTable,
     clearAllFinalMaskContours,
     findMatchingContour,
     isPointInContour,

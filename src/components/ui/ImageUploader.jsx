@@ -33,7 +33,7 @@ const ImageUploader = ({
           <h2 className="text-lg font-semibold flex items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2 text-blue-600"
+              className="h-5 w-5 mr-2 text-teal-600"
               viewBox="0 0 20 20"
               fill="currentColor"
             >
@@ -52,7 +52,7 @@ const ImageUploader = ({
           onClick={() => setIsSidebarCollapsed((prev) => !prev)}
           className={`p-1.5 rounded-md ${
             isSidebarCollapsed
-              ? "bg-blue-500 hover:bg-blue-600 text-white"
+              ? "bg-teal-600 hover:bg-teal-700 text-white"
               : "bg-gray-100 hover:bg-gray-200 text-gray-700"
           } transition-colors ${isSidebarCollapsed ? "mt-1" : ""}`}
           title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -77,7 +77,7 @@ const ImageUploader = ({
               Upload New Image:
             </label>
             <div
-              className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors duration-200 bg-gray-50 group"
+              className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-teal-500 transition-colors duration-200 bg-gray-50 group"
               style={{ minHeight: "120px" }}
             >
               <input
@@ -90,7 +90,7 @@ const ImageUploader = ({
               <div className="text-center flex flex-col items-center justify-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-10 w-10 text-gray-400 group-hover:text-blue-500 transition-colors mb-2"
+                  className="h-10 w-10 text-gray-400 group-hover:text-teal-600 transition-colors mb-2"
                   viewBox="0 0 20 20"
                   fill="currentColor"
                 >
@@ -100,11 +100,11 @@ const ImageUploader = ({
                     clipRule="evenodd"
                   />
                 </svg>
-                <div className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors">
+                <div className="text-sm text-gray-600 group-hover:text-teal-700 transition-colors">
                   <span className="block font-medium mb-1">
                     Click to upload or drag and drop
                   </span>
-                  <span className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">
+                  <span className="text-xs text-gray-500 group-hover:text-teal-500 transition-colors">
                     JPEG, PNG, or other image formats
                   </span>
                 </div>
@@ -117,7 +117,7 @@ const ImageUploader = ({
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-1 text-blue-600"
+                className="h-4 w-4 mr-1 text-teal-600"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -132,7 +132,7 @@ const ImageUploader = ({
             </label>
             <div className="relative">
               <select
-                className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                className="block w-full px-4 py-2 pr-8 leading-tight bg-white border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-none"
                 value={selectedModel}
                 onChange={handleModelChange}
                 disabled={loading}
@@ -168,7 +168,7 @@ const ImageUploader = ({
             <h3 className="font-medium text-sm text-gray-700 flex items-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 mr-1 text-blue-600"
+                className="h-4 w-4 mr-1 text-teal-600"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -185,7 +185,7 @@ const ImageUploader = ({
               <button
                 className={`p-1.5 rounded-md ${
                   viewMode === "grid"
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-teal-100 text-teal-700"
                     : "text-gray-500 hover:bg-gray-100"
                 }`}
                 onClick={() => setViewMode("grid")}
@@ -203,7 +203,7 @@ const ImageUploader = ({
               <button
                 className={`p-1.5 rounded-md ${
                   viewMode === "list"
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-teal-100 text-teal-700"
                     : "text-gray-500 hover:bg-gray-100"
                 }`}
                 onClick={() => setViewMode("list")}
@@ -235,7 +235,7 @@ const ImageUploader = ({
       >
         {loading && !selectedImage ? (
           <div className="flex justify-center items-center py-8">
-            <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+            <div className="w-8 h-8 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner"></div>
           </div>
         ) : availableImages.length === 0 ? (
           !isSidebarCollapsed && (
@@ -269,11 +269,11 @@ const ImageUploader = ({
                 key={`image-${image.id}-${
                   selectedImageId === image.id ? "selected" : "unselected"
                 }`}
-                className={`rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border hover:shadow-md hover:-translate-y-0.5 ${
+                className={`relative cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
                   selectedImageId === image.id
-                    ? "border-blue-500 ring-2 ring-blue-200"
-                    : "border-gray-200"
-                } ${loading ? "opacity-50 pointer-events-none" : ""}`}
+                    ? "border-teal-600 ring-2 ring-teal-200"
+                    : "border-gray-200 hover:border-gray-300"
+                } border-2`}
                 onClick={() => {
                   if (!loading) {
                     handleImageSelect(image);
@@ -312,7 +312,7 @@ const ImageUploader = ({
                     </div>
                   )}
                   {selectedImageId === image.id && (
-                    <div className="absolute top-2 right-2 bg-blue-500 rounded-full p-1 shadow-sm">
+                    <div className="absolute top-2 right-2 bg-teal-600 rounded-full p-1 shadow-sm">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-3 w-3 text-white"
@@ -334,11 +334,11 @@ const ImageUploader = ({
                   </p>
                   <div className="flex items-center mt-1">
                     {image.isFromAPI ? (
-                      <span className="text-xxs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded-full">
+                      <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
                         Server
                       </span>
                     ) : (
-                      <span className="text-xxs px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded-full">
+                      <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
                         Sample
                       </span>
                     )}
@@ -360,13 +360,11 @@ const ImageUploader = ({
                 key={`image-${image.id}-${
                   selectedImageId === image.id ? "selected" : "unselected"
                 }`}
-                className={`${
-                  isSidebarCollapsed ? "p-1" : "p-2"
-                } rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border hover:shadow-md ${
+                className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                   selectedImageId === image.id
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
-                } ${loading ? "opacity-50 pointer-events-none" : ""}`}
+                    ? "border-teal-600 bg-teal-50"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
                 onClick={() => {
                   if (!loading) {
                     handleImageSelect(image);
@@ -401,7 +399,7 @@ const ImageUploader = ({
                       />
                     ) : image.isLoading ? (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-t-blue-500 border-blue-200 rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-t-teal-600 border-teal-200 rounded-full animate-spin"></div>
                       </div>
                     ) : image.loadError ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
@@ -440,7 +438,7 @@ const ImageUploader = ({
                     )}
 
                     {selectedImageId === image.id && (
-                      <div className="absolute bottom-0.5 right-0.5 bg-blue-500 rounded-full p-0.5 border border-white">
+                      <div className="absolute bottom-0.5 right-0.5 bg-teal-600 rounded-full p-0.5 border border-white">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           className="h-2.5 w-2.5 text-white"

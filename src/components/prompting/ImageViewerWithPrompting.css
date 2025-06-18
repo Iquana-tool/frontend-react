@@ -47,7 +47,7 @@
   overflow: hidden;
 }
 
-/* Tiny-font helper (because Tailwind doesn’t ship .text-xxs) */
+/* Tiny-font helper (because Tailwind doesn't ship .text-xxs) */
 .text-xxs { font-size: 0.625rem; }
 
 /* Thin, styled scrollbars */
@@ -109,12 +109,18 @@
   gap: 1rem;
 }
 
+.col-span-2 {
+  grid-column: span 2;
+}
+
+
+
 .slider-label   { width: 100px; min-width: 100px; }
 .loading-progress { animation: loading-progress 5s linear; width: 0; }
 
 /* ---------- Fixes for auto-generated dataset markup ---------- */
 
-/* Remove stray “segments-found” pseudo-elements */
+/* Remove stray "segments-found" pseudo-elements */
 [data-segment-results="true"]
   [data-header="true"]
   [data-content="true"]
@@ -135,7 +141,7 @@
   overflow: hidden;
 }
 
-/* ensure PromptingCanvas doesn’t shift layout */
+/* ensure PromptingCanvas doesn't shift layout */
 [data-segment-results="true"] { margin-top: 1.5rem !important; }
 
 /* globally neutralise any rogue ::before/::after from 3rd-party libs */

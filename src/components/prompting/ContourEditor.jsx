@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Edit, Save, Trash2, Plus, X, CheckCircle, Tag } from "lucide-react";
 import * as api from "../../api";
+import { useDataset } from '../../contexts/DatasetContext';
 
 // Add these styles for the toast notification
 const toastStyles = `
@@ -76,6 +77,7 @@ const ContourEditor = ({
   onMaskUpdated,
   onCancel
 }) => {
+  const { currentDataset } = useDataset();
   const [selectedContourIndex, setSelectedContourIndex] = useState(null);
   const [editedContours, setEditedContours] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -522,19 +524,21 @@ const ContourEditor = ({
 
   // Handle creating a new label
   const handleCreateNewLabel = async (parentId = null) => {
-    if (!newLabelName.trim()) {
-      setError("Please enter a valid label name");
+    if (!newLabelName.trim()) return;
+    
+    if (!currentDataset) {
+      setError("No dataset selected. Please select a dataset first.");
       return;
     }
-    
+
     try {
       setLoading(true);
       
-      // Create new label through API
+      // Create new label through API with dataset_id
       const newLabel = await api.createLabel({
         name: newLabelName.trim(),
-        parent_id: parentId
-      });
+        parent_id: parentId || null
+      }, currentDataset.id);
       
       // Add to available labels
       setAvailableLabels([...availableLabels, newLabel]);

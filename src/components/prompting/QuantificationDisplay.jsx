@@ -49,7 +49,7 @@ const QuantificationDisplay = ({ quantifications, contour, expanded = false }) =
         <div className="p-3 border-b border-gray-100">
           <QuantificationVisualization 
             contour={contour} 
-            quantifications={quantifications} 
+            quantifications={quantifications}
             width={220} 
             height={160} 
           />

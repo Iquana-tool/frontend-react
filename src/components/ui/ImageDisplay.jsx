@@ -56,10 +56,10 @@ const ImageDisplay = ({
               <div className="p-4 flex flex-col items-center justify-center h-[500px] bg-gray-50">
                 {/* Enhanced loading animation */}
                 <div className="relative w-16 h-16 mb-6">
-                  <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-100 rounded-full pulse-ring"></div>
-                  <div className="absolute top-0 left-0 w-full h-full border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full animate-spin"></div>
+                  <div className="absolute top-0 left-0 w-full h-full border-4 border-teal-100 rounded-full pulse-ring"></div>
+                  <div className="absolute top-0 left-0 w-full h-full border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full animate-spin"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-teal-500 rounded-full animate-pulse"></div>
                   </div>
                 </div>
                 <p className="text-gray-700 text-lg font-medium text-center">
@@ -72,7 +72,7 @@ const ImageDisplay = ({
 
                 {/* Progress bar animation */}
                 <div className="w-64 h-1.5 bg-gray-200 rounded-full mt-6 overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full animate-progress shimmer"></div>
+                  <div className="h-full bg-teal-500 rounded-full animate-progress shimmer"></div>
                 </div>
               </div>
             </>
@@ -94,7 +94,7 @@ const ImageDisplay = ({
                       className={`px-3 py-1.5 rounded-md text-sm flex items-center transition-colors ${
                         selectedContours.length === 0 || loading
                           ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "bg-teal-600 hover:bg-teal-700 text-white"
                       }`}
                     >
                       <Plus className="w-4 h-4 mr-1.5" />
@@ -193,6 +193,8 @@ const ImageDisplay = ({
               }}
               zoomLevel={zoomLevel}
               zoomCenter={zoomCenter}
+              selectedFinalMaskContour={selectedFinalMaskContour}
+              finalMasks={finalMasks}
             />
 
             {/* Segmentation complete floating action button */}
@@ -218,7 +220,7 @@ const ImageDisplay = ({
                     className={`h-14 w-14 rounded-full shadow-lg flex items-center justify-center transition-all transform hover:scale-110 ${
                       selectedContours.length === 0
                         ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-blue-600 text-white hover:bg-blue-700"
+                        : "bg-teal-600 text-white hover:bg-teal-700"
                     }`}
                     title="Add Selected Contours to Final Mask"
                   >
@@ -243,33 +245,22 @@ const ImageDisplay = ({
 
             {/* Overlay segmentation controls when segmentation is complete and we have masks */}
             {segmentationMasks.length > 0 && selectedMask && (
-              <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 border border-blue-200 min-w-[200px]">
+              <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-4 rounded-lg shadow-lg z-10 border border-teal-200 min-w-[200px]">
                 <div className="flex flex-col gap-3">
-                  <div className="text-sm font-semibold text-blue-800 flex items-center gap-1.5 border-b border-blue-100 pb-2">
-                    <Layers className="h-4 w-4 text-blue-600" />
+                  <div className="text-sm font-semibold text-teal-800 flex items-center gap-1.5 border-b border-teal-100 pb-2">
+                    <Layers className="h-4 w-4 text-teal-600" />
                     Segmentation Results
                   </div>
                   {isSegmenting ? (
                     <div className="flex flex-col items-center justify-center py-6">
-                      <div className="w-6 h-6 border-4 border-t-blue-500 border-blue-200 rounded-full animate-spin mb-2"></div>
-                      <span className="text-blue-700 font-medium">
+                      <div className="w-6 h-6 border-4 border-t-teal-500 border-teal-200 rounded-full animate-spin mb-2"></div>
+                      <span className="text-teal-700 font-medium">
                         Loading segmentation results...
                       </span>
                     </div>
                   ) : (
                     <>
                       <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-gray-700">
-                            Contours available:
-                          </span>
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                            {selectedMask.contours
-                              ? selectedMask.contours.length
-                              : 0}
-                          </span>
-                        </div>
-
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-gray-700">
                             Contours selected:
@@ -301,7 +292,7 @@ const ImageDisplay = ({
                           className={`px-3 py-1.5 rounded-md text-sm flex-1 flex items-center justify-center transition-colors ${
                             selectedContours.length === 0 || loading
                               ? "bg-gray-200 text-gray-500 cursor-not-allowed"
-                              : "bg-blue-600 hover:bg-blue-700 text-white"
+                              : "bg-teal-600 hover:bg-teal-700 text-white"
                           }`}
                         >
                           <Plus className="w-3 h-3 mr-1.5" />
@@ -362,10 +353,10 @@ const ImageDisplay = ({
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-20">
                 <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm text-center">
                   <div className="relative w-16 h-16 mx-auto mb-6">
-                    <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-100 rounded-full pulse-ring"></div>
-                    <div className="absolute top-0 left-0 w-full h-full border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full animate-spin"></div>
+                    <div className="absolute top-0 left-0 w-full h-full border-4 border-teal-100 rounded-full pulse-ring"></div>
+                    <div className="absolute top-0 left-0 w-full h-full border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full animate-spin"></div>
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                      <div className="w-3 h-3 bg-teal-500 rounded-full animate-pulse"></div>
                     </div>
                   </div>
                   <p className="text-gray-700 text-lg font-medium">
@@ -377,7 +368,7 @@ const ImageDisplay = ({
                   </p>
 
                   <div className="w-full h-1.5 bg-gray-200 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-blue-500 rounded-full animate-progress shimmer"></div>
+                    <div className="h-full bg-teal-500 rounded-full animate-progress shimmer"></div>
                   </div>
                 </div>
               </div>

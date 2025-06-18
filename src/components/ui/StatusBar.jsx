@@ -64,12 +64,12 @@ const StatusBar = ({
           <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center max-w-md w-full transform transition-all">
             <div className="relative w-20 h-20 mb-4">
               {/* Main spinner */}
-              <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+              <div className="absolute inset-0 border-4 border-teal-100 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner"></div>
 
               {/* Inner pulsing dot */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                <div className="w-3 h-3 bg-teal-600 rounded-full animate-pulse"></div>
               </div>
             </div>
             <h3 className="text-lg font-semibold text-gray-800 mb-1">
@@ -81,7 +81,7 @@ const StatusBar = ({
                 : "Loading..."}
             </p>
             <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1 overflow-hidden">
-              <div className="bg-blue-500 h-1.5 rounded-full loading-progress"></div>
+              <div className="bg-teal-600 h-1.5 rounded-full loading-progress"></div>
             </div>
             <p className="text-xs text-gray-500">
               This may take a few moments...

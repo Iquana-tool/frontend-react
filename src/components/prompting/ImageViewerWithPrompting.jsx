@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Typography } from "@mui/material";
+import { useDataset } from "../../contexts/DatasetContext";
 import * as api from "../../api";
 
 // Custom Hooks
@@ -24,6 +25,8 @@ import { exportQuantificationsAsCsv } from "../../utils/exportUtils";
 import "./ImageViewerWithPrompting.css";
 
 const ImageViewerWithPrompting = () => {
+  const { currentDataset } = useDataset();
+
   // UI State
   const [promptType, setPromptType] = useState("point");
   const [currentLabel, setCurrentLabel] = useState(1);
@@ -120,6 +123,7 @@ const ImageViewerWithPrompting = () => {
     handleDeleteSelectedContours: contourDeleteSelected,
     fetchFinalMask,
     handleDeleteFinalMaskContour,
+    handleDeleteContourFromTable,
     clearAllFinalMaskContours,
     findMatchingContour,
     isPointInContour,
@@ -154,8 +158,10 @@ const ImageViewerWithPrompting = () => {
 
   // Initialize component
   useEffect(() => {
-    fetchImagesFromAPI();
-    fetchLabels();
+    if (currentDataset) {
+      fetchImagesFromAPI();
+      fetchLabels();
+    }
 
     // Add CSS animations
     const styleEl = document.createElement("style");
@@ -177,26 +183,44 @@ const ImageViewerWithPrompting = () => {
       resetContourState();
       resetCanvasState();
     };
-  }, []);
+  }, [currentDataset]);
 
-  // Fetch labels from backend
+  // Fetch labels from backend - Note: This is also handled by LabelSelector
+  // Consider removing this if LabelSelector handles all label management
   const fetchLabels = useCallback(async () => {
+    if (!currentDataset) {
+      setLabelOptions([
+        { id: 1, name: "coral" },
+        { id: 2, name: "petri dish" },
+      ]);
+      return;
+    }
+
     try {
-      const labels = await api.fetchLabels();
+      const labels = await api.fetchLabels(currentDataset.id);
       if (labels && labels.length > 0) {
         const formattedLabels = labels.map((label) => ({
           id: label.id,
           name: label.name,
         }));
         setLabelOptions(formattedLabels);
-        if (formattedLabels.length > 0) {
-          setCurrentLabel(formattedLabels[0].id);
-        }
+        // Don't auto-select first label - let LabelSelector handle this
+      } else {
+        // Set default labels if none exist
+        setLabelOptions([
+          { id: 1, name: "coral" },
+          { id: 2, name: "petri dish" },
+        ]);
       }
     } catch (error) {
       console.error("Failed to fetch labels:", error);
+      // Set default labels on error
+      setLabelOptions([
+        { id: 1, name: "coral" },
+        { id: 2, name: "petri dish" },
+      ]);
     }
-  }, []);
+  }, [currentDataset]);
 
   // Enhanced prompting complete handler
   const handlePromptingComplete = useCallback(async (prompts, promptType) => {
@@ -409,7 +433,7 @@ const ImageViewerWithPrompting = () => {
   // Enhanced draw functions that pass proper parameters
   const drawAnnotationCanvasWrapper = useCallback(() => {
     drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour);
-  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour]);
+  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour, zoomLevel, zoomCenter]);
 
   const drawFinalMaskCanvasWrapper = useCallback(() => {
     drawFinalMaskCanvas(canvasImage, finalMasks, selectedFinalMaskContour);
@@ -417,12 +441,25 @@ const ImageViewerWithPrompting = () => {
 
   // Draw final mask canvas when final mask data changes
   useEffect(() => {
-    if (finalMasks.length > 0 && canvasImage) {
+    if (canvasImage) {
       setTimeout(() => {
         drawFinalMaskCanvasWrapper();
       }, 100);
     }
   }, [finalMasks, canvasImage, drawFinalMaskCanvasWrapper]);
+
+    // Draw annotation canvas automatically when data changes (but not for zoom-triggered updates)
+  // Zoom-triggered updates are handled manually in handleFinalMaskContourSelect
+  useEffect(() => {
+    if (bestMask && canvasImage) {
+      // Only auto-redraw if zoom level is 1 (not zoomed) or if it's an initial load
+      if (zoomLevel === 1) {
+        setTimeout(() => {
+          drawAnnotationCanvasWrapper();
+        }, 100);
+      }
+    }
+  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper]);
 
   // Show annotation viewer and draw canvas when segmentation completes
   useEffect(() => {
@@ -433,15 +470,6 @@ const ImageViewerWithPrompting = () => {
       console.log("Segmentation completed with bestMask, but keeping annotation viewer hidden for continued prompting");
     }
   }, [bestMask, canvasImage, showAnnotationViewer]);
-
-  // Draw annotation canvas when bestMask or showAnnotationViewer changes
-  useEffect(() => {
-    if (bestMask && canvasImage && showAnnotationViewer) {
-      setTimeout(() => {
-        drawAnnotationCanvasWrapper();
-      }, 100);
-    }
-  }, [bestMask, canvasImage, showAnnotationViewer, selectedContours, drawAnnotationCanvasWrapper]);
 
   // Update PromptingCanvas when segmentation completes
   useEffect(() => {
@@ -576,6 +604,22 @@ const ImageViewerWithPrompting = () => {
     document.body.removeChild(link);
   }, []);
 
+  // Show dataset selection message if no dataset is selected
+  if (!currentDataset) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center p-8 bg-white rounded-lg border">
+          <Typography variant="h6" className="text-gray-600 mb-2">
+            No Dataset Selected
+          </Typography>
+          <Typography variant="body2" className="text-gray-500">
+            Please select a dataset from the dropdown above to start working with images and labels.
+          </Typography>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       <h1 className="text-2xl font-bold mb-4 text-gray-800">
@@ -619,7 +663,7 @@ const ImageViewerWithPrompting = () => {
         <div
           className={`${
             isSidebarCollapsed ? "md:col-span-5" : "md:col-span-2"
-          } bg-white p-4 rounded-lg shadow-sm border border-gray-100`}
+          } bg-white p-4 rounded-lg shadow-sm border border-gray-200`}
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
@@ -627,7 +671,7 @@ const ImageViewerWithPrompting = () => {
                 <>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2 text-blue-600"
+                    className="h-5 w-5 mr-2 text-teal-600"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                   >
@@ -701,7 +745,7 @@ const ImageViewerWithPrompting = () => {
             ) : (
               <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
                 <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner mb-2"></div>
+                  <div className="w-8 h-8 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner mb-2"></div>
                   <p>Loading image...</p>
                 </div>
               </div>
@@ -714,7 +758,7 @@ const ImageViewerWithPrompting = () => {
 
           {/* Help text */}
           {!selectedImage && !loading && (
-            <div className="mt-4 p-4 bg-blue-50 text-blue-700 rounded-md">
+            <div className="mt-4 p-4 bg-teal-50 text-teal-700 rounded-md">
               <h3 className="font-medium mb-2">How to use:</h3>
               <ol className="list-decimal list-inside text-sm">
                 <li className="mb-1">Select or upload an image from the left panel</li>
@@ -732,10 +776,10 @@ const ImageViewerWithPrompting = () => {
             <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
               <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center max-w-md w-full transform transition-all">
                 <div className="relative w-20 h-20 mb-4">
-                  <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-t-blue-500 border-r-blue-300 border-b-blue-200 border-l-blue-400 rounded-full loading-spinner"></div>
+                  <div className="absolute inset-0 border-4 border-teal-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                    <div className="w-3 h-3 bg-teal-600 rounded-full animate-pulse"></div>
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800 mb-1">Processing</h3>
@@ -745,12 +789,45 @@ const ImageViewerWithPrompting = () => {
                     : "Loading..."}
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1 overflow-hidden">
-                  <div className="bg-blue-500 h-1.5 rounded-full loading-progress"></div>
+                  <div className="bg-teal-600 h-1.5 rounded-full loading-progress"></div>
                 </div>
                 <p className="text-xs text-gray-500">This may take a few moments...</p>
               </div>
             </div>
           )}
+
+          {/* Quantification Table */}
+          <div style={{ marginTop: 24 }}>
+            {finalMasks.length > 0 ? (
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable 
+                  masks={finalMasks} 
+                  onContourSelect={(row) => {
+                    // Find the corresponding contour and trigger zoom
+                    if (finalMasks.length > 0 && finalMasks[0].contours) {
+                      const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
+                      if (contourIndex !== -1) {
+                        const finalMask = finalMasks[0];
+                        
+                        // Call the main function to update zoom and final mask viewer
+                        // The annotation canvas will automatically redraw via the useEffect hook
+                        handleFinalMaskContourSelect(finalMask, contourIndex);
+                      }
+                    }
+                  }}
+                  onContourDelete={(contourId) => {
+                    return handleDeleteContourFromTable(contourId);
+                  }}
+                />
+              </div>
+            ) : (
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable masks={[]} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -819,7 +896,7 @@ const ImageViewerWithPrompting = () => {
                 </div>
               </div>
 
-              <div className="mt-2 p-2 bg-blue-50 text-blue-700 rounded">
+              <div className="mt-2 p-2 bg-teal-50 text-teal-700 rounded">
                 Saving mask as:{" "}
                 <strong>{customSaveMaskLabel.trim() || saveMaskLabel}</strong>
               </div>
@@ -837,7 +914,7 @@ const ImageViewerWithPrompting = () => {
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -852,19 +929,6 @@ const ImageViewerWithPrompting = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Quantification Table */}
-      {segmentationMasks.length > 0 ? (
-        <div style={{ marginTop: 24 }}>
-          <Typography variant="h6">Quantification</Typography>
-          <QuantificationTable masks={segmentationMasks} />
-        </div>
-      ) : (
-        <div style={{ marginTop: 24 }}>
-          <Typography variant="h6">Quantification</Typography>
-          <QuantificationTable masks={[]} />
         </div>
       )}
     </div>

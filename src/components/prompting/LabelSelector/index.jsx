@@ -1,35 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import api from '../../../api';
+import * as api from '../../../api';
+import { useDataset } from '../../../contexts/DatasetContext';
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
-  // Initial state with hierarchical structure
-  const [classStructure, setClassStructure] = useState([
-    {
-      id: 1,
-      name: 'Coral',
-      subclasses: [
-        { id: 11, name: 'Polyp' },
-        { id: 12, name: 'Skeleton' }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Ruler',
-      subclasses: []
-    },
-    {
-      id: 3,
-      name: 'Petri dish',
-      subclasses: []
-    }
-  ]);
+  // Get current dataset context
+  const { currentDataset } = useDataset();
+  
+  // Dynamic state from backend API
+  const [classStructure, setClassStructure] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // State to track if a contour is selected (for demonstration purposes)
-  const [contourSelected, setContourSelected] = useState(false);
   // Toggle expanded state for the selector
   const [expanded, setExpanded] = useState(false);
-  // Currently selected parent class (for adding new subclasses)
-  const [selectedParentClass, setSelectedParentClass] = useState(null);
   // New class/subclass modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalType, setAddModalType] = useState(null); // 'class' or 'subclass'
@@ -38,6 +22,104 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   
   // Click outside handler
   const dropdownRef = useRef(null);
+
+  // Fetch labels from backend when dataset changes
+  useEffect(() => {
+    const fetchLabelsFromBackend = async () => {
+      if (!currentDataset) {
+        // Set default labels when no dataset is selected
+        setClassStructure([
+          {
+            id: 1,
+            name: 'Coral',
+            subclasses: [
+              { id: 11, name: 'Polyp' },
+              { id: 12, name: 'Skeleton' }
+            ]
+          },
+          {
+            id: 2,
+            name: 'Ruler',
+            subclasses: []
+          },
+          {
+            id: 3,
+            name: 'Petri dish',
+            subclasses: []
+          }
+        ]);
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const labels = await api.fetchLabels(currentDataset.id);
+        
+        if (labels && labels.length > 0) {
+          // Transform backend labels into hierarchical structure
+          const transformedLabels = transformLabelsToHierarchy(labels);
+          setClassStructure(transformedLabels);
+          
+          // Auto-select first label if none is selected
+          if (!currentLabel && transformedLabels.length > 0) {
+            setCurrentLabel(transformedLabels[0].id);
+          }
+        } else {
+          // No labels found, use defaults
+          setClassStructure([
+            {
+              id: 1,
+              name: 'Coral',
+              subclasses: []
+            }
+          ]);
+        }
+      } catch (err) {
+        console.error('Error fetching labels:', err);
+        setError(err.message);
+        // Fall back to default labels
+        setClassStructure([
+          {
+            id: 1,
+            name: 'Coral',
+            subclasses: []
+          },
+          {
+            id: 2,
+            name: 'Ruler',
+            subclasses: []
+          }
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLabelsFromBackend();
+  }, [currentDataset, currentLabel]);
+
+  // Transform flat backend labels into hierarchical structure
+  const transformLabelsToHierarchy = (labels) => {
+    // Root labels have parent_id = null or undefined
+    const rootLabels = labels.filter(label => !label.parent_id || label.parent_id === null);
+    // Child labels have a valid parent_id
+    const childLabels = labels.filter(label => label.parent_id !== null && label.parent_id !== undefined);
+    
+    return rootLabels.map(rootLabel => ({
+      id: rootLabel.id,
+      name: rootLabel.name,
+      value: rootLabel.value,
+      subclasses: childLabels
+        .filter(child => child.parent_id === rootLabel.id)
+        .map(child => ({
+          id: child.id,
+          name: child.name,
+          value: child.value
+        }))
+    }));
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -56,13 +138,11 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   // Handle clicking on a class checkbox
   const handleClassSelect = (classItem) => {
     setCurrentLabel(classItem.id);
-    setSelectedParentClass(classItem);
   };
 
   // Handle clicking on a subclass checkbox
   const handleSubclassSelect = (subclass, parentClass) => {
     setCurrentLabel(subclass.id);
-    setSelectedParentClass(parentClass);
   };
 
   // Open modal to add a new class
@@ -82,48 +162,76 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   };
 
   // Handle adding a new class
-  const handleAddNewClass = () => {
-    if (!newItemName || newItemName.trim() === '') return;
+  const handleAddNewClass = async () => {
+    if (!newItemName || newItemName.trim() === '' || !currentDataset) return;
     
-    const newClassId = Math.max(...classStructure.map(c => c.id)) + 1;
-    const newClass = {
-      id: newClassId,
-      name: newItemName.trim(),
-      subclasses: []
-    };
-    
-    setClassStructure(prev => [...prev, newClass]);
-    setCurrentLabel(newClassId);
-    setSelectedParentClass(newClass);
-    setShowAddModal(false);
+    setLoading(true);
+    try {
+      const result = await api.createLabel(
+        { name: newItemName.trim(), parent_id: null }, // null for top-level class
+        currentDataset.id
+      );
+      
+      if (result.success) {
+        // Refresh the labels from backend
+        const labels = await api.fetchLabels(currentDataset.id);
+        const transformedLabels = transformLabelsToHierarchy(labels);
+        setClassStructure(transformedLabels);
+        
+        // Select the new class
+        setCurrentLabel(result.class_id);
+        setShowAddModal(false);
+        setNewItemName('');
+      }
+    } catch (err) {
+      console.error('Error creating new class:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle adding a new subclass
-  const handleAddNewSubclass = () => {
-    if (!newItemName || newItemName.trim() === '' || !targetParentClass) return;
+  const handleAddNewSubclass = async () => {
+    if (!newItemName || newItemName.trim() === '' || !targetParentClass || !currentDataset) return;
     
-    // Generate a new ID for the subclass, using the parent class ID as prefix
-    const subclassBaseId = targetParentClass.id * 10;
-    const existingSubclassIds = targetParentClass.subclasses.map(sub => sub.id);
-    const newSubclassId = existingSubclassIds.length > 0 
-      ? Math.max(...existingSubclassIds) + 1 
-      : subclassBaseId + 1;
+    setLoading(true);
+    try {
+      const result = await api.createLabel(
+        { name: newItemName.trim(), parent_id: targetParentClass.id }, 
+        currentDataset.id
+      );
+      
+      if (result.success) {
+        // Refresh the labels from backend
+        const labels = await api.fetchLabels(currentDataset.id);
+        const transformedLabels = transformLabelsToHierarchy(labels);
+        setClassStructure(transformedLabels);
+        
+        // Select the new subclass
+        setCurrentLabel(result.class_id);
+        setShowAddModal(false);
+        setNewItemName('');
+      }
+    } catch (err) {
+      console.error('Error creating new subclass:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to check if a parent class should show its subclasses
+  const shouldShowSubclasses = (classItem) => {
+    // Show subclasses if:
+    // 1. The parent class itself is selected
+    if (currentLabel === classItem.id) return true;
     
-    const newSubclass = {
-      id: newSubclassId,
-      name: newItemName.trim()
-    };
+    // 2. Any of the subclasses is selected
+    const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
+    if (hasSelectedSubclass) return true;
     
-    // Update the class structure with the new subclass
-    setClassStructure(prev => prev.map(c => 
-      c.id === targetParentClass.id 
-        ? {...c, subclasses: [...c.subclasses, newSubclass]} 
-        : c
-    ));
-    
-    // Select the new subclass
-    setCurrentLabel(newSubclassId);
-    setShowAddModal(false);
+    return false;
   };
 
   // Find the currently selected class or subclass
@@ -163,109 +271,161 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
       {/* Dropdown Button */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-left bg-white border-2 border-blue-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        disabled={loading}
+        className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 border-blue-200 rounded-lg shadow-sm hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
-        <span className="block truncate">{getDisplayName()}</span>
-        <svg className={`w-5 h-5 ml-2 transition-transform ${expanded ? 'transform rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
+        <div className="flex items-center flex-1 min-w-0">
+          <div className="flex-shrink-0 w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
+          <span className="block truncate text-gray-900">
+          {loading ? 'Loading labels...' : getDisplayName()}
+        </span>
+        </div>
+        {loading ? (
+          <div className="w-5 h-5 ml-2 animate-spin">
+            <svg className="w-full h-full text-blue-500" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" className="opacity-25" fill="none" />
+              <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        ) : (
+          <ChevronDownIcon className={`w-5 h-5 ml-2 text-gray-400 transition-transform duration-200 ${expanded ? 'transform rotate-180' : ''}`} />
+        )}
       </button>
 
       {/* Expanded Tree View */}
       {expanded && (
-        <div className="absolute z-10 w-64 mt-1 bg-white rounded-md shadow-lg border border-gray-200">
-          <div className="p-3">
-            <p className="text-xs text-gray-500 mb-3 font-medium">
-              {contourSelected 
-                ? "Coral contour is selected:" 
-                : "No contour selected:"}
-            </p>
+        <div className="absolute z-10 w-72 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-4">
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                Error: {error}
+                </div>
+              </div>
+            )}
             
-            <ul className="space-y-2.5">
-              {classStructure.map((classItem) => (
-                <li key={classItem.id} className="relative">
-                  <div className="flex items-center">
-                    <span className="inline-block w-4 mr-1 text-gray-400">•</span>
-                    <div className="flex items-center flex-grow">
-                      <input
-                        type="checkbox"
-                        id={`class-${classItem.id}`}
-                        checked={currentLabel === classItem.id}
-                        onChange={() => handleClassSelect(classItem)}
-                        className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <label 
-                        htmlFor={`class-${classItem.id}`}
-                        className={`text-sm font-medium ${currentLabel === classItem.id ? 'text-blue-600' : 'text-gray-900'} cursor-pointer`}
+
+            
+            <div className="space-y-1">
+              {classStructure.map((classItem) => {
+                const showSubclasses = shouldShowSubclasses(classItem);
+                const isParentSelected = currentLabel === classItem.id;
+                const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
+                
+                return (
+                  <div key={classItem.id} className="relative">
+                    {/* Parent Class */}
+                    <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${isParentSelected ? 'bg-blue-50 border border-blue-200' : ''}`}>
+                      <button
+                        onClick={() => handleClassSelect(classItem)}
+                        className="flex items-center flex-grow text-left"
                       >
+                        <div className="flex items-center">
+                          {classItem.subclasses.length > 0 && (
+                            <div className="mr-2">
+                              {showSubclasses ? (
+                                <ChevronDownIcon className="w-4 h-4 text-gray-400" />
+                              ) : (
+                                <ChevronRightIcon className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                          )}
+                          <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                            isParentSelected 
+                              ? 'bg-blue-500 border-blue-500' 
+                              : hasSelectedSubclass
+                              ? 'bg-blue-100 border-blue-300'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}>
+                            {isParentSelected && (
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                            {hasSelectedSubclass && !isParentSelected && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            )}
+                          </div>
+                          <span className={`text-sm font-medium ${
+                            isParentSelected 
+                              ? 'text-blue-700' 
+                              : hasSelectedSubclass
+                              ? 'text-blue-600'
+                              : 'text-gray-900'
+                          }`}>
                         {classItem.name}
-                      </label>
+                          </span>
                     </div>
+                      </button>
+                      
+                      {/* Add subclass button */}
+                      {isParentSelected && (
+                        <button
+                          onClick={() => handleAddNewSubclassClick(classItem)}
+                          className="ml-2 p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors duration-150"
+                          title="Add subclass"
+                        >
+                          <PlusIcon className="w-4 h-4" />
+                        </button>
+                      )}
                   </div>
 
                   {/* Subclasses */}
-                  {(currentLabel === classItem.id || contourSelected) && classItem.subclasses.length > 0 && (
-                    <ul className="mt-1.5 ml-6 space-y-1.5">
-                      {classItem.subclasses.map((subclass) => (
-                        <li key={subclass.id} className="flex items-center">
-                          <span className="inline-block w-3 mr-1 text-gray-400">○</span>
-                          <div className="flex items-center flex-grow">
-                            <input
-                              type="checkbox"
-                              id={`subclass-${subclass.id}`}
-                              checked={currentLabel === subclass.id}
-                              onChange={() => handleSubclassSelect(subclass, classItem)}
-                              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <label 
-                              htmlFor={`subclass-${subclass.id}`}
-                              className={`text-sm ${currentLabel === subclass.id ? 'text-blue-600 font-medium' : 'text-gray-700'} cursor-pointer`}
+                    {showSubclasses && classItem.subclasses.length > 0 && (
+                      <div className="ml-6 mt-1 space-y-1">
+                        {classItem.subclasses.map((subclass) => {
+                          const isSubclassSelected = currentLabel === subclass.id;
+                          
+                          return (
+                            <button
+                              key={subclass.id}
+                              onClick={() => handleSubclassSelect(subclass, classItem)}
+                              className={`flex items-center w-full p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${
+                                isSubclassSelected ? 'bg-blue-50 border border-blue-200' : ''
+                              }`}
                             >
+                              <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                                isSubclassSelected 
+                                  ? 'bg-blue-500 border-blue-500' 
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}>
+                                {isSubclassSelected && (
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                              <span className={`text-sm ${
+                                isSubclassSelected ? 'text-blue-700 font-medium' : 'text-gray-700'
+                              }`}>
                               {subclass.name}
-                            </label>
+                              </span>
+                            </button>
+                          );
+                        })}
                           </div>
-                        </li>
-                      ))}
-                    </ul>
                   )}
-                </li>
-              ))}
+                  </div>
+                );
+              })}
 
               {/* Add new class option */}
-              <li className="relative pt-1 mt-1 border-t border-gray-100">
+              <div className="pt-3 mt-3 border-t border-gray-200">
                 <button
                   onClick={handleAddNewClassClick}
-                  className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  className="flex items-center w-full p-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
                 >
-                  <span className="inline-block w-4 mr-1 text-blue-600">•</span>
-                  <span className="text-blue-600">+ New class</span>
+                  <PlusIcon className="w-4 h-4 mr-3" />
+                  <span className="font-medium">Add new class</span>
                 </button>
-              </li>
-
-              {/* Add new subclass option - only show if a class is selected and not a subclass */}
-              {selectedItem && !isSubclass && (
-                <li className="relative ml-6">
-                  <button
-                    onClick={() => handleAddNewSubclassClick(selectedItem)}
-                    className="flex items-center text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    <span className="inline-block w-3 mr-1 text-blue-600">○</span>
-                    <span className="text-blue-600">+ New subclass</span>
-                  </button>
-                </li>
-              )}
-            </ul>
+              </div>
+            </div>
           </div>
 
-          {/* For demonstration - toggle between contour selected/not selected states */}
-          <div className="p-2 border-t border-gray-200 text-center">
-            <button
-              onClick={() => setContourSelected(!contourSelected)}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
-              Toggle contour selection demo
-            </button>
-          </div>
+
         </div>
       )}
 
@@ -279,45 +439,53 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
             </div>
 
             {/* Modal */}
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-6 pt-6 pb-4">
                 <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-xl leading-6 font-semibold text-gray-900 mb-2">
                       {addModalType === 'class' 
-                        ? 'Enter new class name:' 
-                        : `Enter new subclass name for ${targetParentClass?.name}:`}
+                        ? 'Add New Class' 
+                        : `Add New Subclass`}
                     </h3>
-                    <div className="mt-2">
+                    {addModalType === 'subclass' && (
+                      <p className="text-sm text-gray-600 mb-4">
+                        Adding subclass to <span className="font-medium text-blue-600">{targetParentClass?.name}</span>
+                      </p>
+                    )}
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {addModalType === 'class' ? 'Class Name' : 'Subclass Name'}
+                      </label>
                       <input
                         type="text"
                         value={newItemName}
                         onChange={(e) => setNewItemName(e.target.value)}
-                        placeholder={addModalType === 'class' ? "Class name" : "Subclass name"}
-                        className="w-full p-2 border-2 border-green-500 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder={addModalType === 'class' ? "Enter class name..." : "Enter subclass name..."}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                         autoFocus
                       />
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+              <div className="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
                   onClick={addModalType === 'class' ? handleAddNewClass : handleAddNewSubclass}
                   disabled={!newItemName.trim()}
-                  className={`w-full inline-flex justify-center rounded-md px-4 py-2 text-base font-medium text-white sm:ml-3 sm:w-auto sm:text-sm ${
+                  className={`w-full inline-flex justify-center rounded-lg px-6 py-3 text-base font-medium text-white sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200 ${
                     newItemName.trim() 
-                      ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
-                      : 'bg-green-300 cursor-not-allowed'
+                      ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
+                      : 'bg-gray-300 cursor-not-allowed'
                   }`}
                 >
-                  OK
+                  Create {addModalType === 'class' ? 'Class' : 'Subclass'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-teal-100 text-base font-medium text-gray-700 hover:bg-teal-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-6 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200"
                 >
                   Cancel
                 </button>
