@@ -18,6 +18,7 @@ const ImageDisplay = ({
   currentLabel,
   handleContourSelect,
   handleAddSelectedContoursToFinalMask,
+  handleClearSegmentationResults,
   zoomLevel,
   zoomCenter,
   showAnnotationViewer,
@@ -146,6 +147,7 @@ const ImageDisplay = ({
                         onAddToFinalMask={
                           handleAddSelectedContoursToFinalMask
                         }
+                        onClearSegmentationResults={handleClearSegmentationResults}
                         zoomLevel={zoomLevel}
                         zoomCenter={zoomCenter}
                       />
@@ -191,6 +193,7 @@ const ImageDisplay = ({
                 );
                 handleAddSelectedContoursToFinalMask(contours);
               }}
+              onClearSegmentationResults={handleClearSegmentationResults}
               zoomLevel={zoomLevel}
               zoomCenter={zoomCenter}
               selectedFinalMaskContour={selectedFinalMaskContour}

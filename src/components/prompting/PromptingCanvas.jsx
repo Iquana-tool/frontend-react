@@ -27,6 +27,7 @@ const PromptingCanvas = forwardRef(({
   selectedContour,
   onContourSelect,
   onAddToFinalMask,
+  onClearSegmentationResults,
   selectedFinalMaskContour,
   finalMasks,
 }, ref) => {
@@ -1514,8 +1515,28 @@ const PromptingCanvas = forwardRef(({
         {selectedMask && selectedMask.contours && selectedMask.contours.length > 0 && (
           <div className="absolute top-2 right-2 bg-white bg-opacity-95 p-3 rounded-lg shadow-md z-20 border border-blue-100">
             <div className="flex flex-col gap-2">
-              <div className="text-sm font-medium text-blue-800 mb-1">
-                Segmentation Results
+              <div className="flex justify-between items-center mb-1">
+                <div className="text-sm font-medium text-blue-800">
+                  Segmentation Results
+                </div>
+                <button
+                  onClick={() => {
+                    console.log("[PromptingCanvas] Clear segmentation results button clicked");
+                    if (onClearSegmentationResults) {
+                      onClearSegmentationResults();
+                    }
+                    // Also clear local state
+                    setSelectedMask(null);
+                    setSelectedContours([]);
+                    redrawCanvas();
+                  }}
+                  className="p-1 rounded-md text-red-600 hover:bg-red-50 transition-colors"
+                  title="Clear segmentation results"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
               </div>
               
               {selectedContours && selectedContours.length > 0 ? (
