@@ -1468,7 +1468,7 @@ const PromptingCanvas = forwardRef(({
     <div className="flex flex-col h-full">
       <div 
         ref={containerRef}
-        className="relative flex-1 overflow-hidden border border-gray-200 rounded"
+        className="relative flex-1 overflow-hidden"
         style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
       >
         {loading && (
@@ -1484,22 +1484,7 @@ const PromptingCanvas = forwardRef(({
           className="touch-none"
         />
         
-        {/* Minimalist info panel */}
-        <div className="absolute top-2 left-2 bg-white bg-opacity-90 p-2 rounded-md shadow-sm text-xs max-w-xs">
-          <div className="flex items-center justify-between mb-1">
-            <div className="text-gray-600">
-              <span className="font-medium">Pan:</span> Alt/Option + Drag
-            </div>
-            <div className="ml-3 px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
-              {Math.round(zoomLevel * 100)}%
-            </div>
-          </div>
-          {cursorPos && (
-            <div className="text-gray-500 text-xs">
-              Position: {Math.round(cursorPos.x)}, {Math.round(cursorPos.y)}
-            </div>
-          )}
-        </div>
+
         
         {/* Status messages */}
         {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.length > 0 && (
