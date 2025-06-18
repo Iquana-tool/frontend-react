@@ -487,9 +487,6 @@ const PromptingCanvas = forwardRef(({
 
     // Restore the canvas context
     ctx.restore();
-
-    // Debug log
-    console.log('RedrawCanvas:', { panOffset, zoomLevel, centerX, centerY, scale, scaledWidth, scaledHeight });
   };
 
   // Expose methods to parent component via ref

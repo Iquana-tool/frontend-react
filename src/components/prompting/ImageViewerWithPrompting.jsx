@@ -240,7 +240,8 @@ const ImageViewerWithPrompting = () => {
         zoomCenter,
         canvasImage,
         selectedContours,
-        bestMask
+        bestMask,
+        finalMask
       );
 
       if (result) {
@@ -279,6 +280,7 @@ const ImageViewerWithPrompting = () => {
     canvasImage,
     selectedContours,
     bestMask,
+    finalMask,
     segmentationPromptingComplete,
   ]);
 
