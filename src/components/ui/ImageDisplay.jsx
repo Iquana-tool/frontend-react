@@ -380,31 +380,33 @@ const ImageDisplay = ({
         </div>
       )}
 
-      {/* Final Mask Viewer - Now side-by-side with Annotation Drawing Area */}
-      <MaskManager
-        segmentationMasks={segmentationMasks}
-        selectedMask={selectedMask}
-        selectedContours={selectedContours}
-        isSegmenting={isSegmenting}
-        loading={loading}
-        finalMasks={finalMasks}
-        finalMask={finalMask}
-        selectedFinalMaskContour={selectedFinalMaskContour}
-        zoomLevel={zoomLevel}
-        canvasImage={canvasImage}
-        finalMaskCanvasRef={finalMaskCanvasRef}
-        handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
-        handleDeleteSelectedContours={handleDeleteSelectedContours}
-        setSelectedContours={setSelectedContours}
-        handleRunNewSegmentation={handleRunNewSegmentation}
-        handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
-        handleDeleteFinalMaskContour={handleDeleteFinalMaskContour}
-        clearAllFinalMaskContours={clearAllFinalMaskContours}
-        setSelectedFinalMaskContour={setSelectedFinalMaskContour}
-        setZoomLevel={setZoomLevel}
-        handleFinalMaskContourSelect={handleFinalMaskContourSelect}
-        drawFinalMaskCanvas={drawFinalMaskCanvas}
-      />
+      {/* Final Mask Viewer - Only show when there are final masks with contours or selected contours */}
+      {((finalMasks.length > 0 && finalMasks.some(mask => mask.contours && mask.contours.length > 0)) || selectedContours.length > 0) && (
+        <MaskManager
+          segmentationMasks={segmentationMasks}
+          selectedMask={selectedMask}
+          selectedContours={selectedContours}
+          isSegmenting={isSegmenting}
+          loading={loading}
+          finalMasks={finalMasks}
+          finalMask={finalMask}
+          selectedFinalMaskContour={selectedFinalMaskContour}
+          zoomLevel={zoomLevel}
+          canvasImage={canvasImage}
+          finalMaskCanvasRef={finalMaskCanvasRef}
+          handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
+          handleDeleteSelectedContours={handleDeleteSelectedContours}
+          setSelectedContours={setSelectedContours}
+          handleRunNewSegmentation={handleRunNewSegmentation}
+          handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
+          handleDeleteFinalMaskContour={handleDeleteFinalMaskContour}
+          clearAllFinalMaskContours={clearAllFinalMaskContours}
+          setSelectedFinalMaskContour={setSelectedFinalMaskContour}
+          setZoomLevel={setZoomLevel}
+          handleFinalMaskContourSelect={handleFinalMaskContourSelect}
+          drawFinalMaskCanvas={drawFinalMaskCanvas}
+        />
+      )}
     </div>
   );
 };
