@@ -60,6 +60,8 @@ const PromptingCanvas = forwardRef(({
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
   const [panStartOffset, setPanStartOffset] = useState({ x: 0, y: 0 });
   const panOffsetRef = useRef({ x: 0, y: 0 });
+  // Ref used to throttle redraws during panning
+  const panRafIdRef = useRef(null);
 
 
   useEffect(() => {
@@ -554,6 +556,16 @@ const PromptingCanvas = forwardRef(({
         appliedLevel: level,
         appliedCenter: center
       };
+    },
+    // Expose simple zoom helpers for parent components / toolbar
+    zoomIn: () => {
+      handleZoomIn();
+    },
+    zoomOut: () => {
+      handleZoomOut();
+    },
+    resetView: () => {
+      handleResetView();
     }
   }));
 
@@ -810,7 +822,17 @@ const PromptingCanvas = forwardRef(({
   // Handle panning with middle mouse button or Alt+left click
   const handlePanStart = (e) => {
     if (!image) return;
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Begin panning in three situations:
+    // 1. Middle-mouse button (button === 1)
+    // 2. Alt/Option + Left click (existing behaviour)
+    // 3. Drag tool is active with primary button (makes the toolbar "hand" tool work)
+    const leftClick = e.button === 0;
+    const middleClick = e.button === 1;
+    const altDrag = leftClick && e.altKey;
+
+    const dragToolActive = activeTool === "drag" && leftClick;
+
+    if (middleClick || altDrag || dragToolActive) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY });
@@ -857,7 +879,13 @@ const PromptingCanvas = forwardRef(({
     };
     newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
     panOffsetRef.current = newOffset;
-    redrawCanvasWithPanOffset(newOffset);
+    // Throttle redraws to animation frames for smoother experience
+    if (panRafIdRef.current === null) {
+      panRafIdRef.current = window.requestAnimationFrame(() => {
+        redrawCanvasWithPanOffset(panOffsetRef.current);
+        panRafIdRef.current = null;
+      });
+    }
   };
 
   const handlePanEnd = () => {
@@ -865,6 +893,10 @@ const PromptingCanvas = forwardRef(({
       setIsPanning(false);
       if (panOffsetRef.current) {
         setPanOffset({ ...panOffsetRef.current });
+      }
+      if (panRafIdRef.current !== null) {
+        cancelAnimationFrame(panRafIdRef.current);
+        panRafIdRef.current = null;
       }
     }
   };

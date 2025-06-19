@@ -6,7 +6,10 @@ import {
   Pentagon, 
   Move, 
   Download, 
-  Pointer 
+  Pointer, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw 
 } from 'lucide-react';
 import LabelSelector from '../prompting/LabelSelector';
 
@@ -17,12 +20,45 @@ const ToolsPanel = ({
   currentLabel,
   setCurrentLabel,
   segmentationMasks,
-  exportQuantificationsAsCsv
+  exportQuantificationsAsCsv,
+  zoomLevel,
+  setZoomLevel,
+  setZoomCenter
 }) => {
   const handleToolChange = (tool) => {
     setPromptType(tool);
     if (promptingCanvasRef.current) {
       promptingCanvasRef.current.setActiveTool(tool === 'point' ? 'point' : tool);
+    }
+  };
+
+  const handleZoom = (direction) => {
+    if (setZoomLevel) {
+      setZoomLevel((prev) => {
+        const newLevel = direction === 'in' ? Math.min(prev * 1.2, 5) : Math.max(prev / 1.2, 0.5);
+        if (!setZoomCenter) return newLevel;
+        // Ensure we have a center when zooming from 1 → something
+        if (newLevel !== 1 && (!zoomLevel || zoomLevel === 1)) {
+          setZoomCenter({ x: 0.5, y: 0.5 });
+        }
+        return newLevel;
+      });
+    } else if (promptingCanvasRef.current) {
+      // Fallback to internal canvas zoom helpers
+      if (direction === 'in' && promptingCanvasRef.current.zoomIn) promptingCanvasRef.current.zoomIn();
+      if (direction === 'out' && promptingCanvasRef.current.zoomOut) promptingCanvasRef.current.zoomOut();
+    }
+  };
+
+  const handleResetView = () => {
+    if (setZoomLevel) {
+      setZoomLevel(1);
+    }
+    if (setZoomCenter) {
+      setZoomCenter(null);
+    }
+    if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+      promptingCanvasRef.current.resetView();
     }
   };
 
@@ -106,6 +142,31 @@ const ToolsPanel = ({
           title="Polygon Tool"
         >
           <Pentagon className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Zoom Controls */}
+      <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
+        <button
+          className="p-2 transition-colors hover:bg-gray-100"
+          onClick={() => handleZoom('in')}
+          title="Zoom In (Ctrl + Scroll Up)"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </button>
+        <button
+          className="p-2 transition-colors hover:bg-gray-100"
+          onClick={() => handleZoom('out')}
+          title="Zoom Out (Ctrl + Scroll Down)"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </button>
+        <button
+          className="p-2 transition-colors hover:bg-gray-100"
+          onClick={handleResetView}
+          title="Reset View"
+        >
+          <RotateCcw className="w-4 h-4" />
         </button>
       </div>
 

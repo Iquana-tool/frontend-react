@@ -697,6 +697,9 @@ const ImageViewerWithPrompting = () => {
                   setCurrentLabel={setCurrentLabel}
                   segmentationMasks={segmentationMasks}
                   exportQuantificationsAsCsv={exportQuantificationsAsCsv}
+                  zoomLevel={zoomLevel}
+                  setZoomLevel={setZoomLevel}
+                  setZoomCenter={setZoomCenter}
                 />
 
                 {/* Image Display Component */}
