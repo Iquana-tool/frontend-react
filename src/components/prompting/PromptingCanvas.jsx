@@ -72,12 +72,6 @@ const PromptingCanvas = forwardRef(({
     }
   }, [selectedMaskProp]);
 
-  // Redraw when selectedFinalMaskContour changes
-  useEffect(() => {
-    if (image) {
-      redrawCanvas();
-    }
-  }, [selectedFinalMaskContour]);
 
   // Update zoom level and center when external props change
   useEffect(() => {
@@ -571,12 +565,19 @@ const PromptingCanvas = forwardRef(({
     }
   }));
 
+  // Redraw when selectedFinalMaskContour changes
+  useEffect(() => {
+    if (image) {
+      redrawCanvas();
+    }
+  }, [image, redrawCanvas, selectedFinalMaskContour]);
+
   // Update canvas when image or selected mask changes
   useEffect(() => {
     if (canvasRef.current && image) {
       redrawCanvas();
     }
-  }, [image, selectedMask, prompts, currentPolygon, currentShape, zoomLevel, panOffset, canvasSize, initialScale]);
+  }, [image, selectedMask, prompts, currentPolygon, currentShape, zoomLevel, panOffset, canvasSize, initialScale, redrawCanvas]);
 
   // Update internal selectedMask state when prop changes
   useEffect(() => {
@@ -587,7 +588,7 @@ const PromptingCanvas = forwardRef(({
     } else if (!selectedMaskProp && selectedMask) {
       setSelectedMask(null);
     }
-  }, [selectedMaskProp]);
+  }, [selectedMask, selectedMaskProp]);
 
   // Initialize based on selected contour if provided
   useEffect(() => {
@@ -715,22 +716,7 @@ const PromptingCanvas = forwardRef(({
     }, 100);
   }, [image]);
 
-  // Monitor container size changes for responsive behavior
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateCanvasSize();
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      if (containerRef.current) {
-        resizeObserver.unobserve(containerRef.current);
-      }
-    };
-  }, []);
+  
 
   // Update canvas based on container size
   const updateCanvasSize = () => {
@@ -757,6 +743,23 @@ const PromptingCanvas = forwardRef(({
     redrawCanvas(scale);
   };
 
+  // Monitor container size changes for responsive behavior
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateCanvasSize();
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      if (containerRef.current) {
+        resizeObserver.unobserve(containerRef.current);
+      }
+    };
+  }, [updateCanvasSize]);
+
   // Add useEffect to watch for selectedMask changes
   useEffect(() => {
     if (canvasRef.current && image) {
@@ -770,14 +773,14 @@ const PromptingCanvas = forwardRef(({
         redrawCanvas();
       }, 100);
     }
-  }, [selectedMask]);
+  }, [image, redrawCanvas, selectedMask]);
 
   // Update canvas when view parameters change
   useEffect(() => {
     if (canvasRef.current && image) {
       redrawCanvas();
     }
-  }, [zoomLevel, panOffset, prompts, canvasSize, initialScale, selectedMask, image]);
+  }, [zoomLevel, panOffset, prompts, canvasSize, initialScale, selectedMask, image, redrawCanvas]);
 
   // Handle wheel event for zooming with smooth zoom at mouse position
   const handleWheel = useCallback((e) => {
@@ -1294,11 +1297,7 @@ const PromptingCanvas = forwardRef(({
         }
       }
     }
-  }, [
-    image, isPanning, isDrawing, selectedMask, selectedContours, promptType,
-    currentLabel, activeTool, loading, isPointInContour, canvasToImageCoords,
-    handlePanStart, addPointPrompt, redrawCanvas, currentPolygon, onContourSelect, prompts
-  ]);
+  }, [image, isPanning, selectedMask, selectedContours, promptType, currentLabel, activeTool, loading, isPointInContour, canvasToImageCoords, handlePanStart, addPointPrompt, redrawCanvas, currentPolygon, onContourSelect, prompts]);
 
   // Handle mouse move event
   const handleMouseMove = useCallback((e) => {
@@ -1337,7 +1336,7 @@ const PromptingCanvas = forwardRef(({
 
     // Force redraw
     redrawCanvas();
-  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords, redrawCanvas, isPanning, handlePanMove]);
+  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords, redrawCanvas, handlePanMove]);
 
   // Handle mouse up event
   const handleMouseUp = useCallback((e) => {
