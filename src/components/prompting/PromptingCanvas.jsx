@@ -41,7 +41,7 @@ const PromptingCanvas = forwardRef(({
   // View state
   const [zoomLevel, setZoomLevel] = useState(externalZoomLevel || 1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = useState(null);
   const [isPanning, setIsPanning] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,10 +58,12 @@ const PromptingCanvas = forwardRef(({
   const [zoomCenter, setZoomCenter] = useState(externalZoomCenter || null);
   const [selectedContours, setSelectedContours] = useState([]);
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
-  const [panStartOffset, setPanStartOffset] = useState({ x: 0, y: 0 });
+  
+  // Improved panning refs for smooth performance
+  const panStartRef = useRef(null);
   const panOffsetRef = useRef({ x: 0, y: 0 });
-  // Ref used to throttle redraws during panning
   const panRafIdRef = useRef(null);
+  const isDraggingRef = useRef(false);
 
 
   useEffect(() => {
@@ -777,8 +779,8 @@ const PromptingCanvas = forwardRef(({
     }
   }, [zoomLevel, panOffset, prompts, canvasSize, initialScale, selectedMask, image]);
 
-  // Handle wheel event for zooming
-  const handleWheel = (e) => {
+  // Handle wheel event for zooming with smooth zoom at mouse position
+  const handleWheel = useCallback((e) => {
     if (!image) return;
     e.preventDefault();
 
@@ -786,42 +788,49 @@ const PromptingCanvas = forwardRef(({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    // Convert mouse position to image coordinates before zoom
-    const beforeZoom = canvasToImageCoords(mouseX, mouseY);
-    if (!beforeZoom) return;
-
     // Calculate new zoom level
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoomLevel = Math.max(0.1, Math.min(10, zoomLevel * zoomFactor));
 
-    // Update zoom center to the point where mouse is hovering
-    if (beforeZoom) {
-      setZoomCenter({
-        x: beforeZoom.x / image.width,
-        y: beforeZoom.y / image.height
-      });
-    }
+    // Simple zoom at canvas center approach to avoid dependency issues
+    const oldZoomLevel = zoomLevel;
+    const scaleFactor = newZoomLevel / oldZoomLevel;
 
-    // Convert the same mouse position to image coordinates after zoom
+    // Calculate how much the view should shift to keep the mouse point fixed
+    const canvasCenterX = canvasSize.width / 2;
+    const canvasCenterY = canvasSize.height / 2;
+
+    // Calculate offset from canvas center to mouse position
+    const offsetX = mouseX - canvasCenterX;
+    const offsetY = mouseY - canvasCenterY;
+
+    // Calculate new pan offset to keep the point under mouse fixed
+    const newPanOffset = {
+      x: panOffset.x + offsetX * (1 - scaleFactor),
+      y: panOffset.y + offsetY * (1 - scaleFactor)
+    };
+
+    // Apply boundary constraints
+    const scale = initialScale;
+    const clampedPanOffset = clampPanOffset(newPanOffset, image, canvasSize, scale, newZoomLevel);
+
+    // Update states
     setZoomLevel(newZoomLevel);
-    const afterZoom = canvasToImageCoords(mouseX, mouseY);
-    if (!afterZoom) return;
+    setPanOffset(clampedPanOffset);
+    panOffsetRef.current = { ...clampedPanOffset };
 
-    // Adjust pan offset to keep the point under mouse cursor fixed
-    const dx = (afterZoom.x - beforeZoom.x) * initialScale * newZoomLevel;
-    const dy = (afterZoom.y - beforeZoom.y) * initialScale * newZoomLevel;
-    setPanOffset({
-      x: panOffset.x - dx,
-      y: panOffset.y - dy,
-    });
+    // Force redraw
+    setTimeout(() => {
+      redrawCanvas();
+    }, 0);
+  }, [image, zoomLevel, panOffset, canvasSize, initialScale, redrawCanvas]);
 
-    // Force redraw with new zoom level
-    redrawCanvas();
-  };
+
 
   // Handle panning with middle mouse button or Alt+left click
-  const handlePanStart = (e) => {
+  const handlePanStart = useCallback((e) => {
     if (!image) return;
+    
     // Begin panning in three situations:
     // 1. Middle-mouse button (button === 1)
     // 2. Alt/Option + Left click (existing behaviour)
@@ -829,16 +838,27 @@ const PromptingCanvas = forwardRef(({
     const leftClick = e.button === 0;
     const middleClick = e.button === 1;
     const altDrag = leftClick && e.altKey;
-
     const dragToolActive = activeTool === "drag" && leftClick;
 
     if (middleClick || altDrag || dragToolActive) {
       e.preventDefault();
+      e.stopPropagation();
+      
+      // Set panning state
       setIsPanning(true);
-      setPanStart({ x: e.clientX, y: e.clientY });
-      setPanStartOffset({ ...panOffsetRef.current });
+      isDraggingRef.current = true;
+      
+      // Store start position and current offset
+      const startPos = { x: e.clientX, y: e.clientY };
+      panStartRef.current = startPos;
+      setPanStart(startPos);
+      
+      // Update cursor style
+      if (containerRef.current) {
+        containerRef.current.style.cursor = 'grabbing';
+      }
     }
-  };
+  }, [image, activeTool]);
 
   const clampPanOffset = (offset, image, canvasSize, scale, zoomLevel) => {
     if (!image) return offset;
@@ -870,69 +890,124 @@ const PromptingCanvas = forwardRef(({
     return { x, y };
   };
 
-  const handlePanMove = (e) => {
-    if (!image || !isPanning || !panStart || !panStartOffset) return;
+  const handlePanMove = useCallback((e) => {
+    if (!image || !isDraggingRef.current || !panStartRef.current) return;
+    
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Calculate movement delta from the start position
+    const deltaX = e.clientX - panStartRef.current.x;
+    const deltaY = e.clientY - panStartRef.current.y;
+    
+    // Get the initial pan offset when dragging started (stored in panOffset state)
+    const initialPanOffset = panOffset;
+    
+    // Calculate new offset from the initial position when dragging started
     let newOffset = {
-      x: panStartOffset.x + (e.clientX - panStart.x),
-      y: panStartOffset.y + (e.clientY - panStart.y),
+      x: initialPanOffset.x + deltaX,
+      y: initialPanOffset.y + deltaY,
     };
+    
+    // Apply boundary constraints
     newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
-    panOffsetRef.current = newOffset;
-    // Throttle redraws to animation frames for smoother experience
+    
+    // Update the ref for immediate use
+    panOffsetRef.current = { ...newOffset };
+    
+    // Throttle redraws using requestAnimationFrame for smooth performance
     if (panRafIdRef.current === null) {
       panRafIdRef.current = window.requestAnimationFrame(() => {
-        redrawCanvasWithPanOffset(panOffsetRef.current);
+        redrawCanvasWithPanOffset(newOffset);
         panRafIdRef.current = null;
       });
     }
-  };
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset]);
 
-  const handlePanEnd = () => {
-    if (isPanning) {
+  const handlePanEnd = useCallback(() => {
+    if (isDraggingRef.current) {
+      // Sync the final pan offset from ref to state
+      const finalOffset = panOffsetRef.current;
+      setPanOffset({ ...finalOffset });
+      
+      // Reset panning state
       setIsPanning(false);
-      if (panOffsetRef.current) {
-        setPanOffset({ ...panOffsetRef.current });
-      }
+      isDraggingRef.current = false;
+      panStartRef.current = null;
+      setPanStart(null);
+      
+      // Cancel any pending animation frames
       if (panRafIdRef.current !== null) {
         cancelAnimationFrame(panRafIdRef.current);
         panRafIdRef.current = null;
       }
+      
+      // Reset cursor
+      if (containerRef.current) {
+        const cursor = activeTool === "drag" ? "grab" : "crosshair";
+        containerRef.current.style.cursor = cursor;
+      }
+      
+      // Force a final redraw with the complete rendering pipeline
+      setTimeout(() => {
+        redrawCanvas();
+      }, 0);
     }
-  };
+  }, [activeTool, redrawCanvas]);
 
-  // Helper to redraw with a given pan offset (for smooth panning)
-  const redrawCanvasWithPanOffset = (customPanOffset) => {
+  // Optimized helper to redraw with a given pan offset (for smooth panning)
+  const redrawCanvasWithPanOffset = useCallback((customPanOffset) => {
     if (!canvasRef.current || !image) return;
+    
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
+    
+    // Set canvas pixel dimensions (accounting for device pixel ratio for crisp rendering)
     const pixelRatio = window.devicePixelRatio || 1;
     canvas.width = canvasSize.width * pixelRatio;
     canvas.height = canvasSize.height * pixelRatio;
     canvas.style.width = `${canvasSize.width}px`;
     canvas.style.height = `${canvasSize.height}px`;
+    
+    // Scale context for high-DPI displays
     ctx.scale(pixelRatio, pixelRatio);
+    
+    // Clear canvas
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+    
+    // Apply view transformations
     ctx.save();
+    
+    // Center the image in the canvas
     const scale = initialScale;
     const scaledWidth = image.width * scale * zoomLevel;
     const scaledHeight = image.height * scale * zoomLevel;
+    
+    // Calculate centering offsets
     let centerX = (canvasSize.width - scaledWidth) / 2;
     let centerY = (canvasSize.height - scaledHeight) / 2;
+    
+    // If zoomCenter is provided, adjust centering to focus on that point
     if (zoomCenter && zoomLevel > 1) {
       const zoomCenterOffsetX = (zoomCenter.x - 0.5) * scaledWidth;
       const zoomCenterOffsetY = (zoomCenter.y - 0.5) * scaledHeight;
       centerX -= zoomCenterOffsetX;
       centerY -= zoomCenterOffsetY;
     }
+    
+    // Apply transformations: first panOffset, then zoom
     ctx.translate(customPanOffset.x + centerX, customPanOffset.y + centerY);
     ctx.scale(scale * zoomLevel, scale * zoomLevel);
+    
+    // Draw the image
     ctx.drawImage(image, 0, 0);
-    // ... (draw mask, prompts, etc. as in redrawCanvas)
-    // For brevity, call drawAllPrompts(ctx) and any other overlays here
+    
+    // Draw lightweight overlay elements for smooth panning
     drawAllPrompts(ctx);
+    
+    // Restore the canvas context
     ctx.restore();
-  };
+  }, [image, canvasSize, initialScale, zoomLevel, zoomCenter, drawAllPrompts]);
 
   // Convert canvas coordinates to image coordinates
   const canvasToImageCoords = (canvasX, canvasY) => {
@@ -1167,15 +1242,13 @@ const PromptingCanvas = forwardRef(({
 
     // If Alt/Option key is pressed, start panning
     if (e.altKey) {
-      e.preventDefault();
-      setIsPanning(true);
-      setPanStart({ x: canvasX, y: canvasY });
+      handlePanStart(e);
       return;
     }
 
     if (loading || !image) return;
 
-    if (activeTool === "drag" || e.button === 1 || e.altKey) {
+    if (activeTool === "drag" || e.button === 1) {
       handlePanStart(e);
       return;
     }
@@ -1243,7 +1316,7 @@ const PromptingCanvas = forwardRef(({
     setCursorPos({ x: imageCoords.x, y: imageCoords.y });
 
     // Handle panning if active
-    if (isPanning) {
+    if (isDraggingRef.current) {
       handlePanMove(e);
       return;
     }
@@ -1341,30 +1414,114 @@ const PromptingCanvas = forwardRef(({
     redrawCanvas();
   }, [image, promptType, currentPolygon, currentLabel, redrawCanvas]);
 
-  // Canvas control functions
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev * 1.2, 5));
-    
-    // If no specific zoom center is set, use the center of the image
-    if (!zoomCenter) {
-      setZoomCenter({ x: 0.5, y: 0.5 });
-    }
-  };
+  // Smooth zoom function that maintains view center (defined first to avoid dependency issues)
+  const handleSmoothZoom = useCallback((newZoomLevel, centerPoint = null) => {
+    if (!image || !canvasRef.current) return;
 
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev / 1.2, 0.5));
+    const oldZoomLevel = zoomLevel;
+    const zoomFactor = newZoomLevel / oldZoomLevel;
     
-    // If no specific zoom center is set, use the center of the image
-    if (!zoomCenter) {
-      setZoomCenter({ x: 0.5, y: 0.5 });
+    // Use provided center point or current zoom center or canvas center
+    let targetCenter = centerPoint;
+    if (!targetCenter) {
+      if (zoomCenter) {
+        targetCenter = { ...zoomCenter };
+      } else {
+        targetCenter = { x: 0.5, y: 0.5 }; // Center of image
+      }
     }
-  };
 
-  const handleResetView = () => {
+    // Calculate the current view center in canvas coordinates
+    const canvasCenterX = canvasSize.width / 2;
+    const canvasCenterY = canvasSize.height / 2;
+
+    // Convert canvas center to image coordinates at current zoom
+    const scale = initialScale;
+    const currentScaledWidth = image.width * scale * oldZoomLevel;
+    const currentScaledHeight = image.height * scale * oldZoomLevel;
+
+    // Calculate current image center position on canvas
+    let currentCenterX = (canvasSize.width - currentScaledWidth) / 2;
+    let currentCenterY = (canvasSize.height - currentScaledHeight) / 2;
+
+    // Apply current zoom center offset
+    if (zoomCenter && oldZoomLevel > 1) {
+      const currentZoomCenterOffsetX = (zoomCenter.x - 0.5) * currentScaledWidth;
+      const currentZoomCenterOffsetY = (zoomCenter.y - 0.5) * currentScaledHeight;
+      currentCenterX -= currentZoomCenterOffsetX;
+      currentCenterY -= currentZoomCenterOffsetY;
+    }
+
+    // Add current pan offset
+    currentCenterX += panOffset.x;
+    currentCenterY += panOffset.y;
+
+    // Calculate what the new scaled dimensions will be
+    const newScaledWidth = image.width * scale * newZoomLevel;
+    const newScaledHeight = image.height * scale * newZoomLevel;
+
+    // Calculate new center position
+    let newCenterX = (canvasSize.width - newScaledWidth) / 2;
+    let newCenterY = (canvasSize.height - newScaledHeight) / 2;
+
+    // Apply new zoom center offset
+    if (targetCenter && newZoomLevel > 1) {
+      const newZoomCenterOffsetX = (targetCenter.x - 0.5) * newScaledWidth;
+      const newZoomCenterOffsetY = (targetCenter.y - 0.5) * newScaledHeight;
+      newCenterX -= newZoomCenterOffsetX;
+      newCenterY -= newZoomCenterOffsetY;
+    }
+
+    // Calculate the pan offset needed to maintain the visual center
+    const centerOffsetX = canvasCenterX - currentCenterX;
+    const centerOffsetY = canvasCenterY - currentCenterY;
+
+    // Scale the offset by the zoom factor
+    const scaledOffsetX = centerOffsetX * zoomFactor;
+    const scaledOffsetY = centerOffsetY * zoomFactor;
+
+    // Calculate new pan offset
+    const newPanOffsetX = canvasCenterX - newCenterX - scaledOffsetX;
+    const newPanOffsetY = canvasCenterY - newCenterY - scaledOffsetY;
+
+    // Apply boundary constraints
+    let newPanOffset = { x: newPanOffsetX, y: newPanOffsetY };
+    newPanOffset = clampPanOffset(newPanOffset, image, canvasSize, scale, newZoomLevel);
+
+    // Update states
+    setZoomLevel(newZoomLevel);
+    setZoomCenter(targetCenter);
+    setPanOffset(newPanOffset);
+    panOffsetRef.current = { ...newPanOffset };
+
+    // Force redraw
+    setTimeout(() => {
+      redrawCanvas();
+    }, 0);
+  }, [image, zoomLevel, zoomCenter, panOffset, canvasSize, initialScale, redrawCanvas]);
+
+  // Canvas control functions that use handleSmoothZoom
+  const handleZoomIn = useCallback(() => {
+    const newZoomLevel = Math.min(zoomLevel * 1.2, 5);
+    handleSmoothZoom(newZoomLevel, { x: 0.5, y: 0.5 });
+  }, [zoomLevel, handleSmoothZoom]);
+
+  const handleZoomOut = useCallback(() => {
+    const newZoomLevel = Math.max(zoomLevel / 1.2, 0.5);
+    handleSmoothZoom(newZoomLevel, { x: 0.5, y: 0.5 });
+  }, [zoomLevel, handleSmoothZoom]);
+
+  const handleResetView = useCallback(() => {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
     setZoomCenter(null);
-  };
+    panOffsetRef.current = { x: 0, y: 0 };
+    
+    // Force redraw
+    setTimeout(() => {
+      redrawCanvas();
+    }, 0);
+  }, [redrawCanvas]);
 
   const handleToggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -1447,54 +1604,93 @@ const PromptingCanvas = forwardRef(({
     return true;
   };
 
-  // Update canvas cursor based on active tool
+  // Update canvas cursor based on active tool and panning state
   useEffect(() => {
     if (containerRef.current) {
-      if (activeTool === "drag" || isPanning) {
-        containerRef.current.style.cursor = isPanning ? "grabbing" : "grab";
+      if (isDraggingRef.current) {
+        containerRef.current.style.cursor = "grabbing";
+      } else if (activeTool === "drag") {
+        containerRef.current.style.cursor = "grab";
       } else {
         containerRef.current.style.cursor = "crosshair";
       }
     }
   }, [activeTool, isPanning]);
 
-  // Attach event listeners to canvas
+  // Improved event listener management for smooth panning
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const handleCanvasMouseDown = (e) => handleMouseDown(e);
     const handleCanvasMouseMove = (e) => handleMouseMove(e);
-    const handleCanvasMouseUp = (e) => handleMouseUp(e);
-    const handleCanvasMouseLeave = (e) => handleMouseUp(e);
+    const handleCanvasMouseUp = (e) => {
+      handleMouseUp(e);
+      handlePanEnd();
+    };
+    const handleCanvasMouseLeave = (e) => {
+      handleMouseUp(e);
+      handlePanEnd();
+    };
     const handleCanvasDoubleClick = (e) => handleDoubleClick(e);
     const handleCanvasWheel = (e) => handleWheel(e);
 
+    // Attach canvas events
     canvas.addEventListener('mousedown', handleCanvasMouseDown);
     canvas.addEventListener('mousemove', handleCanvasMouseMove);
     canvas.addEventListener('mouseup', handleCanvasMouseUp);
     canvas.addEventListener('mouseleave', handleCanvasMouseLeave);
     canvas.addEventListener('dblclick', handleCanvasDoubleClick);
-    canvas.addEventListener('wheel', handleCanvasWheel);
+    canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
+
+    // Global mouse events for smooth panning outside canvas
+    const handleGlobalMouseMove = (e) => {
+      if (isDraggingRef.current) {
+        handlePanMove(e);
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDraggingRef.current) {
+        handlePanEnd();
+      }
+    };
+
+    // Add global listeners for better panning experience
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
 
     return () => {
+      // Remove canvas events
       canvas.removeEventListener('mousedown', handleCanvasMouseDown);
       canvas.removeEventListener('mousemove', handleCanvasMouseMove);
       canvas.removeEventListener('mouseup', handleCanvasMouseUp);
       canvas.removeEventListener('mouseleave', handleCanvasMouseLeave);
       canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
-      canvas.removeEventListener('wheel', handleCanvasWheel);
+      canvas.removeEventListener('wheel', handleCanvasWheel, { passive: false });
+
+      // Remove global events
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handlePanMove, handlePanEnd]);
 
   useEffect(() => {
     console.log('[PromptingCanvas] selectedContours updated:', selectedContours);
   }, [selectedContours]);
 
-  // Update panOffsetRef whenever panOffset changes
+  // Keep panOffsetRef synchronized with panOffset state
   useEffect(() => {
-    panOffsetRef.current = panOffset;
+    panOffsetRef.current = { ...panOffset };
   }, [panOffset]);
+
+  // Improved panning logic with better state management
+  useEffect(() => {
+    // Ensure refs are initialized
+    if (!panOffsetRef.current) {
+      panOffsetRef.current = { x: 0, y: 0 };
+    }
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
