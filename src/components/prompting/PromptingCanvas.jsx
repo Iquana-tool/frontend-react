@@ -26,7 +26,6 @@ const PromptingCanvas = forwardRef(({
   const canvasRef = useRef(null);
   
   // Basic state
-  const [loading, setLoading] = useState(false);
   const [imageInfo, setImageInfo] = useState({ width: 0, height: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [initialScale, setInitialScale] = useState(1);
@@ -137,7 +136,6 @@ const PromptingCanvas = forwardRef(({
   useEffect(() => {
     if (!image) return;
 
-    setLoading(true);
     clearPrompts();
 
     // Get image dimensions
@@ -146,7 +144,6 @@ const PromptingCanvas = forwardRef(({
     // Update after a slight delay to ensure the container has been measured
     setTimeout(() => {
       updateCanvasSize();
-      setLoading(false);
     }, 100);
   }, [image, clearPrompts]);
 
@@ -415,12 +412,6 @@ const PromptingCanvas = forwardRef(({
         className="relative flex-1 overflow-hidden"
         style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
       >
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-10">
-            <div className="spinner"></div>
-          </div>
-        )}
-        
         <CanvasRenderer
           image={image}
           canvasSize={canvasSize}

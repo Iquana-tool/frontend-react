@@ -254,14 +254,7 @@ const ImageDisplay = ({
                     <Layers className="h-4 w-4 text-teal-600" />
                     Segmentation Results
                   </div>
-                  {isSegmenting ? (
-                    <div className="flex flex-col items-center justify-center py-6">
-                      <div className="w-6 h-6 border-4 border-t-teal-500 border-teal-200 rounded-full animate-spin mb-2"></div>
-                      <span className="text-teal-700 font-medium">
-                        Loading segmentation results...
-                      </span>
-                    </div>
-                  ) : (
+                  {!isSegmenting && (
                     <>
                       <div className="flex flex-col sm:space-y-2">
                         <div className="flex justify-between items-center">
@@ -347,32 +340,6 @@ const ImageDisplay = ({
                       </div>
                     </>
                   )}
-                </div>
-              </div>
-            )}
-
-            {/* Loading overlay */}
-            {isSegmenting && (
-              <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-20">
-                <div className="bg-white rounded-lg p-6 shadow-xl max-w-sm text-center">
-                  <div className="relative w-16 h-16 mx-auto mb-6">
-                    <div className="absolute top-0 left-0 w-full h-full border-4 border-teal-100 rounded-full pulse-ring"></div>
-                    <div className="absolute top-0 left-0 w-full h-full border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full animate-spin"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-3 h-3 bg-teal-500 rounded-full animate-pulse"></div>
-                    </div>
-                  </div>
-                  <p className="text-gray-700 text-lg font-medium">
-                    Processing segmentation...
-                  </p>
-                  <p className="text-gray-500 text-sm mt-2">
-                    This may take a few moments depending on the
-                    image size.
-                  </p>
-
-                  <div className="w-full h-1.5 bg-gray-200 rounded-full mt-6 overflow-hidden">
-                    <div className="h-full bg-teal-500 rounded-full animate-progress shimmer"></div>
-                  </div>
                 </div>
               </div>
             )}
