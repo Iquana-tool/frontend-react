@@ -462,7 +462,7 @@ const ImageViewerWithPrompting = () => {
       );
     }
     setEditingMask(null);
-  }, []);
+  }, [setSegmentationMasks]);
 
   // Wrapper for handleDeleteFinalMaskContour that includes current image context
   const handleDeleteFinalMaskContourWrapper = useCallback(async (contourId) => {
