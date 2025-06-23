@@ -78,6 +78,7 @@ const PromptingCanvas = forwardRef(({
     getFormattedPrompts,
     onPromptingComplete,
     promptType,
+    currentLabel,
     enableInstantSegmentation,
     instantSegmentationDebounce
   );
@@ -162,6 +163,12 @@ const PromptingCanvas = forwardRef(({
   const handleComplete = () => {
     if (prompts.length === 0) {
       console.warn("No prompts to complete");
+      return;
+    }
+
+    if (!currentLabel) {
+      console.warn("No label selected. Please select a label before segmenting.");
+      // You could also show a toast notification here if you have a notification system
       return;
     }
 
@@ -525,7 +532,8 @@ const PromptingCanvas = forwardRef(({
           <button
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleComplete}
-            disabled={prompts.length === 0 || isInstantSegmenting}
+            disabled={prompts.length === 0 || isInstantSegmenting || !currentLabel}
+            title={!currentLabel ? "Please select a label before segmenting" : ""}
           >
             {isInstantSegmentationEnabled ? 'Segment Now' : 'Complete'} {prompts.length > 0 && `(${prompts.length})`}
           </button>

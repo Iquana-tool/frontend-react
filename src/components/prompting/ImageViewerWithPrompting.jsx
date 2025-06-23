@@ -25,7 +25,7 @@ const ImageViewerWithPrompting = () => {
 
   // UI State
   const [promptType, setPromptType] = useState("point");
-  const [currentLabel, setCurrentLabel] = useState(1);
+  const [currentLabel, setCurrentLabel] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
@@ -348,7 +348,7 @@ const ImageViewerWithPrompting = () => {
     resetContourState();
     resetCanvasState();
     setPromptType("point");
-    setCurrentLabel(1);
+    setCurrentLabel(null);
   }, [resetImageState, resetSegmentationState, resetContourState, resetCanvasState]);
 
   const handleRunNewSegmentation = useCallback(() => {

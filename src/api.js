@@ -377,10 +377,15 @@ export const segmentImage = async (
   model = "SAM2Tiny",
   prompts = null,
   cropCoords = { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
-  label = 0,
+  label = null,
   maskId = null
 ) => {
   try {
+    // Validate that a label is provided
+    if (label === null || label === undefined) {
+      throw new Error("A label must be selected before segmentation");
+    }
+
     const requestData = {
       image_id: imageId,
       model: model,

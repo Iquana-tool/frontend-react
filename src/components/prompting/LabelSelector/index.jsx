@@ -66,10 +66,10 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
           const transformedLabels = transformLabelsToHierarchy(labels);
           setClassStructure(transformedLabels);
           
-          // Auto-select first label if none is selected
-          if (!currentLabel && transformedLabels.length > 0) {
-            setCurrentLabel(transformedLabels[0].id);
-          }
+          // Don't auto-select first label - require explicit user selection
+          // if (!currentLabel && transformedLabels.length > 0) {
+          //   setCurrentLabel(transformedLabels[0].id);
+          // }
         } else {
           // No labels found
           setClassStructure([]);
@@ -307,11 +307,17 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
       <button
         onClick={() => setExpanded(!expanded)}
         disabled={loading}
-        className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 border-blue-200 rounded-lg shadow-sm hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 rounded-lg shadow-sm transition-all duration-200 ${
+          loading 
+            ? 'opacity-50 cursor-not-allowed border-gray-200' 
+            : !selectedItem
+            ? 'border-orange-300 hover:bg-orange-50 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
+            : 'border-blue-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+        }`}
       >
         <div className="flex items-center flex-1 min-w-0">
-          <div className="flex-shrink-0 w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-          <span className="block truncate text-gray-900">
+          <div className={`flex-shrink-0 w-3 h-3 rounded-full mr-3 ${!selectedItem ? 'bg-orange-400' : 'bg-blue-500'}`}></div>
+          <span className={`block truncate ${!selectedItem ? 'text-orange-700 font-medium' : 'text-gray-900'}`}>
           {loading ? 'Loading labels...' : getDisplayName()}
         </span>
         </div>

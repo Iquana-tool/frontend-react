@@ -9,6 +9,7 @@ export const useInstantSegmentation = (
   getFormattedPrompts,
   onPromptingComplete,
   promptType,
+  currentLabel,
   isEnabled = false,
   debounceMs = 1000
 ) => {
@@ -23,6 +24,11 @@ export const useInstantSegmentation = (
       return;
     }
 
+    if (!currentLabel) {
+      console.warn("No label selected. Instant segmentation requires a label to be selected.");
+      return;
+    }
+
     setIsInstantSegmenting(true);
     
     try {
@@ -33,7 +39,7 @@ export const useInstantSegmentation = (
     } finally {
       setIsInstantSegmenting(false);
     }
-  }, [isInstantSegmentationEnabled, prompts.length, onPromptingComplete, getFormattedPrompts, promptType]);
+  }, [isInstantSegmentationEnabled, prompts.length, onPromptingComplete, getFormattedPrompts, promptType, currentLabel]);
 
   // Effect to handle prompt changes and trigger instant segmentation
   useEffect(() => {

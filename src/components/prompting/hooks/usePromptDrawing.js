@@ -24,6 +24,12 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
   const handlePromptMouseDown = useCallback((canvasX, canvasY) => {
     if (!image) return false;
 
+    // Check if a label is selected before allowing prompt creation
+    if (!currentLabel) {
+      console.warn("No label selected. Please select a label before drawing prompts.");
+      return false;
+    }
+
     const imageCoords = canvasToImageCoords(canvasX, canvasY);
     if (!imageCoords) return false;
 
