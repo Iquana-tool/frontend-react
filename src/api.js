@@ -378,7 +378,8 @@ export const segmentImage = async (
   prompts = null,
   cropCoords = { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
   label = null,
-  maskId = null
+  maskId = null,
+  parentContourId = null
 ) => {
   try {
     // Validate that a label is provided
@@ -404,6 +405,12 @@ export const segmentImage = async (
     // Add mask_id if provided
     if (maskId) {
       requestData.mask_id = maskId;
+    }
+
+    // Add parent_contour_id if provided
+    if (parentContourId) {
+      requestData.parent_contour_id = parentContourId;
+      console.log("Adding parent_contour_id to segmentation request:", parentContourId);
     }
 
     if (prompts && prompts.length > 0) {

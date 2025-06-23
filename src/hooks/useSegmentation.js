@@ -11,6 +11,68 @@ export const useSegmentation = () => {
   const [maskImagesLoading, setMaskImagesLoading] = useState({});
   const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
 
+  // Utility function to check if a point is inside a contour
+  const isPointInContour = useCallback((x, y, contour) => {
+    if (!contour || !contour.x || !contour.y || contour.x.length < 3) {
+      return false;
+    }
+
+    let inside = false;
+    const n = contour.x.length;
+    
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+      const xi = contour.x[i];
+      const yi = contour.y[i];
+      const xj = contour.x[j];
+      const yj = contour.y[j];
+      
+      const intersect = ((yi > y) !== (yj > y)) &&
+        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    
+    return inside;
+  }, []);
+
+  // Find the parent contour that contains a given prompt
+  const findParentContourForPrompt = useCallback((prompt, finalMask) => {
+    if (!finalMask || !finalMask.contours || finalMask.contours.length === 0) {
+      return null;
+    }
+
+    let promptX, promptY;
+
+    // Extract normalized coordinates (0-1) based on prompt type
+    if (prompt.type === "point") {
+      promptX = prompt.coordinates.x;
+      promptY = prompt.coordinates.y;
+    } else if (prompt.type === "box") {
+      // Use center of box
+      promptX = (prompt.coordinates.startX + prompt.coordinates.endX) / 2;
+      promptY = (prompt.coordinates.startY + prompt.coordinates.endY) / 2;
+    } else if (prompt.type === "polygon") {
+      // Use centroid of polygon
+      promptX = prompt.coordinates.reduce((sum, p) => sum + p.x, 0) / prompt.coordinates.length;
+      promptY = prompt.coordinates.reduce((sum, p) => sum + p.y, 0) / prompt.coordinates.length;
+    } else if (prompt.type === "circle") {
+      promptX = prompt.coordinates.centerX;
+      promptY = prompt.coordinates.centerY;
+    } else {
+      return null;
+    }
+
+    // Find the contour that contains this point
+    // Note: Both promptX/Y and contour coordinates are normalized (0-1)
+    for (let i = 0; i < finalMask.contours.length; i++) {
+      const contour = finalMask.contours[i];
+      if (isPointInContour(promptX, promptY, contour)) {
+        return contour.id; // Return the contour ID
+      }
+    }
+
+    return null;
+  }, [isPointInContour]);
+
   const handlePromptingComplete = useCallback(async (
     prompts, 
     promptType, 
@@ -85,7 +147,25 @@ export const useSegmentation = () => {
       // Extract mask_id from finalMask if available
       const maskId = finalMask && finalMask.id ? finalMask.id : null;
       
-      console.log("Segmenting with mask_id:", maskId);
+      // Detect parent contour for nested segmentation
+      let parentContourId = null;
+      if (prompts.length > 0 && finalMask) {
+        try {
+          // Use original prompts (before adjustment) for parent contour detection
+          // since they contain image-relative coordinates
+          parentContourId = findParentContourForPrompt(prompts[0], finalMask);
+          if (parentContourId) {
+            console.log("Detected parent contour ID:", parentContourId, "for prompt:", prompts[0]);
+          } else {
+            console.log("No parent contour found for prompt:", prompts[0]);
+          }
+        } catch (error) {
+          console.warn("Error detecting parent contour:", error);
+          parentContourId = null;
+        }
+      }
+      
+      console.log("Segmenting with mask_id:", maskId, "parent_contour_id:", parentContourId);
 
       const response = await api.segmentImage(
         selectedImage.id,
@@ -93,7 +173,8 @@ export const useSegmentation = () => {
         promptsForAPI,
         roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
         currentLabel,
-        maskId
+        maskId,
+        parentContourId
         );
 
       if (response && response.original_masks && response.original_masks.length > 0) {
