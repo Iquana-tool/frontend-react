@@ -45,6 +45,12 @@ const ImageViewerWithPrompting = () => {
   // Refs
   const promptingCanvasRef = useRef(null);
 
+  // Instant Segmentation State
+  const [instantSegmentationState, setInstantSegmentationState] = useState({
+    isInstantSegmentationEnabled: false,
+    isInstantSegmenting: false,
+    shouldSuppressLoadingModal: false
+  });
 
   // Custom Hooks
   const imageManagement = useImageManagement();
@@ -564,6 +570,7 @@ const ImageViewerWithPrompting = () => {
         loading={loading}
         isSegmenting={isSegmenting}
         selectedModel={selectedModel}
+        suppressLoadingModal={instantSegmentationState.shouldSuppressLoadingModal}
       />
 
       <div
@@ -672,6 +679,7 @@ const ImageViewerWithPrompting = () => {
                   setSelectedFinalMaskContour={setSelectedFinalMaskContour}
                   setZoomLevel={setZoomLevel}
                   canvasImage={canvasImage}
+                  onInstantSegmentationStateChange={setInstantSegmentationState}
                 />
               </>
             ) : (

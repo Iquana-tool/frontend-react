@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
+import { useInstantSegmentation } from './hooks/useInstantSegmentation';
 import CanvasRenderer from './components/CanvasRenderer';
 import SegmentationOverlay from './components/SegmentationOverlay';
 import PromptSelectionOverlay from './components/PromptSelectionOverlay';
@@ -20,13 +21,15 @@ const PromptingCanvas = forwardRef(({
   onClearSegmentationResults,
   selectedFinalMaskContour,
   finalMasks,
+  enableInstantSegmentation = false,
+  instantSegmentationDebounce = 1000,
+  onInstantSegmentationStateChange,
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   
   // Basic state
-  const [imageInfo, setImageInfo] = useState({ width: 0, height: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [initialScale, setInitialScale] = useState(1);
   const [selectedMask, setSelectedMask] = useState(null);
@@ -68,6 +71,34 @@ const PromptingCanvas = forwardRef(({
     clearPrompts,
     getFormattedPrompts
   } = promptDrawing;
+
+  // Initialize instant segmentation hook
+  const instantSegmentation = useInstantSegmentation(
+    prompts,
+    getFormattedPrompts,
+    onPromptingComplete,
+    promptType,
+    enableInstantSegmentation,
+    instantSegmentationDebounce
+  );
+  const {
+    isInstantSegmentationEnabled,
+    isInstantSegmenting,
+    toggleInstantSegmentation,
+    setIsInstantSegmentationEnabled,
+    shouldSuppressLoadingModal
+  } = instantSegmentation;
+
+  // Notify parent of instant segmentation state changes
+  useEffect(() => {
+    if (onInstantSegmentationStateChange) {
+      onInstantSegmentationStateChange({
+        isInstantSegmentationEnabled,
+        isInstantSegmenting,
+        shouldSuppressLoadingModal
+      });
+    }
+  }, [isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, onInstantSegmentationStateChange]);
 
   useEffect(() => {
     if (selectedMaskProp) {
@@ -118,8 +149,14 @@ const PromptingCanvas = forwardRef(({
     setZoomParameters: setZoomParameters,
     zoomIn: () => zoomIn(redrawCanvasCallback),
     zoomOut: () => zoomOut(redrawCanvasCallback),
-    resetView: () => resetView(redrawCanvasCallback)
-  }));
+    resetView: () => resetView(redrawCanvasCallback),
+    // Instant segmentation controls
+    toggleInstantSegmentation,
+    setInstantSegmentationEnabled: setIsInstantSegmentationEnabled,
+    isInstantSegmentationEnabled,
+    isInstantSegmenting,
+    shouldSuppressLoadingModal
+  }), [prompts, clearPrompts, selectedMask, setSelectedMask, setActiveTool, selectedContours, setSelectedContours, setZoomParameters, zoomIn, zoomOut, resetView, redrawCanvasCallback, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -131,21 +168,6 @@ const PromptingCanvas = forwardRef(({
     const formattedPrompts = getFormattedPrompts();
     onPromptingComplete(formattedPrompts);
   };
-
-  // Initialize canvas when image changes
-  useEffect(() => {
-    if (!image) return;
-
-    clearPrompts();
-
-    // Get image dimensions
-    setImageInfo({ width: image.width, height: image.height });
-
-    // Update after a slight delay to ensure the container has been measured
-    setTimeout(() => {
-      updateCanvasSize();
-    }, 100);
-  }, [image, clearPrompts]);
 
   // Update canvas based on container size
   const updateCanvasSize = useCallback(() => {
@@ -169,20 +191,31 @@ const PromptingCanvas = forwardRef(({
     setInitialScale(scale);
   }, [image]);
 
+  // Initialize canvas when image changes
+  useEffect(() => {
+    if (!image) return;
+
+    clearPrompts();
+
+    // Update after a slight delay to ensure the container has been measured
+    setTimeout(() => {
+      updateCanvasSize();
+    }, 100);
+  }, [image, clearPrompts, updateCanvasSize]);
+
   // Monitor container size changes for responsive behavior
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const resizeObserver = new ResizeObserver(() => {
       updateCanvasSize();
     });
 
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     return () => {
-      if (containerRef.current) {
-        resizeObserver.unobserve(containerRef.current);
-      }
+      resizeObserver.unobserve(container);
     };
   }, [updateCanvasSize]);
 
@@ -440,6 +473,8 @@ const PromptingCanvas = forwardRef(({
           </div>
         )}
 
+
+
         {/* Segmentation Overlay */}
         <SegmentationOverlay
           selectedMask={selectedMask}
@@ -478,23 +513,23 @@ const PromptingCanvas = forwardRef(({
       </div>
 
       <div className="flex justify-between mt-3">
-        <button
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-          onClick={() => {
-            clearPrompts();
-            setSelectedPromptIndex(null);
-          }}
-        >
-          Clear
-        </button>
-        <button
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleComplete}
-          disabled={prompts.length === 0}
-        >
-          Complete {prompts.length > 0 && `(${prompts.length})`}
-        </button>
-      </div>
+          <button
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+            onClick={() => {
+              clearPrompts();
+              setSelectedPromptIndex(null);
+            }}
+          >
+            Clear
+          </button>
+          <button
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleComplete}
+            disabled={prompts.length === 0 || isInstantSegmenting}
+          >
+            {isInstantSegmentationEnabled ? 'Segment Now' : 'Complete'} {prompts.length > 0 && `(${prompts.length})`}
+          </button>
+        </div>
     </div>
   );
 });

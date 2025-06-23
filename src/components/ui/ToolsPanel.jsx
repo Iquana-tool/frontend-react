@@ -1,9 +1,9 @@
-import React from 'react';
-import { 
-  MousePointer, 
-  Square, 
-  Circle, 
-  Pentagon, 
+import React, { useState, useEffect } from 'react';
+import {
+  MousePointer,
+  Square,
+  Circle,
+  Pentagon,
   Move, 
   Download, 
   Pointer, 
@@ -25,6 +25,24 @@ const ToolsPanel = ({
   setZoomLevel,
   setZoomCenter
 }) => {
+  const [isInstantSegmentationEnabled, setIsInstantSegmentationEnabled] = useState(false);
+
+  // Poll for instant segmentation state changes
+  useEffect(() => {
+    const checkInstantSegmentationState = () => {
+      if (promptingCanvasRef.current?.isInstantSegmentationEnabled !== undefined) {
+        setIsInstantSegmentationEnabled(promptingCanvasRef.current.isInstantSegmentationEnabled);
+      }
+    };
+
+    // Initial check
+    checkInstantSegmentationState();
+
+    // Periodic check for state changes
+    const interval = setInterval(checkInstantSegmentationState, 100);
+
+    return () => clearInterval(interval);
+  }, [promptingCanvasRef]);
   const handleToolChange = (tool) => {
     setPromptType(tool);
     if (promptingCanvasRef.current) {
@@ -176,6 +194,32 @@ const ToolsPanel = ({
           currentLabel={currentLabel}
           setCurrentLabel={setCurrentLabel}
         />
+      </div>
+
+      {/* Instant Segmentation Toggle */}
+      <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md">
+        <span className="text-sm font-medium text-gray-700">Instant Segmentation</span>
+        <button
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+            isInstantSegmentationEnabled
+              ? 'bg-blue-600' 
+              : 'bg-gray-300'
+          }`}
+          onClick={() => {
+            if (promptingCanvasRef.current?.toggleInstantSegmentation) {
+              promptingCanvasRef.current.toggleInstantSegmentation();
+            }
+          }}
+          title="Toggle automatic segmentation on prompt placement"
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isInstantSegmentationEnabled 
+                ? 'translate-x-4' 
+                : 'translate-x-0.5'
+            }`}
+          />
+        </button>
       </div>
 
       {/* Export Button */}
