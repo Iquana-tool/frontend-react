@@ -376,7 +376,8 @@ export const segmentImage = async (
   model = "SAM2Tiny",
   prompts = null,
   cropCoords = { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
-  label = 0
+  label = 0,
+  maskId = null
 ) => {
   try {
     const requestData = {
@@ -393,6 +394,11 @@ export const segmentImage = async (
       max_y: cropCoords.max_y,
       label: label
     };
+
+    // Add mask_id if provided
+    if (maskId) {
+      requestData.mask_id = maskId;
+    }
 
     if (prompts && prompts.length > 0) {
       // Convert prompts to the format expected by the API
@@ -576,8 +582,6 @@ export const saveMask = async (imageId, label, contours) => {
 // Get all masks for an image
 export const getMasksForImage = async (imageId) => {
   try {
-    console.log(`Fetching masks for image: ${imageId}`);
-    
     // Add a timeout to avoid hanging on slow requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -585,8 +589,6 @@ export const getMasksForImage = async (imageId) => {
     try {
       // Update to use path parameter format to match backend implementation
       const url = `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`;
-      
-      console.log(`Making request to: ${url}`);
       
       const response = await fetch(url, { 
         signal: controller.signal,
@@ -597,7 +599,6 @@ export const getMasksForImage = async (imageId) => {
       
       // Handle the case where the backend returns 404 (which is expected if no masks exist)
       if (response.status === 404) {
-        console.log(`No masks found for image ID: ${imageId} (normal before segmentation)`);
         return {
           success: true,
           message: "No masks found for this image yet",
@@ -627,7 +628,6 @@ export const getMasksForImage = async (imageId) => {
       }
       
       const data = await response.json();
-      console.log("Masks for image API response:", data);
       
       // If the response is in unexpected format, normalize it
       if (Array.isArray(data)) {
@@ -685,8 +685,6 @@ export const getMaskWithContours = async (maskId) => {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     
     try {
-      console.log(`Fetching mask details for mask ID: ${maskId}`);
-      
       // First get the basic mask info
       const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`, {
         signal: controller.signal
@@ -694,7 +692,6 @@ export const getMaskWithContours = async (maskId) => {
       
       // Handle 404 and other errors
       if (response.status === 404) {
-        console.log(`Mask with ID ${maskId} not found`);
         return {
           success: false,
           message: `Mask not found`,
@@ -714,7 +711,6 @@ export const getMaskWithContours = async (maskId) => {
       const maskData = await response.json();
       
       // Now fetch the contours for this mask
-      console.log(`Fetching contours for mask ID: ${maskId}`);
       const contoursResponse = await fetch(`${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`, {
         signal: controller.signal
       });
@@ -724,7 +720,6 @@ export const getMaskWithContours = async (maskId) => {
       
       // Handle 404 for contours request (mask exists but has no contours)
       if (contoursResponse.status === 404) {
-        console.log(`No contours found for mask ID: ${maskId}`);
         return {
           success: true,
           message: 'Mask found but has no contours',

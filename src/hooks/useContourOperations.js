@@ -122,17 +122,14 @@ export const useContourOperations = () => {
     const targetImageId = imageId;
 
     if (!targetImageId) {
-      console.log("Cannot fetch final mask: No image ID provided and no current image selected");
       return;
     }
 
     setFetchingFinalMask(true);
     try {
-      console.log(`Fetching final mask for image ID: ${targetImageId}`);
       const response = await api.getFinalMask(targetImageId);
 
-      if (response.success && response.mask) {
-        console.log("Final mask fetched successfully:", response.mask);
+              if (response.success && response.mask) {
         setFinalMask(response.mask);
         setFinalMasks([response.mask]);
 
@@ -140,7 +137,6 @@ export const useContourOperations = () => {
           // Additional processing if needed
         }
       } else {
-        console.log("No final mask found or error:", response.message);
         setFinalMask(null);
         setFinalMasks([]);
       }

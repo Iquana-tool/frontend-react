@@ -1,0 +1,244 @@
+import { useState, useCallback } from 'react';
+
+export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageCoords) => {
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStartPos, setDrawStartPos] = useState(null);
+  const [currentShape, setCurrentShape] = useState(null);
+  const [currentPolygon, setCurrentPolygon] = useState([]);
+  const [cursorPos, setCursorPos] = useState(null);
+  const [prompts, setPrompts] = useState([]);
+
+  // Add point prompt
+  const addPointPrompt = useCallback((x, y, label) => {
+    const newPrompt = {
+      type: "point",
+      coordinates: { x, y },
+      label
+    };
+    
+    setPrompts(prev => [...prev, newPrompt]);
+    return newPrompt;
+  }, []);
+
+  // Handle mouse down for prompt creation
+  const handlePromptMouseDown = useCallback((canvasX, canvasY) => {
+    if (!image) return false;
+
+    const imageCoords = canvasToImageCoords(canvasX, canvasY);
+    if (!imageCoords) return false;
+
+    setIsDrawing(true);
+
+    switch (promptType) {
+      case "point":
+        addPointPrompt(imageCoords.x, imageCoords.y, currentLabel);
+        return true;
+
+      case "box":
+        setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
+        setCurrentShape({
+          startX: imageCoords.x,
+          startY: imageCoords.y,
+          endX: imageCoords.x,
+          endY: imageCoords.y
+        });
+        return true;
+
+      case "circle":
+        setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
+        setCurrentShape({
+          startX: imageCoords.x,
+          startY: imageCoords.y,
+          endX: imageCoords.x,
+          endY: imageCoords.y
+        });
+        return true;
+
+      case "polygon":
+        if (!currentPolygon || currentPolygon.length === 0) {
+          setCurrentPolygon([{ x: imageCoords.x, y: imageCoords.y }]);
+        } else {
+          setCurrentPolygon([...currentPolygon, { x: imageCoords.x, y: imageCoords.y }]);
+        }
+        return true;
+
+      default:
+        return false;
+    }
+  }, [image, promptType, currentLabel, canvasToImageCoords, addPointPrompt, currentPolygon]);
+
+  // Handle mouse move for prompt creation
+  const handlePromptMouseMove = useCallback((canvasX, canvasY) => {
+    if (!image) return;
+
+    const imageCoords = canvasToImageCoords(canvasX, canvasY);
+    if (!imageCoords) return;
+
+    // Update cursor position for all cases
+    setCursorPos({ x: imageCoords.x, y: imageCoords.y });
+
+    if (!isDrawing) return;
+
+    if (promptType === "box" || promptType === "circle") {
+      // For box and circle prompts, update the current shape
+      if (drawStartPos) {
+        setCurrentShape({
+          startX: drawStartPos.x,
+          startY: drawStartPos.y,
+          endX: imageCoords.x,
+          endY: imageCoords.y,
+        });
+      }
+    }
+  }, [image, isDrawing, promptType, drawStartPos, canvasToImageCoords]);
+
+  // Handle mouse up for prompt creation
+  const handlePromptMouseUp = useCallback((canvasX, canvasY) => {
+    if (!image || !isDrawing) return false;
+
+    const imageCoords = canvasToImageCoords(canvasX, canvasY);
+    if (!imageCoords) return false;
+
+    if (promptType === "box") {
+      // Add box prompt
+      const newPrompt = {
+        type: "box",
+        coordinates: {
+          startX: Math.min(drawStartPos.x, imageCoords.x),
+          startY: Math.min(drawStartPos.y, imageCoords.y),
+          endX: Math.max(drawStartPos.x, imageCoords.x),
+          endY: Math.max(drawStartPos.y, imageCoords.y),
+        },
+        label: currentLabel,
+      };
+      setPrompts((prev) => [...prev, newPrompt]);
+    } else if (promptType === "circle") {
+      // Add circle prompt
+      const centerX = (drawStartPos.x + imageCoords.x) / 2;
+      const centerY = (drawStartPos.y + imageCoords.y) / 2;
+      const radius = Math.sqrt(
+        Math.pow(imageCoords.x - drawStartPos.x, 2) +
+        Math.pow(imageCoords.y - drawStartPos.y, 2)
+      ) / 2;
+
+      const newPrompt = {
+        type: "circle",
+        coordinates: {
+          centerX,
+          centerY,
+          radius,
+        },
+        label: currentLabel,
+      };
+      setPrompts((prev) => [...prev, newPrompt]);
+    }
+
+    // Reset drawing state
+    setIsDrawing(false);
+    setDrawStartPos(null);
+    setCurrentShape(null);
+
+    return true;
+  }, [image, isDrawing, promptType, drawStartPos, currentLabel, canvasToImageCoords]);
+
+  // Handle double click for completing polygons
+  const handlePromptDoubleClick = useCallback(() => {
+    if (!image || promptType !== "polygon") return false;
+    if (!currentPolygon || !Array.isArray(currentPolygon) || currentPolygon.length < 3) return false;
+
+    // Add the polygon prompt
+    const newPrompt = {
+      type: "polygon",
+      coordinates: [...currentPolygon], // Create a copy to avoid reference issues
+      label: currentLabel,
+    };
+    setPrompts((prev) => [...prev, newPrompt]);
+
+    // Reset the current polygon
+    setCurrentPolygon([]);
+
+    return true;
+  }, [image, promptType, currentPolygon, currentLabel]);
+
+  // Clear all prompts
+  const clearPrompts = useCallback(() => {
+    setPrompts([]);
+    setCurrentPolygon([]);
+    setCurrentShape(null);
+    setIsDrawing(false);
+    setDrawStartPos(null);
+    setCursorPos(null);
+  }, []);
+
+  // Format prompts for API
+  const getFormattedPrompts = useCallback(() => {
+    if (!image || prompts.length === 0) return [];
+
+    return prompts.map(prompt => {
+      switch (prompt.type) {
+        case "point":
+          return {
+            type: "point",
+            coordinates: {
+              x: prompt.coordinates.x / image.width,
+              y: prompt.coordinates.y / image.height
+            },
+            label: prompt.label
+          };
+        case "box":
+          return {
+            type: "box",
+            coordinates: {
+              startX: prompt.coordinates.startX / image.width,
+              startY: prompt.coordinates.startY / image.height,
+              endX: prompt.coordinates.endX / image.width,
+              endY: prompt.coordinates.endY / image.height
+            },
+            label: prompt.label
+          };
+        case "circle":
+          return {
+            type: "circle",
+            coordinates: {
+              centerX: prompt.coordinates.centerX / image.width,
+              centerY: prompt.coordinates.centerY / image.height,
+              radius: prompt.coordinates.radius / Math.max(image.width, image.height)
+            },
+            label: prompt.label
+          };
+        case "polygon":
+          return {
+            type: "polygon",
+            coordinates: prompt.coordinates.map(point => ({
+              x: point.x / image.width,
+              y: point.y / image.height
+            })),
+            label: prompt.label
+          };
+        default:
+          return null;
+      }
+    }).filter(Boolean);
+  }, [image, prompts]);
+
+  return {
+    // State
+    isDrawing,
+    prompts,
+    currentShape,
+    currentPolygon,
+    cursorPos,
+    
+    // Setters
+    setPrompts,
+    setCursorPos,
+    
+    // Functions
+    handlePromptMouseDown,
+    handlePromptMouseMove,
+    handlePromptMouseUp,
+    handlePromptDoubleClick,
+    clearPrompts,
+    getFormattedPrompts
+  };
+}; 

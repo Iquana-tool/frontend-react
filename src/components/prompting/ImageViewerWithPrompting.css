@@ -47,6 +47,20 @@
   overflow: hidden;
 }
 
+/* Responsive height fix for smaller screens */
+.h-\[400px\] {
+  height: 400px !important;
+  max-height: 400px !important;
+  overflow: hidden;
+}
+
+@media (min-width: 640px) {
+  .h-\[400px\] {
+    height: 500px !important;
+    max-height: 500px !important;
+  }
+}
+
 /* Tiny-font helper (because Tailwind doesn't ship .text-xxs) */
 .text-xxs { font-size: 0.625rem; }
 
@@ -72,12 +86,28 @@
 
 /* ---------- Layout ---------- */
 
+/* Remove fixed grid layout - let Tailwind handle responsiveness */
 .dual-viewer-container {
-  display: grid;
-  grid-template-columns: minmax(500px, 1fr) minmax(500px, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   max-width: 100%;
-  margin: 0;          /* remove negative margin */
+  margin: 0;
+}
+
+/* Make responsive at large screens */
+@media (min-width: 1024px) {
+  .dual-viewer-container {
+    display: grid;
+    grid-template-columns: minmax(400px, 1fr) minmax(400px, 1fr);
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .dual-viewer-container {
+    grid-template-columns: minmax(450px, 1fr) minmax(450px, 1fr);
+  }
 }
 
 .viewer-panel {
@@ -86,7 +116,21 @@
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  min-height: 550px;  /* ensure consistent height */
+  min-height: 400px;  /* smaller min-height for mobile */
+  width: 100%;
+}
+
+/* Responsive min-height adjustments */
+@media (min-width: 640px) {
+  .viewer-panel {
+    min-height: 500px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .viewer-panel {
+    min-height: 550px;
+  }
 }
 
 .viewer-header {
@@ -105,15 +149,26 @@
 
 .grid-container {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
-.col-span-2 {
-  grid-column: span 2;
+/* Make grid responsive */
+@media (min-width: 640px) {
+  .grid-container {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
+.col-span-2 {
+  grid-column: span 1;
+}
 
+@media (min-width: 640px) {
+  .col-span-2 {
+    grid-column: span 2;
+  }
+}
 
 .slider-label   { width: 100px; min-width: 100px; }
 .loading-progress { animation: loading-progress 5s linear; width: 0; }

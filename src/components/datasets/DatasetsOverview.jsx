@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
 import { Plus, Download, FolderOpen } from "lucide-react";
 import AddDatasetModal from "./AddDatasetModal";
+import CreateLabelsModal from "./CreateLabelsModal";
 import PlaceholderImage from "../ui/PlaceholderImage";
+import * as api from "../../api";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const {
@@ -14,6 +16,8 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     getSampleImages,
   } = useDataset();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showLabelsModal, setShowLabelsModal] = useState(false);
+  const [selectedDatasetForLabels, setSelectedDatasetForLabels] = useState(null);
   const [datasetImages, setDatasetImages] = useState({});
   const [datasetStats, setDatasetStats] = useState({});
   const [loadingData, setLoadingData] = useState(false);
@@ -66,11 +70,48 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     fetchDatasetData();
   }, [datasets, getSampleImages, getAnnotationProgress]);
 
-  const handleOpenDataset = (dataset) => {
-    selectDataset(dataset);
-    if (onOpenDataset) {
-      onOpenDataset(dataset);
+  const handleOpenDataset = async (dataset) => {
+    try {
+      // Check if the dataset has any labels
+      const labelsResponse = await api.fetchLabels(dataset.id);
+      
+      // Handle different response formats
+      const labels = Array.isArray(labelsResponse) ? labelsResponse : 
+                    (labelsResponse && labelsResponse.labels) ? labelsResponse.labels : [];
+      
+      if (!labels || labels.length === 0) {
+        // No labels found, show the label creation modal
+        setSelectedDatasetForLabels(dataset);
+        setShowLabelsModal(true);
+      } else {
+        // Dataset has labels, proceed to open normally
+        selectDataset(dataset);
+        if (onOpenDataset) {
+          onOpenDataset(dataset);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking labels for dataset:', error);
+      // On error, show the label creation modal as a fallback
+      setSelectedDatasetForLabels(dataset);
+      setShowLabelsModal(true);
     }
+  };
+
+  const handleLabelsCreated = () => {
+    // After labels are created, select the dataset and open it
+    if (selectedDatasetForLabels) {
+      selectDataset(selectedDatasetForLabels);
+      if (onOpenDataset) {
+        onOpenDataset(selectedDatasetForLabels);
+      }
+    }
+    setSelectedDatasetForLabels(null);
+  };
+
+  const handleLabelsModalClose = () => {
+    setShowLabelsModal(false);
+    setSelectedDatasetForLabels(null);
   };
 
   if (loading) {
@@ -277,6 +318,16 @@ const DatasetsOverview = ({ onOpenDataset }) => {
         <AddDatasetModal
           isOpen={showAddModal}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {/* Create Labels Modal */}
+      {showLabelsModal && selectedDatasetForLabels && (
+        <CreateLabelsModal
+          isOpen={showLabelsModal}
+          onClose={handleLabelsModalClose}
+          dataset={selectedDatasetForLabels}
+          onLabelsCreated={handleLabelsCreated}
         />
       )}
     </div>

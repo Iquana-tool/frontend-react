@@ -21,7 +21,8 @@ export const useSegmentation = () => {
     zoomCenter = null,
     canvasImage = null,
     selectedContours = [],
-    bestMask = null
+    bestMask = null,
+    finalMask = null
   ) => {
     console.log("handlePromptingComplete called with promptType:", promptType);
 
@@ -81,12 +82,18 @@ export const useSegmentation = () => {
         roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }
       );
 
+      // Extract mask_id from finalMask if available
+      const maskId = finalMask && finalMask.id ? finalMask.id : null;
+      
+      console.log("Segmenting with mask_id:", maskId);
+
       const response = await api.segmentImage(
         selectedImage.id,
         selectedModel,
         promptsForAPI,
         roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
-        currentLabel
+        currentLabel,
+        maskId
         );
 
       if (response && response.original_masks && response.original_masks.length > 0) {

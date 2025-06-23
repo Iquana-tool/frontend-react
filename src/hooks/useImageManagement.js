@@ -153,7 +153,6 @@ export const useImageManagement = (fetchFinalMask = null) => {
 
       // Load any previous masks for this image
       try {
-        console.log(`Fetching masks for image: ${image.id}`);
         const masksResponse = await api.getMasksForImage(image.id);
 
         if (
