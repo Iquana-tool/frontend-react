@@ -96,7 +96,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     };
 
     fetchLabelsFromBackend();
-  }, [currentDataset, currentLabel]);
+  }, [currentDataset, currentLabel, setCurrentLabel]);
 
   // Transform flat backend labels into hierarchical structure
   const transformLabelsToHierarchy = (labels) => {

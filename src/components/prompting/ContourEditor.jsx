@@ -86,8 +86,8 @@ const ContourEditor = ({
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPolygon, setCurrentPolygon] = useState([]);
-  const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(1);
+  const [, setCanvasOffset] = useState({ x: 0, y: 0 });
+  const [, setScale] = useState(1);
   const [availableLabels, setAvailableLabels] = useState([]);
   const [showLabelSelector, setShowLabelSelector] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState(null);
@@ -157,14 +157,14 @@ const ContourEditor = ({
   }, [currentDataset]);
 
   // Helper to get default label id
-  const getDefaultLabelId = () => {
+  const getDefaultLabelId = useCallback(() => {
     const generic = availableLabels.find(label => label.name === "New class 1");
     if (generic) return generic.id;
     return availableLabels.length > 0 ? availableLabels[0].id : null;
-  };
+  }, [availableLabels]);
 
   // Handle polygon editing with different backend data formats
-  const normalizeContour = (contour) => {
+  const normalizeContour = useCallback((contour) => {
     // If the contour is already in the correct format, return it
     if (contour.x && contour.y && Array.isArray(contour.x) && Array.isArray(contour.y)) {
       return {
@@ -189,56 +189,10 @@ const ContourEditor = ({
       label: contour.label || getDefaultLabelId(),
       type: "polygon"
     };
-  };
-
-  // Initialize editor with mask contours
-  useEffect(() => {
-    if (mask) {
-      try {
-        // Handle empty or missing contours gracefully
-        const contours = mask.contours || [];
-        
-        // Convert any existing contours to ensure they have the correct format
-        const normalizedContours = contours.map(normalizeContour);
-        
-        setEditedContours([...normalizedContours]);
-      } catch (err) {
-        console.error("Error processing mask contours:", err);
-        setError("There was an error processing the mask data. The backend may be sending data in an unexpected format.");
-        setEditedContours([]);
-      }
-    } else {
-      setEditedContours([]);
-    }
-  }, [mask]);
-
-  // Set up canvas when component mounts or image/contours change
-  useEffect(() => {
-    if (!canvasRef.current || !image) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    
-    // Set canvas dimensions to match image
-    canvas.width = image.width;
-    canvas.height = image.height;
-    
-    // Calculate canvas position for coordinate conversion
-    const rect = canvas.getBoundingClientRect();
-    setCanvasOffset({
-      x: rect.left,
-      y: rect.top
-    });
-    
-    // Calculate scale factor if canvas is displayed at different size than its internal dimensions
-    setScale(canvas.clientWidth / canvas.width);
-    
-    // Draw the image and contours
-    drawCanvas();
-  }, [image, editedContours, selectedContourIndex, currentPolygon]);
+  }, [getDefaultLabelId]);
 
   // Draw the canvas with image and contours
-  const drawCanvas = () => {
+  const drawCanvas = useCallback(() => {
     if (!canvasRef.current || !image) return;
     
     const canvas = canvasRef.current;
@@ -366,7 +320,52 @@ const ContourEditor = ({
     };
     
     img.src = image.url || `data:image/jpeg;base64,${image.data}`;
-  };
+  }, [image, editedContours, selectedContourIndex, currentPolygon, isDrawing]);
+
+  // Initialize editor with mask contours
+  useEffect(() => {
+    if (mask) {
+      try {
+        // Handle empty or missing contours gracefully
+        const contours = mask.contours || [];
+        
+        // Convert any existing contours to ensure they have the correct format
+        const normalizedContours = contours.map(normalizeContour);
+        
+        setEditedContours([...normalizedContours]);
+      } catch (err) {
+        console.error("Error processing mask contours:", err);
+        setError("There was an error processing the mask data. The backend may be sending data in an unexpected format.");
+        setEditedContours([]);
+      }
+    } else {
+      setEditedContours([]);
+    }
+  }, [mask, normalizeContour]);
+
+  // Set up canvas when component mounts or image/contours change
+  useEffect(() => {
+    if (!canvasRef.current || !image) return;
+    
+    const canvas = canvasRef.current;
+    
+    // Set canvas dimensions to match image
+    canvas.width = image.width;
+    canvas.height = image.height;
+    
+    // Calculate canvas position for coordinate conversion
+    const rect = canvas.getBoundingClientRect();
+    setCanvasOffset({
+      x: rect.left,
+      y: rect.top
+    });
+    
+    // Calculate scale factor if canvas is displayed at different size than its internal dimensions
+    setScale(canvas.clientWidth / canvas.width);
+    
+    // Draw the image and contours
+    drawCanvas();
+  }, [image, editedContours, selectedContourIndex, currentPolygon, drawCanvas]);
 
   // Convert screen coordinates to canvas coordinates (normalized 0-1)
   const screenToCanvasCoords = (screenX, screenY) => {

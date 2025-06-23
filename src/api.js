@@ -343,7 +343,8 @@ export const getImageById = async (imageId) => {
         }
         
         // Wait before retrying, with increasing backoff
-        await new Promise(resolve => setTimeout(resolve, 300 * retries));
+        const delay = 300 * retries;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
     

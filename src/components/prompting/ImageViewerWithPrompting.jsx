@@ -30,13 +30,13 @@ const ImageViewerWithPrompting = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
   const [showSaveMaskDialog, setShowSaveMaskDialog] = useState(false);
-  const [savingMaskIndex, setSavingMaskIndex] = useState(null);
+  const [, setSavingMaskIndex] = useState(null);
   const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
   const [editingMask, setEditingMask] = useState(null);
 
-// Label Management
-  const [labelOptions, setLabelOptions] = useState([
+  // Label Management
+  const [, setLabelOptions] = useState([
     { id: 1, name: "coral" },
     { id: 2, name: "petri dish" },
   ]);
@@ -462,14 +462,6 @@ const ImageViewerWithPrompting = () => {
       );
     }
     setEditingMask(null);
-  }, []);
-
-  // Handle save mask dialog
-  const handleSaveMask = useCallback(async (maskIndex) => {
-    setSavingMaskIndex(maskIndex);
-    setSaveMaskLabel("coral");
-    setCustomSaveMaskLabel("");
-    setShowSaveMaskDialog(true);
   }, []);
 
   // Wrapper for handleDeleteFinalMaskContour that includes current image context
