@@ -4,13 +4,46 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
   // Drawing utility functions
   const drawPoint = useCallback((ctx, x, y, label) => {
     const pointSize = 5 / (initialScale * zoomLevel);
+    const isNegative = label === 0;
+    
     ctx.beginPath();
     ctx.arc(x, y, pointSize, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(16, 185, 129, 0.6)"; // Always use green
-    ctx.fill();
-    ctx.strokeStyle = "rgba(5, 150, 105, 1)"; // Always use green
+    
+    if (isNegative) {
+      // Red colors for negative points
+      ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(220, 38, 38, 1)";
+    } else {
+      // Green colors for positive points
+      ctx.fillStyle = "rgba(16, 185, 129, 0.6)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(5, 150, 105, 1)";
+    }
+    
     ctx.lineWidth = 1.5 / (initialScale * zoomLevel);
     ctx.stroke();
+    
+    // Draw plus/minus indicator inside the point
+    const indicatorSize = pointSize * 0.6;
+    ctx.strokeStyle = isNegative ? "rgba(220, 38, 38, 1)" : "rgba(5, 150, 105, 1)";
+    ctx.lineWidth = 1 / (initialScale * zoomLevel);
+    
+    if (isNegative) {
+      // Draw minus sign for negative points
+      ctx.beginPath();
+      ctx.moveTo(x - indicatorSize, y);
+      ctx.lineTo(x + indicatorSize, y);
+      ctx.stroke();
+    } else {
+      // Draw plus sign for positive points
+      ctx.beginPath();
+      ctx.moveTo(x - indicatorSize, y);
+      ctx.lineTo(x + indicatorSize, y);
+      ctx.moveTo(x, y - indicatorSize);
+      ctx.lineTo(x, y + indicatorSize);
+      ctx.stroke();
+    }
   }, [initialScale, zoomLevel]);
 
   const drawBox = useCallback((ctx, startX, startY, endX, endY, label) => {

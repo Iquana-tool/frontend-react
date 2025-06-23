@@ -329,9 +329,10 @@ const PromptingCanvas = forwardRef(({
     }
 
     // Handle prompt drawing
-    if (e.button === 0) { // Left mouse button
+    if (e.button === 0 || e.button === 2) { // Left or right mouse button
       if (!isPanning) {
-        handlePromptMouseDown(canvasX, canvasY);
+        const isRightClick = e.button === 2;
+        handlePromptMouseDown(canvasX, canvasY, isRightClick);
       }
     }
   }, [
@@ -388,6 +389,12 @@ const PromptingCanvas = forwardRef(({
     handlePromptDoubleClick();
   }, [handlePromptDoubleClick]);
 
+  // Handle context menu (right-click) to prevent default browser menu
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    return false;
+  }, []);
+
   // Update canvas cursor based on active tool and panning state
   useEffect(() => {
     if (containerRef.current) {
@@ -414,6 +421,7 @@ const PromptingCanvas = forwardRef(({
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('mouseleave', handleMouseUp);
     canvas.addEventListener('dblclick', handleDoubleClick);
+    canvas.addEventListener('contextmenu', handleContextMenu);
     canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
 
     // Global mouse events for smooth panning outside canvas
@@ -438,12 +446,13 @@ const PromptingCanvas = forwardRef(({
       canvas.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('mouseleave', handleMouseUp);
       canvas.removeEventListener('dblclick', handleDoubleClick);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
       canvas.removeEventListener('wheel', handleCanvasWheel);
 
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handlePanMove, handlePanEnd, redrawCanvasCallback, isDraggingRef]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleContextMenu, handleWheel, handlePanMove, handlePanEnd, redrawCanvasCallback, isDraggingRef]);
 
   return (
     <div className="flex flex-col h-full">
@@ -477,6 +486,25 @@ const PromptingCanvas = forwardRef(({
         {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.length > 0 && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 rounded-md text-xs">
             Double-click to finish polygon
+          </div>
+        )}
+        
+        {/* Point prompt instructions */}
+        {promptType === "point" && (
+          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
+            <div className="font-medium mb-1">Point Prompts:</div>
+            <div className="flex items-center gap-1 mb-1">
+              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">+</span>
+              </div>
+              <span>Left-click for positive points</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">−</span>
+              </div>
+              <span>Right-click for negative points</span>
+            </div>
           </div>
         )}
 

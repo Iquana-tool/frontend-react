@@ -21,7 +21,7 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
   }, []);
 
   // Handle mouse down for prompt creation
-  const handlePromptMouseDown = useCallback((canvasX, canvasY) => {
+  const handlePromptMouseDown = useCallback((canvasX, canvasY, isRightClick = false) => {
     if (!image) return false;
 
     // Check if a label is selected before allowing prompt creation
@@ -37,7 +37,9 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
 
     switch (promptType) {
       case "point":
-        addPointPrompt(imageCoords.x, imageCoords.y, currentLabel);
+        // For point prompts, use label 0 for negative (right-click) and currentLabel for positive (left-click)
+        const pointLabel = isRightClick ? 0 : currentLabel;
+        addPointPrompt(imageCoords.x, imageCoords.y, pointLabel);
         return true;
 
       case "box":
