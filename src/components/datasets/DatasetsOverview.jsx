@@ -89,15 +89,42 @@ const DatasetsOverview = ({ onOpenDataset }) => {
       const labelsResponse = await api.fetchLabels(dataset.id);
       
       // Handle different response formats
-      const labels = Array.isArray(labelsResponse) ? labelsResponse : 
-                    (labelsResponse && labelsResponse.labels) ? labelsResponse.labels : [];
+      let labels = [];
       
-      if (!labels || labels.length === 0) {
-        // No labels found, show the label creation modal
+      if (Array.isArray(labelsResponse)) {
+        labels = labelsResponse;
+      } else if (labelsResponse && Array.isArray(labelsResponse.labels)) {
+        labels = labelsResponse.labels;
+      } else if (labelsResponse && typeof labelsResponse === 'object') {
+        // Handle case where response might be an object with no labels property
+        labels = [];
+      }
+      
+      // Filter out any invalid labels and orphaned sublabels
+      const validLabels = labels.filter(label => {
+        // Basic validation
+        if (!label || typeof label !== 'object' || !label.id || !label.name || label.name.trim() === '') {
+          return false;
+        }
+        
+        // If this is a sublabel (has parent_id), check if its parent exists
+        if (label.parent_id) {
+          const parentExists = labels.some(l => l.id === label.parent_id);
+          if (!parentExists) {
+            console.warn(`Orphaned sublabel found: ${label.name} (parent ID ${label.parent_id} missing)`);
+            return false; // Filter out orphaned sublabels
+          }
+        }
+        
+        return true;
+      });
+      
+      if (!validLabels || validLabels.length === 0) {
+        // No valid labels found, show the label creation modal
         setSelectedDatasetForLabels(dataset);
         setShowLabelsModal(true);
       } else {
-        // Dataset has labels, proceed to open normally
+        // Dataset has valid labels, proceed to open normally
         selectDataset(dataset);
         if (onOpenDataset) {
           onOpenDataset(dataset);

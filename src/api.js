@@ -1307,6 +1307,28 @@ export const createLabel = async (labelData, datasetId) => {
   }
 };
 
+// Delete a label
+export const deleteLabel = async (labelId, datasetId) => {
+  try {
+    if (!labelId) {
+      throw new Error("Label ID is required");
+    }
+    
+    if (!datasetId) {
+      throw new Error("Dataset ID is required");
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/labels/delete_label/label=${labelId}`, {
+      method: 'DELETE'
+    });
+    
+    return handleApiError(response);
+  } catch (error) {
+    console.error("Error deleting label:", error);
+    throw error;
+  }
+};
+
 // Get quantification data for a given mask_id
 export const getQuantification = async (maskId) => {
   try {
@@ -1469,6 +1491,7 @@ const API = {
   createCutouts,
   fetchLabels,
   createLabel,
+  deleteLabel,
   getQuantification,
   getContoursForMask,
   getMask,
