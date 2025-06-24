@@ -189,6 +189,18 @@ const ToolsPanel = ({
           </button>
         </div>
 
+        {/* Help text about Alt/Option key */}
+        <div className="text-sm text-gray-600 flex items-center">
+          <span className="hidden sm:inline">Pan with:</span>
+          <kbd className="px-1.5 py-0.5 mx-1 bg-gray-100 rounded text-xs border border-gray-300">
+            Alt/Option
+          </kbd>
+          <span>+</span>
+          <kbd className="px-1.5 py-0.5 ml-1 bg-gray-100 rounded text-xs border border-gray-300">
+            Drag
+          </kbd>
+        </div>
+
         {/* Label Selection */}
         <div className="flex-grow max-w-xs">
           <LabelSelector
@@ -238,18 +250,6 @@ const ToolsPanel = ({
           <Download className="w-4 h-4" />
           <span>Export</span>
         </button>
-
-        {/* Help text about Alt/Option key */}
-        <div className="text-sm text-gray-600 flex items-center ml-auto">
-          <span className="hidden sm:inline">Pan with:</span>
-          <kbd className="px-1.5 py-0.5 mx-1 bg-gray-100 rounded text-xs border border-gray-300">
-            Alt/Option
-          </kbd>
-          <span>+</span>
-          <kbd className="px-1.5 py-0.5 ml-1 bg-gray-100 rounded text-xs border border-gray-300">
-            Drag
-          </kbd>
-        </div>
       </div>
       
       {/* Label Selection Warning */}
