@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as api from '../../../api';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
 
 const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   // Get current dataset context
@@ -316,7 +317,16 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
         }`}
       >
         <div className="flex items-center flex-1 min-w-0">
-          <div className={`flex-shrink-0 w-3 h-3 rounded-full mr-3 ${!selectedItem ? 'bg-orange-400' : 'bg-blue-500'}`}></div>
+          <div 
+            className="flex-shrink-0 w-3 h-3 rounded-full mr-3" 
+            style={{ 
+              backgroundColor: !selectedItem 
+                ? '#f97316' // orange-500 
+                : selectedItem.id 
+                ? getLabelColor(selectedItem.id) 
+                : getLabelColorByName(selectedItem.name || 'default')
+            }}
+          ></div>
           <span className={`block truncate ${!selectedItem ? 'text-orange-700 font-medium' : 'text-gray-900'}`}>
           {loading ? 'Loading labels...' : getDisplayName()}
         </span>
@@ -351,13 +361,28 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
 
             
             <div className="space-y-1">
-              {classStructure.map((classItem) => {
-                const showSubclasses = shouldShowSubclasses(classItem);
-                const isParentSelected = currentLabel === classItem.id;
-                const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
-                
-                return (
-                  <div key={classItem.id} className="relative">
+              {classStructure.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 mb-1">No labels available</h3>
+                    <p className="text-xs text-gray-500 text-center mb-4">
+                      Create your first label to start annotating images. Labels help you categorize and identify objects in your dataset.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                classStructure.map((classItem) => {
+                  const showSubclasses = shouldShowSubclasses(classItem);
+                  const isParentSelected = currentLabel === classItem.id;
+                  const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
+                  
+                  return (
+                    <div key={classItem.id} className="relative">
                     {/* Parent Class */}
                     <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${isParentSelected ? 'bg-blue-50 border border-blue-200' : ''}`}>
                       <button
@@ -374,13 +399,25 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                               )}
                             </div>
                           )}
-                          <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
-                            isParentSelected 
-                              ? 'bg-blue-500 border-blue-500' 
-                              : hasSelectedSubclass
-                              ? 'bg-blue-100 border-blue-300'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}>
+                          <div 
+                            className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                              isParentSelected 
+                                ? 'border-2' 
+                                : hasSelectedSubclass
+                                ? 'border-2'
+                                : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                            style={{
+                              backgroundColor: isParentSelected 
+                                ? getLabelColor(classItem.id) 
+                                : hasSelectedSubclass
+                                ? getLabelColor(classItem.id, 'light')
+                                : 'transparent',
+                              borderColor: (isParentSelected || hasSelectedSubclass) 
+                                ? getLabelColor(classItem.id) 
+                                : undefined
+                            }}
+                          >
                             {isParentSelected && (
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -440,11 +477,21 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                                 onClick={() => handleSubclassSelect(subclass, classItem)}
                                 className="flex items-center flex-grow"
                               >
-                                <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
-                                  isSubclassSelected 
-                                    ? 'bg-blue-500 border-blue-500' 
-                                    : 'border-gray-300 hover:border-gray-400'
-                                }`}>
+                                <div 
+                                  className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                                    isSubclassSelected 
+                                      ? 'border-2' 
+                                      : 'border-gray-300 hover:border-gray-400'
+                                  }`}
+                                  style={{
+                                    backgroundColor: isSubclassSelected 
+                                      ? getLabelColor(subclass.id) 
+                                      : 'transparent',
+                                    borderColor: isSubclassSelected 
+                                      ? getLabelColor(subclass.id) 
+                                      : undefined
+                                  }}
+                                >
                                   {isSubclassSelected && (
                                     <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -471,7 +518,8 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                   )}
                   </div>
                 );
-              })}
+              })
+              )}
 
               {/* Add new class option */}
               <div className="pt-3 mt-3 border-t border-gray-200">
