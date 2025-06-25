@@ -20,7 +20,6 @@ const ToolsPanel = ({
   currentLabel,
   setCurrentLabel,
   segmentationMasks,
-  exportQuantificationsAsCsv,
   zoomLevel,
   setZoomLevel,
   setZoomCenter
@@ -242,14 +241,14 @@ const ToolsPanel = ({
         </div>
 
         {/* Export Button */}
-        <button
+        {/* <button
           className="p-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
-          onClick={() => exportQuantificationsAsCsv(segmentationMasks)}
+          onClick={() => {}}
           title="Export quantifications as CSV"
         >
           <Download className="w-4 h-4" />
           <span>Export</span>
-        </button>
+        </button> */}
       </div>
       
       {/* Label Selection Warning */}
