@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useDataset } from '../../contexts/DatasetContext';
 import { X, Upload, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
-import { uploadImages } from '../../api';
+import { uploadImage } from '../../api';
 
 const AddDatasetModal = ({ isOpen, onClose }) => {
   const { createDataset, fetchDatasets } = useDataset();
@@ -54,138 +54,83 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
 
-    setIsCreating(true);
     setUploadProgress({ current: 0, total: files.length });
+    setIsCreating(true);
     setUploadErrors([]);
-    
+
     try {
-      const response = await createDataset(formData.title.trim(), formData.description.trim(), formData.datasetType);
+      const response = await createDataset(
+        formData.title.trim(),
+        formData.description.trim(),
+        formData.datasetType
+      );
+
       if (response.success) {
         const datasetId = response.dataset_id;
-        
-        // Upload all selected files to the newly created dataset
+
         if (files.length > 0) {
-          try {
-            setUploadProgress({ current: 0, total: files.length });
-            const uploadResponse = await uploadImages(files, datasetId);
-            
-            if (uploadResponse.success) {
-              console.log(`Upload response:`, uploadResponse);
-              
-              // Handle different upload scenarios
-              if (uploadResponse.failed_count > 0) {
-                // Some files failed to upload
-                setUploadErrors([
-                  `Successfully processed ${uploadResponse.uploaded_count} out of ${files.length} files.`,
-                  `${uploadResponse.failed_count} files could not be uploaded.`,
-                  'This may be because some images already exist in the system.',
-                  'The dataset has been created successfully.'
-                ]);
-                
-                // Show partial success message
-                setUploadProgress({ current: uploadResponse.uploaded_count, total: files.length });
-                
-                // Refresh datasets and close modal after showing message
-                try {
-                  await fetchDatasets();
-                  console.log('Dataset list refreshed after partial upload success');
-                } catch (refreshError) {
-                  console.error('Failed to refresh datasets:', refreshError);
-                }
-                
-                setTimeout(() => {
-                  setFormData({ title: '', description: '', datasetType: 'image' });
-                  setFiles([]);
-                  setUploadProgress({ current: 0, total: 0 });
-                  setUploadErrors([]);
-                  onClose();
-                }, 3000);
-                
-              } else {
-                // All files uploaded successfully
-                setUploadProgress({ current: files.length, total: files.length });
-                
-                // Wait for the dataset context to refresh and fetch the new dataset data
-                await fetchDatasets();
-                
-                // Add a small delay to ensure UI updates
-                setTimeout(() => {
-                  setFormData({ title: '', description: '', datasetType: 'image' });
-                  setFiles([]);
-                  setUploadProgress({ current: 0, total: 0 });
-                  setUploadErrors([]);
-                  onClose();
-                }, 300); // Small delay to ensure refresh completes
+          let uploadedCount = 0;
+          let failedCount = 0;
+
+          for (const file of files) {
+            try {
+              const result = await uploadImage(file, datasetId);
+              if (!result.success) {
+                failedCount++;
+                console.error(`Failed to upload ${file.name}:`, result.message);
               }
-              return;
-            } else {
-              throw new Error(uploadResponse.message || 'Upload failed');
+            } catch (err) {
+              failedCount++;
+              console.error(`Error uploading ${file.name}:`, err);
+            } finally {
+              uploadedCount++;
+              setUploadProgress({ current: uploadedCount, total: files.length });
             }
-          } catch (error) {
-            console.error('Failed to upload files:', error);
-            
-            // Check if it's a duplicate image error or similar issue
-            const isDuplicateError = error.message.includes('already exist in the system') || 
-                                   error.message.includes('Invalid file or upload failed') ||
-                                   error.message.includes('UNIQUE constraint failed');
-            
-            if (isDuplicateError) {
-              setUploadErrors([
-                'Some images could not be uploaded because they already exist in the system.',
-                'Each image can only be uploaded once across all datasets.',
-                'The dataset has been created successfully. You can add different images later.'
-              ]);
-              
-              // Ensure dataset refresh happens and wait for it to complete
-              try {
-                await fetchDatasets();
-                console.log('Dataset list refreshed after duplicate image handling');
-              } catch (refreshError) {
-                console.error('Failed to refresh datasets:', refreshError);
-              }
-              
-              // Close modal after showing the message briefly
-              setTimeout(() => {
-                setFormData({ title: '', description: '', datasetType: 'image' });
-                setFiles([]);
-                setUploadProgress({ current: 0, total: 0 });
-                setUploadErrors([]);
-                onClose();
-              }, 3000); // Show message for 3 seconds then close
-              
-            } else {
-              // For other errors, keep the modal open so user can retry
-              setUploadErrors([`Upload failed: ${error.message}`]);
-            }
-            return;
           }
-        } else {
-          // No files to upload, dataset has been created successfully
-          // Ensure dataset refresh happens
-          try {
-            await fetchDatasets();
-            console.log('Dataset list refreshed after creating dataset without files');
-          } catch (refreshError) {
-            console.error('Failed to refresh datasets:', refreshError);
+
+          if (failedCount > 0) {
+            setUploadErrors([
+              `Uploaded ${files.length - failedCount} out of ${files.length} files.`,
+              `${failedCount} files failed to upload.`,
+              'Some images may already exist or were invalid.',
+              'The dataset has been created successfully.'
+            ]);
           }
-          
-          // Add a small delay to ensure UI updates
+
+          // Refresh dataset list
+          await fetchDatasets();
+
+          // Close modal after delay
           setTimeout(() => {
             setFormData({ title: '', description: '', datasetType: 'image' });
             setFiles([]);
             setUploadProgress({ current: 0, total: 0 });
             setUploadErrors([]);
+            setIsCreating(false);
+            onClose();
+          }, failedCount > 0 ? 3000 : 500);
+        } else {
+          // No files, just create dataset
+          await fetchDatasets();
+          setTimeout(() => {
+            setFormData({ title: '', description: '', datasetType: 'image' });
+            setFiles([]);
+            setUploadProgress({ current: 0, total: 0 });
+            setUploadErrors([]);
+            setIsCreating(false);
             onClose();
           }, 500);
         }
+      } else {
+        throw new Error(response.message || 'Failed to create dataset');
       }
     } catch (err) {
-      console.error('Failed to create dataset:', err);
+      console.error('Dataset creation error:', err);
       setUploadErrors([`Failed to create dataset: ${err.message}`]);
-    } finally {
-      setIsCreating(false);
+      setIsCreating(false)
     }
   };
+
 
   const handleDiscard = () => {
     setFormData({ title: '', description: '', datasetType: 'image' });
@@ -317,7 +262,26 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                     }
                   </p>
                 </div>
-
+                {/* Upload Progress */}
+              {isCreating && uploadProgress.total > 0 && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-2">
+                    <span>
+                      {uploadProgress.current === uploadProgress.total ?
+                        'Upload completed!' :
+                        `Uploading ${uploadProgress.total} files...`
+                      }
+                    </span>
+                    <span>{uploadProgress.current}/{uploadProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-teal-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
 
                 {/* File List */}
                 {files.length > 0 && (
@@ -351,27 +315,6 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                   </div>
                 )}
               </div>
-
-              {/* Upload Progress */}
-              {isCreating && uploadProgress.total > 0 && (
-                <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-2">
-                    <span>
-                      {uploadProgress.current === uploadProgress.total ? 
-                        'Upload completed!' : 
-                        `Uploading ${uploadProgress.total} files...`
-                      }
-                    </span>
-                    <span>{uploadProgress.current}/{uploadProgress.total}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-teal-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
 
               {/* Upload Errors */}
               {uploadErrors.length > 0 && (
