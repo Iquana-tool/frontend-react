@@ -285,12 +285,14 @@ const ImageUploader = ({
                     <img
                       src={image.url}
                       alt={image.name}
+                      loading={"lazy"}
                       className="w-full h-full object-cover"
                     />
                   ) : image.isFromAPI && image.thumbnailUrl ? (
                     <img
                       src={image.thumbnailUrl}
                       alt={image.name}
+                        loading={"lazy"}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -385,12 +387,14 @@ const ImageUploader = ({
                       <img
                         src={image.url}
                         alt={image.name || `Sample ${image.id}`}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                     ) : image.thumbnailUrl ? (
                       <img
                         src={image.thumbnailUrl}
                         alt={image.name || `Image ${image.id}`}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.src =
