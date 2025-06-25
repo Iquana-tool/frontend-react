@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { getContourStyle, hexToRgba } from '../utils/labelColors';
 
 export const useCanvasOperations = () => {
@@ -13,11 +13,35 @@ export const useCanvasOperations = () => {
   const annotationCanvasRef = useRef(null);
   const annotationPromptingCanvasRef = useRef(null);
   const finalMaskCanvasRef = useRef(null);
+  const annotationAnimationFrameRef = useRef(null);
+  const finalMaskAnimationFrameRef = useRef(null);
+
+  // Store current draw parameters for animation
+  const annotationDrawParamsRef = useRef({
+    bestMask: null,
+    canvasImage: null,
+    selectedContours: null,
+    selectedFinalMaskContour: null
+  });
+
+  const finalMaskDrawParamsRef = useRef({
+    canvasImage: null,
+    finalMasks: null,
+    selectedFinalMaskContour: null
+  });
 
   const drawAnnotationCanvas = useCallback((bestMask, canvasImage, selectedContours, selectedFinalMaskContour) => {
     if (!annotationCanvasRef.current || !bestMask || !canvasImage) {
       return;
     }
+
+    // Store parameters for animation
+    annotationDrawParamsRef.current = {
+      bestMask,
+      canvasImage,
+      selectedContours,
+      selectedFinalMaskContour
+    };
 
     const canvas = annotationCanvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -59,8 +83,87 @@ export const useCanvasOperations = () => {
       console.error("Error drawing image on annotation canvas:", error);
     }
 
-    ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Apply the spotlight effect if a final mask contour is selected
+    if (selectedFinalMaskContour && selectedFinalMaskContour.contour) {
+      const contour = selectedFinalMaskContour.contour;
+      
+      // Step 1: Create a light overlay over the entire image (much lighter)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.25)'; // Even lighter overlay for annotation canvas
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Step 2: Use composite operation to "cut out" the selected contour area
+      ctx.globalCompositeOperation = 'destination-out';
+      
+      // Create the contour path for the "spotlight"
+      ctx.beginPath();
+      const startX = contour.x[0] * canvas.width;
+      const startY = contour.y[0] * canvas.height;
+      ctx.moveTo(startX, startY);
+      
+      for (let i = 1; i < contour.x.length; i++) {
+        const x = contour.x[i] * canvas.width;
+        const y = contour.y[i] * canvas.height;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      
+      // Add padding around the contour
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.fill();
+      
+      // Step 3: Reset composite operation and add the border effect
+      ctx.globalCompositeOperation = 'source-over';
+      
+      // Create animated pulsing border effect
+      const time = Date.now() * 0.003; // Slow pulse
+      const pulseIntensity = 0.4 + 0.3 * Math.sin(time); // Pulse between 0.4 and 0.7
+      
+      // Outer glow border
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      for (let i = 1; i < contour.x.length; i++) {
+        const x = contour.x[i] * canvas.width;
+        const y = contour.y[i] * canvas.height;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      
+      // Gradient glow effect
+      ctx.strokeStyle = `rgba(59, 130, 246, ${pulseIntensity})`; // Blue with animated opacity
+      ctx.lineWidth = 4;
+      ctx.shadowColor = 'rgba(59, 130, 246, 0.9)';
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      
+      // Inner border for definition
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)'; // White border
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+      
+      // Add a small center indicator (no crosshair)
+      const centerX = contour.x.reduce((sum, x) => sum + x, 0) / contour.x.length * canvas.width;
+      const centerY = contour.y.reduce((sum, y) => sum + y, 0) / contour.y.length * canvas.height;
+      
+      // Small animated center dot (very subtle)
+      const dotPulse = 0.5 + 0.3 * Math.sin(time * 1.5);
+      ctx.fillStyle = `rgba(59, 130, 246, ${dotPulse * 0.6})`; // Very subtle
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // White center (small)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // Normal overlay when no spotlight is active
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     bestMask.contours.forEach((contour, index) => {
       const isSelected = selectedContours && selectedContours.includes(index);
@@ -85,13 +188,9 @@ export const useCanvasOperations = () => {
           ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
         }
 
-                    ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            
-            // Reset shadow
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
         
         // Reset shadow
         ctx.shadowColor = 'transparent';
@@ -151,8 +250,59 @@ export const useCanvasOperations = () => {
     }
   }, [zoomLevel, zoomCenter]);
 
+  // Animation function for annotation canvas
+  const animateAnnotationCanvas = useCallback(() => {
+    const params = annotationDrawParamsRef.current;
+    if (params.bestMask && params.canvasImage) {
+      drawAnnotationCanvas(
+        params.bestMask, 
+        params.canvasImage, 
+        params.selectedContours, 
+        params.selectedFinalMaskContour
+      );
+    }
+    
+    // Continue animation only if a final mask contour is selected
+    if (annotationDrawParamsRef.current.selectedFinalMaskContour) {
+      annotationAnimationFrameRef.current = requestAnimationFrame(animateAnnotationCanvas);
+    }
+  }, [drawAnnotationCanvas]);
+
+  // Effect to manage annotation canvas animation
+  useEffect(() => {
+    const params = annotationDrawParamsRef.current;
+    
+    if (params.selectedFinalMaskContour) {
+      // Start animation loop for pulsing effect
+      if (!annotationAnimationFrameRef.current) {
+        annotationAnimationFrameRef.current = requestAnimationFrame(animateAnnotationCanvas);
+      }
+    } else {
+      // Stop animation when no contour is selected
+      if (annotationAnimationFrameRef.current) {
+        cancelAnimationFrame(annotationAnimationFrameRef.current);
+        annotationAnimationFrameRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (annotationAnimationFrameRef.current) {
+        cancelAnimationFrame(annotationAnimationFrameRef.current);
+        annotationAnimationFrameRef.current = null;
+      }
+    };
+  }, [animateAnnotationCanvas]);
+
   const drawFinalMaskCanvas = useCallback((canvasImage, finalMasks, selectedFinalMaskContour) => {
     if (!finalMaskCanvasRef.current || !canvasImage) return;
+
+    // Store parameters for animation
+    finalMaskDrawParamsRef.current = {
+      canvasImage,
+      finalMasks,
+      selectedFinalMaskContour
+    };
 
     const canvas = finalMaskCanvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -270,6 +420,49 @@ export const useCanvasOperations = () => {
       ctx.fillText(`Zoom: ${zoomLevel}x`, canvas.width - 90, 30);
     }
   }, [zoomLevel, zoomCenter]);
+
+  // Animation function for final mask canvas  
+  const animateFinalMaskCanvas = useCallback(() => {
+    const params = finalMaskDrawParamsRef.current;
+    if (params.canvasImage) {
+      drawFinalMaskCanvas(
+        params.canvasImage, 
+        params.finalMasks, 
+        params.selectedFinalMaskContour
+      );
+    }
+    
+    // Continue animation only if a final mask contour is selected
+    if (finalMaskDrawParamsRef.current.selectedFinalMaskContour) {
+      finalMaskAnimationFrameRef.current = requestAnimationFrame(animateFinalMaskCanvas);
+    }
+  }, [drawFinalMaskCanvas]);
+
+  // Effect to manage final mask canvas animation
+  useEffect(() => {
+    const params = finalMaskDrawParamsRef.current;
+    
+    if (params.selectedFinalMaskContour) {
+      // Start animation loop for pulsing effect
+      if (!finalMaskAnimationFrameRef.current) {
+        finalMaskAnimationFrameRef.current = requestAnimationFrame(animateFinalMaskCanvas);
+      }
+    } else {
+      // Stop animation when no contour is selected
+      if (finalMaskAnimationFrameRef.current) {
+        cancelAnimationFrame(finalMaskAnimationFrameRef.current);
+        finalMaskAnimationFrameRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (finalMaskAnimationFrameRef.current) {
+        cancelAnimationFrame(finalMaskAnimationFrameRef.current);
+        finalMaskAnimationFrameRef.current = null;
+      }
+    };
+  }, [animateFinalMaskCanvas]);
 
   const handleAnnotationCanvasClick = useCallback((event, bestMask, selectedContours, setSelectedContours, setSelectedFinalMaskContour, setZoomLevel, setZoomCenter, finalMasks, findMatchingContour, handleFinalMaskContourSelect, isPointInContour) => {
     if (!annotationCanvasRef.current || !bestMask || !showAnnotationViewer) return;
@@ -575,7 +768,45 @@ export const useCanvasOperations = () => {
     setAnnotationPromptingMode(false);
     setAnnotationPrompts([]);
     setPreviousViewState(null);
+
+    // Clean up animation frames
+    if (annotationAnimationFrameRef.current) {
+      cancelAnimationFrame(annotationAnimationFrameRef.current);
+      annotationAnimationFrameRef.current = null;
+    }
+    if (finalMaskAnimationFrameRef.current) {
+      cancelAnimationFrame(finalMaskAnimationFrameRef.current);
+      finalMaskAnimationFrameRef.current = null;
+    }
+
+    // Reset draw parameters
+    annotationDrawParamsRef.current = {
+      bestMask: null,
+      canvasImage: null,
+      selectedContours: null,
+      selectedFinalMaskContour: null
+    };
+    finalMaskDrawParamsRef.current = {
+      canvasImage: null,
+      finalMasks: null,
+      selectedFinalMaskContour: null
+    };
   }, []);
+
+  // Manual trigger for starting animation when parameters update
+  const triggerAnnotationAnimation = useCallback(() => {
+    const params = annotationDrawParamsRef.current;
+    if (params.selectedFinalMaskContour && !annotationAnimationFrameRef.current) {
+      annotationAnimationFrameRef.current = requestAnimationFrame(animateAnnotationCanvas);
+    }
+  }, [animateAnnotationCanvas]);
+
+  const triggerFinalMaskAnimation = useCallback(() => {
+    const params = finalMaskDrawParamsRef.current;
+    if (params.selectedFinalMaskContour && !finalMaskAnimationFrameRef.current) {
+      finalMaskAnimationFrameRef.current = requestAnimationFrame(animateFinalMaskCanvas);
+    }
+  }, [animateFinalMaskCanvas]);
 
   return {
     // State
@@ -591,6 +822,10 @@ export const useCanvasOperations = () => {
     annotationCanvasRef,
     annotationPromptingCanvasRef,
     finalMaskCanvasRef,
+    annotationAnimationFrameRef,
+    finalMaskAnimationFrameRef,
+    annotationDrawParamsRef,
+    finalMaskDrawParamsRef,
 
     // Actions
     drawAnnotationCanvas,
@@ -609,5 +844,9 @@ export const useCanvasOperations = () => {
     setAnnotationPromptingMode,
     setAnnotationPrompts,
     setPreviousViewState,
+
+    // Manual triggers
+    triggerAnnotationAnimation,
+    triggerFinalMaskAnimation,
   };
 }; 
