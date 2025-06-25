@@ -27,7 +27,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
         )
       );
 
-      const imageData = await api.getImageById(image.id);
+      const imageData = await api.getImageById(image.id, true);
       if (imageData && imageData[image.id]) {
         const imgObj = new Image();
         const base64Data = imageData[image.id];
@@ -125,7 +125,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
 
     try {
       console.log(`Loading image with ID: ${image.id}`);
-      const imageResponse = await api.getImageById(image.id);
+      const imageResponse = await api.getImageById(image.id, false);
 
       if (!imageResponse || !imageResponse[image.id]) {
         throw new Error(`Failed to load image data for ID: ${image.id}`);

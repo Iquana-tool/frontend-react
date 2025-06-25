@@ -333,7 +333,7 @@ export const getImageById = async (imageId, low_res) => {
     while (retries < maxRetries) {
       try {
         const response = await fetch(
-          `${API_BASE_URL}/images/get_image/${imageId}`
+          `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`
         );
 
         if (!response.ok) {
@@ -1451,7 +1451,7 @@ export const getSampleImages = async (datasetId, limit = 4) => {
       // Fetch the actual image data for each sample
       const imagePromises = sampleImages.map(async (image) => {
         try {
-          const imageData = await getImageById(image.id);
+          const imageData = await getImageById(image.id, true);
           return {
             id: image.id,
             base64: imageData[image.id],
