@@ -1,16 +1,50 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
+import { getLabelColor, getLabelColorByName, getContourStyle, hexToRgba } from '../../../utils/labelColors';
 
 export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
   // Drawing utility functions
   const drawPoint = useCallback((ctx, x, y, label) => {
     const pointSize = 5 / (initialScale * zoomLevel);
+    const isNegative = label === 0;
+    
     ctx.beginPath();
     ctx.arc(x, y, pointSize, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(16, 185, 129, 0.6)"; // Always use green
-    ctx.fill();
-    ctx.strokeStyle = "rgba(5, 150, 105, 1)"; // Always use green
+    
+    if (isNegative) {
+      // Red colors for negative points
+      ctx.fillStyle = "rgba(239, 68, 68, 0.6)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(220, 38, 38, 1)";
+    } else {
+      // Green colors for positive points
+      ctx.fillStyle = "rgba(16, 185, 129, 0.6)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(5, 150, 105, 1)";
+    }
+    
     ctx.lineWidth = 1.5 / (initialScale * zoomLevel);
     ctx.stroke();
+    
+    // Draw plus/minus indicator inside the point
+    const indicatorSize = pointSize * 0.6;
+    ctx.strokeStyle = isNegative ? "rgba(220, 38, 38, 1)" : "rgba(5, 150, 105, 1)";
+    ctx.lineWidth = 1 / (initialScale * zoomLevel);
+    
+    if (isNegative) {
+      // Draw minus sign for negative points
+      ctx.beginPath();
+      ctx.moveTo(x - indicatorSize, y);
+      ctx.lineTo(x + indicatorSize, y);
+      ctx.stroke();
+    } else {
+      // Draw plus sign for positive points
+      ctx.beginPath();
+      ctx.moveTo(x - indicatorSize, y);
+      ctx.lineTo(x + indicatorSize, y);
+      ctx.moveTo(x, y - indicatorSize);
+      ctx.lineTo(x, y + indicatorSize);
+      ctx.stroke();
+    }
   }, [initialScale, zoomLevel]);
 
   const drawBox = useCallback((ctx, startX, startY, endX, endY, label) => {
@@ -182,114 +216,101 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
     if (!selectedMask || !selectedMask.contours) return;
 
     try {
-      // Save the current context state
+      // Save current state so we can revert shadow/alphas later.
       ctx.save();
-      
-      // First, draw a semi-transparent black overlay over the entire canvas
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+
+      // Darken everything except the currently selected contour(s) to give users visual focus.
+      // We draw a translucent overlay first and then punch out the selected area(s).
+
+      // Step 1 — dark overlay.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
       ctx.fillRect(0, 0, image.width, image.height);
 
-      // Clear the mask area
+      // Step 2 — remove the area inside selected contour(s) so the content remains clear.
       ctx.globalCompositeOperation = 'destination-out';
-      
-      selectedMask.contours.forEach(contour => {
-        if (!contour.x || !contour.y || contour.x.length < 3) return;
-        
+
+      const contoursToHighlight = selectedContours && selectedContours.length > 0
+        ? selectedContours.map(idx => selectedMask.contours[idx]).filter(Boolean)
+        : selectedMask.contours;
+
+      contoursToHighlight.forEach(contour => {
+        if (!contour || !contour.x || !contour.y || contour.x.length < 3) return;
         ctx.beginPath();
-        
-        // Convert normalized coordinates to actual pixel positions
         const startX = contour.x[0] * image.width;
         const startY = contour.y[0] * image.height;
-        
         ctx.moveTo(startX, startY);
-        
-        // Draw each point of the contour
         for (let i = 1; i < contour.x.length; i++) {
           const x = contour.x[i] * image.width;
           const y = contour.y[i] * image.height;
           ctx.lineTo(x, y);
         }
-        
         ctx.closePath();
         ctx.fill();
       });
 
-      // Draw borders around all contours
+      // Switch back to normal drawing for borders.
       ctx.globalCompositeOperation = 'source-over';
-      
+
+      // === Border / selection styling ===
       selectedMask.contours.forEach((contour, index) => {
         if (!contour.x || !contour.y || contour.x.length < 3) return;
-        
+
         ctx.beginPath();
-        
+
         const startX = contour.x[0] * image.width;
         const startY = contour.y[0] * image.height;
-        
         ctx.moveTo(startX, startY);
-        
+
         for (let i = 1; i < contour.x.length; i++) {
           const x = contour.x[i] * image.width;
           const y = contour.y[i] * image.height;
           ctx.lineTo(x, y);
         }
-        
+
         ctx.closePath();
-        
-        // Use different styling for selected vs unselected contours
-        if (selectedContours.includes(index)) {
-          // Selected contour - use a bright highlight color and thicker line
-          ctx.strokeStyle = '#FF5500';  // Bright orange
-          ctx.lineWidth = 4 / (scale * zoomLevel);  // Thicker line
-          ctx.fillStyle = 'rgba(255, 85, 0, 0.4)';  // More visible fill
+
+        const isSelected = selectedContours.includes(index);
+        const style = getContourStyle(isSelected, contour.label, contour.label_name);
+
+        ctx.strokeStyle = style.strokeStyle;
+        ctx.lineWidth = style.lineWidth / (scale * zoomLevel);
+        ctx.fillStyle = style.fillStyle;
+        ctx.shadowColor = style.shadowColor;
+        ctx.shadowBlur = style.shadowBlur / (scale * zoomLevel);
+
+        if (isSelected) {
           ctx.fill();
-          
-          // Add a glow effect to make selection more visible
-          ctx.shadowColor = '#FF5500';
-          ctx.shadowBlur = 8 / (scale * zoomLevel);
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-          
+        }
+
+        ctx.stroke();
+
+        if (isSelected) {
           // Draw selection handles at the corners of bounding box
-          const contourPoints = [];
-          for (let i = 0; i < contour.x.length; i++) {
-            contourPoints.push({
-              x: contour.x[i] * image.width,
-              y: contour.y[i] * image.height
-            });
-          }
-          
-          // Find bounding box
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          contourPoints.forEach(pt => {
-            minX = Math.min(minX, pt.x);
-            minY = Math.min(minY, pt.y);
-            maxX = Math.max(maxX, pt.x);
-            maxY = Math.max(maxY, pt.y);
-          });
-          
-          // Draw corner handles
+          const pts = contour.x.map((xVal, iPt) => ({ x: xVal * image.width, y: contour.y[iPt] * image.height }));
+          const xs = pts.map(p => p.x);
+          const ys = pts.map(p => p.y);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+
           const handleSize = 6 / (scale * zoomLevel);
-          ctx.fillStyle = '#FF5500';
+          ctx.fillStyle = style.strokeStyle;
           ctx.fillRect(minX - handleSize/2, minY - handleSize/2, handleSize, handleSize);
           ctx.fillRect(maxX - handleSize/2, minY - handleSize/2, handleSize, handleSize);
           ctx.fillRect(maxX - handleSize/2, maxY - handleSize/2, handleSize, handleSize);
           ctx.fillRect(minX - handleSize/2, maxY - handleSize/2, handleSize, handleSize);
-        } else {
-          // Unselected contour - use a more subtle styling
-          ctx.strokeStyle = '#FFD700';  // Gold color
-          ctx.lineWidth = 2 / (scale * zoomLevel);
-          ctx.stroke();
         }
       });
-      
-      // Restore the context state
+
+      // Restore context state to avoid leaking shadows etc.
       ctx.restore();
     } catch (error) {
       console.error("Error drawing mask:", error);
     }
   }, [image, zoomLevel]);
 
-  // Draw final mask contour
+  // Draw final mask contour with modern spotlight effect
   const drawFinalMaskContour = useCallback((ctx, finalMasks, selectedFinalMaskContour, scale) => {
     if (!finalMasks || !finalMasks.length || !selectedFinalMaskContour) return;
 
@@ -299,47 +320,65 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
     const contour = finalMasks[0].contours[selectedIndex];
     
     if (contour && contour.x && contour.y && contour.x.length >= 3) {
+      // Create a subtle "spot-light" so that everything OUTSIDE the chosen contour is gently
+      // darkened.  We keep the opacity lower than the original implementation (0.35 instead of 0.5)
+      // so the rest of the image is still recognisable, while the active region remains fully
+      // bright.
+
+      // Step 1 — draw the translucent overlay everywhere.
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fillRect(0, 0, image.width, image.height);
+
+      // Step 2 — punch a hole where the contour is, so the interior stays bright.
+      ctx.globalCompositeOperation = 'destination-out';
+
+      // Create the contour path that will receive the highlight styling
       ctx.beginPath();
-      
-      // Convert normalized coordinates to actual pixel positions
       const startX = contour.x[0] * image.width;
       const startY = contour.y[0] * image.height;
-      
       ctx.moveTo(startX, startY);
       
-      // Draw each point of the contour
       for (let i = 1; i < contour.x.length; i++) {
         const x = contour.x[i] * image.width;
         const y = contour.y[i] * image.height;
         ctx.lineTo(x, y);
       }
-      
+      ctx.closePath();
+
+      // Padding (stroke only — no fill) so that the highlight sits slightly outside the contour
+      ctx.lineWidth = 8 / (scale * zoomLevel);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0)'; // Invisible stroke to preserve original layout
+      ctx.stroke();
+
+      // Reset to normal drawing mode for the remainder of the highlight work
+      ctx.globalCompositeOperation = 'source-over';
+
+      // Having restored `source-over`, draw a static highlight border around the contour.
+      const baseColor = contour.label ? getLabelColor(contour.label) : (contour.label_name ? getLabelColorByName(contour.label_name) : '#3b82f6');
+      const pulseIntensity = 0.8; // constant opacity
+
+      // Outer glow border (static)
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      for (let i = 1; i < contour.x.length; i++) {
+        const x = contour.x[i] * image.width;
+        const y = contour.y[i] * image.height;
+        ctx.lineTo(x, y);
+      }
       ctx.closePath();
       
-      // Selected final mask contour - highlight with red
-      ctx.strokeStyle = '#FF0066';  // Pink/red color
-      ctx.lineWidth = 4 / (scale * zoomLevel);
-      ctx.fillStyle = 'rgba(255, 0, 102, 0.3)';
-      ctx.fill();
-      
-      // Add glow effect
-      ctx.shadowColor = '#FF0066';
-      ctx.shadowBlur = 10 / (scale * zoomLevel);
+      // Glow effect (static)
+      ctx.strokeStyle = hexToRgba(baseColor, pulseIntensity); // Label-based outline
+      ctx.lineWidth = 6 / (scale * zoomLevel);
+      ctx.shadowColor = hexToRgba(baseColor, 0.8);
+      ctx.shadowBlur = 15 / (scale * zoomLevel);
       ctx.stroke();
-      ctx.shadowBlur = 0;
       
-      // Draw a center indicator for selected contour
-      const centerX = contour.x.reduce((sum, x) => sum + x, 0) / contour.x.length * image.width;
-      const centerY = contour.y.reduce((sum, y) => sum + y, 0) / contour.y.length * image.height;
-      
-      ctx.fillStyle = '#FF0066';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, 8 / (scale * zoomLevel), 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Add white border to center indicator
-      ctx.strokeStyle = '#FFFFFF';
+      // Inner border for definition
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; // Inner white border remains
       ctx.lineWidth = 2 / (scale * zoomLevel);
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
       ctx.stroke();
     }
     

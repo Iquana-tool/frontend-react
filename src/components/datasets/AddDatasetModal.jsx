@@ -318,13 +318,6 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                   </p>
                 </div>
 
-                {/* Information about duplicate images */}
-                <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">
-                    <strong>Note:</strong> Each image can only be uploaded once across all datasets. 
-                    If you try to upload an image that already exists in the system, it will be skipped.
-                  </p>
-                </div>
 
                 {/* File List */}
                 {files.length > 0 && (

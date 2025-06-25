@@ -41,7 +41,8 @@ const ImageDisplay = ({
   setSelectedFinalMaskContour,
   setZoomLevel,
   handleFinalMaskContourSelect,
-  drawFinalMaskCanvas
+  drawFinalMaskCanvas,
+  onInstantSegmentationStateChange
 }) => {
   return (
     <div className="flex flex-col xl:flex-row gap-3 mb-4">
@@ -150,6 +151,7 @@ const ImageDisplay = ({
                   onClearSegmentationResults={handleClearSegmentationResults}
                   zoomLevel={zoomLevel}
                   zoomCenter={zoomCenter}
+                  onInstantSegmentationStateChange={onInstantSegmentationStateChange}
                 />
               ) : (
                 // Show the annotation canvas in normal mode
@@ -198,6 +200,7 @@ const ImageDisplay = ({
               zoomCenter={zoomCenter}
               selectedFinalMaskContour={selectedFinalMaskContour}
               finalMasks={finalMasks}
+              onInstantSegmentationStateChange={onInstantSegmentationStateChange}
             />
 
             {/* Segmentation complete floating action button */}

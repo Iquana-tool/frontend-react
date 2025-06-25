@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
+import { useInstantSegmentation } from './hooks/useInstantSegmentation';
 import CanvasRenderer from './components/CanvasRenderer';
 import SegmentationOverlay from './components/SegmentationOverlay';
 import PromptSelectionOverlay from './components/PromptSelectionOverlay';
@@ -20,13 +21,15 @@ const PromptingCanvas = forwardRef(({
   onClearSegmentationResults,
   selectedFinalMaskContour,
   finalMasks,
+  enableInstantSegmentation = false,
+  instantSegmentationDebounce = 1000,
+  onInstantSegmentationStateChange,
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   
   // Basic state
-  const [imageInfo, setImageInfo] = useState({ width: 0, height: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [initialScale, setInitialScale] = useState(1);
   const [selectedMask, setSelectedMask] = useState(null);
@@ -68,6 +71,35 @@ const PromptingCanvas = forwardRef(({
     clearPrompts,
     getFormattedPrompts
   } = promptDrawing;
+
+  // Initialize instant segmentation hook
+  const instantSegmentation = useInstantSegmentation(
+    prompts,
+    getFormattedPrompts,
+    onPromptingComplete,
+    promptType,
+    currentLabel,
+    enableInstantSegmentation,
+    instantSegmentationDebounce
+  );
+  const {
+    isInstantSegmentationEnabled,
+    isInstantSegmenting,
+    toggleInstantSegmentation,
+    setIsInstantSegmentationEnabled,
+    shouldSuppressLoadingModal
+  } = instantSegmentation;
+
+  // Notify parent of instant segmentation state changes
+  useEffect(() => {
+    if (onInstantSegmentationStateChange) {
+      onInstantSegmentationStateChange({
+        isInstantSegmentationEnabled,
+        isInstantSegmenting,
+        shouldSuppressLoadingModal
+      });
+    }
+  }, [isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, onInstantSegmentationStateChange]);
 
   useEffect(() => {
     if (selectedMaskProp) {
@@ -118,8 +150,14 @@ const PromptingCanvas = forwardRef(({
     setZoomParameters: setZoomParameters,
     zoomIn: () => zoomIn(redrawCanvasCallback),
     zoomOut: () => zoomOut(redrawCanvasCallback),
-    resetView: () => resetView(redrawCanvasCallback)
-  }));
+    resetView: () => resetView(redrawCanvasCallback),
+    // Instant segmentation controls
+    toggleInstantSegmentation,
+    setInstantSegmentationEnabled: setIsInstantSegmentationEnabled,
+    isInstantSegmentationEnabled,
+    isInstantSegmenting,
+    shouldSuppressLoadingModal
+  }), [prompts, clearPrompts, selectedMask, setSelectedMask, setActiveTool, selectedContours, setSelectedContours, setZoomParameters, zoomIn, zoomOut, resetView, redrawCanvasCallback, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -128,24 +166,15 @@ const PromptingCanvas = forwardRef(({
       return;
     }
 
+    if (!currentLabel) {
+      console.warn("No label selected. Please select a label before segmenting.");
+      // You could also show a toast notification here if you have a notification system
+      return;
+    }
+
     const formattedPrompts = getFormattedPrompts();
     onPromptingComplete(formattedPrompts);
   };
-
-  // Initialize canvas when image changes
-  useEffect(() => {
-    if (!image) return;
-
-    clearPrompts();
-
-    // Get image dimensions
-    setImageInfo({ width: image.width, height: image.height });
-
-    // Update after a slight delay to ensure the container has been measured
-    setTimeout(() => {
-      updateCanvasSize();
-    }, 100);
-  }, [image, clearPrompts]);
 
   // Update canvas based on container size
   const updateCanvasSize = useCallback(() => {
@@ -169,20 +198,31 @@ const PromptingCanvas = forwardRef(({
     setInitialScale(scale);
   }, [image]);
 
+  // Initialize canvas when image changes
+  useEffect(() => {
+    if (!image) return;
+
+    clearPrompts();
+
+    // Update after a slight delay to ensure the container has been measured
+    setTimeout(() => {
+      updateCanvasSize();
+    }, 100);
+  }, [image, clearPrompts, updateCanvasSize]);
+
   // Monitor container size changes for responsive behavior
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const resizeObserver = new ResizeObserver(() => {
       updateCanvasSize();
     });
 
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     return () => {
-      if (containerRef.current) {
-        resizeObserver.unobserve(containerRef.current);
-      }
+      resizeObserver.unobserve(container);
     };
   }, [updateCanvasSize]);
 
@@ -289,9 +329,10 @@ const PromptingCanvas = forwardRef(({
     }
 
     // Handle prompt drawing
-    if (e.button === 0) { // Left mouse button
+    if (e.button === 0 || e.button === 2) { // Left or right mouse button
       if (!isPanning) {
-        handlePromptMouseDown(canvasX, canvasY);
+        const isRightClick = e.button === 2;
+        handlePromptMouseDown(canvasX, canvasY, isRightClick);
       }
     }
   }, [
@@ -348,6 +389,12 @@ const PromptingCanvas = forwardRef(({
     handlePromptDoubleClick();
   }, [handlePromptDoubleClick]);
 
+  // Handle context menu (right-click) to prevent default browser menu
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    return false;
+  }, []);
+
   // Update canvas cursor based on active tool and panning state
   useEffect(() => {
     if (containerRef.current) {
@@ -374,6 +421,7 @@ const PromptingCanvas = forwardRef(({
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('mouseleave', handleMouseUp);
     canvas.addEventListener('dblclick', handleDoubleClick);
+    canvas.addEventListener('contextmenu', handleContextMenu);
     canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
 
     // Global mouse events for smooth panning outside canvas
@@ -398,12 +446,13 @@ const PromptingCanvas = forwardRef(({
       canvas.removeEventListener('mouseup', handleMouseUp);
       canvas.removeEventListener('mouseleave', handleMouseUp);
       canvas.removeEventListener('dblclick', handleDoubleClick);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
       canvas.removeEventListener('wheel', handleCanvasWheel);
 
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleWheel, handlePanMove, handlePanEnd, redrawCanvasCallback, isDraggingRef]);
+  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleContextMenu, handleWheel, handlePanMove, handlePanEnd, redrawCanvasCallback, isDraggingRef]);
 
   return (
     <div className="flex flex-col h-full">
@@ -439,6 +488,27 @@ const PromptingCanvas = forwardRef(({
             Double-click to finish polygon
           </div>
         )}
+        
+        {/* Point prompt instructions */}
+        {promptType === "point" && (
+          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
+            <div className="font-medium mb-1">Point Prompts:</div>
+            <div className="flex items-center gap-1 mb-1">
+              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">+</span>
+              </div>
+              <span>Left-click for positive points</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-white text-xs font-bold">−</span>
+              </div>
+              <span>Right-click for negative points</span>
+            </div>
+          </div>
+        )}
+
+
 
         {/* Segmentation Overlay */}
         <SegmentationOverlay
@@ -478,23 +548,26 @@ const PromptingCanvas = forwardRef(({
       </div>
 
       <div className="flex justify-between mt-3">
-        <button
-          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-          onClick={() => {
-            clearPrompts();
-            setSelectedPromptIndex(null);
-          }}
-        >
-          Clear
-        </button>
-        <button
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={handleComplete}
-          disabled={prompts.length === 0}
-        >
-          Complete {prompts.length > 0 && `(${prompts.length})`}
-        </button>
-      </div>
+          <button
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+            onClick={() => {
+              clearPrompts();
+              setSelectedPromptIndex(null);
+            }}
+          >
+            Clear
+          </button>
+          {!isInstantSegmentationEnabled && (
+            <button
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleComplete}
+              disabled={prompts.length === 0 || isInstantSegmenting || !currentLabel}
+              title={!currentLabel ? "Please select a label before segmenting" : ""}
+            >
+              Complete {prompts.length > 0 && `(${prompts.length})`}
+            </button>
+          )}
+        </div>
     </div>
   );
 });

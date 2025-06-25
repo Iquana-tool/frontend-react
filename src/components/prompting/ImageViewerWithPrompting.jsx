@@ -11,15 +11,11 @@ import { useCanvasOperations } from "../../hooks/useCanvasOperations";
 
 // Components
 import ContourEditor from "./ContourEditor";
-import PromptingCanvas from "./PromptingCanvas";
 import QuantificationTable from "../QuantificationTable";
 import ImageUploader from "../ui/ImageUploader";
 import StatusBar from "../ui/StatusBar";
 import ToolsPanel from "../ui/ToolsPanel";
 import ImageDisplay from "../ui/ImageDisplay";
-
-// Utils
-import { exportQuantificationsAsCsv } from "../../utils/exportUtils";
 
 // Styles
 import "./ImageViewerWithPrompting.css";
@@ -29,40 +25,18 @@ const ImageViewerWithPrompting = () => {
 
   // UI State
   const [promptType, setPromptType] = useState("point");
-  const [currentLabel, setCurrentLabel] = useState(1);
+  const [currentLabel, setCurrentLabel] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
   const [showSaveMaskDialog, setShowSaveMaskDialog] = useState(false);
-  const [savingMaskIndex, setSavingMaskIndex] = useState(null);
+  const [, setSavingMaskIndex] = useState(null);
   const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
   const [editingMask, setEditingMask] = useState(null);
-  const [showExpandedQuantifications, setShowExpandedQuantifications] = useState(false);
-
-  // Missing state variables from original
-  const [promptingResult, setPromptingResult] = useState(null);
-  const [cutoutImage, setCutoutImage] = useState(null);
-  const [cutoutPosition, setCutoutPosition] = useState(null);
-  const [cutoutsList, setCutoutsList] = useState([]);
-  const [annotationViewerCollapsed, setAnnotationViewerCollapsed] = useState(false);
-  const [errorMessages, setErrorMessages] = useState([]);
-  const [finalMaskContours, setFinalMaskContours] = useState([]);
-  const [allMasks, setAllMasks] = useState([]);
-  const [displayState, setDisplayState] = useState("original");
-  const [maskImages, setMaskImages] = useState({});
-  const [recentSegmentations, setRecentSegmentations] = useState([]);
-  const [cutouts, setCutouts] = useState([]);
-  const [quantifications, setQuantifications] = useState(null);
-  const [selectedCutout, setSelectedCutout] = useState(null);
-  const [zoomedOnCutout, setZoomedOnCutout] = useState(false);
-  const [refiningMask, setRefiningMask] = useState(false);
-  const [model, setModel] = useState("SAM2Tiny");
-  const [userPrompts, setUserPrompts] = useState([]);
-  const [refinementPrompts, setRefinementPrompts] = useState([]);
 
   // Label Management
-  const [labelOptions, setLabelOptions] = useState([
+  const [, setLabelOptions] = useState([
     { id: 1, name: "coral" },
     { id: 2, name: "petri dish" },
   ]);
@@ -70,8 +44,13 @@ const ImageViewerWithPrompting = () => {
 
   // Refs
   const promptingCanvasRef = useRef(null);
-  const segmentationResultsRef = useRef(null);
-  const annotationPromptingCanvasRef = useRef(null);
+
+  // Instant Segmentation State
+  const [instantSegmentationState, setInstantSegmentationState] = useState({
+    isInstantSegmentationEnabled: false,
+    isInstantSegmenting: false,
+    shouldSuppressLoadingModal: false
+  });
 
   // Custom Hooks
   const imageManagement = useImageManagement();
@@ -87,7 +66,6 @@ const ImageViewerWithPrompting = () => {
     selectedImageId,
     currentImage,
     canvasImage,
-    imageLoaded,
     loading: imageLoading,
     error: imageError,
     fetchImagesFromAPI,
@@ -147,43 +125,12 @@ const ImageViewerWithPrompting = () => {
     resetCanvasState,
     setZoomLevel,
     setZoomCenter,
-    setShowAnnotationViewer,
-    setIsZoomedContourRefinement,
   } = canvasOps;
 
   // Combined error state
   const error = imageError;
   const setError = setImageError;
   const loading = imageLoading || isSegmenting || fetchingFinalMask;
-
-  // Initialize component
-  useEffect(() => {
-    if (currentDataset) {
-      fetchImagesFromAPI();
-      fetchLabels();
-    }
-
-    // Add CSS animations
-    const styleEl = document.createElement("style");
-    styleEl.textContent = `
-      @keyframes slide-up {
-        0% { opacity: 0; transform: translate(-50%, 20px); }
-        100% { opacity: 1; transform: translate(-50%, 0); }
-      }
-      .animate-slide-up {
-        animation: slide-up 0.3s ease-out forwards;
-      }
-    `;
-    document.head.appendChild(styleEl);
-
-    return () => {
-      document.head.removeChild(styleEl);
-      resetImageState();
-      resetSegmentationState();
-      resetContourState();
-      resetCanvasState();
-    };
-  }, [currentDataset]);
 
   // Fetch labels from backend - Note: This is also handled by LabelSelector
   // Consider removing this if LabelSelector handles all label management
@@ -221,6 +168,46 @@ const ImageViewerWithPrompting = () => {
       ]);
     }
   }, [currentDataset]);
+
+  // Utility functions
+  const setSuccessMessageWithTimeout = useCallback((message, timeout = 5000) => {
+    setSuccessMessage(message);
+    if (window.successMessageTimer) {
+      clearTimeout(window.successMessageTimer);
+    }
+    window.successMessageTimer = setTimeout(() => {
+      setSuccessMessage(null);
+    }, timeout);
+  }, []);
+
+  // Initialize component
+  useEffect(() => {
+    if (currentDataset) {
+      fetchImagesFromAPI();
+      fetchLabels();
+    }
+
+    // Add CSS animations
+    const styleEl = document.createElement("style");
+    styleEl.textContent = `
+      @keyframes slide-up {
+        0% { opacity: 0; transform: translate(-50%, 20px); }
+        100% { opacity: 1; transform: translate(-50%, 0); }
+      }
+      .animate-slide-up {
+        animation: slide-up 0.3s ease-out forwards;
+      }
+    `;
+    document.head.appendChild(styleEl);
+
+    return () => {
+      document.head.removeChild(styleEl);
+      resetImageState();
+      resetSegmentationState();
+      resetContourState();
+      resetCanvasState();
+    };
+  }, [currentDataset, fetchImagesFromAPI, fetchLabels, resetCanvasState, resetContourState, resetImageState, resetSegmentationState]);
 
   // Enhanced prompting complete handler
   const handlePromptingComplete = useCallback(async (prompts, promptType) => {
@@ -270,19 +257,7 @@ const ImageViewerWithPrompting = () => {
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [
-    selectedImage,
-    currentImage,
-    currentLabel,
-    isZoomedContourRefinement,
-    zoomLevel,
-    zoomCenter,
-    canvasImage,
-    selectedContours,
-    bestMask,
-    finalMask,
-    segmentationPromptingComplete,
-  ]);
+  }, [selectedImage, currentImage, setError, segmentationPromptingComplete, currentLabel, isZoomedContourRefinement, zoomLevel, zoomCenter, canvasImage, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {
@@ -299,7 +274,7 @@ const ImageViewerWithPrompting = () => {
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, selectedContours, bestMask, contourAddToFinalMask]);
+  }, [currentImage, selectedContours, setError, contourAddToFinalMask, bestMask, setSuccessMessageWithTimeout]);
 
   const handleDeleteSelectedContours = useCallback(() => {
     try {
@@ -316,55 +291,7 @@ const ImageViewerWithPrompting = () => {
     } catch (error) {
       setError(error.message);
     }
-  }, [selectedMask, selectedContours, contourDeleteSelected]);
-
-  // Canvas event handlers with proper parameter passing
-  const handleAnnotationCanvasClick = useCallback((event) => {
-    canvasAnnotationClick(
-      event,
-      bestMask,
-      selectedContours,
-      setSelectedContours,
-      setSelectedFinalMaskContour,
-      setZoomLevel,
-      setZoomCenter,
-      finalMasks,
-      findMatchingContour,
-      handleFinalMaskContourSelect,
-      isPointInContour
-    );
-  }, [
-    bestMask,
-    selectedContours,
-    finalMasks,
-    canvasAnnotationClick,
-    findMatchingContour,
-    isPointInContour,
-  ]);
-
-  const handleFinalMaskCanvasClick = useCallback((event) => {
-    canvasFinalMaskClick(
-      event,
-      finalMasks,
-      selectedFinalMaskContour,
-      setSelectedFinalMaskContour,
-      setZoomLevel,
-      setSelectedContours,
-      canvasImage,
-      () => drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour),
-      handleFinalMaskContourSelect,
-      isPointInContour
-    );
-  }, [
-    finalMasks,
-    selectedFinalMaskContour,
-    canvasImage,
-    bestMask,
-    selectedContours,
-    canvasFinalMaskClick,
-    drawAnnotationCanvas,
-    isPointInContour,
-  ]);
+  }, [contourDeleteSelected, selectedMask, selectedContours, setSelectedMask, setBestMask, setSegmentationMasks, setSuccessMessageWithTimeout, setError]);
 
   const handleFinalMaskContourSelect = useCallback((mask, contourIndex) => {
     canvasFinalMaskContourSelect(
@@ -381,25 +308,39 @@ const ImageViewerWithPrompting = () => {
       canvasImage,
       selectedFinalMaskContour
     );
-  }, [
-    canvasFinalMaskContourSelect,
-    bestMask,
-    findMatchingContour,
-    drawAnnotationCanvas,
-    canvasImage,
-    selectedFinalMaskContour,
-  ]);
+  }, [canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, canvasImage, selectedFinalMaskContour, drawAnnotationCanvas]);
 
-  // Utility functions
-  const setSuccessMessageWithTimeout = useCallback((message, timeout = 5000) => {
-    setSuccessMessage(message);
-    if (window.successMessageTimer) {
-      clearTimeout(window.successMessageTimer);
-    }
-    window.successMessageTimer = setTimeout(() => {
-      setSuccessMessage(null);
-    }, timeout);
-  }, []);
+  // Canvas event handlers with proper parameter passing
+  const handleAnnotationCanvasClick = useCallback((event) => {
+    canvasAnnotationClick(
+      event,
+      bestMask,
+      selectedContours,
+      setSelectedContours,
+      setSelectedFinalMaskContour,
+      setZoomLevel,
+      setZoomCenter,
+      finalMasks,
+      findMatchingContour,
+      handleFinalMaskContourSelect,
+      isPointInContour
+    );
+  }, [canvasAnnotationClick, bestMask, selectedContours, setSelectedContours, setSelectedFinalMaskContour, setZoomLevel, setZoomCenter, finalMasks, findMatchingContour, handleFinalMaskContourSelect, isPointInContour]);
+
+  const handleFinalMaskCanvasClick = useCallback((event) => {
+    canvasFinalMaskClick(
+      event,
+      finalMasks,
+      selectedFinalMaskContour,
+      setSelectedFinalMaskContour,
+      setZoomLevel,
+      setSelectedContours,
+      canvasImage,
+      () => drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour),
+      handleFinalMaskContourSelect,
+      isPointInContour
+    );
+  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, canvasImage, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
 
   const handleReset = useCallback(() => {
     resetImageState();
@@ -407,7 +348,7 @@ const ImageViewerWithPrompting = () => {
     resetContourState();
     resetCanvasState();
     setPromptType("point");
-    setCurrentLabel(1);
+    setCurrentLabel(null);
   }, [resetImageState, resetSegmentationState, resetContourState, resetCanvasState]);
 
   const handleRunNewSegmentation = useCallback(() => {
@@ -415,7 +356,7 @@ const ImageViewerWithPrompting = () => {
       promptingCanvasRef.current.clearPrompts();
       setSuccessMessageWithTimeout("Add new prompts to improve segmentation", 3000);
     }
-  }, []);
+  }, [setSuccessMessageWithTimeout]);
 
   // Load final mask when image changes
   useEffect(() => {
@@ -435,7 +376,7 @@ const ImageViewerWithPrompting = () => {
   // Enhanced draw functions that pass proper parameters
   const drawAnnotationCanvasWrapper = useCallback(() => {
     drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour);
-  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour, zoomLevel, zoomCenter]);
+  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour]);
 
   const drawFinalMaskCanvasWrapper = useCallback(() => {
     drawFinalMaskCanvas(canvasImage, finalMasks, selectedFinalMaskContour);
@@ -461,7 +402,7 @@ const ImageViewerWithPrompting = () => {
         }, 100);
       }
     }
-  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper]);
+  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper, zoomLevel]);
 
   // Show annotation viewer and draw canvas when segmentation completes
   useEffect(() => {
@@ -514,7 +455,7 @@ const ImageViewerWithPrompting = () => {
       console.error("Error saving mask:", error);
       setError("Error saving mask: " + (error.message || "Unknown error"));
     }
-  }, [selectedMask, customSaveMaskLabel, saveMaskLabel]);
+  }, [selectedMask, customSaveMaskLabel, saveMaskLabel, setError, setSuccessMessageWithTimeout]);
 
   // Handle mask updates
   const handleMaskUpdated = useCallback((updatedMask) => {
@@ -527,15 +468,7 @@ const ImageViewerWithPrompting = () => {
       );
     }
     setEditingMask(null);
-  }, []);
-
-  // Handle save mask dialog
-  const handleSaveMask = useCallback(async (maskIndex) => {
-    setSavingMaskIndex(maskIndex);
-    setSaveMaskLabel("coral");
-    setCustomSaveMaskLabel("");
-    setShowSaveMaskDialog(true);
-  }, []);
+  }, [setSegmentationMasks]);
 
   // Wrapper for handleDeleteFinalMaskContour that includes current image context
   const handleDeleteFinalMaskContourWrapper = useCallback(async (contourId) => {
@@ -554,7 +487,7 @@ const ImageViewerWithPrompting = () => {
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, handleDeleteFinalMaskContour, fetchFinalMask]);
+  }, [currentImage, setError, handleDeleteFinalMaskContour, fetchFinalMask, setSuccessMessageWithTimeout]);
 
   // Wrapper for clearAllFinalMaskContours that includes current image context
   const clearAllFinalMaskContoursWrapper = useCallback(async () => {
@@ -571,7 +504,7 @@ const ImageViewerWithPrompting = () => {
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, finalMask, clearAllFinalMaskContours]);
+  }, [currentImage, finalMask, setError, clearAllFinalMaskContours, setSuccessMessageWithTimeout]);
 
   // Export quantifications as CSV
   const exportQuantificationsAsCsv = useCallback((masks) => {
@@ -637,6 +570,7 @@ const ImageViewerWithPrompting = () => {
         loading={loading}
         isSegmenting={isSegmenting}
         selectedModel={selectedModel}
+        suppressLoadingModal={instantSegmentationState.shouldSuppressLoadingModal}
       />
 
       <div
@@ -745,6 +679,7 @@ const ImageViewerWithPrompting = () => {
                   setSelectedFinalMaskContour={setSelectedFinalMaskContour}
                   setZoomLevel={setZoomLevel}
                   canvasImage={canvasImage}
+                  onInstantSegmentationStateChange={setInstantSegmentationState}
                 />
               </>
             ) : (
@@ -769,7 +704,14 @@ const ImageViewerWithPrompting = () => {
                 <li className="mb-1">Select or upload an image from the left panel</li>
                 <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
                 <li className="mb-1">Select foreground (1) or background (0) label</li>
-                <li className="mb-1">Click and drag on the image to create prompts</li>
+                <li className="mb-1">
+                  <strong>For point prompts:</strong>
+                  <ul className="list-disc list-inside ml-4 mt-1">
+                    <li>Left-click for positive points (green with +)</li>
+                    <li>Right-click for negative points (red with -)</li>
+                  </ul>
+                </li>
+                <li className="mb-1">Click and drag on the image to create other prompt types</li>
                 <li className="mb-1">Use zoom and pan controls for detailed work</li>
                 <li>Save your prompts when finished</li>
               </ol>

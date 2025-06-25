@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as api from '../../../api';
 import { useDataset } from '../../../contexts/DatasetContext';
-import { ChevronDownIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ChevronDownIcon, ChevronRightIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
 
 const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   // Get current dataset context
@@ -19,6 +20,10 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
   const [addModalType, setAddModalType] = useState(null); // 'class' or 'subclass'
   const [newItemName, setNewItemName] = useState('');
   const [targetParentClass, setTargetParentClass] = useState(null);
+  
+  // Delete label modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [labelToDelete, setLabelToDelete] = useState(null);
   
   // Click outside handler
   const dropdownRef = useRef(null);
@@ -62,19 +67,13 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
           const transformedLabels = transformLabelsToHierarchy(labels);
           setClassStructure(transformedLabels);
           
-          // Auto-select first label if none is selected
-          if (!currentLabel && transformedLabels.length > 0) {
-            setCurrentLabel(transformedLabels[0].id);
-          }
+          // Don't auto-select first label - require explicit user selection
+          // if (!currentLabel && transformedLabels.length > 0) {
+          //   setCurrentLabel(transformedLabels[0].id);
+          // }
         } else {
-          // No labels found, use defaults
-          setClassStructure([
-            {
-              id: 1,
-              name: 'Coral',
-              subclasses: []
-            }
-          ]);
+          // No labels found
+          setClassStructure([]);
         }
       } catch (err) {
         console.error('Error fetching labels:', err);
@@ -98,7 +97,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     };
 
     fetchLabelsFromBackend();
-  }, [currentDataset, currentLabel]);
+  }, [currentDataset, currentLabel, setCurrentLabel]);
 
   // Transform flat backend labels into hierarchical structure
   const transformLabelsToHierarchy = (labels) => {
@@ -221,6 +220,43 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     }
   };
 
+  // Handle deleting a label
+  const handleDeleteLabel = async () => {
+    if (!labelToDelete || !currentDataset) return;
+    
+    setLoading(true);
+    try {
+      await api.deleteLabel(labelToDelete.id, currentDataset.id);
+      
+      // Refresh the labels from backend
+      const labels = await api.fetchLabels(currentDataset.id);
+      const transformedLabels = transformLabelsToHierarchy(labels);
+      setClassStructure(transformedLabels);
+      
+      // If the deleted label was currently selected, clear selection
+      if (currentLabel === labelToDelete.id) {
+        setCurrentLabel(null);
+      }
+      
+      // Close the delete modal
+      setShowDeleteModal(false);
+      setLabelToDelete(null);
+      
+    } catch (err) {
+      console.error('Error deleting label:', err);
+      setError(err.message || 'Failed to delete label. It may be in use by existing annotations.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Open delete confirmation modal
+  const handleDeleteLabelClick = (label, event) => {
+    event.stopPropagation();
+    setLabelToDelete(label);
+    setShowDeleteModal(true);
+  };
+
   // Function to check if a parent class should show its subclasses
   const shouldShowSubclasses = (classItem) => {
     // Show subclasses if:
@@ -272,11 +308,26 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
       <button
         onClick={() => setExpanded(!expanded)}
         disabled={loading}
-        className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 border-blue-200 rounded-lg shadow-sm hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 rounded-lg shadow-sm transition-all duration-200 ${
+          loading 
+            ? 'opacity-50 cursor-not-allowed border-gray-200' 
+            : !selectedItem
+            ? 'border-orange-300 hover:bg-orange-50 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
+            : 'border-blue-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+        }`}
       >
         <div className="flex items-center flex-1 min-w-0">
-          <div className="flex-shrink-0 w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-          <span className="block truncate text-gray-900">
+          <div 
+            className="flex-shrink-0 w-3 h-3 rounded-full mr-3" 
+            style={{ 
+              backgroundColor: !selectedItem 
+                ? '#f97316' // orange-500 
+                : selectedItem.id 
+                ? getLabelColor(selectedItem.id) 
+                : getLabelColorByName(selectedItem.name || 'default')
+            }}
+          ></div>
+          <span className={`block truncate ${!selectedItem ? 'text-orange-700 font-medium' : 'text-gray-900'}`}>
           {loading ? 'Loading labels...' : getDisplayName()}
         </span>
         </div>
@@ -310,13 +361,28 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
 
             
             <div className="space-y-1">
-              {classStructure.map((classItem) => {
-                const showSubclasses = shouldShowSubclasses(classItem);
-                const isParentSelected = currentLabel === classItem.id;
-                const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
-                
-                return (
-                  <div key={classItem.id} className="relative">
+              {classStructure.length === 0 ? (
+                <div className="text-center py-6">
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 mb-1">No labels available</h3>
+                    <p className="text-xs text-gray-500 text-center mb-4">
+                      Create your first label to start annotating images. Labels help you categorize and identify objects in your dataset.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                classStructure.map((classItem) => {
+                  const showSubclasses = shouldShowSubclasses(classItem);
+                  const isParentSelected = currentLabel === classItem.id;
+                  const hasSelectedSubclass = classItem.subclasses.some(subclass => subclass.id === currentLabel);
+                  
+                  return (
+                    <div key={classItem.id} className="relative">
                     {/* Parent Class */}
                     <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${isParentSelected ? 'bg-blue-50 border border-blue-200' : ''}`}>
                       <button
@@ -333,13 +399,25 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                               )}
                             </div>
                           )}
-                          <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
-                            isParentSelected 
-                              ? 'bg-blue-500 border-blue-500' 
-                              : hasSelectedSubclass
-                              ? 'bg-blue-100 border-blue-300'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}>
+                          <div 
+                            className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                              isParentSelected 
+                                ? 'border-2' 
+                                : hasSelectedSubclass
+                                ? 'border-2'
+                                : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                            style={{
+                              backgroundColor: isParentSelected 
+                                ? getLabelColor(classItem.id) 
+                                : hasSelectedSubclass
+                                ? getLabelColor(classItem.id, 'light')
+                                : 'transparent',
+                              borderColor: (isParentSelected || hasSelectedSubclass) 
+                                ? getLabelColor(classItem.id) 
+                                : undefined
+                            }}
+                          >
                             {isParentSelected && (
                               <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -361,16 +439,25 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                     </div>
                       </button>
                       
-                      {/* Add subclass button */}
-                      {isParentSelected && (
+                      {/* Add subclass and delete buttons */}
+                      <div className="flex items-center gap-1">
+                        {isParentSelected && (
+                          <button
+                            onClick={() => handleAddNewSubclassClick(classItem)}
+                            className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors duration-150"
+                            title="Add subclass"
+                          >
+                            <PlusIcon className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
-                          onClick={() => handleAddNewSubclassClick(classItem)}
-                          className="ml-2 p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded transition-colors duration-150"
-                          title="Add subclass"
+                          onClick={(e) => handleDeleteLabelClick(classItem, e)}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors duration-150"
+                          title="Delete label"
                         >
-                          <PlusIcon className="w-4 h-4" />
+                          <TrashIcon className="w-4 h-4" />
                         </button>
-                      )}
+                      </div>
                   </div>
 
                   {/* Subclasses */}
@@ -380,37 +467,59 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                           const isSubclassSelected = currentLabel === subclass.id;
                           
                           return (
-                            <button
+                            <div
                               key={subclass.id}
-                              onClick={() => handleSubclassSelect(subclass, classItem)}
-                              className={`flex items-center w-full p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${
+                              className={`flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${
                                 isSubclassSelected ? 'bg-blue-50 border border-blue-200' : ''
                               }`}
                             >
-                              <div className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
-                                isSubclassSelected 
-                                  ? 'bg-blue-500 border-blue-500' 
-                                  : 'border-gray-300 hover:border-gray-400'
-                              }`}>
-                                {isSubclassSelected && (
-                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </div>
-                              <span className={`text-sm ${
-                                isSubclassSelected ? 'text-blue-700 font-medium' : 'text-gray-700'
-                              }`}>
-                              {subclass.name}
-                              </span>
-                            </button>
+                              <button
+                                onClick={() => handleSubclassSelect(subclass, classItem)}
+                                className="flex items-center flex-grow"
+                              >
+                                <div 
+                                  className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                                    isSubclassSelected 
+                                      ? 'border-2' 
+                                      : 'border-gray-300 hover:border-gray-400'
+                                  }`}
+                                  style={{
+                                    backgroundColor: isSubclassSelected 
+                                      ? getLabelColor(subclass.id) 
+                                      : 'transparent',
+                                    borderColor: isSubclassSelected 
+                                      ? getLabelColor(subclass.id) 
+                                      : undefined
+                                  }}
+                                >
+                                  {isSubclassSelected && (
+                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
+                                <span className={`text-sm ${
+                                  isSubclassSelected ? 'text-blue-700 font-medium' : 'text-gray-700'
+                                }`}>
+                                {subclass.name}
+                                </span>
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteLabelClick(subclass, e)}
+                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded transition-colors duration-150"
+                                title="Delete subclass"
+                              >
+                                <TrashIcon className="w-3 h-3" />
+                              </button>
+                            </div>
                           );
                         })}
                           </div>
                   )}
                   </div>
                 );
-              })}
+              })
+              )}
 
               {/* Add new class option */}
               <div className="pt-3 mt-3 border-t border-gray-200">
@@ -485,6 +594,64 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-6 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for deleting label */}
+      {showDeleteModal && labelToDelete && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            {/* Modal */}
+            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-6 pt-6 pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <TrashIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Delete Label
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        Are you sure you want to delete the label "{labelToDelete.name}"? 
+                        This action cannot be undone and may affect existing annotations.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-6 py-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleDeleteLabel}
+                  disabled={loading}
+                  className={`w-full inline-flex justify-center rounded-lg px-6 py-3 text-base font-medium text-white sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200 ${
+                    loading 
+                      ? 'bg-gray-300 cursor-not-allowed' 
+                      : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                  }`}
+                >
+                  {loading ? 'Deleting...' : 'Delete'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setLabelToDelete(null);
+                  }}
                   className="mt-3 w-full inline-flex justify-center rounded-lg border border-gray-300 shadow-sm px-6 py-3 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200"
                 >
                   Cancel

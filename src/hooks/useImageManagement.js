@@ -15,6 +15,53 @@ export const useImageManagement = (fetchFinalMask = null) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const loadImageThumbnail = useCallback(async (image) => {
+    if (!image.isFromAPI || image.thumbnailUrl) return;
+
+    try {
+      setAvailableImages((prev) =>
+        prev.map((img) =>
+          img.id === image.id && img.isFromAPI
+            ? { ...img, isLoading: true }
+            : img
+        )
+      );
+
+      const imageData = await api.getImageById(image.id);
+      if (imageData && imageData[image.id]) {
+        const imgObj = new Image();
+        const base64Data = imageData[image.id];
+        const thumbnailUrl = `data:image/jpeg;base64,${base64Data}`;
+
+        const imageLoadPromise = new Promise((resolve, reject) => {
+          imgObj.onload = () => resolve(thumbnailUrl);
+          imgObj.onerror = () => reject(new Error(`Failed to load thumbnail for image ${image.id}`));
+          setTimeout(() => reject(new Error("Thumbnail load timeout")), 5000);
+        });
+
+        imgObj.src = thumbnailUrl;
+        const validThumbnailUrl = await imageLoadPromise;
+
+        setAvailableImages((prev) =>
+          prev.map((img) =>
+            img.id === image.id && img.isFromAPI
+              ? { ...img, thumbnailUrl: validThumbnailUrl, isLoading: false }
+              : img
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`Failed to load thumbnail for image ${image.id}:`, error);
+      setAvailableImages((prev) =>
+        prev.map((img) =>
+          img.id === image.id && img.isFromAPI
+            ? { ...img, loadError: true, isLoading: false }
+            : img
+        )
+      );
+    }
+  }, []);
+
   const fetchImagesFromAPI = useCallback(async () => {
     if (!currentDataset) {
       setAvailableImages([]);
@@ -65,54 +112,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDataset]);
-
-  const loadImageThumbnail = useCallback(async (image) => {
-    if (!image.isFromAPI || image.thumbnailUrl) return;
-
-    try {
-      setAvailableImages((prev) =>
-        prev.map((img) =>
-          img.id === image.id && img.isFromAPI
-            ? { ...img, isLoading: true }
-            : img
-        )
-      );
-
-      const imageData = await api.getImageById(image.id, true);
-      if (imageData && imageData[image.id]) {
-        const imgObj = new Image();
-        const base64Data = imageData[image.id];
-        const thumbnailUrl = `data:image/jpeg;base64,${base64Data}`;
-
-        const imageLoadPromise = new Promise((resolve, reject) => {
-          imgObj.onload = () => resolve(thumbnailUrl);
-          imgObj.onerror = () => reject(new Error(`Failed to load thumbnail for image ${image.id}`));
-          setTimeout(() => reject(new Error("Thumbnail load timeout")), 5000);
-        });
-
-        imgObj.src = thumbnailUrl;
-        const validThumbnailUrl = await imageLoadPromise;
-
-        setAvailableImages((prev) =>
-          prev.map((img) =>
-            img.id === image.id && img.isFromAPI
-              ? { ...img, thumbnailUrl: validThumbnailUrl, isLoading: false }
-              : img
-          )
-        );
-      }
-    } catch (error) {
-      console.error(`Failed to load thumbnail for image ${image.id}:`, error);
-      setAvailableImages((prev) =>
-        prev.map((img) =>
-          img.id === image.id && img.isFromAPI
-            ? { ...img, loadError: true, isLoading: false }
-            : img
-        )
-      );
-    }
-  }, []);
+  }, [currentDataset, loadImageThumbnail]);
 
   const handleImageSelect = useCallback(async (image) => {
     if (!image) return;
@@ -248,7 +248,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDataset, fetchImagesFromAPI]);
+  }, [currentDataset, fetchImagesFromAPI, handleImageSelect]);
 
   const resetImageState = useCallback(() => {
     setSelectedImageId(null);
