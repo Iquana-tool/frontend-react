@@ -22,6 +22,7 @@ const CanvasRenderer = ({
   onCanvasRef
 }) => {
   const canvasRef = useRef(null);
+  
   const { 
     drawAllPrompts, 
     drawMaskOverlay, 
@@ -135,20 +136,18 @@ const CanvasRenderer = ({
     drawFinalMaskContour
   ]);
 
-  // Redraw when dependencies change
+  // Redraw whenever the selectedFinalMaskContour changes
   useEffect(() => {
     redrawCanvas();
-  }, [redrawCanvas]);
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset, zoomCenter, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, selectedMask, selectedContours, finalMasks, selectedFinalMaskContour, redrawCanvas]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={canvasSize.width}
-      height={canvasSize.height}
-      className="touch-none"
       style={{
-        width: `${canvasSize.width}px`,
-        height: `${canvasSize.height}px`
+        width: '100%',
+        height: '100%',
+        objectFit: 'contain'
       }}
     />
   );
