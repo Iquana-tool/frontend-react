@@ -79,7 +79,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
         )
       );
 
-      const imageData = await api.getImageById(image.id);
+      const imageData = await api.getImageById(image.id, true);
       if (imageData && imageData[image.id]) {
         const imgObj = new Image();
         const base64Data = imageData[image.id];

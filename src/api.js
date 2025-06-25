@@ -7,12 +7,12 @@ const handleApiError = async (response) => {
     try {
       const errorData = await response.json();
       console.error("API Error Response:", errorData);
-      
+
       // Handle FastAPI validation errors which come in 'detail' field
       if (errorData.detail) {
         if (Array.isArray(errorData.detail)) {
           // FastAPI validation errors are often arrays
-          const errorMessage = errorData.detail.map(err => 
+          const errorMessage = errorData.detail.map(err =>
             `${err.loc.join('.')}: ${err.msg}`
           ).join(', ');
           throw new Error(`API Validation Error: ${errorMessage}`);
@@ -20,12 +20,12 @@ const handleApiError = async (response) => {
           throw new Error(`API Error: ${errorData.detail}`);
         }
       }
-      
+
       // Handle general error message
       if (errorData.message) {
         throw new Error(`API Error: ${errorData.message}`);
       }
-      
+
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     } catch (parseError) {
       if (parseError instanceof SyntaxError) {
@@ -69,7 +69,7 @@ export const uploadImages = async (files, datasetId) => {
   while (retryCount <= maxRetries) {
     try {
       console.log(`Uploading ${files.length} files to: ${API_BASE_URL}/images/upload_images (attempt ${retryCount + 1}/${maxRetries + 1})`);
-      
+
       // Create a new FormData for each attempt
       const formData = new FormData();
       files.forEach((file) => {
@@ -79,25 +79,25 @@ export const uploadImages = async (files, datasetId) => {
       // Use a timeout to abort the request if it takes too long
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for multiple files
-      
+
       try {
         const url = new URL(`${API_BASE_URL}/images/upload_images`);
         url.searchParams.append('dataset_id', datasetId);
-        
+
         const response = await fetch(url, {
           method: "POST",
           body: formData,
           signal: controller.signal
         });
-        
+
         // Clear the timeout since the request completed
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
           console.error("Upload failed with status:", response.status);
           const responseText = await response.text();
           console.error("Response:", responseText);
-          
+
           // Specific handling for different error codes
           if (response.status === 413) {
             throw new Error("Files are too large. Maximum total size exceeded.");
@@ -107,7 +107,7 @@ export const uploadImages = async (files, datasetId) => {
             throw new Error("Unauthorized. Please try again or refresh the page.");
           } else if (response.status === 500) {
             // Check if it's a duplicate image error
-            if (responseText.includes("UNIQUE constraint failed") || 
+            if (responseText.includes("UNIQUE constraint failed") ||
                 responseText.includes("Invalid file or upload failed")) {
               throw new Error("Some images already exist in the system. Each image can only be uploaded once across all datasets. Please select different images or remove duplicates.");
             }
@@ -120,29 +120,29 @@ export const uploadImages = async (files, datasetId) => {
             }
             throw new Error("Bad request. Please check your files and try again.");
           }
-          
+
           throw new Error(`Upload failed with status ${response.status}`);
         }
-        
+
         // Parse the response
         const data = await response.json();
         return data;
       } catch (fetchError) {
         // Clear the timeout if we got an error
         clearTimeout(timeoutId);
-        
+
         // Handle abort errors specially
         if (fetchError.name === 'AbortError') {
           console.warn("Upload request timed out");
           throw new Error("Upload timed out. Please try again with smaller files or check your connection.");
         }
-        
+
         throw fetchError;
       }
     } catch (error) {
       console.error(`Upload attempt ${retryCount + 1} failed:`, error);
       lastError = error;
-      
+
       // Don't retry duplicate image errors or client errors
       const isDuplicateError = error.message.includes("already exist in the system") ||
                               error.message.includes("Invalid file or upload failed");
@@ -150,29 +150,29 @@ export const uploadImages = async (files, datasetId) => {
                            error.message.includes("Unsupported file type") ||
                            error.message.includes("Unauthorized") ||
                            error.message.includes("Bad request");
-      
+
       if (isDuplicateError || isClientError || retryCount >= maxRetries) {
         break; // Don't retry these types of errors
       }
-      
+
       // Only retry on network errors and server errors (5xx) that aren't duplicate errors
-      const isRetryableError = error.message.includes("Server error") || 
+      const isRetryableError = error.message.includes("Server error") ||
                                error.message.includes("network") ||
                                error.message.includes("failed to fetch");
-      
+
       if (!isRetryableError) {
         break;
       }
-      
+
       // Wait before retrying
       const delay = 1000 * Math.pow(2, retryCount); // Exponential backoff
       console.log(`Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      
+
       retryCount++;
     }
   }
-  
+
   // If we got here, all retries failed
   throw lastError || new Error("Failed to upload images after multiple attempts");
 };
@@ -190,7 +190,7 @@ export const uploadImage = async (file, datasetId) => {
   while (retryCount <= maxRetries) {
     try {
       console.log(`Uploading to: ${API_BASE_URL}/images/upload_image (attempt ${retryCount + 1}/${maxRetries + 1})`);
-      
+
       // Create a new FormData for each attempt
       const formData = new FormData();
       formData.append("file", file);
@@ -198,25 +198,25 @@ export const uploadImage = async (file, datasetId) => {
       // Use a timeout to abort the request if it takes too long
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-      
+
       try {
         const url = new URL(`${API_BASE_URL}/images/upload_image`);
         url.searchParams.append('dataset_id', datasetId);
-        
+
         const response = await fetch(url, {
           method: "POST",
           body: formData,
           signal: controller.signal
         });
-        
+
         // Clear the timeout since the request completed
         clearTimeout(timeoutId);
-        
+
         if (!response.ok) {
           console.error("Upload failed with status:", response.status);
           const responseText = await response.text();
           console.error("Response:", responseText);
-          
+
           // Specific handling for different error codes
           if (response.status === 413) {
             throw new Error("File is too large. Maximum file size is 10MB.");
@@ -226,7 +226,7 @@ export const uploadImage = async (file, datasetId) => {
             throw new Error("Unauthorized. Please try again or refresh the page.");
           } else if (response.status === 500) {
             // Check if it's a duplicate image error
-            if (responseText.includes("UNIQUE constraint failed") || 
+            if (responseText.includes("UNIQUE constraint failed") ||
                 responseText.includes("Invalid file or upload failed")) {
               throw new Error("This image already exists in the system. Each image can only be uploaded once across all datasets.");
             }
@@ -239,29 +239,29 @@ export const uploadImage = async (file, datasetId) => {
             }
             throw new Error("Bad request. Please check your file and try again.");
           }
-          
+
           throw new Error(`Upload failed with status ${response.status}`);
         }
-        
+
         // Parse the response
         const data = await response.json();
         return data;
       } catch (fetchError) {
         // Clear the timeout if we got an error
         clearTimeout(timeoutId);
-        
+
         // Handle abort errors specially
         if (fetchError.name === 'AbortError') {
           console.warn("Upload request timed out");
           throw new Error("Upload timed out. Please try again with a smaller file or check your connection.");
         }
-        
+
         throw fetchError;
       }
     } catch (error) {
       console.error(`Upload attempt ${retryCount + 1} failed:`, error);
       lastError = error;
-      
+
       // Don't retry duplicate image errors or client errors
       const isDuplicateError = error.message.includes("already exists in the system") ||
                               error.message.includes("Invalid file or upload failed");
@@ -269,44 +269,46 @@ export const uploadImage = async (file, datasetId) => {
                            error.message.includes("Unsupported file type") ||
                            error.message.includes("Unauthorized") ||
                            error.message.includes("Bad request");
-      
+
       if (isDuplicateError || isClientError || retryCount >= maxRetries) {
         break; // Don't retry these types of errors
       }
-      
+
       // Only retry on network errors and server errors (5xx) that aren't duplicate errors
-      const isRetryableError = error.message.includes("Server error") || 
+      const isRetryableError = error.message.includes("Server error") ||
                                error.message.includes("network") ||
                                error.message.includes("failed to fetch");
-      
+
       if (!isRetryableError) {
         break;
       }
-      
+
       // Wait before retrying
       const delay = 1000 * Math.pow(2, retryCount); // Exponential backoff
       console.log(`Waiting ${delay}ms before retry...`);
       await new Promise(resolve => setTimeout(resolve, delay));
-      
+
       retryCount++;
     }
   }
-  
+
   // If we got here, all retries failed
   throw lastError || new Error("Failed to upload image after multiple attempts");
 };
 
 // Get image by ID
-export const getImageById = async (imageId) => {
+export const getImageById = async (imageId, low_res) => {
   try {
     const maxRetries = 3;
     let retries = 0;
     let lastError = null;
-    
+
     while (retries < maxRetries) {
       try {
-        const response = await fetch(`${API_BASE_URL}/images/get_image/${imageId}`);
-        
+        const response = await fetch(
+          `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`
+        );
+
         if (!response.ok) {
           // Log detailed error information
           const errorText = await response.text();
@@ -315,16 +317,16 @@ export const getImageById = async (imageId) => {
             statusText: response.statusText,
             errorText
           });
-          
+
           // If we get a 404, don't retry - the image doesn't exist
           if (response.status === 404) {
             throw new Error(`Image with ID ${imageId} not found`);
           }
-          
+
           // For other errors, retry
           throw new Error(`Failed to fetch image: ${response.statusText}`);
         }
-        
+
         // Try to parse as JSON, retry if parsing fails
         try {
           const data = await response.json();
@@ -336,17 +338,17 @@ export const getImageById = async (imageId) => {
       } catch (err) {
         lastError = err;
         retries++;
-        
+
         if (retries >= maxRetries) {
           console.error(`All ${maxRetries} attempts to fetch image ${imageId} failed`);
           break;
         }
-        
+
         // Wait before retrying, with increasing backoff
         await new Promise(resolve => setTimeout(resolve, 300 * retries));
       }
     }
-    
+
     throw lastError || new Error(`Failed to fetch image after ${maxRetries} attempts`);
   } catch (error) {
     console.error("Error getting image:", error);
@@ -435,7 +437,7 @@ export const segmentImage = async (
     }
 
     console.log("Sending segmentation request:", requestData);
-    
+
     const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
       method: "POST",
       headers: {
@@ -443,37 +445,37 @@ export const segmentImage = async (
       },
       body: JSON.stringify(requestData),
     });
-    
+
     const result = await handleApiError(response);
-    
+
     // Handle the new response format (masks with contours instead of base64_masks)
     if (result.masks && Array.isArray(result.masks)) {
       console.log("Received segmentation result with masks:", result.masks.length);
-      
+
       // Convert the new response format to the old format for backward compatibility
       // This helps minimize changes in the rest of the application
       result.base64_masks = [];
       result.quality = [];
-      
+
       result.masks.forEach(mask => {
         if (mask.contours && mask.contours.length > 0) {
           // We'll use a placeholder for base64_masks since we'll use the contours directly
           result.base64_masks.push('placeholder');
           result.quality.push(mask.predicted_iou);
-          
+
           // Log quantification data if available for debugging
           if (mask.contours[0].quantifications) {
             console.log("Mask has quantifications:", mask.contours[0].quantifications);
           }
         }
       });
-      
+
       // Add the original response format to allow proper rendering later
       result.original_masks = result.masks;
     } else {
       console.warn("Unexpected response format from segmentation endpoint:", result);
     }
-    
+
     return result;
   } catch (error) {
     console.error("Error segmenting image:", error);
@@ -488,62 +490,62 @@ export const saveMask = async (imageId, label, contours) => {
     if (imageId === undefined || imageId === null) {
       throw new Error("Image ID is required");
     }
-    
+
     if (!label || typeof label !== 'string') {
       throw new Error("Label is required and must be a string");
     }
-    
+
     if (!contours || !Array.isArray(contours) || contours.length === 0) {
       throw new Error("Contours are required and must be a non-empty array");
     }
-    
+
     console.log(`Creating mask for image ${imageId} with label "${label}" and ${contours.length} contours`);
-    
+
     // First create a mask to get a mask_id
     const createMaskUrl = `${API_BASE_URL}/masks/create_mask/${imageId}`;
     console.log(`Creating base mask at: ${createMaskUrl}`);
-    
+
     const createResponse = await fetch(createMaskUrl, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       }
     });
-    
+
     if (!createResponse.ok) {
       const errorText = await createResponse.text();
       console.error(`Error creating mask: ${createResponse.status}`, errorText);
       throw new Error(`Failed to create mask: ${createResponse.status} ${createResponse.statusText}`);
     }
-    
+
     const createResult = await createResponse.json();
     console.log("Mask creation result:", createResult);
-    
+
     if (!createResult || !createResult.mask_id) {
       throw new Error("Failed to get mask ID from create_mask response");
     }
-    
+
     const maskId = createResult.mask_id;
     console.log(`Successfully created mask with ID: ${maskId}`);
-    
+
     // Now add each contour to the mask
     const results = [];
-    
+
     for (let i = 0; i < contours.length; i++) {
       const contour = contours[i];
       console.log(`Adding contour ${i + 1}/${contours.length} to mask ${maskId}`);
-      
+
       // Create the query parameters
       const params = new URLSearchParams();
       params.append('mask_id', maskId);
-      
+
       if (i > 0 && results.length > 0 && results[i-1].contour_id) {
         // If we have a previous contour, we can set it as parent
         params.append('parent_contour_id', results[i-1].contour_id);
       }
-      
+
       const addContourUrl = `${API_BASE_URL}/masks/add_contour?${params.toString()}`;
-      
+
       const addResponse = await fetch(addContourUrl, {
         method: "POST",
         headers: {
@@ -555,17 +557,17 @@ export const saveMask = async (imageId, label, contours) => {
           label: contour.label || 0
         }),
       });
-      
+
       if (!addResponse.ok) {
         console.error(`Error adding contour ${i + 1}: ${addResponse.status}`);
         continue; // Try to continue with the next contour
       }
-      
+
       const addResult = await addResponse.json();
       console.log(`Added contour ${i + 1}, result:`, addResult);
       results.push(addResult);
     }
-    
+
     // Return information about the mask and contours
     return {
       id: maskId,
@@ -585,18 +587,18 @@ export const getMasksForImage = async (imageId) => {
     // Add a timeout to avoid hanging on slow requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
+
     try {
       // Update to use path parameter format to match backend implementation
       const url = `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`;
-      
-      const response = await fetch(url, { 
+
+      const response = await fetch(url, {
         signal: controller.signal,
         method: 'GET'
       });
-      
+
       clearTimeout(timeoutId);
-      
+
       // Handle the case where the backend returns 404 (which is expected if no masks exist)
       if (response.status === 404) {
         return {
@@ -605,7 +607,7 @@ export const getMasksForImage = async (imageId) => {
           masks: []
         };
       }
-      
+
       // For other error status codes, handle them through structured error responses
       if (!response.ok) {
         // Try to parse error response
@@ -626,9 +628,9 @@ export const getMasksForImage = async (imageId) => {
           };
         }
       }
-      
+
       const data = await response.json();
-      
+
       // If the response is in unexpected format, normalize it
       if (Array.isArray(data)) {
         // Backend is returning just an array of masks without the success wrapper
@@ -640,7 +642,7 @@ export const getMasksForImage = async (imageId) => {
           }))
         };
       }
-      
+
       // Handle the case where masks might be missing or null
       if (data && !data.masks) {
         return {
@@ -649,7 +651,7 @@ export const getMasksForImage = async (imageId) => {
           masks: []
         };
       }
-      
+
       return data;
     } catch (error) {
       clearTimeout(timeoutId);
@@ -659,18 +661,18 @@ export const getMasksForImage = async (imageId) => {
     // Log appropriately based on error type
     if (error.name === "AbortError") {
       console.warn(`Request to get masks for image ${imageId} timed out`);
-    } else if (error.message?.includes("NetworkError") || 
+    } else if (error.message?.includes("NetworkError") ||
                error.message?.includes("Failed to fetch")) {
       console.warn(`Network error fetching masks for image ${imageId} - backend might be unavailable`);
     } else {
       console.error(`Error getting masks for image ${imageId}:`, error);
     }
-    
+
     // Return a safe response instead of throwing
     return {
       success: false,
-      message: "Cannot retrieve masks: " + (error.name === "AbortError" ? 
-        "Request timed out" : 
+      message: "Cannot retrieve masks: " + (error.name === "AbortError" ?
+        "Request timed out" :
         error.message || "Unknown error"),
       masks: []
     };
@@ -683,13 +685,13 @@ export const getMaskWithContours = async (maskId) => {
     // Add a timeout to avoid hanging on slow requests
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
+
     try {
       // First get the basic mask info
       const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`, {
         signal: controller.signal
       });
-      
+
       // Handle 404 and other errors
       if (response.status === 404) {
         return {
@@ -698,7 +700,7 @@ export const getMaskWithContours = async (maskId) => {
           mask: null
         };
       }
-      
+
       if (!response.ok) {
         return {
           success: false,
@@ -706,18 +708,18 @@ export const getMaskWithContours = async (maskId) => {
           mask: null
         };
       }
-      
+
       // Parse mask data
       const maskData = await response.json();
-      
+
       // Now fetch the contours for this mask
       const contoursResponse = await fetch(`${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`, {
         signal: controller.signal
       });
-      
+
       // Clear timeout once both requests complete
       clearTimeout(timeoutId);
-      
+
       // Handle 404 for contours request (mask exists but has no contours)
       if (contoursResponse.status === 404) {
         return {
@@ -729,7 +731,7 @@ export const getMaskWithContours = async (maskId) => {
           }
         };
       }
-      
+
       // Handle other errors for contours request
       if (!contoursResponse.ok) {
         return {
@@ -741,10 +743,10 @@ export const getMaskWithContours = async (maskId) => {
           }
         };
       }
-      
+
       // Parse contours data
       const contoursData = await contoursResponse.json();
-      
+
       // Format contours data for frontend use
       const formattedContours = contoursData.map(contour => {
         let coords = {};
@@ -754,7 +756,7 @@ export const getMaskWithContours = async (maskId) => {
           console.error("Error parsing contour coordinates:", e);
           coords = { x: [], y: [] };
         }
-        
+
         return {
           id: contour.id,
           x: coords.x || [],
@@ -763,7 +765,7 @@ export const getMaskWithContours = async (maskId) => {
           parent_id: contour.parent_id
         };
       });
-      
+
       // Combine mask data with contours
       return {
         success: true,
@@ -772,7 +774,7 @@ export const getMaskWithContours = async (maskId) => {
           contours: formattedContours
         }
       };
-      
+
     } catch (error) {
       clearTimeout(timeoutId);
       throw error;
@@ -781,18 +783,18 @@ export const getMaskWithContours = async (maskId) => {
     // Log appropriately based on error type
     if (error.name === "AbortError") {
       console.warn(`Request to get mask details for mask ID ${maskId} timed out`);
-    } else if (error.message?.includes("NetworkError") || 
+    } else if (error.message?.includes("NetworkError") ||
                error.message?.includes("Failed to fetch")) {
       console.warn(`Network error fetching mask details for mask ID ${maskId}`);
     } else {
       console.error(`Error getting mask details for mask ID ${maskId}:`, error);
     }
-    
+
     // Return a safe response instead of throwing
     return {
       success: false,
-      message: "Cannot retrieve mask details: " + (error.name === "AbortError" ? 
-        "Request timed out" : 
+      message: "Cannot retrieve mask details: " + (error.name === "AbortError" ?
+        "Request timed out" :
         error.message || "Unknown error"),
       mask: null
     };
@@ -802,7 +804,7 @@ export const getMaskWithContours = async (maskId) => {
 /**
  * Retrieves the final mask for an image by getting masks for the image.
  * This function uses the existing mask endpoints since there's no specialized final mask endpoint.
- * 
+ *
  * @param {number} imageId - The ID of the image to get the final mask for.
  * @returns {Promise<Object>} - A response object containing the final mask with its contours if found.
  */
@@ -849,7 +851,7 @@ export async function getFinalMask(imageId) {
       // Parse and return the successful response
       const masks = await response.json();
       console.log(`Successfully fetched masks for image ${imageId}`, masks);
-      
+
       if (!masks || masks.length === 0) {
         return {
           success: false,
@@ -859,7 +861,7 @@ export async function getFinalMask(imageId) {
 
       // Get the first mask (assuming one mask per image for "final" mask)
       const firstMask = masks[0];
-      
+
       // Get contours for this mask
       try {
         const contoursResponse = await fetch(`${API_BASE_URL}/masks/get_contours_of_mask/${firstMask.id}`, {
@@ -897,7 +899,7 @@ export async function getFinalMask(imageId) {
     } catch (error) {
       console.error(`Network error when fetching final mask: ${error.message}`);
       attempts++;
-      
+
       // If we still have attempts left, wait before retrying
       if (attempts < MAX_RETRIES) {
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
@@ -913,7 +915,7 @@ export async function getFinalMask(imageId) {
 
 /**
  * Creates a final mask for an image if one doesn't exist yet.
- * 
+ *
  * @param {number} imageId - The ID of the image to create a final mask for.
  * @returns {Promise<Object>} - Response with the mask ID and creation status.
  */
@@ -962,7 +964,7 @@ export async function createFinalMask(imageId) {
 /**
  * Adds a contour to the final mask of an image.
  * Creates the final mask if it doesn't exist yet.
- * 
+ *
  * @param {number} imageId - The ID of the image.
  * @param {Object} contour - The contour to add with x, y coordinates and a label.
  * @returns {Promise<Object>} - Response with the mask ID and contour ID.
@@ -987,7 +989,7 @@ export async function addContourToFinalMask(imageId, contour) {
     }
 
     console.log(`Adding contour to final mask for image ${imageId} with label ${contour.label}`);
-    
+
     // First, create or get the mask for this image
     const createMaskResponse = await fetch(`${API_BASE_URL}/masks/create_mask/${imageId}`, {
       method: "PUT",
@@ -1059,7 +1061,7 @@ export async function addContourToFinalMask(imageId, contour) {
 /**
  * Adds multiple contours to the final mask of an image.
  * Creates the final mask if it doesn't exist yet.
- * 
+ *
  * @param {number} imageId - The ID of the image.
  * @param {Array<Object>} contours - Array of contours to add, each with x, y coordinates and a label.
  * @returns {Promise<Object>} - Response with the mask ID and array of contour IDs.
@@ -1095,7 +1097,7 @@ export async function addContoursToFinalMask(imageId, contours) {
     }
 
     console.log(`Adding ${contours.length} contours to final mask for image ${imageId}`);
-    
+
     // First, create or get the mask for this image
     const createMaskResponse = await fetch(`${API_BASE_URL}/masks/create_mask/${imageId}`, {
       method: "PUT",
@@ -1119,17 +1121,17 @@ export async function addContoursToFinalMask(imageId, contours) {
     // Now add the contours using the correct endpoint
     const url = new URL(`${API_BASE_URL}/masks/add_contours`);
     url.searchParams.append('mask_id', maskId);
-    
+
     // Format contours for the backend
     const formattedContours = contours.map(contour => ({
       x: contour.x,
       y: contour.y,
       label: contour.label
     }));
-    
+
     console.log(`Making API call to: ${url.toString()}`);
     console.log(`Request body: ${JSON.stringify(formattedContours)}`);
-    
+
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -1272,34 +1274,34 @@ export const fetchLabels = async (datasetId) => {
 };
 
 // Create a new label (class)
-// labelData: { name: string, parent_id: number | null } 
+// labelData: { name: string, parent_id: number | null }
 // parent_id: null for top-level labels, actual ID for subclasses
 export const createLabel = async (labelData, datasetId) => {
   try {
     // Extract values from the label data object
     const { name, parent_id = null } = labelData;
-    
+
     if (!name) {
       throw new Error("Label name is required");
     }
-    
+
     if (!datasetId) {
       throw new Error("Dataset ID is required");
     }
-    
+
     const url = new URL(`${API_BASE_URL}/labels/create_label`);
     url.searchParams.append('label_name', name);
     url.searchParams.append('dataset_id', datasetId);
-    
+
     // Send null for top-level, actual ID for subclasses
     if (parent_id !== null) {
       url.searchParams.append('parent_label_id', parent_id);
     }
-    
+
     const response = await fetch(url, {
       method: 'POST'
     });
-    
+
     return handleApiError(response);
   } catch (error) {
     console.error("Error creating label:", error);
@@ -1312,13 +1314,13 @@ export const getQuantification = async (maskId) => {
   try {
     const response = await fetch(`${API_BASE_URL}/export/get_quantification/${maskId}`);
     const data = await handleApiError(response);
-    
+
     // Check if the data has the expected structure
     if (!data || !data.quantifications) {
       console.warn(`Invalid quantification data format for mask ${maskId}`);
       return { quantifications: [] };
     }
-    
+
     return data;
   } catch (error) {
     console.error(`Error fetching quantification for mask ${maskId}:`, error);
@@ -1372,7 +1374,7 @@ export const createDataset = async (name, description, datasetType) => {
     url.searchParams.append('name', name);
     url.searchParams.append('description', description);
     url.searchParams.append('dataset_type', datasetType);
-    
+
     const response = await fetch(url, {
       method: 'POST'
     });
@@ -1421,11 +1423,11 @@ export const getSampleImages = async (datasetId, limit = 4) => {
   try {
     const response = await fetch(`${API_BASE_URL}/images/list_images/${datasetId}`);
     const data = await handleApiError(response);
-    
+
     if (data.success && data.images && data.images.length > 0) {
       // Get the first few images as samples
       const sampleImages = data.images.slice(0, limit);
-      
+
       // Fetch the actual image data for each sample
       const imagePromises = sampleImages.map(async (image) => {
         try {
@@ -1440,11 +1442,11 @@ export const getSampleImages = async (datasetId, limit = 4) => {
           return null;
         }
       });
-      
+
       const resolvedImages = await Promise.all(imagePromises);
       return resolvedImages.filter(img => img !== null);
     }
-    
+
     return [];
   } catch (error) {
     console.error("Error fetching sample images:", error);
