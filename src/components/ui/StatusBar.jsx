@@ -8,7 +8,8 @@ const StatusBar = ({
   setSuccessMessage, 
   loading, 
   isSegmenting, 
-  selectedModel 
+  selectedModel,
+  suppressLoadingModal = false
 }) => {
   return (
     <>
@@ -59,7 +60,7 @@ const StatusBar = ({
       )}
 
       {/* Loading indicator */}
-      {loading && (
+      {loading && !suppressLoadingModal && (
         <div className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-2xl flex flex-col items-center max-w-md w-full transform transition-all">
             <div className="relative w-20 h-20 mb-4">

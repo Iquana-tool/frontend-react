@@ -3,7 +3,10 @@ import { useDataset } from "../../contexts/DatasetContext";
 import { Plus, Download, FolderOpen } from "lucide-react";
 import AddDatasetModal from "./AddDatasetModal";
 import CreateLabelsModal from "./CreateLabelsModal";
+import DeleteDatasetModal from "./DeleteDatasetModal";
+import DeleteDatasetButton from "./DeleteDatasetButton";
 import PlaceholderImage from "../ui/PlaceholderImage";
+import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
@@ -21,6 +24,16 @@ const DatasetsOverview = ({ onOpenDataset }) => {
   const [datasetImages, setDatasetImages] = useState({});
   const [datasetStats, setDatasetStats] = useState({});
   const [loadingData, setLoadingData] = useState(false);
+
+  // Use the delete functionality hook
+  const {
+    showDeleteModal,
+    datasetToDelete,
+    isDeleting,
+    initiateDelete,
+    confirmDelete,
+    cancelDelete,
+  } = useDeleteDataset();
 
   // Fetch sample images and annotation stats for all datasets
   useEffect(() => {
@@ -76,15 +89,42 @@ const DatasetsOverview = ({ onOpenDataset }) => {
       const labelsResponse = await api.fetchLabels(dataset.id);
       
       // Handle different response formats
-      const labels = Array.isArray(labelsResponse) ? labelsResponse : 
-                    (labelsResponse && labelsResponse.labels) ? labelsResponse.labels : [];
+      let labels = [];
       
-      if (!labels || labels.length === 0) {
-        // No labels found, show the label creation modal
+      if (Array.isArray(labelsResponse)) {
+        labels = labelsResponse;
+      } else if (labelsResponse && Array.isArray(labelsResponse.labels)) {
+        labels = labelsResponse.labels;
+      } else if (labelsResponse && typeof labelsResponse === 'object') {
+        // Handle case where response might be an object with no labels property
+        labels = [];
+      }
+      
+      // Filter out any invalid labels and orphaned sublabels
+      const validLabels = labels.filter(label => {
+        // Basic validation
+        if (!label || typeof label !== 'object' || !label.id || !label.name || label.name.trim() === '') {
+          return false;
+        }
+        
+        // If this is a sublabel (has parent_id), check if its parent exists
+        if (label.parent_id) {
+          const parentExists = labels.some(l => l.id === label.parent_id);
+          if (!parentExists) {
+            console.warn(`Orphaned sublabel found: ${label.name} (parent ID ${label.parent_id} missing)`);
+            return false; // Filter out orphaned sublabels
+          }
+        }
+        
+        return true;
+      });
+      
+      if (!validLabels || validLabels.length === 0) {
+        // No valid labels found, show the label creation modal
         setSelectedDatasetForLabels(dataset);
         setShowLabelsModal(true);
       } else {
-        // Dataset has labels, proceed to open normally
+        // Dataset has valid labels, proceed to open normally
         selectDataset(dataset);
         if (onOpenDataset) {
           onOpenDataset(dataset);
@@ -113,6 +153,8 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     setShowLabelsModal(false);
     setSelectedDatasetForLabels(null);
   };
+
+
 
   if (loading) {
     return (
@@ -201,8 +243,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                   className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
                 >
                   {/* Dataset Header */}
-                  <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white">
-                    <h3 className="text-xl font-bold mb-2">{dataset.name}</h3>
+                  <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white relative">
+                    <DeleteDatasetButton 
+                      dataset={dataset} 
+                      onClick={initiateDelete} 
+                    />
+                    <h3 className="text-xl font-bold mb-2 pr-8">{dataset.name}</h3>
                     <p className="text-teal-100 text-sm">
                       {dataset.description || "No description provided"}
                     </p>
@@ -330,6 +376,15 @@ const DatasetsOverview = ({ onOpenDataset }) => {
           onLabelsCreated={handleLabelsCreated}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteDatasetModal
+        isOpen={showDeleteModal}
+        dataset={datasetToDelete}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

@@ -14,6 +14,7 @@ import {
   Square,
   Circle,
   Polygon,
+  Target,
 } from "lucide-react";
 
 //  A reusable panel of tools for image editing and prompting.
@@ -34,7 +35,7 @@ const ToolsPanel = ({
   // Tool definitions
   const tools = [
     { id: "pointer", icon: <MousePointer size={18} />, label: "Select" },
-    { id: "point", icon: <MousePointer size={18} />, label: "Point Prompt" },
+    { id: "point", icon: <Target size={18} />, label: "Point Prompt" },
     { id: "box", icon: <Square size={18} />, label: "Box Prompt" },
     { id: "circle", icon: <Circle size={18} />, label: "Circle Prompt" },
     { id: "polygon", icon: <Polygon size={18} />, label: "Polygon Prompt" },

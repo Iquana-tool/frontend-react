@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { getContourStyle, hexToRgba } from '../utils/labelColors';
 
 export const useCanvasOperations = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -63,12 +64,18 @@ export const useCanvasOperations = () => {
 
     bestMask.contours.forEach((contour, index) => {
       const isSelected = selectedContours && selectedContours.includes(index);
-
-      ctx.lineWidth = isSelected ? 4 : 2;
-      ctx.strokeStyle = isSelected ? "#FF3366" : "#10b981";
-      ctx.fillStyle = isSelected
-        ? "rgba(255, 51, 102, 0.3)"
-        : "rgba(16, 185, 129, 0.2)";
+      
+      // Get consistent colors based on contour label
+      const contourStyle = getContourStyle(isSelected, contour.label, contour.label_name);
+      
+      ctx.lineWidth = contourStyle.lineWidth;
+      ctx.strokeStyle = contourStyle.strokeStyle;
+      ctx.fillStyle = contourStyle.fillStyle;
+      
+      if (contourStyle.shadowBlur > 0) {
+        ctx.shadowColor = contourStyle.shadowColor;
+        ctx.shadowBlur = contourStyle.shadowBlur;
+      }
 
       if (contour.x && contour.y && contour.x.length > 0) {
         ctx.beginPath();
@@ -78,9 +85,17 @@ export const useCanvasOperations = () => {
           ctx.lineTo(contour.x[i] * canvas.width, contour.y[i] * canvas.height);
         }
 
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+                    ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
 
         if (zoomLevel < 5) {
           let centerX = 0, centerY = 0;
@@ -106,11 +121,11 @@ export const useCanvasOperations = () => {
             16 + padding * 2
           );
 
-          ctx.fillStyle = isSelected ? "#FF3366" : "#10b981";
+          ctx.fillStyle = contourStyle.strokeStyle;
           ctx.fillText(text, centerX, centerY);
 
           if (isSelected) {
-            ctx.strokeStyle = "rgba(255, 51, 102, 0.6)";
+            ctx.strokeStyle = hexToRgba(contourStyle.strokeStyle, 0.6);
             ctx.lineWidth = 2;
             ctx.strokeRect(
               centerX - metrics.width / 2 - padding - 2,
@@ -172,11 +187,17 @@ export const useCanvasOperations = () => {
             selectedFinalMaskContour.maskId === mask.id &&
             selectedFinalMaskContour.contourIndex === index;
 
-          ctx.lineWidth = isSelected ? 4 : 2;
-          ctx.strokeStyle = isSelected ? "#FF3333" : "#FF3333";
-          ctx.fillStyle = isSelected
-            ? "rgba(255, 51, 51, 0.4)"
-            : "rgba(255, 51, 51, 0.2)";
+          // Get consistent colors based on contour label for final masks
+          const contourStyle = getContourStyle(isSelected, contour.label, contour.label_name);
+          
+          ctx.lineWidth = contourStyle.lineWidth;
+          ctx.strokeStyle = contourStyle.strokeStyle;
+          ctx.fillStyle = contourStyle.fillStyle;
+          
+          if (contourStyle.shadowBlur > 0) {
+            ctx.shadowColor = contourStyle.shadowColor;
+            ctx.shadowBlur = contourStyle.shadowBlur;
+          }
 
           if (contour.x && contour.y && contour.x.length > 0) {
             ctx.beginPath();
@@ -218,11 +239,11 @@ export const useCanvasOperations = () => {
                 16 + padding * 2
               );
 
-              ctx.fillStyle = isSelected ? "#FF3333" : "#FF3333";
+              ctx.fillStyle = contourStyle.strokeStyle;
               ctx.fillText(text, centerX, centerY);
 
               if (isSelected) {
-                ctx.strokeStyle = "rgba(255, 51, 51, 0.6)";
+                ctx.strokeStyle = hexToRgba(contourStyle.strokeStyle, 0.6);
                 ctx.lineWidth = 2;
                 ctx.strokeRect(
                   centerX - metrics.width / 2 - padding - 2,
