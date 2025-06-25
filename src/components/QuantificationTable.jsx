@@ -245,21 +245,26 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
     { id: 'diameter_max', label: 'Max Diameter', format: formatValue }
   ];
 
-  // Get unique labels for legend
-  const uniqueLabels = [...new Set(quantRows.map(row => row.label_name))].filter(Boolean);
+  // Get unique labels for legend with their corresponding label IDs
+  const uniqueLabelsWithIds = quantRows.reduce((acc, row) => {
+    if (row.label_name && !acc.some(item => item.name === row.label_name)) {
+      acc.push({ name: row.label_name, id: row.label });
+    }
+    return acc;
+  }, []);
 
   return (
     <div>
       {/* Color Legend */}
-      {uniqueLabels.length > 1 && (
+      {uniqueLabelsWithIds.length > 1 && (
         <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
           <span style={{ fontSize: '12px', color: '#666', marginRight: 8 }}>Labels:</span>
-          {uniqueLabels.map((label) => {
-            const colors = getTableRowColors(label, null);
-            const primaryColor = getLabelColorByName(label);
+          {uniqueLabelsWithIds.map((labelInfo) => {
+            const colors = getTableRowColors(labelInfo.name, labelInfo.id);
+            const primaryColor = labelInfo.id ? getLabelColor(labelInfo.id) : getLabelColorByName(labelInfo.name);
             return (
               <div
-                key={label}
+                key={labelInfo.name}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -272,7 +277,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
                   border: `1px solid ${primaryColor}40`
                 }}
               >
-                {label}
+                {labelInfo.name}
               </div>
             );
           })}
