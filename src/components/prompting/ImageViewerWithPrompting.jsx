@@ -115,7 +115,6 @@ const ImageViewerWithPrompting = () => {
     zoomLevel,
     zoomCenter,
     showAnnotationViewer,
-    isZoomedContourRefinement,
     annotationCanvasRef,
     finalMaskCanvasRef,
     drawAnnotationCanvas,
@@ -223,7 +222,7 @@ const ImageViewerWithPrompting = () => {
         promptType,
         selectedImage,
         currentLabel,
-        isZoomedContourRefinement,
+        false,
         zoomLevel,
         zoomCenter,
         canvasImage,
@@ -258,7 +257,7 @@ const ImageViewerWithPrompting = () => {
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, currentImage, setError, segmentationPromptingComplete, currentLabel, isZoomedContourRefinement, zoomLevel, zoomCenter, canvasImage, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
+  }, [selectedImage, currentImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, canvasImage, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {
@@ -600,7 +599,6 @@ const ImageViewerWithPrompting = () => {
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
-              {!isZoomedContourRefinement && (
                 <>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -612,7 +610,6 @@ const ImageViewerWithPrompting = () => {
                   </svg>
                   Image Viewer with Prompting
                 </>
-              )}
             </h2>
           </div>
 
@@ -652,7 +649,6 @@ const ImageViewerWithPrompting = () => {
                   handlePromptingComplete={handlePromptingComplete}
                   handleMaskSelect={handleMaskSelect}
                   showAnnotationViewer={showAnnotationViewer}
-                  isZoomedContourRefinement={isZoomedContourRefinement}
                   zoomLevel={zoomLevel}
                   zoomCenter={zoomCenter}
                   selectedContours={selectedContours}
