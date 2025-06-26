@@ -16,6 +16,7 @@ import ImageUploader from "../ui/ImageUploader";
 import StatusBar from "../ui/StatusBar";
 import ToolsPanel from "../ui/ToolsPanel";
 import ImageDisplay from "../ui/ImageDisplay";
+import Sidebar from "./Sidebar"; // Adjust path as necessary
 
 // Styles
 import "./ImageViewerWithPrompting.css";
@@ -557,10 +558,6 @@ const ImageViewerWithPrompting = () => {
 
   return (
     <div className="w-full">
-      <h1 className="text-2xl font-bold mb-4 text-gray-800">
-        Image Viewer with Prompting
-      </h1>
-
       {/* Status Bar Component */}
       <StatusBar
         error={error}
@@ -572,14 +569,12 @@ const ImageViewerWithPrompting = () => {
         selectedModel={selectedModel}
         suppressLoadingModal={instantSegmentationState.shouldSuppressLoadingModal}
       />
-
       <div
-        className={`grid grid-cols-1 ${
-          isSidebarCollapsed ? "md:grid-cols-6" : "md:grid-cols-3"
-        } gap-4 mb-6`}
+        // Adjusted grid classes
+        className={`grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 mb-6`} // Use auto for sidebar width, 1fr for main content
       >
-        {/* Image Uploader Component */}
-        <ImageUploader
+        {/* Sidebar Component */}
+        <Sidebar
           selectedImage={selectedImage}
           selectedImageId={selectedImageId}
           availableImages={availableImages}
@@ -593,13 +588,15 @@ const ImageViewerWithPrompting = () => {
           handleModelChange={handleModelChange}
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
+          currentDataset={currentDataset}
         />
 
-        {/* Main Viewer Container */}
+         {/* Main Viewer Container */}
         <div
-          className={`${
-            isSidebarCollapsed ? "md:col-span-5" : "md:col-span-2"
-          } bg-white p-4 rounded-lg shadow-sm border border-gray-200`}
+          className={`
+            bg-white p-4 rounded-lg shadow-sm border border-gray-200
+            ${isSidebarCollapsed ? "ml-16" : ""} // Push main content when sidebar is collapsed
+          `}
         >
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold flex items-center">
@@ -718,22 +715,20 @@ const ImageViewerWithPrompting = () => {
             </div>
           )}
 
-
-
           {/* Quantification Table */}
           <div style={{ marginTop: 24 }}>
             {finalMasks.length > 0 ? (
               <div>
                 <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
-                <QuantificationTable 
-                  masks={finalMasks} 
+                <QuantificationTable
+                  masks={finalMasks}
                   onContourSelect={(row) => {
                     // Find the corresponding contour and trigger zoom
                     if (finalMasks.length > 0 && finalMasks[0].contours) {
                       const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
                       if (contourIndex !== -1) {
                         const finalMask = finalMasks[0];
-                        
+
                         // Call the main function to update zoom and final mask viewer
                         // The annotation canvas will automatically redraw via the useEffect hook
                         handleFinalMaskContourSelect(finalMask, contourIndex);
@@ -859,4 +854,4 @@ const ImageViewerWithPrompting = () => {
   );
 };
 
-export default ImageViewerWithPrompting; 
+export default ImageViewerWithPrompting;
