@@ -1,7 +1,7 @@
 import React from "react";
 import { Trash2, Layers } from "lucide-react";
 
-const MaskManager = ({
+const FinalMaskViewer = ({
   segmentationMasks,
   selectedMask,
   selectedContours,
@@ -249,4 +249,4 @@ const MaskManager = ({
   );
 };
 
-export default MaskManager;
+export default FinalMaskViewer;
