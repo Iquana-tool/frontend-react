@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useDataset } from '../../contexts/DatasetContext';
 import { X, Upload, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { uploadImage } from '../../api';
 
-const AddDatasetModal = ({ isOpen, onClose }) => {
+const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurrentProgress, setDataSetInfo}) => {
   const { createDataset, fetchDatasets } = useDataset();
   const [formData, setFormData] = useState({
     title: '',
@@ -12,10 +12,8 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
     datasetType: 'image'
   });
   const [files, setFiles] = useState([]);
-  const [isCreating, setIsCreating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadErrors, setUploadErrors] = useState([]);
-
   const onDrop = useCallback((acceptedFiles) => {
     setFiles(prev => [...prev, ...acceptedFiles]);
   }, []);
@@ -30,6 +28,19 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
     },
     multiple: true
   });
+
+  const resetFormAfterDelay = (delay) => {
+    console.log("Resetting form after delay:", delay);
+    setTimeout(() => {
+      setFormData({ title: '', description: '', datasetType: 'image' });
+      setFiles([]);
+      setUploadProgress({ current: 0, total: 0 });
+      setUploadErrors([]);
+      setIsCreating(false);
+      onClose();
+    }, delay);
+  };
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,9 +64,8 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
-
-    setUploadProgress({ current: 0, total: files.length });
-    setIsCreating(true);
+    console.log("Submitting dataset with data:", formData, "and files:", files);
+    await setIsCreating(true);
     setUploadErrors([]);
 
     try {
@@ -65,71 +75,68 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
         formData.datasetType
       );
 
-      if (response.success) {
-        const datasetId = response.dataset_id;
-
-        if (files.length > 0) {
-          let uploadedCount = 0;
-          let failedCount = 0;
-
-          for (const file of files) {
-            try {
-              const result = await uploadImage(file, datasetId);
-              if (!result.success) {
-                failedCount++;
-                console.error(`Failed to upload ${file.name}:`, result.message);
-              }
-            } catch (err) {
-              failedCount++;
-              console.error(`Error uploading ${file.name}:`, err);
-            } finally {
-              uploadedCount++;
-              setUploadProgress({ current: uploadedCount, total: files.length });
-            }
-          }
-
-          if (failedCount > 0) {
-            setUploadErrors([
-              `Uploaded ${files.length - failedCount} out of ${files.length} files.`,
-              `${failedCount} files failed to upload.`,
-              'Some images may already exist or were invalid.',
-              'The dataset has been created successfully.'
-            ]);
-          }
-
-          // Refresh dataset list
-          await fetchDatasets();
-
-          // Close modal after delay
-          setTimeout(() => {
-            setFormData({ title: '', description: '', datasetType: 'image' });
-            setFiles([]);
-            setUploadProgress({ current: 0, total: 0 });
-            setUploadErrors([]);
-            setIsCreating(false);
-            onClose();
-          }, failedCount > 0 ? 3000 : 500);
-        } else {
-          // No files, just create dataset
-          await fetchDatasets();
-          setTimeout(() => {
-            setFormData({ title: '', description: '', datasetType: 'image' });
-            setFiles([]);
-            setUploadProgress({ current: 0, total: 0 });
-            setUploadErrors([]);
-            setIsCreating(false);
-            onClose();
-          }, 500);
-        }
-      } else {
+      if (!response.success) {
         throw new Error(response.message || 'Failed to create dataset');
       }
+      // 💡 Store dataset title/description and file count for progress UI
+      await setDataSetInfo({
+        title: formData.title,
+        description: formData.description,
+        total: files.length
+      });
+      console.log('Dataset created successfully:', response);
+      const datasetId = response.dataset_id;
+
+      if (files.length === 0) {
+        await fetchDatasets();
+        resetFormAfterDelay(500);
+        return;
+      }
+
+      // 🔥 set progress early to trigger render
+      setCurrentProgress(0);
+      console.log("Uploading total files:", files.length);
+      // 🔥 small delay to let UI re-render before upload starts
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      let uploadedCount = 0;
+      let failedCount = 0;
+
+      for (const file of files) {
+        try {
+          const result = await uploadImage(file, datasetId);
+          if (!result.success) {
+            failedCount++;
+            console.error(`Failed to upload ${file.name}:`, result.message);
+          }
+        } catch (err) {
+          failedCount++;
+          console.error(`Error uploading ${file.name}:`, err);
+        } finally {
+          uploadedCount++;
+          console.log(`Uploaded ${uploadedCount}/${files.length} files`);
+          setCurrentProgress(prev => (uploadedCount));
+        }
+      }
+
+      if (failedCount > 0) {
+        setUploadErrors([
+          `Uploaded ${files.length - failedCount} out of ${files.length} files.`,
+          `${failedCount} files failed to upload.`,
+          'Some images may already exist or were invalid.',
+          'The dataset has been created successfully.'
+        ]);
+      }
+
+      await fetchDatasets();
+      resetFormAfterDelay(failedCount > 0 ? 3000 : 500);
     } catch (err) {
       console.error('Dataset creation error:', err);
       setUploadErrors([`Failed to create dataset: ${err.message}`]);
-      setIsCreating(false)
+      setIsCreating(false);
     }
   };
+
 
 
   const handleDiscard = () => {
@@ -162,8 +169,8 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
         <div className="flex-1 overflow-y-auto">
           <div className="p-6">
             <h3 className="text-2xl font-bold text-gray-900 mb-6">Datasets</h3>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
+
+            <form onSubmit={handleSubmit} className="space-y-6" id="add-dataset-form">
               {/* Title Field */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -256,8 +263,8 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                   <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-lg font-medium text-gray-700 mb-2">Upload files here</p>
                   <p className="text-sm text-gray-500">
-                    {isDragActive 
-                      ? 'Drop the files here...' 
+                    {isDragActive
+                      ? 'Drop the files here...'
                       : 'Drag and drop files here, or click to select files'
                     }
                   </p>
@@ -330,8 +337,8 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                       error.includes('dataset has been created successfully')
                     ) ? 'text-yellow-800' : 'text-red-800'
                   }`}>
-                    {uploadErrors.some(error => 
-                      error.includes('already exist in the system') || 
+                    {uploadErrors.some(error =>
+                      error.includes('already exist in the system') ||
                       error.includes('dataset has been created successfully')
                     ) ? 'Upload Notice:' : 'Upload Errors:'}
                   </h4>
@@ -345,16 +352,16 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
                       <li key={index} className="break-words">{error}</li>
                     ))}
                   </ul>
-                  {uploadErrors.some(error => 
-                    error.includes('already exist in the system') || 
+                  {uploadErrors.some(error =>
+                    error.includes('already exist in the system') ||
                     error.includes('dataset has been created successfully')
                   ) && (
                     <p className="text-xs text-yellow-600 mt-2 italic">
                       This modal will close automatically in a few seconds...
                     </p>
                   )}
-                  {!uploadErrors.some(error => 
-                    error.includes('already exist in the system') || 
+                  {!uploadErrors.some(error =>
+                    error.includes('already exist in the system') ||
                     error.includes('dataset has been created successfully')
                   ) && (
                     <button
@@ -384,15 +391,15 @@ const AddDatasetModal = ({ isOpen, onClose }) => {
             </button>
             <button
               type="submit"
-              onClick={handleSubmit}
+              form="add-dataset-form"
               disabled={isCreating || !formData.title.trim()}
               className="flex-1 bg-cyan-400 text-white py-3 px-6 rounded-lg hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               {isCreating ? (
-                uploadProgress.total > 0 ? 
-                  uploadProgress.current === uploadProgress.total ? 
+                uploadProgress.total > 0 ?
+                  uploadProgress.current === uploadProgress.total ?
                     'Upload complete!' :
-                    `Uploading ${uploadProgress.total} files...` : 
+                    `Uploading ${uploadProgress.total} files...` :
                   'Creating...'
               ) : 'Create'}
             </button>

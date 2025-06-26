@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
 import { Plus, Download, FolderOpen } from "lucide-react";
 import AddDatasetModal from "./AddDatasetModal";
+import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
 import DeleteDatasetModal from "./DeleteDatasetModal";
 import DeleteDatasetButton from "./DeleteDatasetButton";
@@ -24,6 +25,13 @@ const DatasetsOverview = ({ onOpenDataset }) => {
   const [datasetImages, setDatasetImages] = useState({});
   const [datasetStats, setDatasetStats] = useState({});
   const [loadingData, setLoadingData] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [uploadingDatasetInfo, setUploadingDatasetInfo] = useState({
+    title: "",
+    description: "",
+    total: 0
+  });
+  const [uploadingProgress, setUploadingProgress] = useState(0);
 
   // Use the delete functionality hook
   const {
@@ -34,7 +42,9 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     confirmDelete,
     cancelDelete,
   } = useDeleteDataset();
-
+  useEffect(() => {
+    console.log("Is Creating", isCreating);
+  }, [isCreating]);
   // Fetch sample images and annotation stats for all datasets
   useEffect(() => {
     const fetchDatasetData = async () => {
@@ -360,10 +370,24 @@ const DatasetsOverview = ({ onOpenDataset }) => {
       </div>
 
       {/* Add Dataset Modal */}
-      {showAddModal && (
+      {showAddModal && !isCreating && (
         <AddDatasetModal
           isOpen={showAddModal}
+          isCreating={isCreating}
+          setIsCreating={setIsCreating}
+          setCurrentProgress={setUploadingProgress}
+          setDataSetInfo={setUploadingDatasetInfo}
           onClose={() => setShowAddModal(false)}
+        />
+      )}
+      {showAddModal && isCreating && (
+        <UploadingModal
+            onClose={() => {
+              setShowAddModal(false);
+              setIsCreating(false);
+            }}
+            currentProgress={uploadingProgress}
+            datasetInfo={uploadingDatasetInfo}
         />
       )}
 
