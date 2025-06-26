@@ -47,15 +47,16 @@ export const DatasetProvider = ({ children }) => {
       const response = await api.getAnnotationProgress(datasetId);
       if (response.success) {
         return {
-          manuallyAnnotated: response.manually_annotated || 0,
-          autoAnnotated: (response.auto_annotated_reviewed || 0) + (response.auto_annotated_without_review || 0),
-          missing: 0 // This would need to be calculated based on total images vs annotated
+          manuallyAnnotated: response.manually_annotated,
+          autoAnnotated: (response.auto_annotated_reviewed) + (response.auto_annotated_without_review),
+          missing: response.missing, // This would need to be calculated based on total images vs annotated
+          total: response.total_images
         };
       }
-      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0 };
+      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 };
     } catch (err) {
       console.error('Error fetching annotation progress:', err);
-      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0 };
+      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 };
     }
   };
 

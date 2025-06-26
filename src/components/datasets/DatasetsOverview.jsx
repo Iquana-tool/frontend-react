@@ -5,8 +5,7 @@ import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
 import DeleteDatasetModal from "./DeleteDatasetModal";
-import DeleteDatasetButton from "./DeleteDatasetButton";
-import PlaceholderImage from "../ui/PlaceholderImage";
+import DatasetCard from "./DatasetCard";
 import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
 
@@ -32,6 +31,9 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     total: 0
   });
   const [uploadingProgress, setUploadingProgress] = useState(0);
+  useEffect(()=>{
+    console.log(datasetStats)
+  }, [datasetStats]);
 
   // Use the delete functionality hook
   const {
@@ -75,6 +77,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               manuallyAnnotated: 0,
               autoAnnotated: 0,
               missing: 0,
+              total: 0,
             };
           }
         });
@@ -242,127 +245,19 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 manuallyAnnotated: 0,
                 autoAnnotated: 0,
                 missing: 0,
+                total: 0
               };
               const sampleImages = datasetImages[dataset.id] || [];
-              const totalAnnotations =
-                stats.manuallyAnnotated + stats.autoAnnotated + stats.missing;
 
               return (
-                <div
+                <DatasetCard
                   key={dataset.id}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  {/* Dataset Header */}
-                  <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white relative">
-                    <DeleteDatasetButton 
-                      dataset={dataset} 
-                      onClick={initiateDelete} 
-                    />
-                    <h3 className="text-xl font-bold mb-2 pr-8">{dataset.name}</h3>
-                    <p className="text-teal-100 text-sm">
-                      {dataset.description || "No description provided"}
-                    </p>
-                  </div>
-
-                  {/* Sample Images */}
-                  <div className="p-4">
-                    <div className="grid grid-cols-4 gap-2 mb-4">
-                      {Array.from({ length: 4 }).map((_, index) => {
-                        const image = sampleImages[index];
-                        if (image) {
-                          return (
-                            <div
-                              key={index}
-                              className="aspect-square rounded-lg overflow-hidden"
-                            >
-                              <img
-                                src={`data:image/jpeg;base64,${image.base64}`}
-                                alt={`Sample ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          );
-                        } else {
-                          return (
-                            <PlaceholderImage
-                              key={index}
-                              src={null}
-                              alt={`Sample ${index + 1}`}
-                              className="aspect-square rounded-lg overflow-hidden"
-                              fallbackText="No image"
-                            />
-                          );
-                        }
-                      })}
-                    </div>
-
-                    {/* Annotation Status */}
-                    <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">
-                        Annotation status:
-                      </h4>
-                      {totalAnnotations > 0 ? (
-                        <div className="space-y-1 text-sm">
-                          <div className="flex items-center">
-                            <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-                            <span>
-                              Manually annotated: {stats.manuallyAnnotated} (
-                              {Math.round(
-                                (stats.manuallyAnnotated / totalAnnotations) *
-                                  100
-                              )}
-                              %)
-                            </span>
-                          </div>
-                          <div className="flex items-center">
-                            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-                            <span>
-                              Auto annotated: {stats.autoAnnotated} (
-                              {Math.round(
-                                (stats.autoAnnotated / totalAnnotations) * 100
-                              )}
-                              %)
-                            </span>
-                          </div>
-                          {stats.missing > 0 && (
-                            <div className="flex items-center">
-                              <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-                              <span>
-                                Missing: {stats.missing} (
-                                {Math.round(
-                                  (stats.missing / totalAnnotations) * 100
-                                )}
-                                %)
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">
-                          No annotations yet
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex space-x-2">
-                      <button className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1">
-                        <Download className="w-4 h-4" />
-                        <span>Download quantifications</span>
-                      </button>
-                      <button className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1">
-                        <Download className="w-4 h-4" />
-                        <span>Download dataset</span>
-                      </button>
-                      <button
-                        onClick={() => handleOpenDataset(dataset)}
-                        className="bg-teal-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-teal-700 transition-colors"
-                      >
-                        Open
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  dataset={dataset}
+                  stats={stats}
+                  sampleImages={sampleImages}
+                  onDelete={initiateDelete}
+                  onOpenDataset={handleOpenDataset}
+                />
               );
             })}
           </div>
