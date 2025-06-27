@@ -16,6 +16,7 @@ import Sidebar from "./Sidebar/Sidebar"; // Adjust path as necessary
 
 // Styles
 import "./AnnotationPage.css";
+import QuantificationTable from "./MainAnnotationPage/QuantificationTable";
 
 const AnnotationPage = () => {
   const { currentDataset } = useDataset();
@@ -614,7 +615,70 @@ const AnnotationPage = () => {
             drawFinalMaskCanvas={drawFinalMaskCanvasWrapper}
             drawAnnotationCanvas={drawAnnotationCanvasWrapper}
             />
+          {/* Help text */}
+          {!selectedImage && !loading && (
+              <div className="mt-4 p-4 bg-teal-50 text-teal-700 rounded-md">
+                <h3 className="font-medium mb-2">How to use:</h3>
+                <ol className="list-decimal list-inside text-sm">
+                  <li className="mb-1">Select or upload an image from the left panel</li>
+                  <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
+                  <li className="mb-1">Select foreground (1) or background (0) label</li>
+                  <li className="mb-1">
+                    <strong>For point prompts:</strong>
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Left-click for positive points (green with +)</li>
+                      <li>Right-click for negative points (red with -)</li>
+                    </ul>
+                  </li>
+                  <li className="mb-1">Click and drag on the image to create other prompt types</li>
+                  <li className="mb-1">Use zoom and pan controls for detailed work</li>
+                  <li>Save your prompts when finished</li>
+                </ol>
+              </div>
+          )}
+
+          {/* Quantification Table */}
+          <div style={{ marginTop: 24 }}>
+            {finalMasks.length > 0 ? (
+                <div>
+                  <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                  <QuantificationTable
+                      masks={finalMasks}
+                      onContourSelect={(row) => {
+                        // Find the corresponding contour and trigger zoom
+                        if (finalMasks.length > 0 && finalMasks[0].contours) {
+                          const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
+                          if (contourIndex !== -1) {
+                            const finalMask = finalMasks[0];
+
+                            // Call the main function to update zoom and final mask viewer
+                            // The annotation canvas will automatically redraw via the useEffect hook
+                            handleFinalMaskContourSelect(finalMask, contourIndex);
+                          }
+                        }
+                      }}
+                      onContourDelete={(contourId) => {
+                        return handleDeleteContourFromTable(contourId);
+                      }}
+                  />
+                </div>
+            ) : (
+                <div>
+                  <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                  <QuantificationTable masks={[]} />
+                </div>
+            )}
+          </div>
         </div>
+      </div>
+      {/* Reset Button */}
+      <div className="flex gap-4 mt-4">
+        <button
+            className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md flex items-center space-x-2 transition-colors"
+            onClick={handleReset}
+        >
+          <span>Reset All</span>
+        </button>
       </div>
     </div>
   );
