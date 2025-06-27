@@ -1,5 +1,5 @@
-import PromptingCanvas from "../prompting/PromptingCanvas";
-import AddContourModal from "./masks/AddContourModal";
+import PromptingCanvas from "../../prompting/PromptingCanvas";
+import AddContourModal from "../masks/AddContourModal";
 import React from "react";
 
 
