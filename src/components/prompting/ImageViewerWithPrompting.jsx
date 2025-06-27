@@ -45,6 +45,9 @@ const ImageViewerWithPrompting = () => {
     shouldSuppressLoadingModal: false
   });
 
+  const [labelOptions, setLabelOptions] = useState({});
+  const maskLabelOptions = ["petri_dish", "coral", "polyp"];
+
   // Custom Hooks
   const imageManagement = useImageManagement();
   const segmentation = useSegmentation();
@@ -128,10 +131,6 @@ const ImageViewerWithPrompting = () => {
   // Consider removing this if LabelSelector handles all label management
   const fetchLabels = useCallback(async () => {
     if (!currentDataset) {
-      setLabelOptions([
-        { id: 1, name: "coral" },
-        { id: 2, name: "petri dish" },
-      ]);
       return;
     }
 
@@ -143,21 +142,9 @@ const ImageViewerWithPrompting = () => {
           name: label.name,
         }));
         setLabelOptions(formattedLabels);
-        // Don't auto-select first label - let LabelSelector handle this
-      } else {
-        // Set default labels if none exist
-        setLabelOptions([
-          { id: 1, name: "coral" },
-          { id: 2, name: "petri dish" },
-        ]);
       }
     } catch (error) {
       console.error("Failed to fetch labels:", error);
-      // Set default labels on error
-      setLabelOptions([
-        { id: 1, name: "coral" },
-        { id: 2, name: "petri dish" },
-      ]);
     }
   }, [currentDataset]);
 
