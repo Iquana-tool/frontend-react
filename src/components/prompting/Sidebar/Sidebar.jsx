@@ -1,8 +1,8 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import SidebarUploader from './Sidebar/SidebarUploader';
-import SidebarModelSelector from './Sidebar/SidebarModelSelector';
-import SidebarImageGallery from './Sidebar/SidebarImageGallery';
+import SidebarUploader from './SidebarUploader';
+import SidebarModelSelector from './SidebarModelSelector';
+import SidebarImageGallery from './SidebarImageGallery';
 
 const Sidebar = ({
              selectedImage,

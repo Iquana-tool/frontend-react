@@ -10,9 +10,9 @@ import { useContourOperations } from "../../hooks/useContourOperations";
 import { useCanvasOperations } from "../../hooks/useCanvasOperations";
 
 // Components
-import StatusBar from "../ui/StatusBar";
-import MainViewers from "../ui/MainAnnotationPage/MainViewers";
-import Sidebar from "../ui/Sidebar"; // Adjust path as necessary
+import StatusBar from "./MainAnnotationPage/StatusBar";
+import MainViewers from "./MainAnnotationPage/MainViewers";
+import Sidebar from "./Sidebar/Sidebar"; // Adjust path as necessary
 
 // Styles
 import "./AnnotationPage.css";

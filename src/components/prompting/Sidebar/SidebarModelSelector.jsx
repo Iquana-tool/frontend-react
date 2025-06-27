@@ -1,10 +1,12 @@
 import React from "react";
+import {getPromptedModels} from "../../../api/models";
 
 
 const SidebarModelSelector = ({
     selectedModel,
     handleModelChange,
     loading}) => {
+    const promptedModels = getPromptedModels();
     return (
         <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
@@ -30,11 +32,9 @@ const SidebarModelSelector = ({
                     onChange={handleModelChange}
                     disabled={loading}
                 >
-                    <option value="Mockup">Mockup (For Testing)</option>
-                    <option value="SAM2Tiny">SAM2 Tiny (Default)</option>
-                    <option value="SAM2Small">SAM2 Small</option>
-                    <option value="SAM2Large">SAM2 Large</option>
-                    <option value="SAM2BasePlus">SAM2 Base Plus</option>
+                    {promptedModels.models.map((model) => (
+                        <option value={model.name}> '{model.name}' </option>
+                    ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                     <svg

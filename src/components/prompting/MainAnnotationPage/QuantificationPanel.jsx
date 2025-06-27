@@ -1,6 +1,6 @@
 import React from 'react';
 import { Typography } from "@mui/material";
-import QuantificationTable from '../QuantificationTable';
+import QuantificationTable from './QuantificationTable';
 
 const QuantificationPanel = ({ segmentationMasks }) => {
   return (
