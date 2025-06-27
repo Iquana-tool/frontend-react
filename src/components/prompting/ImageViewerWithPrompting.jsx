@@ -12,7 +12,6 @@ import { useCanvasOperations } from "../../hooks/useCanvasOperations";
 // Components
 import ContourEditor from "./ContourEditor";
 import QuantificationTable from "../QuantificationTable";
-import ImageUploader from "../ui/ImageUploader";
 import StatusBar from "../ui/StatusBar";
 import ToolsPanel from "../ui/ToolsPanel";
 import ImageDisplay from "../ui/ImageDisplay";
