@@ -15,7 +15,7 @@ import QuantificationTable from "../QuantificationTable";
 import StatusBar from "../ui/StatusBar";
 import ToolsPanel from "../ui/ToolsPanel";
 import ImageDisplay from "../ui/ImageDisplay";
-import Sidebar from "./Sidebar"; // Adjust path as necessary
+import Sidebar from "../ui/Sidebar"; // Adjust path as necessary
 
 // Styles
 import "./ImageViewerWithPrompting.css";
