@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {getPromptedModels} from "../../../api/models";
 
 
@@ -6,7 +6,21 @@ const SidebarModelSelector = ({
     selectedModel,
     handleModelChange,
     loading}) => {
-    const promptedModels = getPromptedModels();
+    const [models, setModels] = useState([]);
+
+    useEffect(() => {
+        const fetchModels = async () => {
+            try {
+                const response = await getPromptedModels();
+                setModels(response.models); // or response.data.models depending on API
+            } catch (error) {
+                console.error("Failed to fetch models", error);
+                setModels([]);
+            }
+        };
+
+        fetchModels();
+    }, []);
     return (
         <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
@@ -32,8 +46,10 @@ const SidebarModelSelector = ({
                     onChange={handleModelChange}
                     disabled={loading}
                 >
-                    {promptedModels.models.map((model) => (
-                        <option value={model.name}> '{model.name}' </option>
+                    {models.map((model) => (
+                        <option key={model.name} value={model.name}>
+                            {model.name}
+                        </option>
                     ))}
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
