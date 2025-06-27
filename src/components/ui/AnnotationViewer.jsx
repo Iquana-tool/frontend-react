@@ -53,6 +53,7 @@ const AnnotationViewer = ({
                   onInstantSegmentationStateChange={onInstantSegmentationStateChange}
                   selectedFinalMaskContour={selectedFinalMaskContour}
                   finalMasks={finalMasks}
+                  isSegmenting={isSegmenting}
               />
 
               {/* Overlay segmentation controls when segmentation is complete and we have masks */}
