@@ -1,5 +1,5 @@
 // Function to handle API errors
-const handleApiError = async (response) => {
+export const handleApiError = async (response) => {
     if (!response.ok) {
         // Try to parse the error message from the response
         try {
