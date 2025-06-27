@@ -17,6 +17,7 @@ import Sidebar from "./Sidebar/Sidebar"; // Adjust path as necessary
 // Styles
 import "./AnnotationPage.css";
 import QuantificationTable from "./MainAnnotationPage/QuantificationTable";
+import ToolsPanel from "./MainAnnotationPage/ToolsPanel";
 
 const AnnotationPage = () => {
   const { currentDataset } = useDataset();
@@ -542,6 +543,19 @@ const AnnotationPage = () => {
                 ${isSidebarCollapsed ? "w-auto" : ""} // Push main content when sidebar is collapsed
               `}
         >
+          {/* Tools Panel Component */}
+          <ToolsPanel
+              promptType={promptType}
+              setPromptType={setPromptType}
+              promptingCanvasRef={promptingCanvasRef}
+              currentLabel={currentLabel}
+              setCurrentLabel={setCurrentLabel}
+              segmentationMasks={segmentationMasks}
+              exportQuantificationsAsCsv={exportQuantificationsAsCsv}
+              zoomLevel={zoomLevel}
+              setZoomLevel={setZoomLevel}
+              setZoomCenter={setZoomCenter}
+          />
           <MainViewers
             selectedImage={selectedImage}
             imageObject={imageObject}
