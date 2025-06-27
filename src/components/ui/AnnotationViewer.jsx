@@ -7,7 +7,6 @@ const AnnotationViewer = ({
     promptingCanvasRef,
     imageObject,
     handlePromptingComplete,
-    isZoomedContourRefinement,
     selectedMask,
     promptType,
     currentLabel,
@@ -35,28 +34,25 @@ const AnnotationViewer = ({
             <div className="h-[400px] sm:h-[500px] relative">
               {/* Use the PromptingCanvas for adding annotations */}
               <PromptingCanvas
-                ref={promptingCanvasRef}
-                image={imageObject}
-                onPromptingComplete={handlePromptingComplete}
-                isRefinementMode={isZoomedContourRefinement}
-                selectedMask={selectedMask}
-                promptType={promptType}
-                currentLabel={currentLabel}
-                onContourSelect={handleContourSelect}
-                onAddToFinalMask={(contours) => {
-                  console.log(
-                    "onAddToFinalMask handler triggered with contours:",
-                    contours
-                  );
-                  handleAddSelectedContoursToFinalMask(contours);
-                }}
-                onClearSegmentationResults={handleClearSegmentationResults}
-                zoomLevel={zoomLevel}
-                zoomCenter={zoomCenter}
-                selectedFinalMaskContour={selectedFinalMaskContour}
-                finalMasks={finalMasks}
-                onInstantSegmentationStateChange={onInstantSegmentationStateChange}
-                selectedContours={selectedContours}
+                  ref={promptingCanvasRef}
+                  image={imageObject}
+                  onPromptingComplete={
+                      handlePromptingComplete
+                  }
+                  selectedMask={selectedMask}
+                  promptType={promptType}
+                  activeTool={promptType}
+                  currentLabel={currentLabel}
+                  onContourSelect={handleContourSelect}
+                  onAddToFinalMask={
+                      handleAddSelectedContoursToFinalMask
+                  }
+                  onClearSegmentationResults={handleClearSegmentationResults}
+                  zoomLevel={zoomLevel}
+                  zoomCenter={zoomCenter}
+                  onInstantSegmentationStateChange={onInstantSegmentationStateChange}
+                  selectedFinalMaskContour={selectedFinalMaskContour}
+                  finalMasks={finalMasks}
               />
 
               {/* Overlay segmentation controls when segmentation is complete and we have masks */}
