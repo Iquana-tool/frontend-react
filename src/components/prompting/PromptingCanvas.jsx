@@ -24,6 +24,7 @@ const PromptingCanvas = forwardRef(({
   enableInstantSegmentation = false,
   instantSegmentationDebounce = 1000,
   onInstantSegmentationStateChange,
+  isSegmenting = false,
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
@@ -564,7 +565,7 @@ const PromptingCanvas = forwardRef(({
               disabled={prompts.length === 0 || isInstantSegmenting || !currentLabel}
               title={!currentLabel ? "Please select a label before segmenting" : ""}
             >
-              Complete {prompts.length > 0 && `(${prompts.length})`}
+              {isSegmenting ? `Segmenting...` : "Segment Object"}
             </button>
           )}
         </div>
