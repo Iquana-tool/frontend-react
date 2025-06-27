@@ -33,7 +33,6 @@ const ImageViewerWithPrompting = () => {
   const [, setSavingMaskIndex] = useState(null);
   const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
-  const [editingMask, setEditingMask] = useState(null);
 
   // Refs
   const promptingCanvasRef = useRef(null);
@@ -436,19 +435,6 @@ const ImageViewerWithPrompting = () => {
     }
   }, [selectedMask, customSaveMaskLabel, saveMaskLabel, setError, setSuccessMessageWithTimeout]);
 
-  // Handle mask updates
-  const handleMaskUpdated = useCallback((updatedMask) => {
-    if (updatedMask.is_final) {
-      // Handle final mask update
-      console.log("Final mask updated:", updatedMask);
-    } else {
-      setSegmentationMasks((prev) =>
-        prev.map((mask) => (mask.id === updatedMask.id ? updatedMask : mask))
-      );
-    }
-    setEditingMask(null);
-  }, [setSegmentationMasks]);
-
   // Wrapper for handleDeleteFinalMaskContour that includes current image context
   const handleDeleteFinalMaskContourWrapper = useCallback(async (contourId) => {
     if (!currentImage) {
@@ -718,16 +704,6 @@ const ImageViewerWithPrompting = () => {
           <span>Reset All</span>
         </button>
       </div>
-
-      {/* Contour Editor */}
-      {editingMask && (
-        <ContourEditor
-          mask={editingMask}
-          image={imageObject}
-          onMaskUpdated={handleMaskUpdated}
-          onCancel={() => setEditingMask(null)}
-        />
-      )}
 
       {/* Save Mask Dialog */}
       {showSaveMaskDialog && (
