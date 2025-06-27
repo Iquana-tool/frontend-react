@@ -35,13 +35,6 @@ const ImageViewerWithPrompting = () => {
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
   const [editingMask, setEditingMask] = useState(null);
 
-  // Label Management
-  const [, setLabelOptions] = useState([
-    { id: 1, name: "coral" },
-    { id: 2, name: "petri dish" },
-  ]);
-  const maskLabelOptions = ["petri_dish", "coral", "polyp"];
-
   // Refs
   const promptingCanvasRef = useRef(null);
 
