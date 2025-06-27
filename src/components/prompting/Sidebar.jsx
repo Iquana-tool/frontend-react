@@ -18,20 +18,6 @@ const Sidebar = ({
   setIsSidebarCollapsed,
   currentDataset
 }) => {
-  if (!currentDataset) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center p-8 bg-white rounded-lg border">
-          <Typography variant="h6" className="text-gray-600 mb-2">
-            No Dataset Selected
-          </Typography>
-          <Typography variant="body2" className="text-gray-500">
-            Please select a dataset from the dropdown above to start working with images and labels.
-          </Typography>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
