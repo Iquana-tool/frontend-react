@@ -282,7 +282,7 @@ const ImageViewerWithPrompting = () => {
       setSelectedContours,
       bestMask,
       findMatchingContour,
-      (bMask, cImage, sContours, sFinalMaskContour) => 
+      (bMask, cImage, sContours, sFinalMaskContour) =>
         drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour),
       canvasImage,
       selectedFinalMaskContour
@@ -557,7 +557,7 @@ const ImageViewerWithPrompting = () => {
         <div
           className={`
             bg-white p-4 rounded-lg shadow-sm border border-gray-200
-            ${isSidebarCollapsed ? "ml-16" : ""} // Push main content when sidebar is collapsed
+            ${isSidebarCollapsed ? "w-auto" : ""} // Push main content when sidebar is collapsed
           `}
         >
           <div className="flex justify-between items-center mb-4">
