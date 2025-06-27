@@ -68,6 +68,7 @@ const ImageDisplay = ({
         handleRunNewSegmentation={handleRunNewSegmentation}
         setError={setError}
         onInstantSegmentationStateChange={onInstantSegmentationStateChange}
+        finalMasks={finalMasks}
       />
       {/* Final Mask Viewer - Only show when there are final masks with contours or selected contours */}
       {((finalMasks.length > 0 && finalMasks.some(mask => mask.contours && mask.contours.length > 0)) || selectedContours.length > 0) && (
