@@ -1,16 +1,13 @@
-import { useState, useCallback } from 'react';
+import {useState, useCallback, useEffect} from 'react';
 import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
 
 export const useImageManagement = (fetchFinalMask = null) => {
   const { currentDataset } = useDataset();
-  const [selectedImage, setSelectedImage] = useState(null);
-  const [imageObject, setImageObject] = useState(null);
+  const [selectedImageMetadata, setSelectedImageMetadata] = useState(null);
+  const [selectedImageBase64, setSelectedImageBase64] = useState(null);
   const [availableImages, setAvailableImages] = useState([]);
   const [selectedImageId, setSelectedImageId] = useState(null);
-  const [originalImage, setOriginalImage] = useState(null);
-  const [currentImage, setCurrentImage] = useState(null);
-  const [canvasImage, setCanvasImage] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -120,8 +117,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
     setLoading(true);
     setError(null);
     setSelectedImageId(image.id);
-    setSelectedImage(image);
-    setCurrentImage(image);
+    setSelectedImageMetadata(image);
 
     try {
       console.log(`Loading image with ID: ${image.id}`);
@@ -141,9 +137,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
         imgObject.src = imageUrl;
       });
 
-      setImageObject(imgObject);
-      setOriginalImage(imgObject);
-      setCanvasImage(imgObject);
+      setSelectedImageBase64(imgObject);
       setImageLoaded(true);
 
       // Load the final mask if it exists - this was missing!
@@ -173,7 +167,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
       console.error("Error selecting image:", error);
       setError("Failed to load image: " + (error.message || "Unknown error"));
       setSelectedImageId(null);
-      setSelectedImage(null);
+      setSelectedImageMetadata(null);
     } finally {
       setLoading(false);
     }
@@ -210,11 +204,8 @@ export const useImageManagement = (fetchFinalMask = null) => {
         thumbnailUrl: localPreviewUrl,
       };
 
-      setImageObject(localPreviewImg);
-      setOriginalImage(localPreviewImg);
-      setCanvasImage(localPreviewImg);
-      setSelectedImage(tempImage);
-      setCurrentImage(tempImage);
+      setSelectedImageBase64(localPreviewImg);
+      setSelectedImageMetadata(tempImage);
       setImageLoaded(true);
 
       // Upload to server with dataset_id
@@ -243,7 +234,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
       console.error("Upload error:", error);
       setError("Failed to upload image: " + (error.message || "Unknown error"));
       setSelectedImageId(null);
-      setSelectedImage(null);
+      setSelectedImageMetadata(null);
       setImageLoaded(false);
     } finally {
       setLoading(false);
@@ -252,23 +243,17 @@ export const useImageManagement = (fetchFinalMask = null) => {
 
   const resetImageState = useCallback(() => {
     setSelectedImageId(null);
-    setSelectedImage(null);
-    setImageObject(null);
-    setOriginalImage(null);
-    setCurrentImage(null);
-    setCanvasImage(null);
+    setSelectedImageMetadata(null);
+    setSelectedImageBase64(null);
     setImageLoaded(false);
   }, []);
 
   return {
     // State
-    selectedImage,
-    imageObject,
+    selectedImage: selectedImageMetadata,
+    imageObject: selectedImageBase64,
     availableImages,
     selectedImageId,
-    originalImage,
-    currentImage,
-    canvasImage,
     imageLoaded,
     loading,
     error,
@@ -282,9 +267,8 @@ export const useImageManagement = (fetchFinalMask = null) => {
     setLoading,
     
     // Setters for external use
-    setSelectedImage,
-    setImageObject,
-    setCanvasImage,
+    setSelectedImage: setSelectedImageMetadata,
+    setImageObject: setSelectedImageBase64,
     setImageLoaded,
   };
 }; 

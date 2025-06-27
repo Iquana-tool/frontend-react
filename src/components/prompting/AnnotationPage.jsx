@@ -58,8 +58,6 @@ const AnnotationPage = () => {
     imageObject,
     availableImages,
     selectedImageId,
-    currentImage,
-    canvasImage,
     loading: imageLoading,
     error: imageError,
     fetchImagesFromAPI,
@@ -188,7 +186,7 @@ const AnnotationPage = () => {
 
   // Enhanced prompting complete handler
   const handlePromptingComplete = useCallback(async (prompts, promptType) => {
-    if (!selectedImage || !currentImage) {
+    if (!selectedImage || !selectedImage) {
       setError("No image selected for segmentation");
       return;
     }
@@ -202,7 +200,7 @@ const AnnotationPage = () => {
         false,
         zoomLevel,
         zoomCenter,
-        canvasImage,
+          imageObject,
         selectedContours,
         bestMask,
         finalMask
@@ -234,24 +232,24 @@ const AnnotationPage = () => {
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, currentImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, canvasImage, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
+  }, [selectedImage, selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {
-    if (!currentImage || selectedContours.length === 0) {
+    if (!selectedImage || selectedContours.length === 0) {
       setError("No contours selected or no current image");
       return;
     }
 
     try {
-      const result = await contourAddToFinalMask(currentImage, selectedContours, bestMask);
+      const result = await contourAddToFinalMask(selectedImage, selectedContours, bestMask);
       if (result.success) {
         setSuccessMessageWithTimeout(result.message);
       }
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, selectedContours, setError, contourAddToFinalMask, bestMask, setSuccessMessageWithTimeout]);
+  }, [selectedImage, selectedContours, setError, contourAddToFinalMask, bestMask, setSuccessMessageWithTimeout]);
 
   const handleDeleteSelectedContours = useCallback(() => {
     try {
@@ -282,10 +280,10 @@ const AnnotationPage = () => {
       findMatchingContour,
       (bMask, cImage, sContours, sFinalMaskContour) =>
         drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour),
-      canvasImage,
+        imageObject,
       selectedFinalMaskContour
     );
-  }, [canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, canvasImage, selectedFinalMaskContour, drawAnnotationCanvas]);
+  }, [canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, imageObject, selectedFinalMaskContour, drawAnnotationCanvas]);
 
   // Canvas event handlers with proper parameter passing
   const handleAnnotationCanvasClick = useCallback((event) => {
@@ -312,12 +310,12 @@ const AnnotationPage = () => {
       setSelectedFinalMaskContour,
       setZoomLevel,
       setSelectedContours,
-      canvasImage,
-      () => drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour),
+        imageObject,
+      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour),
       handleFinalMaskContourSelect,
       isPointInContour
     );
-  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, canvasImage, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
+  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
 
   const handleReset = useCallback(() => {
     resetImageState();
@@ -337,10 +335,10 @@ const AnnotationPage = () => {
 
   // Load final mask when image changes
   useEffect(() => {
-    if (currentImage && currentImage.id) {
-      fetchFinalMask(currentImage.id);
+    if (selectedImage && selectedImage.id) {
+      fetchFinalMask(selectedImage.id);
     }
-  }, [currentImage, fetchFinalMask]);
+  }, [selectedImage, fetchFinalMask]);
 
   // Handle file upload wrapper
   const handleFileUploadWrapper = useCallback((e) => {
@@ -352,26 +350,26 @@ const AnnotationPage = () => {
 
   // Enhanced draw functions that pass proper parameters
   const drawAnnotationCanvasWrapper = useCallback(() => {
-    drawAnnotationCanvas(bestMask, canvasImage, selectedContours, selectedFinalMaskContour);
-  }, [drawAnnotationCanvas, bestMask, canvasImage, selectedContours, selectedFinalMaskContour]);
+    drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour);
+  }, [drawAnnotationCanvas, bestMask, imageObject, selectedContours, selectedFinalMaskContour]);
 
   const drawFinalMaskCanvasWrapper = useCallback(() => {
-    drawFinalMaskCanvas(canvasImage, finalMasks, selectedFinalMaskContour);
-  }, [drawFinalMaskCanvas, canvasImage, finalMasks, selectedFinalMaskContour]);
+    drawFinalMaskCanvas(imageObject, finalMasks, selectedFinalMaskContour);
+  }, [drawFinalMaskCanvas, imageObject, finalMasks, selectedFinalMaskContour]);
 
   // Draw final mask canvas when final mask data changes
   useEffect(() => {
-    if (canvasImage) {
+    if (imageObject) {
       setTimeout(() => {
         drawFinalMaskCanvasWrapper();
       }, 100);
     }
-  }, [finalMasks, canvasImage, drawFinalMaskCanvasWrapper]);
+  }, [finalMasks, imageObject, drawFinalMaskCanvasWrapper]);
 
     // Draw annotation canvas automatically when data changes (but not for zoom-triggered updates)
   // Zoom-triggered updates are handled manually in handleFinalMaskContourSelect
   useEffect(() => {
-    if (bestMask && canvasImage) {
+    if (bestMask && imageObject) {
       // Only auto-redraw if zoom level is 1 (not zoomed) or if it's an initial load
       if (zoomLevel === 1) {
         setTimeout(() => {
@@ -379,17 +377,17 @@ const AnnotationPage = () => {
         }, 100);
       }
     }
-  }, [bestMask, canvasImage, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper, zoomLevel]);
+  }, [bestMask, imageObject, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper, zoomLevel]);
 
   // Show annotation viewer and draw canvas when segmentation completes
   useEffect(() => {
-    if (bestMask && canvasImage && !showAnnotationViewer) {
+    if (bestMask && imageObject && !showAnnotationViewer) {
       // Don't automatically show the annotation viewer
       // Let users manually toggle it when they want to see the detailed contours
       // This allows them to continue drawing prompts in the main area
       console.log("Segmentation completed with bestMask, but keeping annotation viewer hidden for continued prompting");
     }
-  }, [bestMask, canvasImage, showAnnotationViewer]);
+  }, [bestMask, imageObject, showAnnotationViewer]);
 
   // Update PromptingCanvas when segmentation completes
   useEffect(() => {
@@ -436,7 +434,7 @@ const AnnotationPage = () => {
 
   // Wrapper for handleDeleteFinalMaskContour that includes current image context
   const handleDeleteFinalMaskContourWrapper = useCallback(async (contourId) => {
-    if (!currentImage) {
+    if (!selectedImage) {
       setError("No current image selected");
       return;
     }
@@ -445,30 +443,30 @@ const AnnotationPage = () => {
       const result = await handleDeleteFinalMaskContour(contourId);
       if (result && result.success) {
         // Refresh the final mask after deletion
-        await fetchFinalMask(currentImage.id);
+        await fetchFinalMask(selectedImage.id);
         setSuccessMessageWithTimeout(result.message);
       }
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, setError, handleDeleteFinalMaskContour, fetchFinalMask, setSuccessMessageWithTimeout]);
+  }, [selectedImage, setError, handleDeleteFinalMaskContour, fetchFinalMask, setSuccessMessageWithTimeout]);
 
   // Wrapper for clearAllFinalMaskContours that includes current image context
   const clearAllFinalMaskContoursWrapper = useCallback(async () => {
-    if (!currentImage || !finalMask) {
+    if (!selectedImage || !finalMask) {
       setError("No current image or final mask available");
       return;
     }
 
     try {
-      const result = await clearAllFinalMaskContours(finalMask, currentImage);
+      const result = await clearAllFinalMaskContours(finalMask, selectedImage);
       if (result && result.success) {
         setSuccessMessageWithTimeout(result.message);
       }
     } catch (error) {
       setError(error.message);
     }
-  }, [currentImage, finalMask, setError, clearAllFinalMaskContours, setSuccessMessageWithTimeout]);
+  }, [selectedImage, finalMask, setError, clearAllFinalMaskContours, setSuccessMessageWithTimeout]);
 
   // Export quantifications as CSV
   const exportQuantificationsAsCsv = useCallback((masks) => {
@@ -559,8 +557,6 @@ const AnnotationPage = () => {
           <MainViewers
             selectedImage={selectedImage}
             imageObject={imageObject}
-            canvasImage={canvasImage}
-            currentImage={currentImage}
             segmentationMasks={segmentationMasks}
             selectedMask={selectedMask}
             bestMask={bestMask}
