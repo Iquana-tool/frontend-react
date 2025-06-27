@@ -19,24 +19,14 @@ export const getPromptedModels = async () => {
         // Fallback to hardcoded models if backend doesn't return any
         return {
             success: true,
-            models: [
-                { id: 1, name: "SAM2Tiny", model_type: "prompted" },
-                { id: 2, name: "SAM2Small", model_type: "prompted" },
-                { id: 3, name: "SAM2Large", model_type: "prompted" },
-                { id: 4, name: "SAM2BasePlus", model_type: "prompted" },
-            ],
+            models: [],
             fallback: true,
         };
     } catch (error) {
         console.warn("Error fetching prompted models, using fallback:", error);
         return {
             success: true,
-            models: [
-                { id: 1, name: "SAM2Tiny", model_type: "prompted" },
-                { id: 2, name: "SAM2Small", model_type: "prompted" },
-                { id: 3, name: "SAM2Large", model_type: "prompted" },
-                { id: 4, name: "SAM2BasePlus", model_type: "prompted" },
-            ],
+            models: [],
             fallback: true,
         };
     }
