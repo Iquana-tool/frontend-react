@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect} from 'react';
 import FinalMaskViewer from './FinalMaskViewer';
 import AnnotationViewer from './AnnotationViewer';
 
@@ -11,7 +11,6 @@ const ImageDisplay = ({
   selectedContours,
   promptingCanvasRef,
   handlePromptingComplete,
-  isZoomedContourRefinement,
   promptType,
   currentLabel,
   handleContourSelect,
@@ -37,6 +36,12 @@ const ImageDisplay = ({
   drawFinalMaskCanvas,
   onInstantSegmentationStateChange
 }) => {
+  useEffect(() => {
+    console.log("Selected Final Mask Contour changed:", selectedFinalMaskContour);
+  }, [selectedFinalMaskContour]);
+  useEffect(() => {
+    console.log("Final Masks updated:", finalMasks);
+  }, [finalMasks]);
   return (
     <div className="flex flex-col xl:flex-row gap-3 mb-4">
       {/* Annotation Viewer - Only show when imageObject is available */}
@@ -47,9 +52,9 @@ const ImageDisplay = ({
         segmentationMasks={segmentationMasks}
         selectedMask={selectedMask}
         selectedContours={selectedContours}
+        selectedFinalMaskContour={selectedFinalMaskContour}
         promptingCanvasRef={promptingCanvasRef}
         handlePromptingComplete={handlePromptingComplete}
-        isZoomedContourRefinement={isZoomedContourRefinement}
         promptType={promptType}
         currentLabel={currentLabel}
         handleContourSelect={handleContourSelect}
