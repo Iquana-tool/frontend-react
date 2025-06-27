@@ -10,17 +10,14 @@ import { useContourOperations } from "../../hooks/useContourOperations";
 import { useCanvasOperations } from "../../hooks/useCanvasOperations";
 
 // Components
-import ContourEditor from "./ContourEditor";
-import QuantificationTable from "../QuantificationTable";
 import StatusBar from "../ui/StatusBar";
-import ToolsPanel from "../ui/ToolsPanel";
-import ImageDisplay from "../ui/ImageDisplay";
+import MainViewers from "../ui/MainAnnotationPage/MainViewers";
 import Sidebar from "../ui/Sidebar"; // Adjust path as necessary
 
 // Styles
-import "./ImageViewerWithPrompting.css";
+import "./AnnotationPage.css";
 
-const ImageViewerWithPrompting = () => {
+const AnnotationPage = () => {
   const { currentDataset } = useDataset();
 
   // UI State
@@ -538,255 +535,89 @@ const ImageViewerWithPrompting = () => {
           setIsSidebarCollapsed={setIsSidebarCollapsed}
           currentDataset={currentDataset}
         />
-
-         {/* Main Viewer Container */}
         <div
-          className={`
-            bg-white p-4 rounded-lg shadow-sm border border-gray-200
-            ${isSidebarCollapsed ? "w-auto" : ""} // Push main content when sidebar is collapsed
-          `}
+            className={`
+                bg-white p-4 rounded-lg shadow-sm border border-gray-200
+                ${isSidebarCollapsed ? "w-auto" : ""} // Push main content when sidebar is collapsed
+              `}
         >
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold flex items-center">
-                <>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 mr-2 text-teal-600"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path d="M5 4a1 1 0 00-2 0v7.268a2 2 0 000 3.464V16a1 1 0 102 0v-1.268a2 2 0 000-3.464V4zM11 4a1 1 0 10-2 0v1.268a2 2 0 000 3.464V16a1 1 0 102 0V8.732a2 2 0 000-3.464V4zM16 3a1 1 0 011 1v7.268a2 2 0 010 3.464V16a1 1 0 11-2 0v-1.268a2 2 0 010-3.464V4a1 1 0 011-1z" />
-                  </svg>
-                  Image Viewer with Prompting
-                </>
-            </h2>
-          </div>
-
-          {selectedImage ? (
-            imageObject ? (
-              <>
-                {/* Tools Panel Component */}
-                <ToolsPanel
-                  promptType={promptType}
-                  setPromptType={setPromptType}
-                  promptingCanvasRef={promptingCanvasRef}
-                  currentLabel={currentLabel}
-                  setCurrentLabel={setCurrentLabel}
-                  segmentationMasks={segmentationMasks}
-                  exportQuantificationsAsCsv={exportQuantificationsAsCsv}
-                  zoomLevel={zoomLevel}
-                  setZoomLevel={setZoomLevel}
-                  setZoomCenter={setZoomCenter}
-                />
-
-                {/* Image Display Component */}
-                <ImageDisplay
-                  selectedImage={selectedImage}
-                  imageObject={imageObject}
-                  loading={loading}
-                  isSegmenting={isSegmenting}
-                  segmentationMasks={segmentationMasks}
-                  selectedMask={selectedMask}
-                  bestMask={bestMask}
-                  promptType={promptType}
-                  setPromptType={setPromptType}
-                  currentLabel={currentLabel}
-                  selectedModel={selectedModel}
-                  promptingCanvasRef={promptingCanvasRef}
-                  annotationCanvasRef={annotationCanvasRef}
-                  finalMaskCanvasRef={finalMaskCanvasRef}
-                  handlePromptingComplete={handlePromptingComplete}
-                  handleMaskSelect={handleMaskSelect}
-                  showAnnotationViewer={showAnnotationViewer}
-                  zoomLevel={zoomLevel}
-                  zoomCenter={zoomCenter}
-                  selectedContours={selectedContours}
-                  setSelectedContours={setSelectedContours}
-                  handleRunNewSegmentation={handleRunNewSegmentation}
-                  setError={setError}
-                  handleContourSelect={handleContourSelect}
-                  handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
-                  handleDeleteSelectedContours={handleDeleteSelectedContours}
-                  finalMasks={finalMasks}
-                  finalMask={finalMask}
-                  selectedFinalMaskContour={selectedFinalMaskContour}
-                  fetchingFinalMask={fetchingFinalMask}
-                  drawAnnotationCanvas={drawAnnotationCanvas}
-                  drawFinalMaskCanvas={drawFinalMaskCanvas}
-                  handleAnnotationCanvasClick={handleAnnotationCanvasClick}
-                  handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
-                  handleFinalMaskContourSelect={handleFinalMaskContourSelect}
-                  handleDeleteFinalMaskContour={handleDeleteFinalMaskContourWrapper}
-                  clearAllFinalMaskContours={clearAllFinalMaskContoursWrapper}
-                  setSelectedFinalMaskContour={setSelectedFinalMaskContour}
-                  setZoomLevel={setZoomLevel}
-                  canvasImage={canvasImage}
-                  onInstantSegmentationStateChange={setInstantSegmentationState}
-                />
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
-                <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner mb-2"></div>
-                  <p>Loading image...</p>
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
-              <p className="text-gray-500">Select an image to start prompting</p>
-            </div>
-          )}
-
-          {/* Help text */}
-          {!selectedImage && !loading && (
-            <div className="mt-4 p-4 bg-teal-50 text-teal-700 rounded-md">
-              <h3 className="font-medium mb-2">How to use:</h3>
-              <ol className="list-decimal list-inside text-sm">
-                <li className="mb-1">Select or upload an image from the left panel</li>
-                <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
-                <li className="mb-1">Select foreground (1) or background (0) label</li>
-                <li className="mb-1">
-                  <strong>For point prompts:</strong>
-                  <ul className="list-disc list-inside ml-4 mt-1">
-                    <li>Left-click for positive points (green with +)</li>
-                    <li>Right-click for negative points (red with -)</li>
-                  </ul>
-                </li>
-                <li className="mb-1">Click and drag on the image to create other prompt types</li>
-                <li className="mb-1">Use zoom and pan controls for detailed work</li>
-                <li>Save your prompts when finished</li>
-              </ol>
-            </div>
-          )}
-
-          {/* Quantification Table */}
-          <div style={{ marginTop: 24 }}>
-            {finalMasks.length > 0 ? (
-              <div>
-                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
-                <QuantificationTable
-                  masks={finalMasks}
-                  onContourSelect={(row) => {
-                    // Find the corresponding contour and trigger zoom
-                    if (finalMasks.length > 0 && finalMasks[0].contours) {
-                      const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
-                      if (contourIndex !== -1) {
-                        const finalMask = finalMasks[0];
-
-                        // Call the main function to update zoom and final mask viewer
-                        // The annotation canvas will automatically redraw via the useEffect hook
-                        handleFinalMaskContourSelect(finalMask, contourIndex);
-                      }
-                    }
-                  }}
-                  onContourDelete={(contourId) => {
-                    return handleDeleteContourFromTable(contourId);
-                  }}
-                />
-              </div>
-            ) : (
-              <div>
-                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
-                <QuantificationTable masks={[]} />
-              </div>
-            )}
-          </div>
+          <MainViewers
+            selectedImage={selectedImage}
+            imageObject={imageObject}
+            canvasImage={canvasImage}
+            currentImage={currentImage}
+            segmentationMasks={segmentationMasks}
+            selectedMask={selectedMask}
+            bestMask={bestMask}
+            isSegmenting={isSegmenting}
+            selectedModel={selectedModel}
+            handlePromptingComplete={handlePromptingComplete}
+            handleMaskSelect={handleMaskSelect}
+            resetSegmentationState={resetSegmentationState}
+            setSelectedMask={setSelectedMask}
+            setBestMask={setBestMask}
+            setSegmentationMasks={setSegmentationMasks}
+            zoomLevel={zoomLevel}
+            zoomCenter={zoomCenter}
+            showAnnotationViewer={showAnnotationViewer}
+            annotationCanvasRef={annotationCanvasRef}
+            finalMaskCanvasRef={finalMaskCanvasRef}
+            drawAnnotationCanvasWrapper={drawAnnotationCanvasWrapper}
+            drawFinalMaskCanvasWrapper={drawFinalMaskCanvasWrapper}
+            handleAnnotationCanvasClick={handleAnnotationCanvasClick}
+            handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
+            handleFinalMaskContourSelect={handleFinalMaskContourSelect}
+            resetCanvasState={resetCanvasState}
+            setZoomLevel={setZoomLevel}
+            setZoomCenter={setZoomCenter}
+            handleReset={handleReset}
+            handleRunNewSegmentation={handleRunNewSegmentation}
+            promptingCanvasRef={promptingCanvasRef}
+            imageLoading={imageLoading}
+            imageError={imageError}
+            setError={setError}
+            handleFileUpload={handleFileUploadWrapper}
+            handleImageSelect={handleImageSelect}
+            resetImageState={resetImageState}
+            labelOptions={labelOptions}
+            promptType={promptType}
+            setPromptType={setPromptType}
+            currentLabel={currentLabel}
+            setCurrentLabel={setCurrentLabel}
+            handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
+            handleDeleteSelectedContours={handleDeleteSelectedContours}
+            selectedContours={selectedContours}
+            setSelectedContours={setSelectedContours}
+            handleDeleteFinalMaskContour={handleDeleteFinalMaskContourWrapper}
+            clearAllFinalMaskContours={clearAllFinalMaskContoursWrapper}
+            handleDeleteContourFromTable={handleDeleteContourFromTable}
+            exportQuantificationsAsCsv={exportQuantificationsAsCsv}
+            showSaveMaskDialog={showSaveMaskDialog}
+            setShowSaveMaskDialog={setShowSaveMaskDialog}
+            savingMaskIndex={null} // Not used in this context, can be removed
+            setSavingMaskIndex={setSavingMaskIndex}
+            saveMaskLabel={saveMaskLabel}
+            setSaveMaskLabel={setSaveMaskLabel}
+            customSaveMaskLabel={customSaveMaskLabel}
+            setCustomSaveMaskLabel={setCustomSaveMaskLabel}
+            saveSelectedMask={saveSelectedMask}
+            instantSegmentationState={instantSegmentationState}
+            setInstantSegmentationState={setInstantSegmentationState}
+            fetchFinalMask={fetchFinalMask}
+            finalMasks={finalMasks}
+            finalMask={finalMask}
+            selectedFinalMaskContour={selectedFinalMaskContour}
+            setSelectedFinalMaskContour={setSelectedFinalMaskContour}
+            handleContourSelect={handleContourSelect}
+            findMatchingContour={findMatchingContour}
+            isPointInContour={isPointInContour}
+            drawFinalMaskCanvas={drawFinalMaskCanvasWrapper}
+            drawAnnotationCanvas={drawAnnotationCanvasWrapper}
+            />
         </div>
       </div>
-
-      {/* Reset Button */}
-      <div className="flex gap-4 mt-4">
-        <button
-          className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md flex items-center space-x-2 transition-colors"
-          onClick={handleReset}
-        >
-          <span>Reset All</span>
-        </button>
-      </div>
-
-      {/* Save Mask Dialog */}
-      {showSaveMaskDialog && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Save Mask As</h2>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Select a class label:
-              </label>
-              <div className="flex flex-col space-y-2">
-                <select
-                  className="border border-gray-300 rounded-md p-2 bg-white"
-                  value={saveMaskLabel}
-                  onChange={(e) => {
-                    setSaveMaskLabel(e.target.value);
-                    setCustomSaveMaskLabel(""); // Clear custom label when selecting from dropdown
-                  }}
-                >
-                  {maskLabelOptions.map((label) => (
-                    <option key={label} value={label}>
-                      {label.replace("_", " ")}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="flex items-center">
-                  <span className="text-sm mr-2">Or create new class:</span>
-                  <input
-                    type="text"
-                    placeholder="Custom class label"
-                    className="border border-gray-300 rounded-md p-2 flex-grow"
-                    value={customSaveMaskLabel}
-                    onChange={(e) => {
-                      setCustomSaveMaskLabel(e.target.value);
-                      if (e.target.value.trim()) {
-                        setSaveMaskLabel(""); // Clear dropdown selection when custom label is entered
-                      } else {
-                        setSaveMaskLabel("coral"); // Reset to default if custom field is empty
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-2 p-2 bg-teal-50 text-teal-700 rounded">
-                Saving mask as:{" "}
-                <strong>{customSaveMaskLabel.trim() || saveMaskLabel}</strong>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                onClick={() => {
-                  setShowSaveMaskDialog(false);
-                  setSavingMaskIndex(null);
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md shadow-sm transition-all duration-200 font-medium"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log(
-                    "Save button clicked in dialog - explicit function call"
-                  );
-                  saveSelectedMask();
-                }}
-                type="button"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
-export default ImageViewerWithPrompting;
+export default AnnotationPage;
