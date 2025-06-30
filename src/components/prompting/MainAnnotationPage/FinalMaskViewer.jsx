@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Trash2, Layers } from "lucide-react";
+import FinishButton from "./FinishButton"; // Adjust the import path as necessary
+import NextButton from "./NextButton";
 
 const FinalMaskViewer = ({
   segmentationMasks,
@@ -65,7 +67,7 @@ const FinalMaskViewer = ({
       setLastPanPoint({ x: e.clientX, y: e.clientY });
       return;
     }
-    
+
     // For normal clicks, transform coordinates and pass to canvas handler
     if (e.button === 0) { // Left click
       const transformedEvent = createTransformedEvent(e);
@@ -81,7 +83,7 @@ const FinalMaskViewer = ({
 
     const containerRect = containerRef.current.getBoundingClientRect();
     const canvasRect = finalMaskCanvasRef.current.getBoundingClientRect();
-    
+
     // Get the click position relative to the container
     const containerX = originalEvent.clientX - containerRect.left;
     const containerY = originalEvent.clientY - containerRect.top;
@@ -105,12 +107,12 @@ const FinalMaskViewer = ({
       e.preventDefault();
       const deltaX = e.clientX - lastPanPoint.x;
       const deltaY = e.clientY - lastPanPoint.y;
-      
+
       setPanOffset(prev => ({
         x: prev.x + deltaX,
         y: prev.y + deltaY
       }));
-      
+
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     }
   };
@@ -160,16 +162,6 @@ const FinalMaskViewer = ({
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-blue-600" />
           <span>Final Mask</span>
-          {finalMasks.length > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-              {finalMasks.length} mask{finalMasks.length !== 1 ? "s" : ""}
-              {finalMask && finalMask.contours
-                ? ` (${finalMask.contours.length} contour${
-                    finalMask.contours.length !== 1 ? "s" : ""
-                  })`
-                : ""}
-            </span>
-          )}
         </div>
 
         {finalMasks.length > 0 && (
@@ -188,7 +180,7 @@ const FinalMaskViewer = ({
       </div>
 
       {/* Adjusted height to account for missing Clear/Complete buttons */}
-      <div 
+      <div
         ref={containerRef}
         className="h-[340px] sm:h-[420px] relative overflow-hidden"
         style={{
@@ -201,43 +193,20 @@ const FinalMaskViewer = ({
         onWheel={handleWheel}
         onContextMenu={(e) => e.preventDefault()} // Prevent context menu on right click
       >
-        {/* Panning instruction overlay
-        <div className="absolute top-2 left-2 bg-white bg-opacity-75 p-2 rounded shadow z-10 text-xs">
-          <div>Pan: Alt + Drag, Middle Mouse, or Right Click</div>
-          <div>Click contours to focus and zoom</div>
-          {selectedFinalMaskContour && <div>Use +/- controls to manually adjust zoom</div>}
-        </div> */}
-
-        {finalMasks.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center px-4">
-              <div className="bg-blue-50 rounded-full p-4 mx-auto mb-4 w-16 h-16 flex items-center justify-center">
-                <Layers className="h-8 w-8 text-blue-500" />
-              </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-2">
-                No Final Masks
-              </h3>
-              <p className="text-gray-500 text-sm sm:text-base max-w-xs mx-auto">
-                Select contours in the Annotation Drawing Area and click "Add to
-                Final Mask" to create your final segmentation result.
-              </p>
-            </div>
+        <>
+          {/* Canvas container with panning only (zoom handled by canvas utilities) */}
+          <div style={{
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+            width: '100%',
+            height: '100%',
+            position: 'relative'
+          }}>
+            <canvas
+              ref={finalMaskCanvasRef}
+              className="w-full h-full object-contain"
+              style={{ cursor: isPanning ? 'grabbing' : 'pointer' }}
+            />
           </div>
-        ) : (
-          <>
-            {/* Canvas container with panning only (zoom handled by canvas utilities) */}
-            <div style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
-              width: '100%',
-              height: '100%',
-              position: 'relative'
-            }}>
-              <canvas
-                ref={finalMaskCanvasRef}
-                className="w-full h-full object-contain"
-                style={{ cursor: isPanning ? 'grabbing' : 'pointer' }}
-              />
-            </div>
 
             {/* Zoom Controls - only visible when a contour is selected */}
             {selectedFinalMaskContour && (
@@ -388,7 +357,12 @@ const FinalMaskViewer = ({
             Finish
           </button>
         </div>
-      </div>
+        <div className="viewer-controls flex justify-end mt-2">
+          <FinishButton
+              maskId={finalMask?.id}
+          />
+          <NextButton dataset_id={"1"} />
+        </div>
     </div>
   );
 };
