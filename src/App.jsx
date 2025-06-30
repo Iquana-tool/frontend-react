@@ -1,61 +1,21 @@
-import React, { useState } from "react";
-import AnnotationPage from "./components/prompting/AnnotationPage";
-import DatasetSelector from "./components/datasets/DatasetSelector";
-import DatasetsOverview from "./components/datasets/DatasetsOverview";
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { DatasetProvider } from "./contexts/DatasetContext";
-import { BugIcon, ArrowLeft } from "lucide-react";
-
-function AppContent() {
-  const [currentView, setCurrentView] = useState('datasets'); // 'datasets' or 'workspace'
-
-  const handleOpenDataset = (dataset) => {
-    setCurrentView('workspace');
-  };
-
-  if (currentView === 'datasets') {
-    return <DatasetsOverview onOpenDataset={handleOpenDataset} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
-        <div className="max-w-[98%] mx-auto px-2 py-2.5 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => setCurrentView('datasets')}
-              className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
-            >
-              <ArrowLeft size={20} />
-              <span>Back to Datasets</span>
-            </button>
-            <div className="h-6 w-px bg-teal-400"></div>
-            <h1 className="text-2xl font-bold">AquaMorph</h1>
-          </div>
-          
-          <a 
-            href="https://github.com/yapat-app/AquaMorph/issues" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <BugIcon size={16} />
-            <span>Report Bug</span>
-          </a>
-        </div>
-      </nav>
-
-      <main className="max-w-[98%] mx-auto py-5 px-2">
-        {/* Main Application */}
-        <AnnotationPage />
-      </main>
-    </div>
-  );
-}
+import DatasetsPage from "./pages/DatasetsPage";
+import AnnotationPage from "./pages/AnnotationPage";
 
 function App() {
   return (
     <DatasetProvider>
-      <AppContent />
+      <Router>
+        <Routes>
+          <Route path="/" element={<DatasetsPage />} />
+          <Route path="/datasets" element={<DatasetsPage />} />
+          <Route path="/dataset/:datasetId/annotate" element={<AnnotationPage />} />
+          {/* Catch-all route - redirect unknown routes to datasets page */}
+          <Route path="*" element={<Navigate to="/datasets" replace />} />
+        </Routes>
+      </Router>
     </DatasetProvider>
   );
 }

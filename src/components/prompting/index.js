@@ -3,7 +3,6 @@
 import { default as ImageViewerWithPrompting } from './AnnotationPage';
 import { default as PromptingCanvas } from './PromptingCanvas';
 import { default as ToolsPanel } from './ToolsPanel';
-import { default as MaskGenerationPanel } from './MaskGenerationPanel';
 import { default as ContourEditor } from './ContourEditor';
 import * as utils from './utils';
 
@@ -12,7 +11,6 @@ export {
   ImageViewerWithPrompting,
   PromptingCanvas,
   ToolsPanel,
-  MaskGenerationPanel,
   ContourEditor
 };
 
