@@ -33,6 +33,10 @@ const AnnotationPage = () => {
   const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
 
+  // Separate zoom state for annotation drawing area (prompting canvas)
+  const [annotationZoomLevel, setAnnotationZoomLevel] = useState(1);
+  const [annotationZoomCenter, setAnnotationZoomCenter] = useState({ x: 0.5, y: 0.5 });
+
   // Refs
   const promptingCanvasRef = useRef(null);
 
@@ -44,7 +48,6 @@ const AnnotationPage = () => {
   });
 
   const [labelOptions, setLabelOptions] = useState({});
-  const maskLabelOptions = ["petri_dish", "coral", "polyp"];
 
   // Custom Hooks
   const imageManagement = useImageManagement();
@@ -155,6 +158,60 @@ const AnnotationPage = () => {
     }, timeout);
   }, []);
 
+  // Annotation zoom handlers (for ToolsPanel - only affects prompting canvas)
+  const handleAnnotationZoomIn = useCallback(() => {
+    setAnnotationZoomLevel((prev) => {
+      const newLevel = Math.min(prev * 1.2, 5);
+      // Ensure we have a center when zooming from 1 → something
+      if (newLevel !== 1 && (!annotationZoomLevel || annotationZoomLevel === 1)) {
+        setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+      }
+      
+      // Sync with final mask view if a contour is selected
+      if (selectedFinalMaskContour) {
+        setZoomLevel(newLevel);
+      }
+      
+      return newLevel;
+    });
+    // Apply zoom to prompting canvas if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomIn) {
+      promptingCanvasRef.current.zoomIn();
+    }
+  }, [annotationZoomLevel, selectedFinalMaskContour, setZoomLevel]);
+
+  const handleAnnotationZoomOut = useCallback(() => {
+    setAnnotationZoomLevel((prev) => {
+      const newLevel = Math.max(prev / 1.2, 0.5);
+      
+      // Sync with final mask view if a contour is selected
+      if (selectedFinalMaskContour) {
+        setZoomLevel(newLevel);
+      }
+      
+      return newLevel;
+    });
+    // Apply zoom to prompting canvas if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomOut) {
+      promptingCanvasRef.current.zoomOut();
+    }
+  }, [selectedFinalMaskContour, setZoomLevel]);
+
+  const handleAnnotationResetView = useCallback(() => {
+    setAnnotationZoomLevel(1);
+    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+    
+    // Also reset the final mask view zoom to keep them synced
+    setZoomLevel(1);
+    setZoomCenter({ x: 0.5, y: 0.5 });
+    setSelectedFinalMaskContour(null);
+    
+    // Reset prompting canvas view if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+      promptingCanvasRef.current.resetView();
+    }
+  }, [setZoomLevel, setZoomCenter, setSelectedFinalMaskContour]);
+
   // Initialize component
   useEffect(() => {
     if (currentDataset) {
@@ -232,7 +289,7 @@ const AnnotationPage = () => {
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
+  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {
@@ -269,6 +326,40 @@ const AnnotationPage = () => {
   }, [contourDeleteSelected, selectedMask, selectedContours, setSelectedMask, setBestMask, setSegmentationMasks, setSuccessMessageWithTimeout, setError]);
 
   const handleFinalMaskContourSelect = useCallback((mask, contourIndex) => {
+    // Check if we're deselecting the same contour
+    if (
+      selectedFinalMaskContour &&
+      selectedFinalMaskContour.maskId === mask.id &&
+      selectedFinalMaskContour.contourIndex === contourIndex
+    ) {
+      // Reset both zoom states when deselecting
+      setAnnotationZoomLevel(1);
+      setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+      
+      // Reset prompting canvas view if available
+      if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+        promptingCanvasRef.current.resetView();
+      }
+    } else {
+      // First, calculate the optimal zoom for the contour so we can sync both views
+      const contour = mask.contours[contourIndex];
+      if (contour && contour.x && contour.y && contour.x.length > 0) {
+        // Use the same calculateOptimalZoomLevel function from canvas operations
+        const { calculateOptimalZoomLevel } = canvasOps;
+        const { zoomLevel: optimalZoom, centerX, centerY } = calculateOptimalZoomLevel(contour);
+        
+        // Sync the annotation drawing area zoom state
+        setAnnotationZoomLevel(optimalZoom);
+        setAnnotationZoomCenter({ x: centerX, y: centerY });
+        
+        // Also apply zoom to the prompting canvas if available
+        if (promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
+          promptingCanvasRef.current.setZoomParameters(optimalZoom, { x: centerX, y: centerY });
+        }
+      }
+    }
+
+    // Then call the original final mask contour select function
     canvasFinalMaskContourSelect(
       mask,
       contourIndex,
@@ -283,7 +374,7 @@ const AnnotationPage = () => {
         imageObject,
       selectedFinalMaskContour
     );
-  }, [canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, imageObject, selectedFinalMaskContour, drawAnnotationCanvas]);
+  }, [selectedFinalMaskContour, canvasOps, canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, imageObject, drawAnnotationCanvas, setAnnotationZoomLevel, setAnnotationZoomCenter, promptingCanvasRef]);
 
   // Canvas event handlers with proper parameter passing
   const handleAnnotationCanvasClick = useCallback((event) => {
@@ -315,7 +406,7 @@ const AnnotationPage = () => {
       handleFinalMaskContourSelect,
       isPointInContour
     );
-  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
+  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, imageObject, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
 
   const handleReset = useCallback(() => {
     resetImageState();
@@ -324,6 +415,9 @@ const AnnotationPage = () => {
     resetCanvasState();
     setPromptType("point");
     setCurrentLabel(null);
+    // Reset annotation zoom states
+    setAnnotationZoomLevel(1);
+    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
   }, [resetImageState, resetSegmentationState, resetContourState, resetCanvasState]);
 
   const handleRunNewSegmentation = useCallback(() => {
@@ -553,6 +647,9 @@ const AnnotationPage = () => {
               zoomLevel={zoomLevel}
               setZoomLevel={setZoomLevel}
               setZoomCenter={setZoomCenter}
+              handleAnnotationZoomIn={handleAnnotationZoomIn}
+              handleAnnotationZoomOut={handleAnnotationZoomOut}
+              handleAnnotationResetView={handleAnnotationResetView}
           />
           <MainViewers
             selectedImage={selectedImage}
@@ -624,6 +721,10 @@ const AnnotationPage = () => {
             isPointInContour={isPointInContour}
             drawFinalMaskCanvas={drawFinalMaskCanvasWrapper}
             drawAnnotationCanvas={drawAnnotationCanvasWrapper}
+            annotationZoomLevel={annotationZoomLevel}
+            annotationZoomCenter={annotationZoomCenter}
+            setAnnotationZoomLevel={setAnnotationZoomLevel}
+            setAnnotationZoomCenter={setAnnotationZoomCenter}
             />
           {/* Help text */}
           {!selectedImage && !loading && (

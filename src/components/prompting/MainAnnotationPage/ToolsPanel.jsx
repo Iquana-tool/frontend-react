@@ -5,7 +5,6 @@ import {
   Circle,
   Pentagon,
   Move, 
-  Download, 
   Pointer, 
   ZoomIn, 
   ZoomOut, 
@@ -22,7 +21,10 @@ const ToolsPanel = ({
   segmentationMasks,
   zoomLevel,
   setZoomLevel,
-  setZoomCenter
+  setZoomCenter,
+  handleAnnotationZoomIn,
+  handleAnnotationZoomOut,
+  handleAnnotationResetView
 }) => {
   const [isInstantSegmentationEnabled, setIsInstantSegmentationEnabled] = useState(false);
 
@@ -42,6 +44,7 @@ const ToolsPanel = ({
 
     return () => clearInterval(interval);
   }, [promptingCanvasRef]);
+  
   const handleToolChange = (tool) => {
     setPromptType(tool);
     if (promptingCanvasRef.current) {
@@ -50,7 +53,13 @@ const ToolsPanel = ({
   };
 
   const handleZoom = (direction) => {
-    if (setZoomLevel) {
+    // Use the new annotation zoom handlers if available, otherwise fallback to old behavior
+    if (direction === 'in' && handleAnnotationZoomIn) {
+      handleAnnotationZoomIn();
+    } else if (direction === 'out' && handleAnnotationZoomOut) {
+      handleAnnotationZoomOut();
+    } else if (setZoomLevel) {
+      // Fallback to old shared zoom behavior
       setZoomLevel((prev) => {
         const newLevel = direction === 'in' ? Math.min(prev * 1.2, 5) : Math.max(prev / 1.2, 0.5);
         if (!setZoomCenter) return newLevel;
@@ -68,11 +77,14 @@ const ToolsPanel = ({
   };
 
   const handleResetView = () => {
-    if (setZoomLevel) {
+    // Use the new annotation reset handler if available, otherwise fallback to old behavior
+    if (handleAnnotationResetView) {
+      handleAnnotationResetView();
+    } else if (setZoomLevel) {
       setZoomLevel(1);
-    }
-    if (setZoomCenter) {
-      setZoomCenter(null);
+      if (setZoomCenter) {
+        setZoomCenter(null);
+      }
     }
     if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
       promptingCanvasRef.current.resetView();

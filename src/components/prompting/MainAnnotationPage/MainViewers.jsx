@@ -36,7 +36,11 @@ const MainViewers = ({
                        handleFinalMaskContourSelect,
                        drawFinalMaskCanvas,
                        onInstantSegmentationStateChange,
-                       setZoomCenter
+                       setZoomCenter,
+                       annotationZoomLevel,
+                       annotationZoomCenter,
+                       setAnnotationZoomLevel,
+                       setAnnotationZoomCenter
                      }) => {
   if (!selectedImage) {
     return (
@@ -116,6 +120,11 @@ const MainViewers = ({
                 setZoomCenter={setZoomCenter}
                 handleFinalMaskContourSelect={handleFinalMaskContourSelect}
                 drawFinalMaskCanvas={drawFinalMaskCanvas}
+                annotationZoomLevel={annotationZoomLevel}
+                annotationZoomCenter={annotationZoomCenter}
+                setAnnotationZoomLevel={setAnnotationZoomLevel}
+                setAnnotationZoomCenter={setAnnotationZoomCenter}
+                promptingCanvasRef={promptingCanvasRef}
             />
         )}
       </div>
