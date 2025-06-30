@@ -10,7 +10,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
   // Improved panning refs for smooth performance
   const panStartRef = useRef(null);
   const panOffsetRef = useRef({ x: 0, y: 0 });
-  const panRafIdRef = useRef(null);
+  const initialPanOffsetRef = useRef({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
 
   // Keep panOffsetRef synchronized with panOffset state
@@ -30,20 +30,23 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       // Center image horizontally
       x = (canvasSize.width - scaledWidth) / 2;
     } else {
-      // Clamp so no empty space is shown
-      const minX = canvasSize.width - scaledWidth;
-      const maxX = 0;
-      x = Math.min(maxX, Math.max(offset.x, minX));
+      // For wide images, calculate the range needed to see all parts
+      const centerX = (canvasSize.width - scaledWidth) / 2; // This is negative
+      const maxX = -centerX; // To align left edge with canvas left (positive)
+      const minX = centerX; // To align right edge with canvas right (negative)
+      x = Math.min(maxX, Math.max(minX, offset.x));
     }
 
     if (scaledHeight <= canvasSize.height) {
       // Center image vertically
       y = (canvasSize.height - scaledHeight) / 2;
     } else {
-      // Clamp so no empty space is shown
-      const minY = canvasSize.height - scaledHeight;
-      const maxY = 0;
-      y = Math.min(maxY, Math.max(offset.y, minY));
+      // For tall images, calculate the range needed to see all parts
+      const centerY = (canvasSize.height - scaledHeight) / 2; // This is negative
+      const maxY = -centerY; // To align top edge with canvas top (positive)
+      const minY = centerY; // To align bottom edge with canvas bottom (negative)
+      
+      y = Math.min(maxY, Math.max(minY, offset.y));
     }
 
     return { x, y };
@@ -118,13 +121,16 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       panStartRef.current = startPos;
       setPanStart(startPos);
       
+      // Store the initial pan offset when dragging starts
+      initialPanOffsetRef.current = { ...panOffset };
+      
       return true; // Indicate that panning started
     }
     
     return false;
-  }, [image]);
+  }, [image, panOffset]);
 
-  // Handle pan move
+  // Handle pan move - Simplified for smoother performance
   const handlePanMove = useCallback((e, redrawCallback) => {
     if (!image || !isDraggingRef.current || !panStartRef.current) return;
     
@@ -135,31 +141,31 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
     const deltaX = e.clientX - panStartRef.current.x;
     const deltaY = e.clientY - panStartRef.current.y;
     
-    // Get the initial pan offset when dragging started (stored in panOffset state)
-    const initialPanOffset = panOffset;
-    
     // Calculate new offset from the initial position when dragging started
     let newOffset = {
-      x: initialPanOffset.x + deltaX,
-      y: initialPanOffset.y + deltaY,
+      x: initialPanOffsetRef.current.x + deltaX,
+      y: initialPanOffsetRef.current.y + deltaY,
     };
     
-    // Apply boundary constraints
-    newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
+    // Apply boundary constraints when the image is larger than the canvas
+    const scaledWidth = image.width * initialScale * zoomLevel;
+    const scaledHeight = image.height * initialScale * zoomLevel;
+    
+    if (scaledWidth > canvasSize.width || scaledHeight > canvasSize.height) {
+      newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
+    }
     
     // Update the ref for immediate use
     panOffsetRef.current = { ...newOffset };
     
-    // Throttle redraws using requestAnimationFrame for smooth performance
-    if (panRafIdRef.current === null) {
-      panRafIdRef.current = window.requestAnimationFrame(() => {
-        if (redrawCallback) {
-          redrawCallback(newOffset);
-        }
-        panRafIdRef.current = null;
-      });
+    // Update state immediately for smooth panning
+    setPanOffset(newOffset);
+    
+    // Immediate redraw without requestAnimationFrame for responsiveness
+    if (redrawCallback) {
+      redrawCallback(newOffset);
     }
-  }, [image, canvasSize, initialScale, zoomLevel, panOffset, clampPanOffset]);
+  }, [image, canvasSize, initialScale, zoomLevel, clampPanOffset]);
 
   // Handle pan end
   const handlePanEnd = useCallback(() => {
@@ -173,12 +179,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       isDraggingRef.current = false;
       panStartRef.current = null;
       setPanStart(null);
-      
-      // Cancel any pending animation frames
-      if (panRafIdRef.current !== null) {
-        cancelAnimationFrame(panRafIdRef.current);
-        panRafIdRef.current = null;
-      }
+      initialPanOffsetRef.current = { x: 0, y: 0 };
       
       return true; // Indicate that panning ended
     }
@@ -189,49 +190,28 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
   // Handle wheel event for zooming
   const handleWheel = useCallback((e, redrawCallback) => {
     if (!image) return;
+    
+    // Only zoom when Ctrl/Cmd key is held down
+    if (!(e.ctrlKey || e.metaKey)) {
+      return;
+    }
+    
     e.preventDefault();
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+    e.stopPropagation();
 
     // Calculate new zoom level
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoomLevel = Math.max(0.1, Math.min(10, zoomLevel * zoomFactor));
 
-    // Simple zoom at canvas center approach to avoid dependency issues
-    const oldZoomLevel = zoomLevel;
-    const scaleFactor = newZoomLevel / oldZoomLevel;
-
-    // Calculate how much the view should shift to keep the mouse point fixed
-    const canvasCenterX = canvasSize.width / 2;
-    const canvasCenterY = canvasSize.height / 2;
-
-    // Calculate offset from canvas center to mouse position
-    const offsetX = mouseX - canvasCenterX;
-    const offsetY = mouseY - canvasCenterY;
-
-    // Calculate new pan offset to keep the point under mouse fixed
-    const newPanOffset = {
-      x: panOffset.x + offsetX * (1 - scaleFactor),
-      y: panOffset.y + offsetY * (1 - scaleFactor)
-    };
-
-    // Apply boundary constraints
-    const clampedPanOffset = clampPanOffset(newPanOffset, image, canvasSize, initialScale, newZoomLevel);
-
-    // Update states
+    // Simple zoom without complex pan offset calculations
+    // Just update the zoom level and let the existing system handle it
     setZoomLevel(newZoomLevel);
-    setPanOffset(clampedPanOffset);
-    panOffsetRef.current = { ...clampedPanOffset };
 
     // Force redraw
     if (redrawCallback) {
-      setTimeout(() => {
-        redrawCallback();
-      }, 0);
+      redrawCallback();
     }
-  }, [image, zoomLevel, panOffset, canvasSize, initialScale, clampPanOffset]);
+  }, [image, zoomLevel]);
 
   // Smooth zoom function
   const handleSmoothZoom = useCallback((newZoomLevel, centerPoint = null, redrawCallback) => {
@@ -315,9 +295,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
 
     // Force redraw
     if (redrawCallback) {
-      setTimeout(() => {
-        redrawCallback();
-      }, 0);
+      redrawCallback();
     }
   }, [image, zoomLevel, zoomCenter, panOffset, canvasSize, initialScale, clampPanOffset]);
 
@@ -340,9 +318,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
     
     // Force redraw
     if (redrawCallback) {
-      setTimeout(() => {
-        redrawCallback();
-      }, 0);
+      redrawCallback();
     }
   }, []);
 
@@ -397,8 +373,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
     resetView,
     setZoomParameters,
     
-    // Refs (for external access if needed)
-    isDraggingRef,
-    panOffsetRef
+    // Refs for external access
+    isDraggingRef
   };
 }; 
