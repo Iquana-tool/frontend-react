@@ -3,6 +3,46 @@ import { handleApiError } from "../api/util";
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
 
+export const markMaskAsFinal = async (maskId) => {
+    try {
+        // Validate maskId
+        if (!maskId || typeof maskId !== "number") {
+            throw new Error("Invalid mask ID provided");
+        }
+
+        // Send request to mark the mask as final
+        const response = await fetch(`${API_BASE_URL}/masks/finish_mask/${maskId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}
+
+export const getMaskAnnotationStatus = async (maskId) => {
+    try {
+        // Validate maskId
+        if (!maskId || typeof maskId !== "number") {
+            throw new Error("Invalid mask ID provided");
+        }
+
+        // Send request to get the annotation status of the mask
+        const response = await fetch(`${API_BASE_URL}/masks/get_mask_annotation_status/${maskId}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}
+
 // Save a mask
 export const saveMask = async (imageId, label, contours) => {
     try {
