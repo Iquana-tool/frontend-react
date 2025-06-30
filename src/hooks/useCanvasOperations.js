@@ -32,6 +32,74 @@ export const useCanvasOperations = () => {
     selectedFinalMaskContour: null,
   });
 
+  // Calculate optimal zoom level for a contour to fit in view with padding
+  const calculateOptimalZoomLevel = useCallback((contour) => {
+    if (!contour || !contour.x || !contour.y || contour.x.length === 0) {
+      return { zoomLevel: 1, centerX: 0.5, centerY: 0.5 };
+    }
+
+    // Calculate bounding box of the contour (coordinates are normalized 0-1)
+    let minX = Math.min(...contour.x);
+    let maxX = Math.max(...contour.x);
+    let minY = Math.min(...contour.y);
+    let maxY = Math.max(...contour.y);
+
+    // Calculate the contour size
+    const contourWidth = maxX - minX;
+    const contourHeight = maxY - minY;
+
+    // Add padding around the contour (5% on each side)
+    const padding = 0.05;
+    const paddedWidth = contourWidth + (2 * padding);
+    const paddedHeight = contourHeight + (2 * padding);
+
+    // Calculate zoom needed to fit the padded contour in the viewport
+    // At zoom level Z, the viewport shows 1/Z of the image space
+    // So we need: 1/Z >= paddedWidth and 1/Z >= paddedHeight
+    // Therefore: Z <= 1/paddedWidth and Z <= 1/paddedHeight
+    const maxZoomForWidth = 1.0 / paddedWidth;
+    const maxZoomForHeight = 1.0 / paddedHeight;
+
+    // Use the smaller zoom to ensure the entire contour with padding fits
+    let optimalZoom = Math.min(maxZoomForWidth, maxZoomForHeight);
+
+    // Clamp zoom level between reasonable bounds
+    optimalZoom = Math.max(1.1, Math.min(4.0, optimalZoom));
+
+    // Calculate center point of the bounding box
+    let centerX = (minX + maxX) / 2;
+    let centerY = (minY + maxY) / 2;
+
+    // At the chosen zoom level, calculate what portion of the image is visible
+    const visibleWidth = 1.0 / optimalZoom;
+    const visibleHeight = 1.0 / optimalZoom;
+
+    // Calculate the half-width and half-height of what we need to show
+    const halfPaddedWidth = paddedWidth / 2;
+    const halfPaddedHeight = paddedHeight / 2;
+
+    // Adjust center to ensure the entire padded contour stays within the visible area
+    // Check horizontal bounds
+    if (centerX - halfPaddedWidth < 0) {
+      centerX = halfPaddedWidth;
+    } else if (centerX + halfPaddedWidth > 1) {
+      centerX = 1 - halfPaddedWidth;
+    }
+
+    // Check vertical bounds  
+    if (centerY - halfPaddedHeight < 0) {
+      centerY = halfPaddedHeight;
+    } else if (centerY + halfPaddedHeight > 1) {
+      centerY = 1 - halfPaddedHeight;
+    }
+
+    // Ensure center coordinates are within valid bounds
+    centerX = Math.max(0, Math.min(1, centerX));
+    centerY = Math.max(0, Math.min(1, centerY));
+
+    return { zoomLevel: optimalZoom, centerX, centerY };
+  }, []);
+
   const drawAnnotationCanvas = useCallback(
     (bestMask, canvasImage, selectedContours, selectedFinalMaskContour) => {
       // Store current parameters so animation can reuse them
@@ -224,17 +292,11 @@ export const useCanvasOperations = () => {
 
           const contour = bestMask.contours[clickedContourIndex];
           if (contour && contour.x && contour.y && contour.x.length > 0) {
-            let centerX = 0,
-              centerY = 0;
-            for (let i = 0; i < contour.x.length; i++) {
-              centerX += contour.x[i];
-              centerY += contour.y[i];
-            }
-            centerX /= contour.x.length;
-            centerY /= contour.y.length;
-
+            // Calculate optimal zoom level to fit the entire contour
+            const { zoomLevel: optimalZoom, centerX, centerY } = calculateOptimalZoomLevel(contour);
+            
             setZoomCenter({ x: centerX, y: centerY });
-            setZoomLevel(3);
+            setZoomLevel(optimalZoom);
           }
 
           if (finalMasks && finalMasks.length > 0) {
@@ -462,17 +524,11 @@ export const useCanvasOperations = () => {
         return;
       }
 
-      let centerX = 0,
-        centerY = 0;
-      for (let i = 0; i < contour.x.length; i++) {
-        centerX += contour.x[i];
-        centerY += contour.y[i];
-      }
-      centerX /= contour.x.length;
-      centerY /= contour.y.length;
+      // Calculate optimal zoom level to fit the entire contour
+      const { zoomLevel: optimalZoom, centerX, centerY } = calculateOptimalZoomLevel(contour);
 
       setZoomCenter({ x: centerX, y: centerY });
-      setZoomLevel(3);
+      setZoomLevel(optimalZoom);
 
       setSelectedFinalMaskContour({
         maskId: mask.id,
