@@ -5,7 +5,6 @@ import {
   Circle,
   Pentagon,
   Move, 
-  Download, 
   Pointer, 
   ZoomIn, 
   ZoomOut, 

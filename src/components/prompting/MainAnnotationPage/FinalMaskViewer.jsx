@@ -26,6 +26,11 @@ const FinalMaskViewer = ({
   setZoomCenter,
   handleFinalMaskContourSelect,
   drawFinalMaskCanvas,
+  annotationZoomLevel,
+  annotationZoomCenter,
+  setAnnotationZoomLevel,
+  setAnnotationZoomCenter,
+  promptingCanvasRef,
 }) => {
   // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
@@ -134,6 +139,19 @@ const FinalMaskViewer = ({
       setZoomCenter({ x: 0.5, y: 0.5 });
     }
     setPanOffset({ x: 0, y: 0 });
+    
+    // Sync with annotation drawing area
+    if (setAnnotationZoomLevel) {
+      setAnnotationZoomLevel(1);
+    }
+    if (setAnnotationZoomCenter) {
+      setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+    }
+    
+    // Reset prompting canvas view if available
+    if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+      promptingCanvasRef.current.resetView();
+    }
   };
 
   return (
@@ -235,6 +253,16 @@ const FinalMaskViewer = ({
                   // Zoom in with 1x increments
                   const newZoomLevel = Math.min(zoomLevel + 1, 6);
                   setZoomLevel(newZoomLevel);
+                  
+                  // Sync with annotation drawing area
+                  if (setAnnotationZoomLevel) {
+                    setAnnotationZoomLevel(newZoomLevel);
+                  }
+                  
+                  // Apply zoom to prompting canvas if available
+                  if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
+                    promptingCanvasRef.current.setZoomParameters(newZoomLevel, zoomCenter);
+                  }
                 }}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -273,6 +301,16 @@ const FinalMaskViewer = ({
                   // Zoom out with 1x increments - no reset logic
                   const newZoomLevel = Math.max(zoomLevel - 1, 1);
                   setZoomLevel(newZoomLevel);
+                  
+                  // Sync with annotation drawing area
+                  if (setAnnotationZoomLevel) {
+                    setAnnotationZoomLevel(newZoomLevel);
+                  }
+                  
+                  // Apply zoom to prompting canvas if available
+                  if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
+                    promptingCanvasRef.current.setZoomParameters(newZoomLevel, zoomCenter);
+                  }
                 }}
                 onMouseDown={(e) => {
                   e.preventDefault();

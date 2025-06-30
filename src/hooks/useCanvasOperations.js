@@ -715,6 +715,7 @@ export const useCanvasOperations = () => {
     handleFinalMaskContourSelect,
     toggleAnnotationPromptingMode,
     resetCanvasState,
+    calculateOptimalZoomLevel,
 
     // Setters
     setZoomLevel,
