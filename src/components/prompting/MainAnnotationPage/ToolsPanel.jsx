@@ -11,7 +11,7 @@ import {
   ZoomOut, 
   RotateCcw 
 } from 'lucide-react';
-import LabelSelector from '../prompting/LabelSelector';
+import LabelSelector from '../LabelSelector';
 
 const ToolsPanel = ({
   promptType,

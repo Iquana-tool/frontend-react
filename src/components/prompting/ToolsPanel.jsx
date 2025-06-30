@@ -13,7 +13,7 @@ import {
   MousePointer,
   Square,
   Circle,
-  Polygon,
+  Pentagon,
   Target,
 } from "lucide-react";
 
@@ -38,7 +38,7 @@ const ToolsPanel = ({
     { id: "point", icon: <Target size={18} />, label: "Point Prompt" },
     { id: "box", icon: <Square size={18} />, label: "Box Prompt" },
     { id: "circle", icon: <Circle size={18} />, label: "Circle Prompt" },
-    { id: "polygon", icon: <Polygon size={18} />, label: "Polygon Prompt" },
+    { id: "polygon", icon: <Pentagon size={18} />, label: "Polygon Prompt" },
   ];
 
   // Actions

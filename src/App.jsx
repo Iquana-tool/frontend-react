@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import ImageViewerWithPrompting from "./components/prompting/ImageViewerWithPrompting";
+import AnnotationPage from "./components/prompting/AnnotationPage";
 import DatasetSelector from "./components/datasets/DatasetSelector";
 import DatasetsOverview from "./components/datasets/DatasetsOverview";
 import { DatasetProvider } from "./contexts/DatasetContext";
@@ -46,7 +46,7 @@ function AppContent() {
 
       <main className="max-w-[98%] mx-auto py-5 px-2">
         {/* Main Application */}
-        <ImageViewerWithPrompting />
+        <AnnotationPage />
       </main>
     </div>
   );
