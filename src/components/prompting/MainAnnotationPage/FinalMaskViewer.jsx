@@ -1,5 +1,6 @@
-import React from "react";
+import React, {useEffect} from "react";
 import { Trash2, Layers } from "lucide-react";
+import FinishButton from "./FinishButton"; // Adjust the import path as necessary
 
 const FinalMaskViewer = ({
   segmentationMasks,
@@ -25,22 +26,15 @@ const FinalMaskViewer = ({
   handleFinalMaskContourSelect,
   drawFinalMaskCanvas,
 }) => {
+  useEffect(() => {
+    console.log("Final Mask", finalMask);
+  }, [finalMask]);
   return (
     <div className="viewer-panel flex-1 w-full xl:min-w-[400px] 2xl:min-w-[450px]">
       <div className="viewer-header flex justify-between items-center">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-blue-600" />
           <span>Final Mask</span>
-          {finalMasks.length > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-              {finalMasks.length} mask{finalMasks.length !== 1 ? "s" : ""}
-              {finalMask && finalMask.contours
-                ? ` (${finalMask.contours.length} contour${
-                    finalMask.contours.length !== 1 ? "s" : ""
-                  })`
-                : ""}
-            </span>
-          )}
         </div>
 
         {finalMasks.length > 0 && (
@@ -60,22 +54,6 @@ const FinalMaskViewer = ({
 
       {/* Adjusted height to account for missing Clear/Complete buttons */}
       <div className="h-[340px] sm:h-[420px] relative">
-        {finalMasks.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center px-4">
-              <div className="bg-blue-50 rounded-full p-4 mx-auto mb-4 w-16 h-16 flex items-center justify-center">
-                <Layers className="h-8 w-8 text-blue-500" />
-              </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-2">
-                No Final Masks
-              </h3>
-              <p className="text-gray-500 text-sm sm:text-base max-w-xs mx-auto">
-                Select contours in the Annotation Drawing Area and click "Add to
-                Final Mask" to create your final segmentation result.
-              </p>
-            </div>
-          </div>
-        ) : (
           <>
             {/* Direct canvas - no card wrapper, matches PromptingCanvas approach */}
             <canvas
@@ -164,21 +142,10 @@ const FinalMaskViewer = ({
               </div>
             )}
           </>
-        )}
       </div>
-
-      {/* Bottom spacing to match the button area height */}
-      <div>
-          <div className="flex justify-end">
-          <button
-              type="button"
-
-              className="bg-green-600 hover:bg-green-400 text-white font-bold py-2 px-4 rounded"
-          >
-            Finish
-          </button>
-        </div>
-      </div>
+      <FinishButton
+        maskId={finalMask.id}
+      />
     </div>
   );
 };
