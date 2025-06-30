@@ -182,7 +182,7 @@ const FinalMaskViewer = ({
       {/* Adjusted height to account for missing Clear/Complete buttons */}
       <div
         ref={containerRef}
-        className="h-[340px] sm:h-[420px] relative overflow-hidden"
+        className="h-[340px] sm:h-[420px] relative overflow-hidden py-5"
         style={{
           cursor: isPanning ? 'grabbing' : 'grab'
         }}
@@ -345,11 +345,11 @@ const FinalMaskViewer = ({
 
       {/* Bottom spacing to match the button area height */}
       <div>
-        <div className="viewer-controls flex justify-end mt-2">
+        <div className="viewer-controls flex justify-end items-center mt-2 gap-4 px-4 py-3 pr-8">
           <FinishButton
             maskId={finalMask?.id}
           />
-          <NextButton dataset_id={"1"} />
+          {/* <NextButton dataset_id={"1"} /> */}
         </div>
       </div>
     </div>
