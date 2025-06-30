@@ -30,20 +30,23 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       // Center image horizontally
       x = (canvasSize.width - scaledWidth) / 2;
     } else {
-      // Clamp so no empty space is shown
-      const minX = canvasSize.width - scaledWidth;
-      const maxX = 0;
-      x = Math.min(maxX, Math.max(offset.x, minX));
+      // For wide images, calculate the range needed to see all parts
+      const centerX = (canvasSize.width - scaledWidth) / 2; // This is negative
+      const maxX = -centerX; // To align left edge with canvas left (positive)
+      const minX = centerX; // To align right edge with canvas right (negative)
+      x = Math.min(maxX, Math.max(minX, offset.x));
     }
 
     if (scaledHeight <= canvasSize.height) {
       // Center image vertically
       y = (canvasSize.height - scaledHeight) / 2;
     } else {
-      // Clamp so no empty space is shown
-      const minY = canvasSize.height - scaledHeight;
-      const maxY = 0;
-      y = Math.min(maxY, Math.max(offset.y, minY));
+      // For tall images, calculate the range needed to see all parts
+      const centerY = (canvasSize.height - scaledHeight) / 2; // This is negative
+      const maxY = -centerY; // To align top edge with canvas top (positive)
+      const minY = centerY; // To align bottom edge with canvas bottom (negative)
+      
+      y = Math.min(maxY, Math.max(minY, offset.y));
     }
 
     return { x, y };
@@ -144,8 +147,11 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       y: initialPanOffsetRef.current.y + deltaY,
     };
     
-    // Apply boundary constraints only when necessary (for performance)
-    if (zoomLevel > 1) {
+    // Apply boundary constraints when the image is larger than the canvas
+    const scaledWidth = image.width * initialScale * zoomLevel;
+    const scaledHeight = image.height * initialScale * zoomLevel;
+    
+    if (scaledWidth > canvasSize.width || scaledHeight > canvasSize.height) {
       newOffset = clampPanOffset(newOffset, image, canvasSize, initialScale, zoomLevel);
     }
     
