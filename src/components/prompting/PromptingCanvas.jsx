@@ -504,10 +504,7 @@ const PromptingCanvas = forwardRef(({
             <div className="font-medium mb-1">Polygon Prompts:</div>
             <div className="mb-1">Left-click to add points</div>
             <div className="mb-1">Double-click to finish</div>
-            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
-              <div>Pan: Alt + Drag or Middle Mouse</div>
-              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
-            </div>
+            
           </div>
         )}
 
@@ -516,10 +513,6 @@ const PromptingCanvas = forwardRef(({
           <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
             <div className="font-medium mb-1">Box Prompts:</div>
             <div className="mb-1">Click and drag to draw box</div>
-            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
-              <div>Pan: Alt + Drag or Middle Mouse</div>
-              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
-            </div>
           </div>
         )}
 

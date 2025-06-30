@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Trash2, Layers } from "lucide-react";
 
 const FinalMaskViewer = ({
@@ -11,6 +11,7 @@ const FinalMaskViewer = ({
   finalMask,
   selectedFinalMaskContour,
   zoomLevel,
+  zoomCenter,
   canvasImage,
   finalMaskCanvasRef,
   handleAddSelectedContoursToFinalMask,
@@ -22,14 +23,33 @@ const FinalMaskViewer = ({
   clearAllFinalMaskContours,
   setSelectedFinalMaskContour,
   setZoomLevel,
+  setZoomCenter,
   handleFinalMaskContourSelect,
   drawFinalMaskCanvas,
 }) => {
-  // Add panning state
+  // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
   const containerRef = useRef(null);
+
+  // Reset pan when zoom level reaches 1
+  useEffect(() => {
+    if (zoomLevel === 1) {
+      setPanOffset({ x: 0, y: 0 });
+    }
+  }, [zoomLevel]);
+
+  // Trigger canvas redraw when masks or image change (not on zoom changes)
+  useEffect(() => {
+    if (drawFinalMaskCanvas && canvasImage && finalMasks) {
+      setTimeout(() => {
+        drawFinalMaskCanvas();
+      }, 20);
+    }
+  }, [drawFinalMaskCanvas, canvasImage, finalMasks]);
+
+
 
   // Handle mouse events for panning
   const handleMouseDown = (e) => {
@@ -48,7 +68,7 @@ const FinalMaskViewer = ({
     }
   };
 
-  // Create a transformed event with adjusted coordinates
+  // Create a transformed event with adjusted coordinates (simplified for pan-only)
   const createTransformedEvent = (originalEvent) => {
     if (!containerRef.current || !finalMaskCanvasRef.current) {
       return originalEvent;
@@ -61,9 +81,9 @@ const FinalMaskViewer = ({
     const containerX = originalEvent.clientX - containerRect.left;
     const containerY = originalEvent.clientY - containerRect.top;
     
-    // Reverse the transform: subtract pan offset and divide by zoom
-    const transformedX = (containerX - panOffset.x) / zoomLevel;
-    const transformedY = (containerY - panOffset.y) / zoomLevel;
+    // Adjust for pan offset only (zoom is handled by canvas utilities)
+    const transformedX = containerX - panOffset.x;
+    const transformedY = containerY - panOffset.y;
     
     // Create a new event-like object with transformed coordinates
     return {
@@ -98,47 +118,21 @@ const FinalMaskViewer = ({
     setIsPanning(false);
   };
 
-  // Handle wheel for zoom
+  // Handle wheel for panning (zoom is handled by canvas utilities)
   const handleWheel = (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      
-      // Calculate zoom direction and factor
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoomLevel = Math.max(0.5, Math.min(5, zoomLevel * zoomFactor));
-      
-      if (newZoomLevel !== zoomLevel) {
-        // Get mouse position relative to container
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        
-        // Calculate how much to adjust pan offset to keep mouse point fixed
-        const scaleFactor = newZoomLevel / zoomLevel;
-        const containerCenterX = rect.width / 2;
-        const containerCenterY = rect.height / 2;
-        
-        // Calculate offset from center to mouse
-        const offsetX = mouseX - containerCenterX;
-        const offsetY = mouseY - containerCenterY;
-        
-        // Adjust pan offset to keep point under mouse fixed
-        const newPanOffset = {
-          x: panOffset.x + offsetX * (1 - scaleFactor),
-          y: panOffset.y + offsetY * (1 - scaleFactor)
-        };
-        
-        setZoomLevel(newZoomLevel);
-        setPanOffset(newPanOffset);
-      }
-    }
+    // Allow normal scroll behavior
+    // Zoom is handled internally by the canvas drawing utilities
   };
 
-  // Reset pan when zoom is reset
+  // Reset zoom and pan
   const handleResetZoom = (e) => {
+    e.preventDefault();
     e.stopPropagation();
     setSelectedFinalMaskContour(null);
     setZoomLevel(1);
+    if (setZoomCenter) {
+      setZoomCenter({ x: 0.5, y: 0.5 });
+    }
     setPanOffset({ x: 0, y: 0 });
   };
 
@@ -189,12 +183,12 @@ const FinalMaskViewer = ({
         onWheel={handleWheel}
         onContextMenu={(e) => e.preventDefault()} // Prevent context menu on right click
       >
-        {/* Panning instruction overlay */}
+        {/* Panning instruction overlay
         <div className="absolute top-2 left-2 bg-white bg-opacity-75 p-2 rounded shadow z-10 text-xs">
           <div>Pan: Alt + Drag, Middle Mouse, or Right Click</div>
-          <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
-          <div>Click contours to select</div>
-        </div>
+          <div>Click contours to focus and zoom</div>
+          {selectedFinalMaskContour && <div>Use +/- controls to manually adjust zoom</div>}
+        </div> */}
 
         {finalMasks.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -213,10 +207,9 @@ const FinalMaskViewer = ({
           </div>
         ) : (
           <>
-            {/* Canvas container with transform-based panning */}
+            {/* Canvas container with panning only (zoom handled by canvas utilities) */}
             <div style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
-              transformOrigin: 'center center',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
               width: '100%',
               height: '100%',
               position: 'relative'
@@ -228,62 +221,100 @@ const FinalMaskViewer = ({
               />
             </div>
 
-            {/* Zoom Controls - match the segmentation controls styling */}
-            {zoomLevel > 1 && (
-              <div className="absolute bottom-2 right-2 flex space-x-1 bg-white/95 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-gray-200">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setZoomLevel((prev) => Math.min(prev + 1, 5));
-                  }}
-                  className="p-1.5 rounded hover:bg-gray-100 transition-colors"
-                  title="Zoom In"
+            {/* Zoom Controls - only visible when a contour is selected */}
+            {selectedFinalMaskContour && (
+              <div className="absolute bottom-2 right-2 flex items-center space-x-1 bg-white/95 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-gray-200">
+              {/* Zoom level indicator */}
+              <span className="text-xs text-gray-600 px-1 font-mono">
+                {zoomLevel % 1 === 0 ? `${zoomLevel}x` : `${zoomLevel.toFixed(1)}x`}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Zoom in with 1x increments
+                  const newZoomLevel = Math.min(zoomLevel + 1, 6);
+                  setZoomLevel(newZoomLevel);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onMouseUp={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                className={`p-1.5 rounded transition-colors ${
+                  zoomLevel >= 6 
+                    ? 'text-gray-400 cursor-not-allowed' 
+                    : 'hover:bg-gray-100 cursor-pointer'
+                }`}
+                title="Zoom In"
+                disabled={zoomLevel >= 6}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                    />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (zoomLevel > 1) {
-                      setZoomLevel((prev) => prev - 1);
-                      if (zoomLevel === 2) {
-                        setSelectedFinalMaskContour(null);
-                        setZoomLevel(1);
-                        setPanOffset({ x: 0, y: 0 });
-                      }
-                    }
-                  }}
-                  className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  // Zoom out with 1x increments - no reset logic
+                  const newZoomLevel = Math.max(zoomLevel - 1, 1);
+                  setZoomLevel(newZoomLevel);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onMouseUp={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                                  className={`p-1.5 rounded transition-colors ${
+                    zoomLevel <= 1 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'hover:bg-gray-100 cursor-pointer'
+                  }`}
                   title="Zoom Out"
+                  disabled={zoomLevel <= 1}
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M20 12H4"
-                    />
-                  </svg>
-                </button>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20 12H4"
+                  />
+                </svg>
+              </button>
+              {zoomLevel > 1 && (
                 <button
                   onClick={handleResetZoom}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onMouseUp={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                   className="p-1.5 rounded hover:bg-gray-100 transition-colors"
                   title="Reset Zoom"
                 >
@@ -301,7 +332,8 @@ const FinalMaskViewer = ({
                     />
                   </svg>
                 </button>
-              </div>
+              )}
+            </div>
             )}
           </>
         )}
