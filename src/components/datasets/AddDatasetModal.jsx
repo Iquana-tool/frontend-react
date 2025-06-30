@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, } from 'react';
 import { useDataset } from '../../contexts/DatasetContext';
 import { X, Upload, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -115,7 +115,7 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
         } finally {
           uploadedCount++;
           console.log(`Uploaded ${uploadedCount}/${files.length} files`);
-          setCurrentProgress(prev => (uploadedCount));
+          setCurrentProgress(uploadedCount);
         }
       }
 
