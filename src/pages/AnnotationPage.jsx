@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDataset } from "../contexts/DatasetContext";
-import ImageViewerWithPrompting from "../components/prompting/ImageViewerWithPrompting";
+import ImageViewerWithPrompting from "../components/prompting";
 import { BugIcon, ArrowLeft } from "lucide-react";
 
 const AnnotationPage = () => {
