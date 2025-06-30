@@ -19,6 +19,7 @@ const CanvasRenderer = ({
   selectedContours,
   finalMasks,
   selectedFinalMaskContour,
+  forceRender,
   onCanvasRef
 }) => {
   const canvasRef = useRef(null);
@@ -139,7 +140,7 @@ const CanvasRenderer = ({
   // Redraw whenever the selectedFinalMaskContour changes
   useEffect(() => {
     redrawCanvas();
-  }, [image, canvasSize, initialScale, zoomLevel, panOffset, zoomCenter, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, selectedMask, selectedContours, finalMasks, selectedFinalMaskContour, redrawCanvas]);
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset, zoomCenter, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, selectedMask, selectedContours, finalMasks, selectedFinalMaskContour, forceRender, redrawCanvas]);
 
   return (
     <canvas

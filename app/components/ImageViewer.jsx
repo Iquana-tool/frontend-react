@@ -10,6 +10,7 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPromptClass, setCurrentPromptClass] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
   const [points, setPoints] = useState([]);
   const [pointsCount, setPointsCount] = useState([0, 0]);
@@ -18,9 +19,9 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
   const getImageCoordinates = (e) => {
     if (!containerRef.current) return { x: 0, y: 0, class: currentPromptClass };
     
-    const rect = containerRef.current.querySelector('div[style*="transform"]').getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) - panOffset.x) / zoom;
+    const y = ((e.clientY - rect.top) - panOffset.y) / zoom;
     
     return { x, y, class: currentPromptClass };
   };
@@ -44,13 +45,16 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
 
   const handleMouseMove = (e) => {
     if (isPanning) {
+      e.preventDefault();
       const deltaX = e.clientX - lastPanPoint.x;
       const deltaY = e.clientY - lastPanPoint.y;
       
+      setPanOffset(prev => ({
+        x: prev.x + deltaX,
+        y: prev.y + deltaY
+      }));
+      
       setLastPanPoint({ x: e.clientX, y: e.clientY });
-      containerRef.current.scrollLeft -= deltaX;
-      containerRef.current.scrollTop -= deltaY;
-      e.preventDefault();
       return;
     }
     
@@ -203,7 +207,7 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
       
       <div 
         ref={containerRef}
-        className="relative overflow-auto flex-1 border border-gray-300 rounded"
+        className="relative overflow-hidden flex-1 border border-gray-300 rounded"
         style={{ 
           cursor: isPanning ? 'grabbing' : 
                   (tool === 'pan' || tool === 'drag') ? 'grab' : 'crosshair',
@@ -227,7 +231,7 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
         </div>
         
         <div style={{
-          transform: `scale(${zoom})`,
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
           transformOrigin: 'top left',
           width: imageSize.width,
           height: imageSize.height,

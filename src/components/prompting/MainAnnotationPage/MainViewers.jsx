@@ -35,7 +35,8 @@ const MainViewers = ({
                        setZoomLevel,
                        handleFinalMaskContourSelect,
                        drawFinalMaskCanvas,
-                       onInstantSegmentationStateChange
+                       onInstantSegmentationStateChange,
+                       setZoomCenter
                      }) => {
   if (!selectedImage) {
     return (

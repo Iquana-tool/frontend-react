@@ -13,8 +13,6 @@ const PromptingCanvas = forwardRef(({
   selectedMask: selectedMaskProp,
   promptType,
   currentLabel,
-  zoomLevel: externalZoomLevel,
-  zoomCenter: externalZoomCenter,
   selectedContour,
   onContourSelect,
   onAddToFinalMask,
@@ -37,6 +35,7 @@ const PromptingCanvas = forwardRef(({
   const [activeTool, setActiveTool] = useState("point");
   const [selectedContours, setSelectedContours] = useState([]);
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
+  const [forceRender, setForceRender] = useState(0);
 
   // Initialize pan/zoom hook
   const panZoom = usePanZoom(image, canvasSize, initialScale);
@@ -108,44 +107,30 @@ const PromptingCanvas = forwardRef(({
     }
   }, [selectedMaskProp]);
 
-  // Update zoom level and center when external props change
-  useEffect(() => {
-    if (externalZoomLevel !== undefined && externalZoomLevel !== zoomLevel) {
-      setZoomParameters(externalZoomLevel, zoomCenter);
-    }
-  }, [externalZoomLevel, zoomLevel, zoomCenter, setZoomParameters]);
 
-  useEffect(() => {
-    if (externalZoomCenter !== undefined) {
-      setZoomParameters(zoomLevel, externalZoomCenter);
-    }
-  }, [externalZoomCenter, zoomLevel, setZoomParameters]);
 
   // Redraw function for canvas renderer
   const redrawCanvasCallback = useCallback((customPanOffset) => {
-    // This will be handled by the CanvasRenderer component
+    // Force a re-render by incrementing the counter
+    setForceRender(prev => prev + 1);
   }, []);
 
   // Expose methods to parent component via ref
   useImperativeHandle(ref, () => ({
     getPrompts: () => prompts,
     clearPrompts: () => {
-      console.log("PromptingCanvas: clearPrompts called");
       clearPrompts();
     },
     updateSelectedMask: (mask) => {
-      console.log("PromptingCanvas: updateSelectedMask called", mask?.id);
       if (!selectedMask || mask === null || selectedMask.id !== mask?.id) {
         setSelectedMask(mask);
       }
     },
     setActiveTool: (tool) => {
-      console.log("PromptingCanvas: setActiveTool called with", tool);
       setActiveTool(tool);
     },
     getSelectedContours: () => selectedContours,
     clearSelectedContours: () => {
-      console.log("PromptingCanvas: clearSelectedContours called");
       setSelectedContours([]);
     },
     setZoomParameters: setZoomParameters,
@@ -412,9 +397,12 @@ const PromptingCanvas = forwardRef(({
   // Event listener management
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
-    const handleCanvasWheel = (e) => handleWheel(e, redrawCanvasCallback);
+    const handleCanvasWheel = (e) => {
+      handleWheel(e, redrawCanvasCallback);
+    };
 
     // Attach canvas events
     canvas.addEventListener('mousedown', handleMouseDown);
@@ -480,6 +468,7 @@ const PromptingCanvas = forwardRef(({
           selectedContours={selectedContours}
           finalMasks={finalMasks}
           selectedFinalMaskContour={selectedFinalMaskContour}
+          forceRender={forceRender}
           onCanvasRef={(canvas) => { canvasRef.current = canvas; }}
         />
 
@@ -500,16 +489,53 @@ const PromptingCanvas = forwardRef(({
               </div>
               <span>Left-click for positive points</span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 mb-1">
               <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
                 <span className="text-white text-xs font-bold">−</span>
               </div>
               <span>Right-click for negative points</span>
             </div>
+            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
+              <div>Pan: Alt + Drag or Middle Mouse</div>
+              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
+            </div>
           </div>
         )}
 
+        {/* Polygon prompt instructions */}
+        {promptType === "polygon" && (
+          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
+            <div className="font-medium mb-1">Polygon Prompts:</div>
+            <div className="mb-1">Left-click to add points</div>
+            <div className="mb-1">Double-click to finish</div>
+            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
+              <div>Pan: Alt + Drag or Middle Mouse</div>
+              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
+            </div>
+          </div>
+        )}
 
+        {/* Box prompt instructions */}
+        {promptType === "box" && (
+          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
+            <div className="font-medium mb-1">Box Prompts:</div>
+            <div className="mb-1">Click and drag to draw box</div>
+            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
+              <div>Pan: Alt + Drag or Middle Mouse</div>
+              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
+            </div>
+          </div>
+        )}
+
+        {/* Drag tool instructions */}
+        {activeTool === "drag" && (
+          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
+            <div className="font-medium mb-1">Drag Tool Active:</div>
+            <div className="mb-1">Click and drag to pan</div>
+            <div className="mb-1">Ctrl/Cmd + Mouse Wheel to zoom</div>
+            <div className="text-gray-600">Switch tools to draw prompts</div>
+          </div>
+        )}
 
         {/* Segmentation Overlay */}
         <SegmentationOverlay
