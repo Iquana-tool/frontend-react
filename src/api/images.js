@@ -18,6 +18,21 @@ export const fetchImages = async (datasetId) => {
     }
 };
 
+// Fetch list of unannotated images
+export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
+    try {
+        if (!datasetId) {
+            throw new Error("Dataset ID is required");
+        }
+        const response = await fetch(
+            `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`
+        );
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}
+
 // Upload multiple images at once
 export const uploadImages = async (files, datasetId) => {
     const maxRetries = 2;

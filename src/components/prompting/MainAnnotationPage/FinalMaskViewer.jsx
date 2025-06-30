@@ -1,6 +1,7 @@
 import React, {useEffect} from "react";
 import { Trash2, Layers } from "lucide-react";
 import FinishButton from "./FinishButton"; // Adjust the import path as necessary
+import NextButton from "./NextButton";
 
 const FinalMaskViewer = ({
   segmentationMasks,
@@ -143,10 +144,11 @@ const FinalMaskViewer = ({
             )}
           </>
       </div>
-        <div className="viewer-controls flex place-items-end justify-end mt-2">
+        <div className="viewer-controls flex justify-end mt-2">
           <FinishButton
               maskId={finalMask?.id}
           />
+          <NextButton dataset_id={finalMask?.dataset_id} />
         </div>
     </div>
   );
