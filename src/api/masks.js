@@ -23,6 +23,26 @@ export const markMaskAsFinal = async (maskId) => {
     }
 }
 
+export const markMaskAsUnfinished = async (maskId) => {
+    try {
+        // Validate maskId
+        if (!maskId || typeof maskId !== "number") {
+            throw new Error("Invalid mask ID provided");
+        }
+
+        // Send request to mark the mask as unfinished
+        const response = await fetch(`${API_BASE_URL}/masks/unfinish_mask/${maskId}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}
+
 export const getMaskAnnotationStatus = async (maskId) => {
     try {
         // Validate maskId

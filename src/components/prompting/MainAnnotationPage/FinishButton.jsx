@@ -1,21 +1,24 @@
 import React, {useState, useEffect} from "react";
-import {markMaskAsFinal, getMaskAnnotationStatus} from "../../../api/masks";
+import {markMaskAsFinal, getMaskAnnotationStatus, markMaskAsUnfinished} from "../../../api/masks";
 
 const FinishButton = ({
-    mask_id, // Assuming mask is passed as a prop
+    maskId, // Assuming mask is passed as a prop
                       }) => {
+    console.log("FinishButton component rendered with maskId:", maskId);
     const [finished, setFinished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
+        if (maskId === undefined) {
+            console.warn("No mask ID provided, skipping status check.");
+            return;
+        } else {
+            console.log("Checking mask status for ID:", maskId);
+        }
         // Check if the mask is already marked as final
         const checkMaskStatus = async () => {
-            if (mask_id === undefined) {
-                console.warn("No mask ID provided, skipping status check.");
-                return;
-            }
             try {
-                const response = await getMaskAnnotationStatus(mask_id);
+                const response = await getMaskAnnotationStatus(maskId);
                 console.log("Mask status response:", response.status);
                 setFinished(response.status === "finished"); // Assuming response contains a boolean isFinal
             } catch (error) {
@@ -24,24 +27,45 @@ const FinishButton = ({
         };
         checkMaskStatus();
         setIsLoading(false);
-    }, [mask_id]);
+    }, [maskId]);
 
     const onClick = async () => {
-        if (mask_id === undefined){return}
         setIsLoading(true);
         // Simulate an async operation, e.g., saving data
-        await markMaskAsFinal(mask_id)
+        if (!finished){
+            console.log("Finish button triggered with unfinished mask. Marking mask with ID ", maskId, " as final.");
+            await markMaskAsFinal(maskId)
+                .then(() => {
+                    // Handle success, e.g., show a success message or redirect
+                    console.log("Mask marked as final successfully");
+                })
+                .catch((error) => {
+                    // Handle error, e.g., show an error message
+                    console.error("Error marking mask as final:", error);
+                    console.log("Mask id:", maskId);
+                })
+                .finally(() => {
+                    setIsLoading(false);
+                });
+            setFinished(true);
+        } else {
+            console.log("Finish button triggered with finished mask with id ", maskId, ". Marking mask as unfinished.");
+            await markMaskAsUnfinished(maskId)
             .then(() => {
-                // Handle success, e.g., show a success message or redirect
-                console.log("Mask marked as final successfully");
-            })
+                    // Handle success, e.g., show a success message or redirect
+                    console.log("Mask marked as unfinished successfully");
+                })
             .catch((error) => {
                 // Handle error, e.g., show an error message
-                console.error("Error marking mask as final:", error);
+                console.error("Error marking mask as unfinished:", error);
+                console.log("Mask id:", maskId);
             })
             .finally(() => {
                 setIsLoading(false);
             });
+            setFinished(false);
+        }
+
     };
 
     return (
