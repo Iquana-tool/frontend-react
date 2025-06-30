@@ -101,6 +101,7 @@ const MainViewers = ({
                 finalMask={finalMask}
                 selectedFinalMaskContour={selectedFinalMaskContour}
                 zoomLevel={zoomLevel}
+                zoomCenter={zoomCenter}
                 canvasImage={canvasImage}
                 finalMaskCanvasRef={finalMaskCanvasRef}
                 handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
@@ -112,6 +113,7 @@ const MainViewers = ({
                 clearAllFinalMaskContours={clearAllFinalMaskContours}
                 setSelectedFinalMaskContour={setSelectedFinalMaskContour}
                 setZoomLevel={setZoomLevel}
+                setZoomCenter={setZoomCenter}
                 handleFinalMaskContourSelect={handleFinalMaskContourSelect}
                 drawFinalMaskCanvas={drawFinalMaskCanvas}
             />

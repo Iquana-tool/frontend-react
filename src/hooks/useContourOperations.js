@@ -28,6 +28,37 @@ export const useContourOperations = () => {
     }
   }, []);
 
+  const fetchFinalMask = useCallback(async (imageId) => {
+    const targetImageId = imageId;
+
+    if (!targetImageId) {
+      return;
+    }
+
+    setFetchingFinalMask(true);
+    try {
+      const response = await api.getFinalMask(targetImageId);
+
+              if (response.success && response.mask) {
+        setFinalMask(response.mask);
+        setFinalMasks([response.mask]);
+
+        if (response.mask.contours) {
+          // Additional processing if needed
+        }
+      } else {
+        setFinalMask(null);
+        setFinalMasks([]);
+      }
+    } catch (error) {
+      console.error("Error fetching final mask:", error);
+      setFinalMask(null);
+      setFinalMasks([]);
+    } finally {
+      setFetchingFinalMask(false);
+    }
+  }, []);
+
   const handleAddSelectedContoursToFinalMask = useCallback(async (currentImage, selectedContours, bestMask) => {
     if (!currentImage || selectedContours.length === 0) {
       console.log("No contours selected or no current image");
@@ -90,7 +121,7 @@ export const useContourOperations = () => {
       console.error("Error adding selected contours to final mask:", error);
       throw new Error(`Error adding contours to final mask: ${error.message}`);
     }
-  }, []);
+  }, [fetchFinalMask]);
 
   const handleDeleteSelectedContours = useCallback((selectedMask, selectedContours, setSelectedMask, setBestMask, setSegmentationMasks) => {
     if (!selectedMask || selectedContours.length === 0) return;
@@ -116,37 +147,6 @@ export const useContourOperations = () => {
     }, 0);
 
     return "Selected contours deleted";
-  }, []);
-
-  const fetchFinalMask = useCallback(async (imageId) => {
-    const targetImageId = imageId;
-
-    if (!targetImageId) {
-      return;
-    }
-
-    setFetchingFinalMask(true);
-    try {
-      const response = await api.getFinalMask(targetImageId);
-
-              if (response.success && response.mask) {
-        setFinalMask(response.mask);
-        setFinalMasks([response.mask]);
-
-        if (response.mask.contours) {
-          // Additional processing if needed
-        }
-      } else {
-        setFinalMask(null);
-        setFinalMasks([]);
-      }
-    } catch (error) {
-      console.error("Error fetching final mask:", error);
-      setFinalMask(null);
-      setFinalMasks([]);
-    } finally {
-      setFetchingFinalMask(false);
-    }
   }, []);
 
   const handleDeleteFinalMaskContour = useCallback(async (contourId, currentImageId = null) => {
@@ -358,7 +358,7 @@ export const useContourOperations = () => {
       const xj = points[j][0], yj = points[j][1];
 
       const intersect =
-        yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+        (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
 
       if (intersect) inside = !inside;
     }
