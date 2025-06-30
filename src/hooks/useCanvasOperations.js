@@ -70,9 +70,7 @@ export const useCanvasOperations = () => {
     let centerX = (minX + maxX) / 2;
     let centerY = (minY + maxY) / 2;
 
-    // At the chosen zoom level, calculate what portion of the image is visible
-    const visibleWidth = 1.0 / optimalZoom;
-    const visibleHeight = 1.0 / optimalZoom;
+
 
     // Calculate the half-width and half-height of what we need to show
     const halfPaddedWidth = paddedWidth / 2;
@@ -327,7 +325,7 @@ export const useCanvasOperations = () => {
         setSelectedFinalMaskContour(null);
       }
     },
-    [showAnnotationViewer, zoomLevel, zoomCenter]
+    [showAnnotationViewer, zoomLevel, zoomCenter, calculateOptimalZoomLevel]
   );
 
   const handleFinalMaskCanvasClick = useCallback(
@@ -581,7 +579,7 @@ export const useCanvasOperations = () => {
         }
       }
     },
-    []
+    [calculateOptimalZoomLevel]
   );
 
   const toggleAnnotationPromptingMode = useCallback(

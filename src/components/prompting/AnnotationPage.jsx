@@ -33,6 +33,10 @@ const AnnotationPage = () => {
   const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
 
+  // Separate zoom state for annotation drawing area (prompting canvas)
+  const [annotationZoomLevel, setAnnotationZoomLevel] = useState(1);
+  const [annotationZoomCenter, setAnnotationZoomCenter] = useState({ x: 0.5, y: 0.5 });
+
   // Refs
   const promptingCanvasRef = useRef(null);
 
@@ -153,6 +157,42 @@ const AnnotationPage = () => {
     window.successMessageTimer = setTimeout(() => {
       setSuccessMessage(null);
     }, timeout);
+  }, []);
+
+  // Annotation zoom handlers (for ToolsPanel - only affects prompting canvas)
+  const handleAnnotationZoomIn = useCallback(() => {
+    setAnnotationZoomLevel((prev) => {
+      const newLevel = Math.min(prev * 1.2, 5);
+      // Ensure we have a center when zooming from 1 → something
+      if (newLevel !== 1 && (!annotationZoomLevel || annotationZoomLevel === 1)) {
+        setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+      }
+      return newLevel;
+    });
+    // Apply zoom to prompting canvas if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomIn) {
+      promptingCanvasRef.current.zoomIn();
+    }
+  }, [annotationZoomLevel]);
+
+  const handleAnnotationZoomOut = useCallback(() => {
+    setAnnotationZoomLevel((prev) => {
+      const newLevel = Math.max(prev / 1.2, 0.5);
+      return newLevel;
+    });
+    // Apply zoom to prompting canvas if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomOut) {
+      promptingCanvasRef.current.zoomOut();
+    }
+  }, []);
+
+  const handleAnnotationResetView = useCallback(() => {
+    setAnnotationZoomLevel(1);
+    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+    // Reset prompting canvas view if available
+    if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+      promptingCanvasRef.current.resetView();
+    }
   }, []);
 
   // Initialize component
@@ -553,6 +593,9 @@ const AnnotationPage = () => {
               zoomLevel={zoomLevel}
               setZoomLevel={setZoomLevel}
               setZoomCenter={setZoomCenter}
+              handleAnnotationZoomIn={handleAnnotationZoomIn}
+              handleAnnotationZoomOut={handleAnnotationZoomOut}
+              handleAnnotationResetView={handleAnnotationResetView}
           />
           <MainViewers
             selectedImage={selectedImage}
