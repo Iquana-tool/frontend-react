@@ -73,33 +73,45 @@ const FinishButton = ({
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-2 justify-center px-4 py-2 rounded-md text-white transition-colors ${
-                isLoading
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : (!finished
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-blue-600 hover:bg-blue-700"
-                    )
-                    }
-            }`}
+            className={`
+                group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
+                transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
+                shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
+                ${
+                    isLoading
+                        ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
+                        : (!finished
+                            ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-500/25 hover:shadow-emerald-500/40"
+                            : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/25 hover:shadow-amber-500/40"
+                        )
+                }
+                min-w-[120px] relative overflow-hidden
+                before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
+                hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
+            `}
             disabled={isLoading}
         >
             {isLoading ? (
                 <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Loading...</span>
+                    <span className="animate-pulse">Processing...</span>
                 </>
             ) : finished ? (
                 <>
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
                     <span>Edit Mask</span>
                 </>
             ) : (
                 <>
-                    <CheckCircle className="h-4 w-4" />
+                    <CheckCircle className="h-4 w-4 group-hover:scale-110 transition-transform duration-300" />
                     <span>Finish Mask</span>
                 </>
             )}
+            
+            {/* Shine effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
+                         transition-all duration-700 ease-out"></div>
         </button>
     );
 };
