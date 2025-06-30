@@ -27,9 +27,6 @@ const FinalMaskViewer = ({
   handleFinalMaskContourSelect,
   drawFinalMaskCanvas,
 }) => {
-  useEffect(() => {
-    console.log("Final Mask", finalMask);
-  }, [finalMask]);
   return (
     <div className="viewer-panel flex-1 w-full xl:min-w-[400px] 2xl:min-w-[450px]">
       <div className="viewer-header flex justify-between items-center">
@@ -148,7 +145,7 @@ const FinalMaskViewer = ({
           <FinishButton
               maskId={finalMask?.id}
           />
-          <NextButton dataset_id={finalMask?.dataset_id} />
+          <NextButton dataset_id={1} />
         </div>
     </div>
   );
