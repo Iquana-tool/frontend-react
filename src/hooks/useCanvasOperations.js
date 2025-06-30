@@ -8,8 +8,6 @@ export const useCanvasOperations = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [zoomCenter, setZoomCenter] = useState({ x: 0.5, y: 0.5 });
   const [showAnnotationViewer, setShowAnnotationViewer] = useState(false);
-  const [isZoomedContourRefinement, setIsZoomedContourRefinement] =
-    useState(false);
   const [annotationPromptingMode, setAnnotationPromptingMode] = useState(false);
   const [annotationPrompts, setAnnotationPrompts] = useState([]);
   const [previousViewState, setPreviousViewState] = useState(null);
@@ -584,7 +582,6 @@ export const useCanvasOperations = () => {
     setZoomLevel(1);
     setZoomCenter({ x: 0.5, y: 0.5 });
     setShowAnnotationViewer(false);
-    setIsZoomedContourRefinement(false);
     setAnnotationPromptingMode(false);
     setAnnotationPrompts([]);
     setPreviousViewState(null);
@@ -643,7 +640,6 @@ export const useCanvasOperations = () => {
     zoomLevel,
     zoomCenter,
     showAnnotationViewer,
-    isZoomedContourRefinement,
     annotationPromptingMode,
     annotationPrompts,
     previousViewState,
@@ -670,7 +666,6 @@ export const useCanvasOperations = () => {
     setZoomLevel,
     setZoomCenter,
     setShowAnnotationViewer,
-    setIsZoomedContourRefinement,
     setAnnotationPromptingMode,
     setAnnotationPrompts,
     setPreviousViewState,

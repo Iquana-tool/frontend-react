@@ -1,6 +1,6 @@
 //  This file exports all components related to the prompting functionality.
 
-import { default as ImageViewerWithPrompting } from './ImageViewerWithPrompting';
+import { default as ImageViewerWithPrompting } from './AnnotationPage';
 import { default as PromptingCanvas } from './PromptingCanvas';
 import { default as ToolsPanel } from './ToolsPanel';
 import { default as MaskGenerationPanel } from './MaskGenerationPanel';

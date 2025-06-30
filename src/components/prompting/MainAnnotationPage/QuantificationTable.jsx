@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import * as api from '../api';
-import { getLabelColor, getLabelColorByName } from '../utils/labelColors';
+import * as api from '../../../api';
+import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
 
 const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
   const [quantRows, setQuantRows] = useState([]);
