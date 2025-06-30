@@ -9,7 +9,6 @@ import {
 const FinishButton = ({
     maskId, // Assuming mask is passed as a prop
                       }) => {
-    console.log("FinishButton component rendered with maskId:", maskId);
     const [finished, setFinished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -17,8 +16,6 @@ const FinishButton = ({
         if (maskId === undefined) {
             console.warn("No mask ID provided, skipping status check.");
             return;
-        } else {
-            console.log("Checking mask status for ID:", maskId);
         }
         // Check if the mask is already marked as final
         const checkMaskStatus = async () => {
