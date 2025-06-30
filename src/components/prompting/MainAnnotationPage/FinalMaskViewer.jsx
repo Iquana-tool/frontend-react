@@ -204,7 +204,6 @@ const FinalMaskViewer = ({
             </div>
 
             {/* Zoom Controls - match the segmentation controls styling */}
-            {zoomLevel > 1 && (
               <div className="absolute bottom-2 right-2 flex space-x-1 bg-white/95 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-gray-200">
                 <button
                   onClick={(e) => {
@@ -277,8 +276,8 @@ const FinalMaskViewer = ({
                   </svg>
                 </button>
               </div>
-          </>
-      </div>
+            </>
+          </div>
         <div className="viewer-controls flex justify-end mt-2">
           <FinishButton
               maskId={finalMask?.id}
