@@ -345,14 +345,6 @@ const FinalMaskViewer = ({
 
       {/* Bottom spacing to match the button area height */}
       <div>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="bg-green-600 hover:bg-green-400 text-white font-bold py-2 px-4 rounded"
-          >
-            Finish
-          </button>
-        </div>
         <div className="viewer-controls flex justify-end mt-2">
           <FinishButton
             maskId={finalMask?.id}
