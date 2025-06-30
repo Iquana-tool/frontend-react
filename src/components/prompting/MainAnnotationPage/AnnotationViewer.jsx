@@ -48,8 +48,6 @@ const AnnotationViewer = ({
                       handleAddSelectedContoursToFinalMask
                   }
                   onClearSegmentationResults={handleClearSegmentationResults}
-                  zoomLevel={zoomLevel}
-                  zoomCenter={zoomCenter}
                   onInstantSegmentationStateChange={onInstantSegmentationStateChange}
                   selectedFinalMaskContour={selectedFinalMaskContour}
                   finalMasks={finalMasks}
