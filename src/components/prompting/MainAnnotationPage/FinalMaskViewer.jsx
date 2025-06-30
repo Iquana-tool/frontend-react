@@ -143,9 +143,11 @@ const FinalMaskViewer = ({
             )}
           </>
       </div>
+        <div className="viewer-controls flex place-items-end justify-end mt-2">
           <FinishButton
               maskId={finalMask?.id}
           />
+        </div>
     </div>
   );
 };

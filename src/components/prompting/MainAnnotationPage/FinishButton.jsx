@@ -1,5 +1,10 @@
 import React, {useState, useEffect} from "react";
 import {markMaskAsFinal, getMaskAnnotationStatus, markMaskAsUnfinished} from "../../../api/masks";
+import {
+    CheckCircle,
+    Pencil,
+    Loader2,
+} from "lucide-react";
 
 const FinishButton = ({
     maskId, // Assuming mask is passed as a prop
@@ -70,23 +75,36 @@ const FinishButton = ({
 
     return (
         <button
-        onClick={onClick}
-        className={`flex items-center justify-center px-4 py-2 rounded-md text-white transition-colors ${
-            isLoading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-        }`}
-        disabled={isLoading}
+            onClick={onClick}
+            className={`flex items-center gap-2 justify-center px-4 py-2 rounded-md text-white transition-colors ${
+                isLoading
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : (!finished
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    )
+                    }
+            }`}
+            disabled={isLoading}
         >
-        {isLoading ? (
-            <span>
-                Loading...
-            </span>
-        ) : (
-            <span>
-                {finished ? "Edit Mask" : "Finish Mask"}
-            </span>
-        )}
+            {isLoading ? (
+                <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading...</span>
+                </>
+            ) : finished ? (
+                <>
+                    <Pencil className="h-4 w-4" />
+                    <span>Edit Mask</span>
+                </>
+            ) : (
+                <>
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Finish Mask</span>
+                </>
+            )}
         </button>
     );
-}
+};
 
 export default FinishButton;
