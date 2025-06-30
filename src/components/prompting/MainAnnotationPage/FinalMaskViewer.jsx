@@ -143,9 +143,9 @@ const FinalMaskViewer = ({
             )}
           </>
       </div>
-      <FinishButton
-        maskId={finalMask.id}
-      />
+          <FinishButton
+              maskId={finalMask?.id}
+          />
     </div>
   );
 };
