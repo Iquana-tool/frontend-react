@@ -495,10 +495,6 @@ const PromptingCanvas = forwardRef(({
               </div>
               <span>Right-click for negative points</span>
             </div>
-            <div className="border-t border-gray-200 mt-2 pt-1 text-gray-600">
-              <div>Pan: Alt + Drag or Middle Mouse</div>
-              <div>Zoom: Ctrl/Cmd + Mouse Wheel</div>
-            </div>
           </div>
         )}
 

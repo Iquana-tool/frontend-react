@@ -219,8 +219,7 @@ const ImageViewer = ({ imageUrl, onSegmentation }) => {
         onMouseLeave={handleMouseUp}
       >
         <div className="absolute top-2 left-2 bg-white bg-opacity-75 p-2 rounded shadow z-10">
-          <div className="text-sm">Pan: Alt + Drag or Middle Mouse</div>
-          <div className="text-sm">Zoom: Mouse Wheel</div>
+      
           <div className="mt-1 text-xs text-gray-600 font-medium">
             Current Tool: {tool === 'pan' ? 'Pan' : tool === 'drag' ? 'Drag' : 'Draw'}
           </div>
