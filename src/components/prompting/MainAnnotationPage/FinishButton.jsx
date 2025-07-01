@@ -11,6 +11,7 @@ const FinishButton = ({
                       }) => {
     const [finished, setFinished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [showTooltip, setShowTooltip] = useState(false);
 
     useEffect(() => {
         if (maskId === undefined) {
@@ -71,9 +72,12 @@ const FinishButton = ({
     };
 
     return (
-        <button
-            onClick={onClick}
-            className={`
+        <div className="relative">
+            <button
+                onClick={onClick}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                className={`
                 group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
                 transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
                 shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
@@ -112,7 +116,19 @@ const FinishButton = ({
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
                          opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
                          transition-all duration-700 ease-out"></div>
-        </button>
+            </button>
+
+            {/* Hover tooltip */}
+            {showTooltip && (
+                <div className="absolute bottom-[60px] left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
+                    <span className="text-xs">
+                        {finished ? "Mark mask as incomplete to continue editing" : "Mark this mask as complete"}
+                    </span>
+                    {/* Arrow pointing down */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-gray-800"></div>
+                </div>
+            )}
+        </div>
     );
 };
 

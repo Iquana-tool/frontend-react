@@ -1,59 +1,90 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import { Typography } from "@mui/material";
+import { useParams } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
-import * as api from "../../api";
 
 // Custom Hooks
 import { useImageManagement } from "../../hooks/useImageManagement";
 import { useSegmentation } from "../../hooks/useSegmentation";
 import { useContourOperations } from "../../hooks/useContourOperations";
 import { useCanvasOperations } from "../../hooks/useCanvasOperations";
+import { useAnnotationState } from "../../hooks/useAnnotationState";
+import { useAnnotationZoom } from "../../hooks/useAnnotationZoom";
+import { useAnnotationHandlers } from "../../hooks/useAnnotationHandlers";
+import { useImageNavigation } from "../../hooks/useImageNavigation";
+
+// Utilities
+import {
+  exportQuantificationsAsCsv,
+  createSaveMaskHandler,
+  createSuccessMessageHandler,
+  createFinalMaskContourWrappers,
+} from "../../utils/annotationUtils";
 
 // Components
 import StatusBar from "./MainAnnotationPage/StatusBar";
 import MainViewers from "./MainAnnotationPage/MainViewers";
-import Sidebar from "./Sidebar/Sidebar"; // Adjust path as necessary
+import Sidebar from "./Sidebar/Sidebar";
+import QuantificationTable from "./MainAnnotationPage/QuantificationTable";
+import ToolsPanel from "./MainAnnotationPage/ToolsPanel";
+import HelpSection from "./HelpSection";
 
 // Styles
 import "./AnnotationPage.css";
-import QuantificationTable from "./MainAnnotationPage/QuantificationTable";
-import ToolsPanel from "./MainAnnotationPage/ToolsPanel";
 
-const AnnotationPage = () => {
+const AnnotationPage = ({ initialImageId = null }) => {
   const { currentDataset } = useDataset();
-
-  // UI State
-  const [promptType, setPromptType] = useState("point");
-  const [currentLabel, setCurrentLabel] = useState(null);
-  const [viewMode, setViewMode] = useState("grid");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [successMessage, setSuccessMessage] = useState(null);
-  const [showSaveMaskDialog, setShowSaveMaskDialog] = useState(false);
-  const [, setSavingMaskIndex] = useState(null);
-  const [saveMaskLabel, setSaveMaskLabel] = useState("coral");
-  const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
-
-  // Separate zoom state for annotation drawing area (prompting canvas)
-  const [annotationZoomLevel, setAnnotationZoomLevel] = useState(1);
-  const [annotationZoomCenter, setAnnotationZoomCenter] = useState({ x: 0.5, y: 0.5 });
+  const { datasetId } = useParams();
 
   // Refs
   const promptingCanvasRef = useRef(null);
 
-  // Instant Segmentation State
-  const [instantSegmentationState, setInstantSegmentationState] = useState({
-    isInstantSegmentationEnabled: false,
-    isInstantSegmenting: false,
-    shouldSuppressLoadingModal: false
-  });
-
-  const [labelOptions, setLabelOptions] = useState({});
-
   // Custom Hooks
-  const imageManagement = useImageManagement();
-  const segmentation = useSegmentation();
+  const annotationState = useAnnotationState();
+  const annotationZoom = useAnnotationZoom();
   const contourOps = useContourOperations();
+  const imageManagement = useImageManagement(contourOps.fetchFinalMask);
+  const segmentation = useSegmentation();
   const canvasOps = useCanvasOperations();
+
+  // Destructure state
+  const {
+    promptType,
+    setPromptType,
+    currentLabel,
+    setCurrentLabel,
+    viewMode,
+    setViewMode,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    successMessage,
+    setSuccessMessage,
+    showSaveMaskDialog,
+    setShowSaveMaskDialog,
+    savingMaskIndex,
+    setSavingMaskIndex,
+    saveMaskLabel,
+    setSaveMaskLabel,
+    customSaveMaskLabel,
+    setCustomSaveMaskLabel,
+    isTransitioning,
+    setIsTransitioning,
+    labelOptions,
+    setLabelOptions,
+    instantSegmentationState,
+    setInstantSegmentationState,
+  } = annotationState;
+
+  const {
+    annotationZoomLevel,
+    setAnnotationZoomLevel,
+    annotationZoomCenter,
+    setAnnotationZoomCenter,
+    resetZoomStates,
+    handleAnnotationZoomIn,
+    handleAnnotationZoomOut,
+    handleAnnotationResetView,
+  } = annotationZoom;
 
   // Destructure hook returns for easier access
   const {
@@ -64,7 +95,7 @@ const AnnotationPage = () => {
     loading: imageLoading,
     error: imageError,
     fetchImagesFromAPI,
-    handleImageSelect,
+    handleImageSelect: originalHandleImageSelect,
     handleFileUpload,
     resetImageState,
     setError: setImageError,
@@ -113,9 +144,6 @@ const AnnotationPage = () => {
     finalMaskCanvasRef,
     drawAnnotationCanvas,
     drawFinalMaskCanvas,
-    handleAnnotationCanvasClick: canvasAnnotationClick,
-    handleFinalMaskCanvasClick: canvasFinalMaskClick,
-    handleFinalMaskContourSelect: canvasFinalMaskContourSelect,
     resetCanvasState,
     setZoomLevel,
     setZoomCenter,
@@ -124,99 +152,138 @@ const AnnotationPage = () => {
   // Combined error state
   const error = imageError;
   const setError = setImageError;
-  const loading = imageLoading || isSegmenting || fetchingFinalMask;
 
-  // Fetch labels from backend - Note: This is also handled by LabelSelector
-  // Consider removing this if LabelSelector handles all label management
-  const fetchLabels = useCallback(async () => {
-    if (!currentDataset) {
-      return;
-    }
+  // Create utility functions
+  const setSuccessMessageWithTimeout = createSuccessMessageHandler(setSuccessMessage);
 
-    try {
-      const labels = await api.fetchLabels(currentDataset.id);
-      if (labels && labels.length > 0) {
-        const formattedLabels = labels.map((label) => ({
-          id: label.id,
-          name: label.name,
-        }));
-        setLabelOptions(formattedLabels);
-      }
-    } catch (error) {
-      console.error("Failed to fetch labels:", error);
-    }
-  }, [currentDataset]);
+  const resetZoomStatesWrapper = useCallback(() => {
+    resetZoomStates(setZoomLevel, setZoomCenter, setSelectedFinalMaskContour, promptingCanvasRef);
+  }, [resetZoomStates, setZoomLevel, setZoomCenter, setSelectedFinalMaskContour]);
 
-  // Utility functions
-  const setSuccessMessageWithTimeout = useCallback((message, timeout = 5000) => {
-    setSuccessMessage(message);
-    if (window.successMessageTimer) {
-      clearTimeout(window.successMessageTimer);
-    }
-    window.successMessageTimer = setTimeout(() => {
-      setSuccessMessage(null);
-    }, timeout);
-  }, []);
+  // Navigation hook
+  const imageNavigation = useImageNavigation({
+    originalHandleImageSelect,
+    resetSegmentationState,
+    resetContourState,
+    resetCanvasState,
+    resetZoomStates: resetZoomStatesWrapper,
+    setIsTransitioning,
+    setError,
+  });
 
-  // Annotation zoom handlers (for ToolsPanel - only affects prompting canvas)
-  const handleAnnotationZoomIn = useCallback(() => {
-    setAnnotationZoomLevel((prev) => {
-      const newLevel = Math.min(prev * 1.2, 5);
-      // Ensure we have a center when zooming from 1 → something
-      if (newLevel !== 1 && (!annotationZoomLevel || annotationZoomLevel === 1)) {
-        setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
-      }
-      
-      // Sync with final mask view if a contour is selected
-      if (selectedFinalMaskContour) {
-        setZoomLevel(newLevel);
-      }
-      
-      return newLevel;
-    });
-    // Apply zoom to prompting canvas if available
-    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomIn) {
-      promptingCanvasRef.current.zoomIn();
-    }
-  }, [annotationZoomLevel, selectedFinalMaskContour, setZoomLevel]);
+  // Handlers hook
+  const handlers = useAnnotationHandlers({
+    currentDataset,
+    selectedImage,
+    setLabelOptions,
+    resetImageState,
+    resetSegmentationState,
+    resetContourState,
+    resetCanvasState,
+    setPromptType,
+    setCurrentLabel,
+    selectedContours,
+    setSelectedContours,
+    bestMask,
+    finalMasks,
+    finalMask,
+    selectedFinalMaskContour,
+    setSelectedFinalMaskContour,
+    setZoomLevel,
+    setZoomCenter,
+    findMatchingContour,
+    isPointInContour,
+    drawAnnotationCanvas,
+    imageObject,
+    canvasOps,
+    setError,
+    segmentationPromptingComplete,
+    currentLabel,
+    zoomLevel,
+    zoomCenter,
+    setSuccessMessageWithTimeout,
+    contourAddToFinalMask,
+    contourDeleteSelected,
+    selectedMask,
+    setSelectedMask,
+    setBestMask,
+    setSegmentationMasks,
+    fetchFinalMask,
+    promptingCanvasRef,
+  });
 
-  const handleAnnotationZoomOut = useCallback(() => {
-    setAnnotationZoomLevel((prev) => {
-      const newLevel = Math.max(prev / 1.2, 0.5);
-      
-      // Sync with final mask view if a contour is selected
-      if (selectedFinalMaskContour) {
-        setZoomLevel(newLevel);
-      }
-      
-      return newLevel;
-    });
-    // Apply zoom to prompting canvas if available
-    if (promptingCanvasRef.current && promptingCanvasRef.current.zoomOut) {
-      promptingCanvasRef.current.zoomOut();
-    }
-  }, [selectedFinalMaskContour, setZoomLevel]);
+  // Create wrapper functions for final mask contour operations
+  const { handleDeleteFinalMaskContourWrapper, clearAllFinalMaskContoursWrapper } =
+    createFinalMaskContourWrappers(
+      selectedImage,
+      setError,
+      handleDeleteFinalMaskContour,
+      fetchFinalMask,
+      setSuccessMessageWithTimeout,
+      clearAllFinalMaskContours,
+      finalMask
+    );
 
-  const handleAnnotationResetView = useCallback(() => {
-    setAnnotationZoomLevel(1);
-    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
-    
-    // Also reset the final mask view zoom to keep them synced
-    setZoomLevel(1);
-    setZoomCenter({ x: 0.5, y: 0.5 });
-    setSelectedFinalMaskContour(null);
-    
-    // Reset prompting canvas view if available
-    if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
-      promptingCanvasRef.current.resetView();
-    }
-  }, [setZoomLevel, setZoomCenter, setSelectedFinalMaskContour]);
+  // Save mask handler
+  const saveSelectedMask = createSaveMaskHandler(
+    selectedMask,
+    customSaveMaskLabel,
+    saveMaskLabel,
+    setError,
+    setSuccessMessageWithTimeout,
+    setShowSaveMaskDialog,
+    setSavingMaskIndex,
+    setSaveMaskLabel,
+    setCustomSaveMaskLabel
+  );
+
+  // Enhanced wrapper functions with zoom parameters
+  const handleAnnotationZoomInWrapper = useCallback(() => {
+    handleAnnotationZoomIn(selectedFinalMaskContour, setZoomLevel, promptingCanvasRef);
+  }, [handleAnnotationZoomIn, selectedFinalMaskContour, setZoomLevel]);
+
+  const handleAnnotationZoomOutWrapper = useCallback(() => {
+    handleAnnotationZoomOut(selectedFinalMaskContour, setZoomLevel, promptingCanvasRef);
+  }, [handleAnnotationZoomOut, selectedFinalMaskContour, setZoomLevel]);
+
+  const handleAnnotationResetViewWrapper = useCallback(() => {
+    handleAnnotationResetView(setZoomLevel, setZoomCenter, setSelectedFinalMaskContour, promptingCanvasRef);
+  }, [handleAnnotationResetView, setZoomLevel, setZoomCenter, setSelectedFinalMaskContour]);
+
+  const handleFinalMaskContourSelectWrapper = useCallback((mask, contourIndex) => {
+    handlers.handleFinalMaskContourSelect(mask, contourIndex, setAnnotationZoomLevel, setAnnotationZoomCenter);
+  }, [handlers.handleFinalMaskContourSelect, setAnnotationZoomLevel, setAnnotationZoomCenter]);
+
+  const handleAnnotationCanvasClickWrapper = useCallback((event) => {
+    handlers.handleAnnotationCanvasClick(event, handleFinalMaskContourSelectWrapper);
+  }, [handlers.handleAnnotationCanvasClick, handleFinalMaskContourSelectWrapper]);
+
+  const handleFinalMaskCanvasClickWrapper = useCallback((event) => {
+    handlers.handleFinalMaskCanvasClick(event, handleFinalMaskContourSelectWrapper);
+  }, [handlers.handleFinalMaskCanvasClick, handleFinalMaskContourSelectWrapper]);
+
+  const handleResetWrapper = useCallback(() => {
+    handlers.handleReset(setAnnotationZoomLevel, setAnnotationZoomCenter);
+  }, [handlers.handleReset, setAnnotationZoomLevel, setAnnotationZoomCenter]);
+
+  const handleFileUploadWrapper = useCallback((e) => {
+    imageNavigation.handleFileUploadWrapper(e, handleFileUpload);
+  }, [imageNavigation.handleFileUploadWrapper, handleFileUpload]);
+
+  // Enhanced draw functions that pass proper parameters
+  const drawAnnotationCanvasWrapper = useCallback(() => {
+    drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour);
+  }, [drawAnnotationCanvas, bestMask, imageObject, selectedContours, selectedFinalMaskContour]);
+
+  const drawFinalMaskCanvasWrapper = useCallback(() => {
+    drawFinalMaskCanvas(imageObject, finalMasks, selectedFinalMaskContour);
+  }, [drawFinalMaskCanvas, imageObject, finalMasks, selectedFinalMaskContour]);
 
   // Initialize component
   useEffect(() => {
     if (currentDataset) {
       fetchImagesFromAPI();
-      fetchLabels();
+      handlers.fetchLabels();
     }
 
     // Add CSS animations
@@ -239,193 +306,36 @@ const AnnotationPage = () => {
       resetContourState();
       resetCanvasState();
     };
-  }, [currentDataset, fetchImagesFromAPI, fetchLabels, resetCanvasState, resetContourState, resetImageState, resetSegmentationState]);
+  }, [currentDataset, fetchImagesFromAPI, handlers, handlers.fetchLabels, resetCanvasState, resetContourState, resetImageState, resetSegmentationState]);
 
-  // Enhanced prompting complete handler
-  const handlePromptingComplete = useCallback(async (prompts, promptType) => {
-    if (!selectedImage || !selectedImage) {
-      setError("No image selected for segmentation");
-      return;
-    }
-
-    try {
-      const result = await segmentationPromptingComplete(
-        prompts,
-        promptType,
-        selectedImage,
-        currentLabel,
-        false,
-        zoomLevel,
-        zoomCenter,
-          imageObject,
-        selectedContours,
-        bestMask,
-        finalMask
-      );
-
-      if (result) {
-        // Set prompt type to select after successful segmentation
-        setPromptType("select");
-        if (promptingCanvasRef.current) {
-          promptingCanvasRef.current.setActiveTool("select");
-        }
-
-        // Handle zoom state restoration if needed
-        if (result.zoomState && result.zoomState.level && result.zoomState.center) {
-          setTimeout(() => {
-            setZoomLevel(result.zoomState.level);
-            if (promptingCanvasRef.current) {
-              promptingCanvasRef.current.setZoomParameters(
-                result.zoomState.level,
-                result.zoomState.center
-              );
-            }
-          }, 100);
-        }
-
-        setSuccessMessageWithTimeout("Segmentation complete!");
-      }
-    } catch (error) {
-      console.error("Segmentation failed:", error);
-      setError(error.message);
-    }
-  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel]);
-
-  // Enhanced contour operations
-  const handleAddSelectedContoursToFinalMask = useCallback(async () => {
-    if (!selectedImage || selectedContours.length === 0) {
-      setError("No contours selected or no current image");
-      return;
-    }
-
-    try {
-      const result = await contourAddToFinalMask(selectedImage, selectedContours, bestMask);
-      if (result.success) {
-        setSuccessMessageWithTimeout(result.message);
-      }
-    } catch (error) {
-      setError(error.message);
-    }
-  }, [selectedImage, selectedContours, setError, contourAddToFinalMask, bestMask, setSuccessMessageWithTimeout]);
-
-  const handleDeleteSelectedContours = useCallback(() => {
-    try {
-      const message = contourDeleteSelected(
-        selectedMask,
-        selectedContours,
-        setSelectedMask,
-        setBestMask,
-        setSegmentationMasks
-      );
-      if (message) {
-        setSuccessMessageWithTimeout(message);
-      }
-    } catch (error) {
-      setError(error.message);
-    }
-  }, [contourDeleteSelected, selectedMask, selectedContours, setSelectedMask, setBestMask, setSegmentationMasks, setSuccessMessageWithTimeout, setError]);
-
-  const handleFinalMaskContourSelect = useCallback((mask, contourIndex) => {
-    // Check if we're deselecting the same contour
-    if (
-      selectedFinalMaskContour &&
-      selectedFinalMaskContour.maskId === mask.id &&
-      selectedFinalMaskContour.contourIndex === contourIndex
-    ) {
-      // Reset both zoom states when deselecting
-      setAnnotationZoomLevel(1);
-      setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
-      
-      // Reset prompting canvas view if available
-      if (promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
-        promptingCanvasRef.current.resetView();
-      }
-    } else {
-      // First, calculate the optimal zoom for the contour so we can sync both views
-      const contour = mask.contours[contourIndex];
-      if (contour && contour.x && contour.y && contour.x.length > 0) {
-        // Use the same calculateOptimalZoomLevel function from canvas operations
-        const { calculateOptimalZoomLevel } = canvasOps;
-        const { zoomLevel: optimalZoom, centerX, centerY } = calculateOptimalZoomLevel(contour);
-        
-        // Sync the annotation drawing area zoom state
-        setAnnotationZoomLevel(optimalZoom);
-        setAnnotationZoomCenter({ x: centerX, y: centerY });
-        
-        // Also apply zoom to the prompting canvas if available
-        if (promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
-          promptingCanvasRef.current.setZoomParameters(optimalZoom, { x: centerX, y: centerY });
+  // Handle initial image selection from URL
+  useEffect(() => {
+    if (initialImageId && availableImages.length > 0) {
+      // Check if we need to switch to a different image
+      if (selectedImageId !== initialImageId) {
+        const targetImage = availableImages.find(img => img.id === initialImageId);
+        if (targetImage) {
+          // Set transitioning state for URL-triggered changes too
+          setIsTransitioning(true);
+          
+          // Clear image-specific state for cleaner transition
+          resetSegmentationState();
+          resetContourState();
+          resetCanvasState();
+          
+          // Reset zoom states to ensure clean transition
+          resetZoomStatesWrapper();
+          
+          // Use original handler to avoid circular dependency with URL updates
+          originalHandleImageSelect(targetImage).finally(() => {
+            setIsTransitioning(false);
+          });
+        } else {
+          console.warn(`Image with ID ${initialImageId} not found in available images`);
         }
       }
     }
-
-    // Then call the original final mask contour select function
-    canvasFinalMaskContourSelect(
-      mask,
-      contourIndex,
-      setSelectedFinalMaskContour,
-      setZoomCenter,
-      setZoomLevel,
-      setSelectedContours,
-      bestMask,
-      findMatchingContour,
-      (bMask, cImage, sContours, sFinalMaskContour) =>
-        drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour),
-        imageObject,
-      selectedFinalMaskContour
-    );
-  }, [selectedFinalMaskContour, canvasOps, canvasFinalMaskContourSelect, setSelectedFinalMaskContour, setZoomCenter, setZoomLevel, setSelectedContours, bestMask, findMatchingContour, imageObject, drawAnnotationCanvas, setAnnotationZoomLevel, setAnnotationZoomCenter, promptingCanvasRef]);
-
-  // Canvas event handlers with proper parameter passing
-  const handleAnnotationCanvasClick = useCallback((event) => {
-    canvasAnnotationClick(
-      event,
-      bestMask,
-      selectedContours,
-      setSelectedContours,
-      setSelectedFinalMaskContour,
-      setZoomLevel,
-      setZoomCenter,
-      finalMasks,
-      findMatchingContour,
-      handleFinalMaskContourSelect,
-      isPointInContour
-    );
-  }, [canvasAnnotationClick, bestMask, selectedContours, setSelectedContours, setSelectedFinalMaskContour, setZoomLevel, setZoomCenter, finalMasks, findMatchingContour, handleFinalMaskContourSelect, isPointInContour]);
-
-  const handleFinalMaskCanvasClick = useCallback((event) => {
-    canvasFinalMaskClick(
-      event,
-      finalMasks,
-      selectedFinalMaskContour,
-      setSelectedFinalMaskContour,
-      setZoomLevel,
-      setSelectedContours,
-        imageObject,
-      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour),
-      handleFinalMaskContourSelect,
-      isPointInContour
-    );
-  }, [canvasFinalMaskClick, finalMasks, selectedFinalMaskContour, setSelectedFinalMaskContour, setZoomLevel, setSelectedContours, imageObject, handleFinalMaskContourSelect, isPointInContour, drawAnnotationCanvas, bestMask, selectedContours]);
-
-  const handleReset = useCallback(() => {
-    resetImageState();
-    resetSegmentationState();
-    resetContourState();
-    resetCanvasState();
-    setPromptType("point");
-    setCurrentLabel(null);
-    // Reset annotation zoom states
-    setAnnotationZoomLevel(1);
-    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
-  }, [resetImageState, resetSegmentationState, resetContourState, resetCanvasState]);
-
-  const handleRunNewSegmentation = useCallback(() => {
-    if (promptingCanvasRef && promptingCanvasRef.current) {
-      promptingCanvasRef.current.clearPrompts();
-      setSuccessMessageWithTimeout("Add new prompts to improve segmentation", 3000);
-    }
-  }, [setSuccessMessageWithTimeout]);
+  }, [initialImageId, availableImages, selectedImageId, originalHandleImageSelect, resetSegmentationState, resetContourState, resetCanvasState, resetZoomStatesWrapper, setIsTransitioning]);
 
   // Load final mask when image changes
   useEffect(() => {
@@ -433,23 +343,6 @@ const AnnotationPage = () => {
       fetchFinalMask(selectedImage.id);
     }
   }, [selectedImage, fetchFinalMask]);
-
-  // Handle file upload wrapper
-  const handleFileUploadWrapper = useCallback((e) => {
-    const file = e.target.files[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  }, [handleFileUpload]);
-
-  // Enhanced draw functions that pass proper parameters
-  const drawAnnotationCanvasWrapper = useCallback(() => {
-    drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour);
-  }, [drawAnnotationCanvas, bestMask, imageObject, selectedContours, selectedFinalMaskContour]);
-
-  const drawFinalMaskCanvasWrapper = useCallback(() => {
-    drawFinalMaskCanvas(imageObject, finalMasks, selectedFinalMaskContour);
-  }, [drawFinalMaskCanvas, imageObject, finalMasks, selectedFinalMaskContour]);
 
   // Draw final mask canvas when final mask data changes
   useEffect(() => {
@@ -460,8 +353,7 @@ const AnnotationPage = () => {
     }
   }, [finalMasks, imageObject, drawFinalMaskCanvasWrapper]);
 
-    // Draw annotation canvas automatically when data changes (but not for zoom-triggered updates)
-  // Zoom-triggered updates are handled manually in handleFinalMaskContourSelect
+  // Draw annotation canvas automatically when data changes (but not for zoom-triggered updates)
   useEffect(() => {
     if (bestMask && imageObject) {
       // Only auto-redraw if zoom level is 1 (not zoomed) or if it's an initial load
@@ -472,16 +364,6 @@ const AnnotationPage = () => {
       }
     }
   }, [bestMask, imageObject, selectedContours, selectedFinalMaskContour, drawAnnotationCanvasWrapper, zoomLevel]);
-
-  // Show annotation viewer and draw canvas when segmentation completes
-  useEffect(() => {
-    if (bestMask && imageObject && !showAnnotationViewer) {
-      // Don't automatically show the annotation viewer
-      // Let users manually toggle it when they want to see the detailed contours
-      // This allows them to continue drawing prompts in the main area
-      console.log("Segmentation completed with bestMask, but keeping annotation viewer hidden for continued prompting");
-    }
-  }, [bestMask, imageObject, showAnnotationViewer]);
 
   // Update PromptingCanvas when segmentation completes
   useEffect(() => {
@@ -498,103 +380,6 @@ const AnnotationPage = () => {
     }
   }, [bestMask, showAnnotationViewer]);
 
-  // Save mask functionality
-  const saveSelectedMask = useCallback(async () => {
-    if (!selectedMask) {
-      setError("No mask selected to save");
-      return;
-    }
-
-    const label = customSaveMaskLabel || saveMaskLabel;
-
-    if (!label || label.trim() === "") {
-      setError("Please provide a valid label for the mask");
-      return;
-    }
-
-    try {
-      // Here you would implement the actual save functionality
-      // For now, we'll just show a success message
-      setSuccessMessageWithTimeout(`Mask saved successfully with label: ${label}`);
-      setShowSaveMaskDialog(false);
-      setSavingMaskIndex(null);
-      setSaveMaskLabel("coral");
-      setCustomSaveMaskLabel("");
-    } catch (error) {
-      console.error("Error saving mask:", error);
-      setError("Error saving mask: " + (error.message || "Unknown error"));
-    }
-  }, [selectedMask, customSaveMaskLabel, saveMaskLabel, setError, setSuccessMessageWithTimeout]);
-
-  // Wrapper for handleDeleteFinalMaskContour that includes current image context
-  const handleDeleteFinalMaskContourWrapper = useCallback(async (contourId) => {
-    if (!selectedImage) {
-      setError("No current image selected");
-      return;
-    }
-
-    try {
-      const result = await handleDeleteFinalMaskContour(contourId);
-      if (result && result.success) {
-        // Refresh the final mask after deletion
-        await fetchFinalMask(selectedImage.id);
-        setSuccessMessageWithTimeout(result.message);
-      }
-    } catch (error) {
-      setError(error.message);
-    }
-  }, [selectedImage, setError, handleDeleteFinalMaskContour, fetchFinalMask, setSuccessMessageWithTimeout]);
-
-  // Wrapper for clearAllFinalMaskContours that includes current image context
-  const clearAllFinalMaskContoursWrapper = useCallback(async () => {
-    if (!selectedImage || !finalMask) {
-      setError("No current image or final mask available");
-      return;
-    }
-
-    try {
-      const result = await clearAllFinalMaskContours(finalMask, selectedImage);
-      if (result && result.success) {
-        setSuccessMessageWithTimeout(result.message);
-      }
-    } catch (error) {
-      setError(error.message);
-    }
-  }, [selectedImage, finalMask, setError, clearAllFinalMaskContours, setSuccessMessageWithTimeout]);
-
-  // Export quantifications as CSV
-  const exportQuantificationsAsCsv = useCallback((masks) => {
-    if (!masks || masks.length === 0) return;
-
-    // Prepare CSV header
-    let csvContent = "ID,Label,Area,Perimeter,Circularity,Confidence\n";
-
-    // Add data for each mask
-    masks.forEach((mask, index) => {
-      const q = mask.quantifications || {};
-      const row = [
-        index + 1,
-        mask.label || "unlabeled",
-        q.area?.toFixed(2) || 0,
-        q.perimeter?.toFixed(2) || 0,
-        q.circularity?.toFixed(2) || 0,
-        (mask.quality * 100).toFixed(2) || 0,
-      ].join(",");
-      csvContent += row + "\n";
-    });
-
-    // Create and trigger download
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "quantifications.csv");
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, []);
-
   return (
     <div className="w-full">
       {/* Status Bar Component */}
@@ -603,54 +388,49 @@ const AnnotationPage = () => {
         setError={setError}
         successMessage={successMessage}
         setSuccessMessage={setSuccessMessage}
-        loading={loading}
+        loading={imageLoading || isSegmenting || fetchingFinalMask || isTransitioning}
         isSegmenting={isSegmenting}
         selectedModel={selectedModel}
         suppressLoadingModal={instantSegmentationState.shouldSuppressLoadingModal}
       />
-      <div
-        // Adjusted grid classes
-        className={`grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 mb-6`} // Use auto for sidebar width, 1fr for main content
-      >
+      
+      <div className={`grid grid-cols-1 md:grid-cols-[auto_1fr] gap-4 mb-6`}>
         {/* Sidebar Component */}
         <Sidebar
           selectedImage={selectedImage}
           selectedImageId={selectedImageId}
           availableImages={availableImages}
-          loading={loading}
+          loading={imageLoading || isSegmenting || fetchingFinalMask || isTransitioning}
           error={error}
           viewMode={viewMode}
           setViewMode={setViewMode}
           handleFileUpload={handleFileUploadWrapper}
-          handleImageSelect={handleImageSelect}
+          handleImageSelect={imageNavigation.handleImageSelect}
           selectedModel={selectedModel}
           handleModelChange={handleModelChange}
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
           currentDataset={currentDataset}
         />
-        <div
-            className={`
-                bg-white p-4 rounded-lg shadow-sm border border-gray-200
-                ${isSidebarCollapsed ? "w-auto" : ""} // Push main content when sidebar is collapsed
-              `}
-        >
+        
+        <div className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 ${isSidebarCollapsed ? "w-auto" : ""}`}>
           {/* Tools Panel Component */}
           <ToolsPanel
-              promptType={promptType}
-              setPromptType={setPromptType}
-              promptingCanvasRef={promptingCanvasRef}
-              currentLabel={currentLabel}
-              setCurrentLabel={setCurrentLabel}
-              segmentationMasks={segmentationMasks}
-              exportQuantificationsAsCsv={exportQuantificationsAsCsv}
-              zoomLevel={zoomLevel}
-              setZoomLevel={setZoomLevel}
-              setZoomCenter={setZoomCenter}
-              handleAnnotationZoomIn={handleAnnotationZoomIn}
-              handleAnnotationZoomOut={handleAnnotationZoomOut}
-              handleAnnotationResetView={handleAnnotationResetView}
+            promptType={promptType}
+            setPromptType={setPromptType}
+            promptingCanvasRef={promptingCanvasRef}
+            currentLabel={currentLabel}
+            setCurrentLabel={setCurrentLabel}
+            segmentationMasks={segmentationMasks}
+            exportQuantificationsAsCsv={exportQuantificationsAsCsv}
+            zoomLevel={zoomLevel}
+            setZoomLevel={setZoomLevel}
+            setZoomCenter={setZoomCenter}
+            handleAnnotationZoomIn={handleAnnotationZoomInWrapper}
+            handleAnnotationZoomOut={handleAnnotationZoomOutWrapper}
+            handleAnnotationResetView={handleAnnotationResetViewWrapper}
           />
+          
           <MainViewers
             selectedImage={selectedImage}
             imageObject={imageObject}
@@ -659,7 +439,7 @@ const AnnotationPage = () => {
             bestMask={bestMask}
             isSegmenting={isSegmenting}
             selectedModel={selectedModel}
-            handlePromptingComplete={handlePromptingComplete}
+            handlePromptingComplete={handlers.handlePromptingComplete}
             handleMaskSelect={handleMaskSelect}
             resetSegmentationState={resetSegmentationState}
             setSelectedMask={setSelectedMask}
@@ -672,28 +452,28 @@ const AnnotationPage = () => {
             finalMaskCanvasRef={finalMaskCanvasRef}
             drawAnnotationCanvasWrapper={drawAnnotationCanvasWrapper}
             drawFinalMaskCanvasWrapper={drawFinalMaskCanvasWrapper}
-            handleAnnotationCanvasClick={handleAnnotationCanvasClick}
-            handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
-            handleFinalMaskContourSelect={handleFinalMaskContourSelect}
+            handleAnnotationCanvasClick={handleAnnotationCanvasClickWrapper}
+            handleFinalMaskCanvasClick={handleFinalMaskCanvasClickWrapper}
+            handleFinalMaskContourSelect={handleFinalMaskContourSelectWrapper}
             resetCanvasState={resetCanvasState}
             setZoomLevel={setZoomLevel}
             setZoomCenter={setZoomCenter}
-            handleReset={handleReset}
-            handleRunNewSegmentation={handleRunNewSegmentation}
+            handleReset={handleResetWrapper}
+            handleRunNewSegmentation={handlers.handleRunNewSegmentation}
             promptingCanvasRef={promptingCanvasRef}
             imageLoading={imageLoading}
-            imageError={imageError}
+            imageError={error}
             setError={setError}
             handleFileUpload={handleFileUploadWrapper}
-            handleImageSelect={handleImageSelect}
+            handleImageSelect={imageNavigation.handleImageSelect}
             resetImageState={resetImageState}
             labelOptions={labelOptions}
             promptType={promptType}
             setPromptType={setPromptType}
             currentLabel={currentLabel}
             setCurrentLabel={setCurrentLabel}
-            handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
-            handleDeleteSelectedContours={handleDeleteSelectedContours}
+            handleAddSelectedContoursToFinalMask={handlers.handleAddSelectedContoursToFinalMask}
+            handleDeleteSelectedContours={handlers.handleDeleteSelectedContours}
             selectedContours={selectedContours}
             setSelectedContours={setSelectedContours}
             handleDeleteFinalMaskContour={handleDeleteFinalMaskContourWrapper}
@@ -702,7 +482,7 @@ const AnnotationPage = () => {
             exportQuantificationsAsCsv={exportQuantificationsAsCsv}
             showSaveMaskDialog={showSaveMaskDialog}
             setShowSaveMaskDialog={setShowSaveMaskDialog}
-            savingMaskIndex={null} // Not used in this context, can be removed
+            savingMaskIndex={savingMaskIndex}
             setSavingMaskIndex={setSavingMaskIndex}
             saveMaskLabel={saveMaskLabel}
             setSaveMaskLabel={setSaveMaskLabel}
@@ -725,68 +505,48 @@ const AnnotationPage = () => {
             annotationZoomCenter={annotationZoomCenter}
             setAnnotationZoomLevel={setAnnotationZoomLevel}
             setAnnotationZoomCenter={setAnnotationZoomCenter}
-            />
-          {/* Help text */}
-          {!selectedImage && !loading && (
-              <div className="mt-4 p-4 bg-teal-50 text-teal-700 rounded-md">
-                <h3 className="font-medium mb-2">How to use:</h3>
-                <ol className="list-decimal list-inside text-sm">
-                  <li className="mb-1">Select or upload an image from the left panel</li>
-                  <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
-                  <li className="mb-1">Select foreground (1) or background (0) label</li>
-                  <li className="mb-1">
-                    <strong>For point prompts:</strong>
-                    <ul className="list-disc list-inside ml-4 mt-1">
-                      <li>Left-click for positive points (green with +)</li>
-                      <li>Right-click for negative points (red with -)</li>
-                    </ul>
-                  </li>
-                  <li className="mb-1">Click and drag on the image to create other prompt types</li>
-                  <li className="mb-1">Use zoom and pan controls for detailed work</li>
-                  <li>Save your prompts when finished</li>
-                </ol>
-              </div>
-          )}
+          />
+          
+          {/* Help Section */}
+          <HelpSection selectedImage={selectedImage} imageLoading={imageLoading} />
 
           {/* Quantification Table */}
           <div style={{ marginTop: 24 }}>
             {finalMasks.length > 0 ? (
-                <div>
-                  <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
-                  <QuantificationTable
-                      masks={finalMasks}
-                      onContourSelect={(row) => {
-                        // Find the corresponding contour and trigger zoom
-                        if (finalMasks.length > 0 && finalMasks[0].contours) {
-                          const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
-                          if (contourIndex !== -1) {
-                            const finalMask = finalMasks[0];
-
-                            // Call the main function to update zoom and final mask viewer
-                            // The annotation canvas will automatically redraw via the useEffect hook
-                            handleFinalMaskContourSelect(finalMask, contourIndex);
-                          }
-                        }
-                      }}
-                      onContourDelete={(contourId) => {
-                        return handleDeleteContourFromTable(contourId);
-                      }}
-                  />
-                </div>
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable
+                  masks={finalMasks}
+                  onContourSelect={(row) => {
+                    // Find the corresponding contour and trigger zoom
+                    if (finalMasks.length > 0 && finalMasks[0].contours) {
+                      const contourIndex = finalMasks[0].contours.findIndex(c => c.id === row.contour_id);
+                      if (contourIndex !== -1) {
+                        const finalMask = finalMasks[0];
+                        handleFinalMaskContourSelectWrapper(finalMask, contourIndex);
+                      }
+                    }
+                  }}
+                  onContourDelete={(contourId) => {
+                    return handleDeleteContourFromTable(contourId);
+                  }}
+                />
+              </div>
             ) : (
-                <div>
-                  <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
-                  <QuantificationTable masks={[]} />
-                </div>
+              <div>
+                <Typography variant="h6" style={{ marginBottom: 16 }}>Quantification</Typography>
+                <QuantificationTable masks={[]} />
+              </div>
             )}
           </div>
         </div>
       </div>
+      
       {/* Reset Button */}
       <div className="flex gap-4 mt-4">
         <button
-            className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md flex items-center space-x-2 transition-colors"
-            onClick={handleReset}
+          className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-md flex items-center space-x-2 transition-colors"
+          onClick={handleResetWrapper}
         >
           <span>Reset All</span>
         </button>

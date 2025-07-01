@@ -12,6 +12,7 @@ function App() {
           <Route path="/" element={<DatasetsPage />} />
           <Route path="/datasets" element={<DatasetsPage />} />
           <Route path="/dataset/:datasetId/annotate" element={<AnnotationPage />} />
+          <Route path="/dataset/:datasetId/annotate/:imageId" element={<AnnotationPage />} />
           {/* Catch-all route - redirect unknown routes to datasets page */}
           <Route path="*" element={<Navigate to="/datasets" replace />} />
         </Routes>
