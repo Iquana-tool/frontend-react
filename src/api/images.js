@@ -27,7 +27,7 @@ export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
         const response = await fetch(
             `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`
         );
-        return handleApiError(response);
+        return response;
     } catch (error) {
         throw error;
     }

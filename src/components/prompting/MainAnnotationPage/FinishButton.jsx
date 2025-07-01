@@ -72,12 +72,9 @@ const FinishButton = ({
     };
 
     return (
-        <div className="relative">
-            <button
-                onClick={onClick}
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
-                className={`
+        <button
+            onClick={onClick}
+            className={`
                 group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
                 transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
                 shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
@@ -111,10 +108,10 @@ const FinishButton = ({
                     <span>Finish Mask</span>
                 </>
             )}
-            
+
             {/* Shine effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
+                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%]
                          transition-all duration-700 ease-out"></div>
             </button>
 

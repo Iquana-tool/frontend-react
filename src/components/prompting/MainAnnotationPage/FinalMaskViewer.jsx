@@ -37,7 +37,7 @@ const FinalMaskViewer = ({
 }) => {
   // Get dataset ID from URL params
   const { datasetId } = useParams();
-  
+
   // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -353,7 +353,7 @@ const FinalMaskViewer = ({
           <FinishButton
             maskId={finalMask?.id}
           />
-          <NextButton dataset_id={datasetId} />
+          <NextButton />
         </div>
       </div>
     </div>
