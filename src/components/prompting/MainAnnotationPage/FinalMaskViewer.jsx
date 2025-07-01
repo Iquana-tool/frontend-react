@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Trash2, Layers } from "lucide-react";
 import FinishButton from "./FinishButton"; // Adjust the import path as necessary
 import NextButton from "./NextButton";
+import { useParams } from "react-router-dom";
 
 const FinalMaskViewer = ({
   segmentationMasks,
@@ -34,6 +35,9 @@ const FinalMaskViewer = ({
   setAnnotationZoomCenter,
   promptingCanvasRef,
 }) => {
+  // Get dataset ID from URL params
+  const { datasetId } = useParams();
+  
   // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -349,7 +353,7 @@ const FinalMaskViewer = ({
           <FinishButton
             maskId={finalMask?.id}
           />
-          {/* <NextButton dataset_id={"1"} /> */}
+          <NextButton dataset_id={datasetId} />
         </div>
       </div>
     </div>

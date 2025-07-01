@@ -1,4 +1,4 @@
-import {useState, useCallback, useEffect} from 'react';
+import {useState, useCallback} from 'react';
 import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
 
