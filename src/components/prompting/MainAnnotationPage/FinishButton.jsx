@@ -75,6 +75,8 @@ const FinishButton = ({
         <div className="relative inline-block">
         <button
             onClick={onClick}
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
             className={`
                 group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
                 transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
