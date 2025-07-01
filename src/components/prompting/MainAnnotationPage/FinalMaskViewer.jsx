@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { Trash2, Layers } from "lucide-react";
 import FinishButton from "./FinishButton"; // Adjust the import path as necessary
 import NextButton from "./NextButton";
-import { useParams } from "react-router-dom";
 
 const FinalMaskViewer = ({
   segmentationMasks,
@@ -35,8 +34,6 @@ const FinalMaskViewer = ({
   setAnnotationZoomCenter,
   promptingCanvasRef,
 }) => {
-  // Get dataset ID from URL params
-  const { datasetId } = useParams();
 
   // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
@@ -72,38 +69,8 @@ const FinalMaskViewer = ({
       return;
     }
 
-    // For normal clicks, transform coordinates and pass to canvas handler
-    if (e.button === 0) { // Left click
-      const transformedEvent = createTransformedEvent(e);
-      handleFinalMaskCanvasClick(transformedEvent);
-    }
-  };
-
-  // Create a transformed event with adjusted coordinates (simplified for pan-only)
-  const createTransformedEvent = (originalEvent) => {
-    if (!containerRef.current || !finalMaskCanvasRef.current) {
-      return originalEvent;
-    }
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const canvasRect = finalMaskCanvasRef.current.getBoundingClientRect();
-
-    // Get the click position relative to the container
-    const containerX = originalEvent.clientX - containerRect.left;
-    const containerY = originalEvent.clientY - containerRect.top;
-    
-    // Adjust for pan offset only (zoom is handled by canvas utilities)
-    const transformedX = containerX - panOffset.x;
-    const transformedY = containerY - panOffset.y;
-    
-    // Create a new event-like object with transformed coordinates
-    return {
-      ...originalEvent,
-      clientX: transformedX + canvasRect.left,
-      clientY: transformedY + canvasRect.top,
-      target: finalMaskCanvasRef.current,
-      currentTarget: finalMaskCanvasRef.current
-    };
+    // For normal clicks, - let the canvas handle it directly
+    // The canvas click handler will receive the raw event and handle coordinate transformation
   };
 
   const handleMouseMove = (e) => {
@@ -122,11 +89,15 @@ const FinalMaskViewer = ({
   };
 
   const handleMouseUp = (e) => {
-    setIsPanning(false);
+    if (isPanning) {
+      setIsPanning(false);
+    }
   };
 
   const handleMouseLeave = (e) => {
-    setIsPanning(false);
+    if (isPanning) {
+      setIsPanning(false);
+    }
   };
 
   // Handle wheel for panning (zoom is handled by canvas utilities)
@@ -188,7 +159,7 @@ const FinalMaskViewer = ({
         ref={containerRef}
         className="h-[340px] sm:h-[420px] relative overflow-hidden py-5"
         style={{
-          cursor: isPanning ? 'grabbing' : 'grab'
+          cursor: isPanning ? 'grabbing' : 'default'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -207,7 +178,90 @@ const FinalMaskViewer = ({
           <canvas
             ref={finalMaskCanvasRef}
             className="w-full h-full object-contain"
-            style={{ cursor: isPanning ? 'grabbing' : 'pointer' }}
+            style={{ 
+              cursor: isPanning ? 'grabbing' : 'pointer',
+              pointerEvents: 'auto'
+            }}
+            onClick={(e) => {
+              // Only handle click if not panning
+              if (!isPanning) {
+                const canvas = finalMaskCanvasRef.current;
+                if (!canvas) return;
+                
+                // Calculate click coordinates in canvas space
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const x = (e.clientX - rect.left) * scaleX;
+                const y = (e.clientY - rect.top) * scaleY;
+                
+                // Look for clicked contour
+                let foundMask = null;
+                let foundContourIndex = -1;
+                
+                for (const mask of finalMasks) {
+                  if (!mask.contours || !Array.isArray(mask.contours)) continue;
+                  
+                  for (let i = 0; i < mask.contours.length; i++) {
+                    const contour = mask.contours[i];
+                    if (!contour?.x?.length) continue;
+                    
+                    // Point-in-polygon test
+                    let inside = false;
+                    const n = contour.x.length;
+                    
+                    for (let j = 0, k = n - 1; j < n; k = j++) {
+                      const xi = contour.x[j] * canvas.width;
+                      const yi = contour.y[j] * canvas.height;
+                      const xj = contour.x[k] * canvas.width;
+                      const yj = contour.y[k] * canvas.height;
+                      
+                      const intersect = ((yi > y) !== (yj > y)) &&
+                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                      if (intersect) inside = !inside;
+                    }
+                    
+                    if (inside) {
+                      foundMask = mask;
+                      foundContourIndex = i;
+                      break;
+                    }
+                  }
+                  if (foundMask) break;
+                }
+                
+                // Handle contour selection
+                if (foundMask && foundContourIndex !== -1) {
+                  handleFinalMaskContourSelect(foundMask, foundContourIndex);
+                } else if (zoomLevel > 1) {
+                  // If no contour was clicked but we're zoomed in, reset zoom to default
+                  setSelectedFinalMaskContour(null);
+                  setZoomLevel(1);
+                  if (setZoomCenter) {
+                    setZoomCenter({ x: 0.5, y: 0.5 });
+                  }
+                  
+                  // Sync with annotation drawing area
+                  if (setAnnotationZoomLevel) {
+                    setAnnotationZoomLevel(1);
+                  }
+                  if (setAnnotationZoomCenter) {
+                    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+                  }
+                  
+                  // Reset prompting canvas view if available
+                  if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+                    promptingCanvasRef.current.resetView();
+                  }
+                }
+              }
+            }}
+            onMouseDown={(e) => {
+              // Prevent the container's mouse down from interfering with direct canvas clicks
+              if (e.button === 0) { // Left click
+                e.stopPropagation();
+              }
+            }}
           />
         </div>
 

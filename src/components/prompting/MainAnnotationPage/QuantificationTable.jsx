@@ -9,6 +9,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deletingContours, setDeletingContours] = useState(new Set());
+  const [selectedContourId, setSelectedContourId] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -126,6 +127,11 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
         // Remove the contour from local state immediately for UI responsiveness
         setQuantRows(prevRows => prevRows.filter(row => row.contour_id !== contourId));
         
+        // Clear selection if the deleted contour was selected
+        if (selectedContourId === contourId) {
+          setSelectedContourId(null);
+        }
+        
         // Call parent callback if provided to handle final mask updates
         if (onContourDelete) {
           try {
@@ -155,6 +161,11 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
         
         // Remove from local state anyway
         setQuantRows(prevRows => prevRows.filter(row => row.contour_id !== contourId));
+        
+        // Clear selection if the deleted contour was selected
+        if (selectedContourId === contourId) {
+          setSelectedContourId(null);
+        }
         
         // Still call parent callback to update final mask viewer
         if (onContourDelete) {
@@ -305,13 +316,24 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
                 onClick={() => {
                   // Handle row click for zoom functionality
                   if (onContourSelect && row.contour_id && !isDeleting) {
-                    onContourSelect(row);
+                    if (selectedContourId === row.contour_id) {
+                      // Toggle off - zoom out and deselect
+                      setSelectedContourId(null);
+                      onContourSelect(null); // Signal to parent to zoom out
+                    } else {
+                      // Select new contour - zoom to it
+                      setSelectedContourId(row.contour_id);
+                      onContourSelect(row);
+                    }
                   }
                 }}
                 sx={{ 
-                  backgroundColor: labelColors.backgroundColor,
+                  backgroundColor: selectedContourId === row.contour_id ? 
+                    `${labelColors.backgroundColor}dd` : labelColors.backgroundColor,
                   cursor: onContourSelect && !isDeleting ? 'pointer' : 'default',
                   opacity: isDeleting ? 0.6 : 1,
+                  border: selectedContourId === row.contour_id ? 
+                    `2px solid ${getLabelColor(row.label) || '#1976d2'}` : 'none',
                   '&:hover': { 
                     backgroundColor: labelColors.backgroundColor, 
                     opacity: isDeleting ? 0.6 : 0.8,
@@ -319,7 +341,9 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
                   },
                   transition: 'all 0.2s ease-in-out'
                 }}
-                title={onContourSelect && !isDeleting ? "Click to zoom to this contour" : ""}
+                title={onContourSelect && !isDeleting ? 
+                  (selectedContourId === row.contour_id ? 
+                    "Click to zoom out" : "Click to zoom to this contour") : ""}
               >
                 {displayColumns.map((column) => (
                   <TableCell 
