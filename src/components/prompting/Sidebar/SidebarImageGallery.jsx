@@ -1,5 +1,6 @@
 import React from "react";
-
+import { useNavigate } from "react-router-dom";
+import { useDataset } from "../../../contexts/DatasetContext";
 
 const SidebarImageGallery = ({
     selectedImage,
@@ -10,9 +11,18 @@ const SidebarImageGallery = ({
     setViewMode,
     handleImageSelect,
     isSidebarCollapsed,
-    setIsSidebarCollapsed,
-    currentDataset
+    setIsSidebarCollapsed
                              }) => {
+    const navigate = useNavigate();
+    const { currentDataset } = useDataset();
+
+    const handleImageClick = (image) => {
+        if (!loading && currentDataset && currentDataset.id && image && image.id) {
+            const navigationUrl = `/dataset/${currentDataset.id}/annotate/${image.id}`;
+            navigate(navigationUrl);
+        }
+    };
+
     return (
         <div>
             <div className="mb-3 flex items-center justify-between">
@@ -113,9 +123,7 @@ const SidebarImageGallery = ({
                     <div className="grid grid-cols-2 gap-2">
                         {availableImages.map((image) => (
                             <div
-                                key={`image-${image.id}-${
-                                    selectedImageId === image.id ? "selected" : "unselected"
-                                }`}
+                                key={`image-${image.id}`}
                                 className={`relative cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
                                     selectedImageId === image.id
                                         ? "border-teal-600 ring-2 ring-teal-200"
@@ -123,7 +131,7 @@ const SidebarImageGallery = ({
                                 } border-2`}
                                 onClick={() => {
                                     if (!loading) {
-                                        handleImageSelect(image);
+                                        handleImageClick(image);
                                     }
                                 }}
                             >
@@ -182,14 +190,18 @@ const SidebarImageGallery = ({
                                         {image.name}
                                     </p>
                                     <div className="flex items-center mt-1">
-                                        {image.isFromAPI ? (
-                                            <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
-                        Server
-                      </span>
+                                        {image.finished ? (
+                                            <span className="text-xxs px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
+                                            Finished
+                                          </span>
+                                        ) : image.generated ? (
+                                            <span className="text-xxs px-1.5 py-0.5 bg-green-500 text-white rounded-full">
+                                                Reviewable
+                                              </span>
                                         ) : (
-                                            <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
-                        Sample
-                      </span>
+                                            <span className="text-xxs px-1.5 py-0.5 bg-red-500 text-white rounded-full">
+                                                Pending
+                                              </span>
                                         )}
                                         {image.width && image.height && (
                                             <p className="text-xs text-gray-500 ml-3">
@@ -206,9 +218,7 @@ const SidebarImageGallery = ({
                     <div className={`${isSidebarCollapsed ? "space-y-2" : "space-y-1"}`}>
                         {availableImages.map((image) => (
                             <div
-                                key={`image-${image.id}-${
-                                    selectedImageId === image.id ? "selected" : "unselected"
-                                }`}
+                                key={`image-${image.id}`}
                                 className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                                     selectedImageId === image.id
                                         ? "border-teal-600 bg-teal-50"
@@ -216,7 +226,7 @@ const SidebarImageGallery = ({
                                 }`}
                                 onClick={() => {
                                     if (!loading) {
-                                        handleImageSelect(image);
+                                        handleImageClick(image);
                                     }
                                 }}
                             >

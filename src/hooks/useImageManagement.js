@@ -1,4 +1,4 @@
-import {useState, useCallback, useEffect} from 'react';
+import {useState, useCallback} from 'react';
 import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
 
@@ -71,12 +71,15 @@ export const useImageManagement = (fetchFinalMask = null) => {
       setError(null);
       const response = await api.fetchImages(currentDataset.id);
       if (response.success) {
+        console.log(response);
         const apiImages = response.images.map((img) => ({
           id: img.id,
-          name: img.filename,
+          name: img.file_name,
           width: img.width,
           height: img.height,
           hash: img.hash_code,
+          finished: img.finished,
+          generated: img.generated,
           thumbnailUrl: null,
           isFromAPI: true,
           isLoading: false,
@@ -114,13 +117,14 @@ export const useImageManagement = (fetchFinalMask = null) => {
   const handleImageSelect = useCallback(async (image) => {
     if (!image) return;
 
-    setLoading(true);
-    setError(null);
+    // Set immediate state for responsive feedback
     setSelectedImageId(image.id);
     setSelectedImageMetadata(image);
+    setLoading(true);
+    setError(null);
 
     try {
-      console.log(`Loading image with ID: ${image.id}`);
+      // Load image data first (priority)
       const imageResponse = await api.getImageById(image.id, false);
 
       if (!imageResponse || !imageResponse[image.id]) {
@@ -137,38 +141,34 @@ export const useImageManagement = (fetchFinalMask = null) => {
         imgObject.src = imageUrl;
       });
 
+      // Set image immediately after it loads
       setSelectedImageBase64(imgObject);
       setImageLoaded(true);
+      setLoading(false);
 
-      // Load the final mask if it exists - this was missing!
-      if (fetchFinalMask) {
-        await fetchFinalMask(image.id);
-      }
+      // Load additional data in background (non-blocking)
+      setTimeout(async () => {
+        try {
+          // Load final mask in background
+          if (fetchFinalMask) {
+            await fetchFinalMask(image.id);
+          }
 
-      // Load any previous masks for this image
-      try {
-        const masksResponse = await api.getMasksForImage(image.id);
-
-        if (
-          masksResponse.success &&
-          masksResponse.masks &&
-          masksResponse.masks.length > 0
-        ) {
-          console.log(`Loaded ${masksResponse.masks.length} existing masks`);
-          // Note: We don't set segmentation masks here as that's handled by the segmentation hook
-        } else {
-          console.log("No existing masks found for this image");
+          // Load existing masks in background
+          const masksResponse = await api.getMasksForImage(image.id);
+          if (masksResponse.success && masksResponse.masks?.length > 0) {
+            console.log(`Loaded ${masksResponse.masks.length} existing masks`);
+          }
+        } catch (err) {
+          console.warn("Background loading error:", err);
         }
-      } catch (maskErr) {
-        console.warn("Error loading masks:", maskErr);
-      }
+      }, 100);
 
     } catch (error) {
       console.error("Error selecting image:", error);
       setError("Failed to load image: " + (error.message || "Unknown error"));
       setSelectedImageId(null);
       setSelectedImageMetadata(null);
-    } finally {
       setLoading(false);
     }
   }, [fetchFinalMask]);

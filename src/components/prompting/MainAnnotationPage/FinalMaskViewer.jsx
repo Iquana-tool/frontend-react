@@ -34,6 +34,7 @@ const FinalMaskViewer = ({
   setAnnotationZoomCenter,
   promptingCanvasRef,
 }) => {
+
   // Add panning state (simplified - only for user-initiated panning)
   const [isPanning, setIsPanning] = useState(false);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
@@ -68,38 +69,8 @@ const FinalMaskViewer = ({
       return;
     }
 
-    // For normal clicks, transform coordinates and pass to canvas handler
-    if (e.button === 0) { // Left click
-      const transformedEvent = createTransformedEvent(e);
-      handleFinalMaskCanvasClick(transformedEvent);
-    }
-  };
-
-  // Create a transformed event with adjusted coordinates (simplified for pan-only)
-  const createTransformedEvent = (originalEvent) => {
-    if (!containerRef.current || !finalMaskCanvasRef.current) {
-      return originalEvent;
-    }
-
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const canvasRect = finalMaskCanvasRef.current.getBoundingClientRect();
-
-    // Get the click position relative to the container
-    const containerX = originalEvent.clientX - containerRect.left;
-    const containerY = originalEvent.clientY - containerRect.top;
-    
-    // Adjust for pan offset only (zoom is handled by canvas utilities)
-    const transformedX = containerX - panOffset.x;
-    const transformedY = containerY - panOffset.y;
-    
-    // Create a new event-like object with transformed coordinates
-    return {
-      ...originalEvent,
-      clientX: transformedX + canvasRect.left,
-      clientY: transformedY + canvasRect.top,
-      target: finalMaskCanvasRef.current,
-      currentTarget: finalMaskCanvasRef.current
-    };
+    // For normal clicks, - let the canvas handle it directly
+    // The canvas click handler will receive the raw event and handle coordinate transformation
   };
 
   const handleMouseMove = (e) => {
@@ -118,11 +89,15 @@ const FinalMaskViewer = ({
   };
 
   const handleMouseUp = (e) => {
-    setIsPanning(false);
+    if (isPanning) {
+      setIsPanning(false);
+    }
   };
 
   const handleMouseLeave = (e) => {
-    setIsPanning(false);
+    if (isPanning) {
+      setIsPanning(false);
+    }
   };
 
   // Handle wheel for panning (zoom is handled by canvas utilities)
@@ -184,7 +159,7 @@ const FinalMaskViewer = ({
         ref={containerRef}
         className="h-[340px] sm:h-[420px] relative overflow-hidden py-5"
         style={{
-          cursor: isPanning ? 'grabbing' : 'grab'
+          cursor: isPanning ? 'grabbing' : 'default'
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -203,7 +178,157 @@ const FinalMaskViewer = ({
           <canvas
             ref={finalMaskCanvasRef}
             className="w-full h-full object-contain"
-            style={{ cursor: isPanning ? 'grabbing' : 'pointer' }}
+            style={{ 
+              cursor: isPanning ? 'grabbing' : 'pointer',
+              pointerEvents: 'auto'
+            }}
+            onClick={(e) => {
+              // Only handle click if not panning
+              if (!isPanning) {
+                const canvas = finalMaskCanvasRef.current;
+                if (!canvas) return;
+                
+                // Calculate click coordinates in canvas space with object-fit: contain correction
+                const rect = canvas.getBoundingClientRect();
+                
+                // Get the actual image dimensions if we have canvas image
+                const actualImageAspect = canvasImage ? canvasImage.width / canvasImage.height : canvas.width / canvas.height;
+                const displayAspect = rect.width / rect.height;
+                
+                let imageDisplayWidth, imageDisplayHeight, offsetX = 0, offsetY = 0;
+                
+                if (actualImageAspect > displayAspect) {
+                  // Image is wider - fit to width, center vertically
+                  imageDisplayWidth = rect.width;
+                  imageDisplayHeight = rect.width / actualImageAspect;
+                  offsetY = (rect.height - imageDisplayHeight) / 2;
+                } else {
+                  // Image is taller - fit to height, center horizontally  
+                  imageDisplayHeight = rect.height;
+                  imageDisplayWidth = rect.height * actualImageAspect;
+                  offsetX = (rect.width - imageDisplayWidth) / 2;
+                }
+                
+                // Adjust click coordinates for the centered/scaled image
+                const relativeX = (e.clientX - rect.left - offsetX) / imageDisplayWidth;
+                const relativeY = (e.clientY - rect.top - offsetY) / imageDisplayHeight;
+                
+                let x = relativeX * canvas.width;
+                let y = relativeY * canvas.height;
+                
+
+                
+                // Account for zoom transformation (exactly like useCanvasOperations.js)
+                if (zoomLevel > 1 && zoomCenter) {
+                  const centerX = zoomCenter.x * canvas.width;
+                  const centerY = zoomCenter.y * canvas.height;
+                  x = (x - centerX) / zoomLevel + centerX;
+                  y = (y - centerY) / zoomLevel + centerY;
+
+                }
+                
+                // Look for clicked contour
+                let foundMask = null;
+                let foundContourIndex = -1;
+                
+                for (const mask of finalMasks) {
+                  if (!mask.contours || !Array.isArray(mask.contours)) continue;
+                  
+                  for (let i = 0; i < mask.contours.length; i++) {
+                    const contour = mask.contours[i];
+                    if (!contour?.x?.length || contour.x.length < 3) continue;
+                    
+                    // Use the same point-in-contour logic as useContourOperations.js
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+
+                    const points = [];
+                    for (let j = 0; j < contour.x.length; j++) {
+                      points.push([contour.x[j] * canvasWidth, contour.y[j] * canvasHeight]);
+                    }
+                    
+
+
+                    let inside = false;
+                    for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
+                      const xi = points[j][0], yi = points[j][1];
+                      const xj = points[k][0], yj = points[k][1];
+
+                      const intersect =
+                        (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+                      if (intersect) inside = !inside;
+                    }
+
+                    // Check proximity to edges if not inside (within 5 pixels)
+                    if (!inside) {
+                      for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
+                        const xi = points[j][0], yi = points[j][1];
+                        const xj = points[k][0], yj = points[k][1];
+
+                        const lineLength = Math.sqrt((xj - xi) ** 2 + (yj - yi) ** 2);
+                        if (lineLength === 0) continue;
+
+                        const t = Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            ((x - xi) * (xj - xi) + (y - yi) * (yj - yi)) /
+                              (lineLength * lineLength)
+                          )
+                        );
+                        const projX = xi + t * (xj - xi);
+                        const projY = yi + t * (yj - yi);
+                        const distance = Math.sqrt((x - projX) ** 2 + (y - projY) ** 2);
+
+                        if (distance < 5) {
+                          inside = true;
+                          break;
+                        }
+                      }
+                    }
+                    
+                    if (inside) {
+                      foundMask = mask;
+                      foundContourIndex = i;
+                      break;
+                    }
+                  }
+                  if (foundMask) break;
+                }
+                
+                // Handle contour selection
+                if (foundMask && foundContourIndex !== -1) {
+                  handleFinalMaskContourSelect(foundMask, foundContourIndex);
+                } else if (zoomLevel > 1) {
+                  // If no contour was clicked but we're zoomed in, reset zoom to default
+                  setSelectedFinalMaskContour(null);
+                  setZoomLevel(1);
+                  if (setZoomCenter) {
+                    setZoomCenter({ x: 0.5, y: 0.5 });
+                  }
+                  
+                  // Sync with annotation drawing area
+                  if (setAnnotationZoomLevel) {
+                    setAnnotationZoomLevel(1);
+                  }
+                  if (setAnnotationZoomCenter) {
+                    setAnnotationZoomCenter({ x: 0.5, y: 0.5 });
+                  }
+                  
+                  // Reset prompting canvas view if available
+                  if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.resetView) {
+                    promptingCanvasRef.current.resetView();
+                  }
+                }
+              }
+            }}
+            onMouseDown={(e) => {
+              // Prevent the container's mouse down from interfering with direct canvas clicks
+              if (e.button === 0) { // Left click
+                e.stopPropagation();
+              }
+            }}
           />
         </div>
 

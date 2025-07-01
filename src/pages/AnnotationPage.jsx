@@ -6,7 +6,7 @@ import { BugIcon, ArrowLeft } from "lucide-react";
 
 const AnnotationPage = () => {
   const navigate = useNavigate();
-  const { datasetId } = useParams();
+  const { datasetId, imageId } = useParams();
   const { datasets, currentDataset, selectDataset, loading } = useDataset();
   const [datasetNotFound, setDatasetNotFound] = useState(false);
 
@@ -119,7 +119,7 @@ const AnnotationPage = () => {
       </nav>
 
       <main className="max-w-[98%] mx-auto py-5 px-2">
-        <ImageViewerWithPrompting />
+        <ImageViewerWithPrompting initialImageId={imageId ? parseInt(imageId) : null} />
       </main>
     </div>
   );
