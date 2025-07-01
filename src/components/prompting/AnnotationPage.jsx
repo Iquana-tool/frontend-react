@@ -1,7 +1,5 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import React, { useRef, useEffect, useCallback } from "react";
 import { Typography } from "@mui/material";
-import { useParams } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
 
 // Custom Hooks
