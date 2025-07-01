@@ -13,6 +13,7 @@ const SidebarImageGallery = ({
     setIsSidebarCollapsed,
     currentDataset
                              }) => {
+    console.log(availableImages);
     return (
         <div>
             <div className="mb-3 flex items-center justify-between">
@@ -182,14 +183,18 @@ const SidebarImageGallery = ({
                                         {image.name}
                                     </p>
                                     <div className="flex items-center mt-1">
-                                        {image.isFromAPI ? (
-                                            <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
-                        Server
-                      </span>
+                                        {image.finished ? (
+                                            <span className="text-xxs px-1.5 py-0.5 bg-blue-500 text-white rounded-full">
+                                            Finished
+                                          </span>
+                                        ) : image.generated ? (
+                                            <span className="text-xxs px-1.5 py-0.5 bg-green-500 text-white rounded-full">
+                                                Review
+                                              </span>
                                         ) : (
-                                            <span className="text-xxs px-1.5 py-0.5 bg-teal-100 text-teal-700 rounded-full">
-                        Sample
-                      </span>
+                                            <span className="text-xxs px-1.5 py-0.5 bg-red-500 text-white rounded-full">
+                                                Todo
+                                              </span>
                                         )}
                                         {image.width && image.height && (
                                             <p className="text-xs text-gray-500 ml-3">
