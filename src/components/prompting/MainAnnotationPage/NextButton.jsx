@@ -1,8 +1,8 @@
-import React, { useState, } from "react";
+import React, { useState, useEffect} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {fetchImagesWithAnnotationStatus} from "../../../api/images";
 import {useDataset} from "../../../contexts/DatasetContext";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Home } from "lucide-react";
 
 
 const NextButton = () => {
@@ -39,12 +39,7 @@ const NextButton = () => {
         setIsLoading(true);
         try {
             // Fetch the list of unannotated images
-            const response = await fetchImagesWithAnnotationStatus(dataset_id, "missing");
-
-            if (!response.success) {
-                throw new Error("Failed to fetch the next image");
-            }
-
+            const response = await fetchImagesWithAnnotationStatus(currentDataset.id, "missing");
             // Get the unannotated images from the response
             const unannotatedImages = response.images;
 
@@ -58,12 +53,12 @@ const NextButton = () => {
                 if (currentIndex === -1) {
                     // Current image is not in unannotated list, go to first unannotated image
                     const nextImageId = unannotatedImages[0];
-                    const navigationUrl = `/dataset/${dataset_id}/annotate/${nextImageId}`;
+                    const navigationUrl = `/dataset/${currentDataset.id}/annotate/${nextImageId}`;
                     navigate(navigationUrl);
                 } else if (currentIndex < unannotatedImages.length - 1) {
                     // There's a next image in the list
                     const nextImageId = unannotatedImages[currentIndex + 1];
-                    const navigationUrl = `/dataset/${dataset_id}/annotate/${nextImageId}`;
+                    const navigationUrl = `/dataset/${currentDataset.id}/annotate/${nextImageId}`;
                     navigate(navigationUrl);
                 } else {
                     // We're at the last unannotated image

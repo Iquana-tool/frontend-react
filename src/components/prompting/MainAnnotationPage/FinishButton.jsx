@@ -72,6 +72,7 @@ const FinishButton = ({
     };
 
     return (
+        <div className="relative inline-block">
         <button
             onClick={onClick}
             className={`
