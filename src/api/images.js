@@ -24,9 +24,9 @@ export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
-        return await fetch(
+        return handleApiError(await fetch(
             `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`
-        );
+        ));
     } catch (error) {
         throw error;
     }
