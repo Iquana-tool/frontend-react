@@ -71,12 +71,15 @@ export const useImageManagement = (fetchFinalMask = null) => {
       setError(null);
       const response = await api.fetchImages(currentDataset.id);
       if (response.success) {
+        console.log(response);
         const apiImages = response.images.map((img) => ({
           id: img.id,
-          name: img.filename,
+          name: img.file_name,
           width: img.width,
           height: img.height,
           hash: img.hash_code,
+          finished: img.finished,
+          generated: img.generated,
           thumbnailUrl: null,
           isFromAPI: true,
           isLoading: false,
