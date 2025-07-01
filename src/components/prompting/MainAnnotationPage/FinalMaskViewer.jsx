@@ -349,7 +349,7 @@ const FinalMaskViewer = ({
           <FinishButton
             maskId={finalMask?.id}
           />
-          {/* <NextButton dataset_id={"1"} /> */}
+          <NextButton />
         </div>
       </div>
     </div>

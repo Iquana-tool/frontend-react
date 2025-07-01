@@ -1,27 +1,44 @@
-import React, { useState, } from "react";
+import React, { useState, useEffect } from "react";
 import {fetchImagesWithAnnotationStatus} from "../../../api/images";
+import {useDataset} from "../../../contexts/DatasetContext";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 
-const NextButton = ({dataset_id}) => {
+const NextButton = () => {
     const [isLoading, setIsLoading] = useState(false);
-    const [, setError] = useState(null);
+    const datasetsContext = useDataset();
+    const {
+        datasets,
+        currentDataset,
+        loading,
+        error,
+        fetchDatasets,
+        createDataset,
+        deleteDataset,
+        selectDataset,
+        getAnnotationProgress,
+        getSampleImages,
+        setError
+    } = datasetsContext;
+    useEffect(() => {
+        console.log(currentDataset)
+    }, [currentDataset]);
 
     const handleNext = async () => {
         setIsLoading(true);
         try {
         // Simulate an API call to fetch the next image
-        const response = await fetchImagesWithAnnotationStatus(dataset_id, "missing");
+        const response = await fetchImagesWithAnnotationStatus(currentDataset.id, "missing");
         if (!response.ok) {
             throw new Error("Failed to fetch the next image");
         }
         console.warn("Next button pressed, but the actual image fetching logic is not implemented yet.");
         // Handle the next image data as needed
         } catch (err) {
-        console.error("Error fetching next image:", err);
-        setError(err.message);
+            console.error("Error fetching next image:", err);
+            setError(err.message);
         } finally {
-        setIsLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -54,10 +71,10 @@ const NextButton = ({dataset_id}) => {
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
                 </>
             )}
-            
+
             {/* Shine effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
+                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%]
                          transition-all duration-700 ease-out"></div>
         </button>
     );
