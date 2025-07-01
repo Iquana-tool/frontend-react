@@ -188,12 +188,44 @@ const FinalMaskViewer = ({
                 const canvas = finalMaskCanvasRef.current;
                 if (!canvas) return;
                 
-                // Calculate click coordinates in canvas space
+                // Calculate click coordinates in canvas space with object-fit: contain correction
                 const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = (e.clientX - rect.left) * scaleX;
-                const y = (e.clientY - rect.top) * scaleY;
+                
+                // Get the actual image dimensions if we have canvas image
+                const actualImageAspect = canvasImage ? canvasImage.width / canvasImage.height : canvas.width / canvas.height;
+                const displayAspect = rect.width / rect.height;
+                
+                let imageDisplayWidth, imageDisplayHeight, offsetX = 0, offsetY = 0;
+                
+                if (actualImageAspect > displayAspect) {
+                  // Image is wider - fit to width, center vertically
+                  imageDisplayWidth = rect.width;
+                  imageDisplayHeight = rect.width / actualImageAspect;
+                  offsetY = (rect.height - imageDisplayHeight) / 2;
+                } else {
+                  // Image is taller - fit to height, center horizontally  
+                  imageDisplayHeight = rect.height;
+                  imageDisplayWidth = rect.height * actualImageAspect;
+                  offsetX = (rect.width - imageDisplayWidth) / 2;
+                }
+                
+                // Adjust click coordinates for the centered/scaled image
+                const relativeX = (e.clientX - rect.left - offsetX) / imageDisplayWidth;
+                const relativeY = (e.clientY - rect.top - offsetY) / imageDisplayHeight;
+                
+                let x = relativeX * canvas.width;
+                let y = relativeY * canvas.height;
+                
+
+                
+                // Account for zoom transformation (exactly like useCanvasOperations.js)
+                if (zoomLevel > 1 && zoomCenter) {
+                  const centerX = zoomCenter.x * canvas.width;
+                  const centerY = zoomCenter.y * canvas.height;
+                  x = (x - centerX) / zoomLevel + centerX;
+                  y = (y - centerY) / zoomLevel + centerY;
+
+                }
                 
                 // Look for clicked contour
                 let foundMask = null;
@@ -204,21 +236,56 @@ const FinalMaskViewer = ({
                   
                   for (let i = 0; i < mask.contours.length; i++) {
                     const contour = mask.contours[i];
-                    if (!contour?.x?.length) continue;
+                    if (!contour?.x?.length || contour.x.length < 3) continue;
                     
-                    // Point-in-polygon test
+                    // Use the same point-in-contour logic as useContourOperations.js
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+
+                    const points = [];
+                    for (let j = 0; j < contour.x.length; j++) {
+                      points.push([contour.x[j] * canvasWidth, contour.y[j] * canvasHeight]);
+                    }
+                    
+
+
                     let inside = false;
-                    const n = contour.x.length;
-                    
-                    for (let j = 0, k = n - 1; j < n; k = j++) {
-                      const xi = contour.x[j] * canvas.width;
-                      const yi = contour.y[j] * canvas.height;
-                      const xj = contour.x[k] * canvas.width;
-                      const yj = contour.y[k] * canvas.height;
-                      
-                      const intersect = ((yi > y) !== (yj > y)) &&
-                        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
+                      const xi = points[j][0], yi = points[j][1];
+                      const xj = points[k][0], yj = points[k][1];
+
+                      const intersect =
+                        (yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
                       if (intersect) inside = !inside;
+                    }
+
+                    // Check proximity to edges if not inside (within 5 pixels)
+                    if (!inside) {
+                      for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
+                        const xi = points[j][0], yi = points[j][1];
+                        const xj = points[k][0], yj = points[k][1];
+
+                        const lineLength = Math.sqrt((xj - xi) ** 2 + (yj - yi) ** 2);
+                        if (lineLength === 0) continue;
+
+                        const t = Math.max(
+                          0,
+                          Math.min(
+                            1,
+                            ((x - xi) * (xj - xi) + (y - yi) * (yj - yi)) /
+                              (lineLength * lineLength)
+                          )
+                        );
+                        const projX = xi + t * (xj - xi);
+                        const projY = yi + t * (yj - yi);
+                        const distance = Math.sqrt((x - projX) ** 2 + (y - projY) ** 2);
+
+                        if (distance < 5) {
+                          inside = true;
+                          break;
+                        }
+                      }
                     }
                     
                     if (inside) {
