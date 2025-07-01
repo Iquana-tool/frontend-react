@@ -113,9 +113,7 @@ const SidebarImageGallery = ({
                     <div className="grid grid-cols-2 gap-2">
                         {availableImages.map((image) => (
                             <div
-                                key={`image-${image.id}-${
-                                    selectedImageId === image.id ? "selected" : "unselected"
-                                }`}
+                                key={`image-${image.id}`}
                                 className={`relative cursor-pointer rounded-lg overflow-hidden transition-all duration-200 ${
                                     selectedImageId === image.id
                                         ? "border-teal-600 ring-2 ring-teal-200"
@@ -206,9 +204,7 @@ const SidebarImageGallery = ({
                     <div className={`${isSidebarCollapsed ? "space-y-2" : "space-y-1"}`}>
                         {availableImages.map((image) => (
                             <div
-                                key={`image-${image.id}-${
-                                    selectedImageId === image.id ? "selected" : "unselected"
-                                }`}
+                                key={`image-${image.id}`}
                                 className={`p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                                     selectedImageId === image.id
                                         ? "border-teal-600 bg-teal-50"

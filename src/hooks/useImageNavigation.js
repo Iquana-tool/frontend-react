@@ -28,16 +28,16 @@ export const useImageNavigation = ({
       // Reset zoom states to ensure clean transition
       resetZoomStates();
       
-      // Update URL only if it's different from current URL to prevent circular dependency
+      // Call the original handler first to ensure image is loaded
+      await originalHandleImageSelect(image);
+      
+      // Update URL only after image is successfully loaded to prevent circular dependency
       const targetPath = `/dataset/${datasetId}/annotate/${image.id}`;
       if (image && image.id && datasetId && location.pathname !== targetPath) {
         navigate(targetPath, { replace: true });
       }
       
-      // Call the original handler
-      await originalHandleImageSelect(image);
-      
-      // Clear transitioning state once image is loaded
+      // Clear transitioning state once image is loaded and URL is updated
       setIsTransitioning(false);
     } catch (error) {
       console.error("Error selecting image:", error);

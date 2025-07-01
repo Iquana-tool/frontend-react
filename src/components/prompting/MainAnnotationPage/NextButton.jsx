@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from "react";
+import React, { useState, useEffect, useRef} from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {fetchImagesWithAnnotationStatus} from "../../../api/images";
 import {useDataset} from "../../../contexts/DatasetContext";
@@ -7,27 +7,26 @@ import { ArrowRight, Loader2, Home } from "lucide-react";
 
 const NextButton = () => {
     const [isLoading, setIsLoading] = useState(false);
-    const datasetsContext = useDataset();
-    const {
-        datasets,
-        currentDataset,
-        loading,
-        error,
-        fetchDatasets,
-        createDataset,
-        deleteDataset,
-        selectDataset,
-        getAnnotationProgress,
-        getSampleImages,
-        setError
-    } = datasetsContext;
-    useEffect(() => {
-        console.log(currentDataset)
-    }, [currentDataset]);
     const [showCompletionMessage, setShowCompletionMessage] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
+    
     const navigate = useNavigate();
     const { imageId } = useParams();
+    const prevImageIdRef = useRef(imageId);
+    
+    const datasetsContext = useDataset();
+    const {
+        currentDataset,
+        setError
+    } = datasetsContext;
+
+    // Reset completion message when imageId changes (user navigated to different image)
+    useEffect(() => {
+        if (prevImageIdRef.current !== imageId) {
+            setShowCompletionMessage(false);
+        }
+        prevImageIdRef.current = imageId;
+    }, [imageId]);
 
     const handleClick = async () => {
         // If showing completion message, navigate back to datasets
@@ -40,6 +39,7 @@ const NextButton = () => {
         try {
             // Fetch the list of unannotated images
             const response = await fetchImagesWithAnnotationStatus(currentDataset.id, "missing");
+            
             // Get the unannotated images from the response
             const unannotatedImages = response.images;
 
@@ -48,7 +48,7 @@ const NextButton = () => {
                 const currentImageId = parseInt(imageId);
 
                 // Find the current image's position in the unannotated images list
-                const currentIndex = unannotatedImages.indexOf(currentImageId);
+                const currentIndex = unannotatedImages.findIndex(id => parseInt(id) === currentImageId);
 
                 if (currentIndex === -1) {
                     // Current image is not in unannotated list, go to first unannotated image
@@ -62,14 +62,20 @@ const NextButton = () => {
                     navigate(navigationUrl);
                 } else {
                     // We're at the last unannotated image
-                    setShowCompletionMessage(true);
+                    // Use setTimeout to ensure state update is processed
+                    setTimeout(() => {
+                        setShowCompletionMessage(true);
+                    }, 100);
                 }
             } else {
-                setShowCompletionMessage(true);
+                // Use setTimeout to ensure state update is processed
+                setTimeout(() => {
+                    setShowCompletionMessage(true);
+                }, 100);
             }
         } catch (err) {
             console.error("Error fetching next image:", err);
-            setError(err.message);
+            setError(err.message || "Failed to fetch next image");
         } finally {
             setIsLoading(false);
         }
