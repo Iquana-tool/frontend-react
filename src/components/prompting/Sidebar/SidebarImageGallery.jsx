@@ -196,11 +196,11 @@ const SidebarImageGallery = ({
                                           </span>
                                         ) : image.generated ? (
                                             <span className="text-xxs px-1.5 py-0.5 bg-green-500 text-white rounded-full">
-                                                Review
+                                                Pending review
                                               </span>
                                         ) : (
                                             <span className="text-xxs px-1.5 py-0.5 bg-red-500 text-white rounded-full">
-                                                Todo
+                                                Pending annotation
                                               </span>
                                         )}
                                         {image.width && image.height && (
