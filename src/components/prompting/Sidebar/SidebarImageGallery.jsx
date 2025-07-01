@@ -1,5 +1,6 @@
 import React from "react";
-
+import { useNavigate } from "react-router-dom";
+import { useDataset } from "../../../contexts/DatasetContext";
 
 const SidebarImageGallery = ({
     selectedImage,
@@ -10,9 +11,18 @@ const SidebarImageGallery = ({
     setViewMode,
     handleImageSelect,
     isSidebarCollapsed,
-    setIsSidebarCollapsed,
-    currentDataset
+    setIsSidebarCollapsed
                              }) => {
+    const navigate = useNavigate();
+    const { currentDataset } = useDataset();
+
+    const handleImageClick = (image) => {
+        if (!loading && currentDataset && currentDataset.id && image && image.id) {
+            const navigationUrl = `/dataset/${currentDataset.id}/annotate/${image.id}`;
+            navigate(navigationUrl);
+        }
+    };
+
     return (
         <div>
             <div className="mb-3 flex items-center justify-between">
@@ -121,7 +131,7 @@ const SidebarImageGallery = ({
                                 } border-2`}
                                 onClick={() => {
                                     if (!loading) {
-                                        handleImageSelect(image);
+                                        handleImageClick(image);
                                     }
                                 }}
                             >
@@ -212,7 +222,7 @@ const SidebarImageGallery = ({
                                 }`}
                                 onClick={() => {
                                     if (!loading) {
-                                        handleImageSelect(image);
+                                        handleImageClick(image);
                                     }
                                 }}
                             >

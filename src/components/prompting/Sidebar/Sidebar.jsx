@@ -85,6 +85,8 @@ const Sidebar = ({
                             viewMode={viewMode}
                             setViewMode={setViewMode}
                             handleImageSelect={handleImageSelect}
+                            isSidebarCollapsed={isSidebarCollapsed}
+                            setIsSidebarCollapsed={setIsSidebarCollapsed}
                         />
                     </div>
                 )}
