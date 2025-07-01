@@ -20,6 +20,12 @@ export const useImageNavigation = ({
       // Set transitioning state to prevent flickering
       setIsTransitioning(true);
       
+      // Update URL immediately for responsive feedback
+      const targetPath = `/dataset/${datasetId}/annotate/${image.id}`;
+      if (image && image.id && datasetId && location.pathname !== targetPath) {
+        navigate(targetPath, { replace: true });
+      }
+      
       // Clear image-specific state immediately to prevent showing stale data
       resetSegmentationState();
       resetContourState();
@@ -28,13 +34,7 @@ export const useImageNavigation = ({
       // Reset zoom states to ensure clean transition
       resetZoomStates();
       
-      // Update URL only if it's different from current URL to prevent circular dependency
-      const targetPath = `/dataset/${datasetId}/annotate/${image.id}`;
-      if (image && image.id && datasetId && location.pathname !== targetPath) {
-        navigate(targetPath, { replace: true });
-      }
-      
-      // Call the original handler
+      // Call the original handler (this loads the image)
       await originalHandleImageSelect(image);
       
       // Clear transitioning state once image is loaded

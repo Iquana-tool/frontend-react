@@ -438,7 +438,6 @@ const AnnotationPage = ({ initialImageId = null }) => {
           handleModelChange={handleModelChange}
           isSidebarCollapsed={isSidebarCollapsed}
           setIsSidebarCollapsed={setIsSidebarCollapsed}
-          currentDataset={currentDataset}
         />
         
         <div className={`bg-white p-4 rounded-lg shadow-sm border border-gray-200 ${isSidebarCollapsed ? "w-auto" : ""}`}>
