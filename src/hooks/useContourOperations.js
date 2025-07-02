@@ -112,7 +112,7 @@ export const useContourOperations = () => {
         console.log(`Successfully added contours to final mask:`, response);
         await fetchFinalMask(currentImage.id);
         setSelectedContours([]);
-        return { success: true, message: `Successfully added ${contours.length} contour(s) to final mask` };
+        return { success: true, message: "Selected contour added to Final Mask" };
       } else {
         console.error("Failed to add contours to final mask:", response.message);
         throw new Error(`Failed to add contours to final mask: ${response.message}`);
