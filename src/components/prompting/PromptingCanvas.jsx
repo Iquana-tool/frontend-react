@@ -108,8 +108,6 @@ const PromptingCanvas = forwardRef(({
     }
   }, [selectedMaskProp]);
 
-
-
   // Redraw function for canvas renderer
   const redrawCanvasCallback = useCallback((customPanOffset) => {
     // Force a re-render by incrementing the counter
@@ -448,7 +446,7 @@ const PromptingCanvas = forwardRef(({
     <div className="flex flex-col h-full">
       <div 
         ref={containerRef}
-        className="relative flex-1 overflow-hidden"
+        className="relative flex-1 overflow-hidden pt-4"
         style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
       >
         <CanvasRenderer
@@ -527,7 +525,6 @@ const PromptingCanvas = forwardRef(({
           </div>
         )}
 
-        {/* Segmentation Overlay */}
         <SegmentationOverlay
           selectedMask={selectedMask}
           selectedContours={selectedContours}
@@ -550,7 +547,6 @@ const PromptingCanvas = forwardRef(({
           }}
         />
 
-        {/* Prompt Selection Overlay */}
         <PromptSelectionOverlay
           selectedPromptIndex={selectedPromptIndex}
           prompts={prompts}
@@ -564,31 +560,47 @@ const PromptingCanvas = forwardRef(({
         />
       </div>
 
-      <div className="flex justify-between items-center mt-4 gap-4 px-6 py-3">
-          <button
-            className="
-              group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
-              transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
-              shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
-              bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 
-              shadow-red-500/25 hover:shadow-red-500/40
-              min-w-[100px] relative overflow-hidden
-              before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
-              hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
-            "
-            onClick={() => {
-              clearPrompts();
-              setSelectedPromptIndex(null);
-            }}
-          >
-            <Trash2 className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
-            <span>Clear</span>
-            
-            {/* Shine effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                         opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
-                         transition-all duration-700 ease-out"></div>
-          </button>
+      <div className="flex flex-col gap-2 mt-4">
+        {isInstantSegmentationEnabled && (
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 bg-blue-500/90 text-white text-xs px-4 py-2 rounded-full shadow-sm transition-all duration-300 ease-in-out">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="font-medium">Instant Segmentation Active</span>
+              <span className="text-blue-200">•</span>
+              <span>Just place your prompt to segment</span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center gap-4 px-6 py-3">
+          <div>
+            {!isInstantSegmentationEnabled && prompts.length > 0 && (
+              <button
+                className="
+                  group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
+                  transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
+                  shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
+                  bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 
+                  shadow-red-500/25 hover:shadow-red-500/40
+                  min-w-[100px] relative overflow-hidden
+                  before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
+                  hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
+                "
+                onClick={() => {
+                  clearPrompts();
+                  setSelectedPromptIndex(null);
+                }}
+              >
+                <Trash2 className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
+                <span>Clear Prompts</span>
+                
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
+                             opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
+                             transition-all duration-700 ease-out"></div>
+              </button>
+            )}
+          </div>
           {!isInstantSegmentationEnabled && (
             <button
               className={`
@@ -627,6 +639,7 @@ const PromptingCanvas = forwardRef(({
             </button>
           )}
         </div>
+      </div>
     </div>
   );
 });

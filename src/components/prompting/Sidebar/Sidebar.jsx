@@ -23,37 +23,14 @@ const Sidebar = ({
         <div
             className={`bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${
                 isSidebarCollapsed
-                    ? "md:col-span-1 w-[50px] overflow-hidden p-2"
+                    ? "md:col-span-1 w-[50px] overflow-visible p-2"
                     : "md:col-span-1 w-[280px] p-4"
             }`}
         >
-            {/* Toggle Button */}
-            <button
-                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-                className={`p-1.5 rounded-md ${
-                    isSidebarCollapsed
-                        ? "bg-teal-600 hover:bg-teal-700 text-white"
-                        : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                } transition-colors ${isSidebarCollapsed ? "mt-1" : ""}`}
-                title={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                aria-label={
-                    isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"
-                }
-            >
-                {isSidebarCollapsed ? (
-                    <ArrowRight className="h-5 w-5" />
-                ) : (
-                    <ArrowLeft className="h-5 w-5" />
-                )}
-            </button>
-            <div
-                className={`flex ${
-                    isSidebarCollapsed ? "justify-center" : "justify-between"
-                } items-center mb-4`}
-            >
-                {!isSidebarCollapsed && (
-                    <div className="w-full">
-                        <h2 className="text-base font-semibold flex items-center mb-4">
+            {!isSidebarCollapsed && (
+                <div className="w-full">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-semibold flex items-center">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
                                 className="h-4 w-4 mr-2 text-teal-600"
@@ -68,29 +45,63 @@ const Sidebar = ({
                             </svg>
                             Sidebar
                         </h2>
-                        <SidebarUploader
-                            handleFileUpload={handleFileUpload}
-                        />
-                        <SidebarModelSelector
-                            selectedModel={selectedModel}
-                            handleModelChange={handleModelChange}
-                            loading={loading}
-                        />
-                        <SidebarImageGallery
-                            selectedImage={selectedImage}
-                            selectedImageId={selectedImageId}
-                            availableImages={availableImages}
-                            loading={loading}
-                            error={error}
-                            viewMode={viewMode}
-                            setViewMode={setViewMode}
-                            handleImageSelect={handleImageSelect}
-                            isSidebarCollapsed={isSidebarCollapsed}
-                            setIsSidebarCollapsed={setIsSidebarCollapsed}
-                        />
+                        <div className="group relative">
+                            <button
+                                onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                                className="flex items-center justify-center w-6 h-6 rounded-full border border-gray-200
+                                    text-teal-600 hover:text-teal-700 hover:bg-gray-50
+                                    transition-all duration-200 ease-in-out
+                                    focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50"
+                                aria-label="Collapse sidebar"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded 
+                                opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                                Collapse sidebar
+                            </div>
+                        </div>
                     </div>
-                )}
-            </div>
+                    <SidebarUploader
+                        handleFileUpload={handleFileUpload}
+                    />
+                    <SidebarModelSelector
+                        selectedModel={selectedModel}
+                        handleModelChange={handleModelChange}
+                        loading={loading}
+                    />
+                    <SidebarImageGallery
+                        selectedImage={selectedImage}
+                        selectedImageId={selectedImageId}
+                        availableImages={availableImages}
+                        loading={loading}
+                        error={error}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        handleImageSelect={handleImageSelect}
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        setIsSidebarCollapsed={setIsSidebarCollapsed}
+                    />
+                </div>
+            )}
+            {isSidebarCollapsed && (
+                <div className="group relative">
+                    <button
+                        onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                        className="flex items-center justify-center w-6 h-6 rounded-full border border-gray-200 mb-2
+                            text-teal-600 hover:text-teal-700 hover:bg-gray-50
+                            transition-all duration-200 ease-in-out
+                            focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-opacity-50"
+                        aria-label="Expand sidebar"
+                    >
+                        <ArrowRight className="h-4 w-4" />
+                    </button>
+                    <div className="absolute left-full top-0 ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded 
+                        opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 pointer-events-none">
+                        Expand sidebar
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
