@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, Download, FolderOpen } from "lucide-react";
+import { Plus, FolderOpen } from "lucide-react";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";

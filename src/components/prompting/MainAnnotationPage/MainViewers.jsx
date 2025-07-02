@@ -67,7 +67,8 @@ const MainViewers = ({
       selectedContours.length > 0;
 
   return (
-      <div className="flex flex-col xl:flex-row gap-3 mb-4">
+    <div className={`flex ${showFinalMaskViewer ? 'flex-col xl:flex-row' : 'flex-col'} gap-3 mb-4`}>
+      <div className={showFinalMaskViewer ? 'flex-1' : 'w-full max-w-[900px] mx-auto'}>
         <AnnotationViewer
             imageObject={imageObject}
             loading={loading}
@@ -93,41 +94,44 @@ const MainViewers = ({
             onInstantSegmentationStateChange={onInstantSegmentationStateChange}
             finalMasks={finalMasks}
         />
-
-        {showFinalMaskViewer && (
-            <FinalMaskViewer
-                segmentationMasks={segmentationMasks}
-                selectedMask={selectedMask}
-                selectedContours={selectedContours}
-                isSegmenting={isSegmenting}
-                loading={loading}
-                finalMasks={finalMasks}
-                finalMask={finalMask}
-                selectedFinalMaskContour={selectedFinalMaskContour}
-                zoomLevel={zoomLevel}
-                zoomCenter={zoomCenter}
-                canvasImage={canvasImage}
-                finalMaskCanvasRef={finalMaskCanvasRef}
-                handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
-                handleDeleteSelectedContours={handleDeleteSelectedContours}
-                setSelectedContours={setSelectedContours}
-                handleRunNewSegmentation={handleRunNewSegmentation}
-                handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
-                handleDeleteFinalMaskContour={handleDeleteFinalMaskContour}
-                clearAllFinalMaskContours={clearAllFinalMaskContours}
-                setSelectedFinalMaskContour={setSelectedFinalMaskContour}
-                setZoomLevel={setZoomLevel}
-                setZoomCenter={setZoomCenter}
-                handleFinalMaskContourSelect={handleFinalMaskContourSelect}
-                drawFinalMaskCanvas={drawFinalMaskCanvas}
-                annotationZoomLevel={annotationZoomLevel}
-                annotationZoomCenter={annotationZoomCenter}
-                setAnnotationZoomLevel={setAnnotationZoomLevel}
-                setAnnotationZoomCenter={setAnnotationZoomCenter}
-                promptingCanvasRef={promptingCanvasRef}
-            />
-        )}
       </div>
+
+      {showFinalMaskViewer && (
+        <div className="flex-1">
+          <FinalMaskViewer
+              segmentationMasks={segmentationMasks}
+              selectedMask={selectedMask}
+              selectedContours={selectedContours}
+              isSegmenting={isSegmenting}
+              loading={loading}
+              finalMasks={finalMasks}
+              finalMask={finalMask}
+              selectedFinalMaskContour={selectedFinalMaskContour}
+              zoomLevel={zoomLevel}
+              zoomCenter={zoomCenter}
+              canvasImage={canvasImage}
+              finalMaskCanvasRef={finalMaskCanvasRef}
+              handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
+              handleDeleteSelectedContours={handleDeleteSelectedContours}
+              setSelectedContours={setSelectedContours}
+              handleRunNewSegmentation={handleRunNewSegmentation}
+              handleFinalMaskCanvasClick={handleFinalMaskCanvasClick}
+              handleDeleteFinalMaskContour={handleDeleteFinalMaskContour}
+              clearAllFinalMaskContours={clearAllFinalMaskContours}
+              setSelectedFinalMaskContour={setSelectedFinalMaskContour}
+              setZoomLevel={setZoomLevel}
+              setZoomCenter={setZoomCenter}
+              handleFinalMaskContourSelect={handleFinalMaskContourSelect}
+              drawFinalMaskCanvas={drawFinalMaskCanvas}
+              annotationZoomLevel={annotationZoomLevel}
+              annotationZoomCenter={annotationZoomCenter}
+              setAnnotationZoomLevel={setAnnotationZoomLevel}
+              setAnnotationZoomCenter={setAnnotationZoomCenter}
+              promptingCanvasRef={promptingCanvasRef}
+          />
+        </div>
+      )}
+    </div>
   );
 };
 

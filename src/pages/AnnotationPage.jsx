@@ -90,11 +90,11 @@ const AnnotationPage = () => {
         <div className="max-w-[98%] mx-auto px-2 py-2.5 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => navigate("/datasets")}
+              onClick={() => navigate(`/dataset/${datasetId}/gallery`)}
               className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
             >
               <ArrowLeft size={20} />
-              <span>Back to Datasets</span>
+              <span>Back to Gallery</span>
             </button>
             <div className="h-6 w-px bg-teal-400"></div>
             <h1 className="text-2xl font-bold">AquaMorph</h1>

@@ -23,8 +23,8 @@ const Sidebar = ({
         <div
             className={`bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${
                 isSidebarCollapsed
-                    ? "md:col-span-1 w-auto overflow-hidden p-2"
-                    : "md:col-span-1 p-6"
+                    ? "md:col-span-1 w-[50px] overflow-hidden p-2"
+                    : "md:col-span-1 w-[280px] p-4"
             }`}
         >
             {/* Toggle Button */}
@@ -52,11 +52,11 @@ const Sidebar = ({
                 } items-center mb-4`}
             >
                 {!isSidebarCollapsed && (
-                    <div>
-                        <h2 className="text-lg font-semibold flex items-center">
+                    <div className="w-full">
+                        <h2 className="text-base font-semibold flex items-center mb-4">
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
-                                className="h-5 w-5 mr-2 text-teal-600"
+                                className="h-4 w-4 mr-2 text-teal-600"
                                 viewBox="0 0 20 20"
                                 fill="currentColor"
                             >
