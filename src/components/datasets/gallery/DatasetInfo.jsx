@@ -57,10 +57,6 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="text-sm text-gray-600 space-y-1">
               <div className="flex justify-between">
-                <span>Total images:</span>
-                <span className="font-medium">{stats.total || 0}</span>
-              </div>
-              <div className="flex justify-between">
                 <span>Completed:</span>
                 <span className="font-medium text-green-600">
                   {((stats.manuallyAnnotated || 0) + (stats.autoAnnotated || 0))}
