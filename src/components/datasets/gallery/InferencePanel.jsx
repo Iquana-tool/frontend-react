@@ -71,12 +71,12 @@ const InferencePanel = ({ dataset }) => {
   const selectedModelData = availableModels.find(m => m.id === selectedModel);
 
   return (
-    <div className="p-6 h-full overflow-y-auto">
+    <div className="p-5 h-full overflow-y-auto">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
+      <div className="mb-5">
+        <div className="flex items-center mb-2">
           <Brain className="w-5 h-5 text-teal-600 mr-2" />
-          <h2 className="text-xl font-bold text-gray-900">Inference Model</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Inference Model</h2>
         </div>
         <p className="text-sm text-gray-600">
           Select the AI architecture to train on this dataset
@@ -84,72 +84,72 @@ const InferencePanel = ({ dataset }) => {
       </div>
 
       {/* Model Selection */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Model</h3>
-        <div className="space-y-2">
+      <div className="mb-5">
+        <h3 className="text-base font-medium text-gray-900 mb-2">Model</h3>
+        <select
+          value={selectedModel}
+          onChange={(e) => handleModelSelect(e.target.value)}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
+        >
           {availableModels.map((model) => (
-            <div
-              key={model.id}
-              className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                selectedModel === model.id
-                  ? "border-teal-500 bg-teal-50"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              onClick={() => handleModelSelect(model.id)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h4 className="font-medium text-gray-900">{model.name}</h4>
-                  <p className="text-sm text-gray-600">{model.description}</p>
-                </div>
-                <div className="ml-3">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                    model.status === "Ready" 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-yellow-100 text-yellow-800"
-                  }`}>
-                    {model.status}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
-                <span>Accuracy: {model.accuracy}</span>
-                <span>Speed: {model.speed}</span>
-              </div>
-            </div>
+            <option key={model.id} value={model.id}>
+              {model.name} - {model.description}
+            </option>
           ))}
-        </div>
+        </select>
+
+        {/* Selected Model Info */}
+        {selectedModelData && (
+          <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h4 className="text-sm font-medium text-gray-900">{selectedModelData.name}</h4>
+                <p className="text-sm text-gray-600">{selectedModelData.description}</p>
+              </div>
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                selectedModelData.status === "Ready" 
+                  ? "bg-green-100 text-green-800" 
+                  : "bg-yellow-100 text-yellow-800"
+              }`}>
+                {selectedModelData.status}
+              </span>
+            </div>
+            <div className="flex items-center space-x-4 text-sm text-gray-500">
+              <span>Accuracy: {selectedModelData.accuracy}</span>
+              <span>Speed: {selectedModelData.speed}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Model Performance */}
       {selectedModelData && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Performance (on selected classes)</h3>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="grid grid-cols-4 gap-4 text-center">
+        <div className="mb-5">
+          <h3 className="text-base font-medium text-gray-900 mb-2">Performance (on selected classes)</h3>
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="grid grid-cols-4 gap-3 text-center">
               <div>
-                <div className="text-xs text-gray-500 mb-1">Coral</div>
-                <div className="text-lg font-bold text-green-600">86%</div>
+                <div className="text-sm text-gray-500">Coral</div>
+                <div className="text-base font-bold text-green-600">86%</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1">Polyp</div>
-                <div className="text-lg font-bold text-green-600">91%</div>
+                <div className="text-sm text-gray-500">Polyp</div>
+                <div className="text-base font-bold text-green-600">91%</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1">Skeleton</div>
-                <div className="text-lg font-bold text-green-600">84%</div>
+                <div className="text-sm text-gray-500">Skeleton</div>
+                <div className="text-base font-bold text-green-600">84%</div>
               </div>
               <div>
-                <div className="text-xs text-gray-500 mb-1">Ruler</div>
-                <div className="text-lg font-bold text-green-600">95%</div>
+                <div className="text-sm text-gray-500">Ruler</div>
+                <div className="text-base font-bold text-green-600">95%</div>
               </div>
             </div>
             
-            <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="mt-3 pt-3 border-t border-gray-200">
               <div className="flex items-center justify-center">
                 <BarChart3 className="w-4 h-4 text-teal-600 mr-2" />
-                <span className="text-lg font-bold text-gray-900">86%</span>
+                <span className="text-base font-bold text-gray-900">86%</span>
                 <span className="text-sm text-gray-500 ml-1">Average Dice Score</span>
               </div>
             </div>
@@ -158,10 +158,10 @@ const InferencePanel = ({ dataset }) => {
       )}
 
       {/* Training */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Training</h3>
+      <div className="mb-5">
+        <h3 className="text-base font-medium text-gray-900 mb-2">Training</h3>
         
-        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+        <div className="bg-gray-50 p-3 rounded-lg mb-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Last trained on:</span>
             <span className="text-sm text-gray-600">12/04/2024</span>
@@ -176,39 +176,39 @@ const InferencePanel = ({ dataset }) => {
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           <button
             onClick={handleStartInference}
             disabled={isRunning}
-            className="w-full flex items-center justify-center space-x-2 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center space-x-2 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
           >
-            <Cpu size={18} />
+            <Cpu size={16} />
             <span>Reset model</span>
           </button>
           
           <button
             onClick={handleStartInference}
             disabled={isRunning}
-            className="w-full flex items-center justify-center space-x-2 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center space-x-2 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 text-sm"
           >
-            <Pause size={18} />
+            <Pause size={16} />
             <span>Continue last checkpoint</span>
           </button>
         </div>
       </div>
 
       {/* Inference */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3">Inference</h3>
-        <p className="text-sm text-gray-600 mb-4">
+      <div className="mb-5">
+        <h3 className="text-base font-medium text-gray-900 mb-2">Inference</h3>
+        <p className="text-sm text-gray-600 mb-3">
           Use this model to automatically annotate images, infer annotations for these image types:
         </p>
         
-        <div className="space-y-3 mb-4">
+        <div className="space-y-2 mb-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Automatically annotated (override):</span>
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
-              Automatically annotated (override)
+              Auto
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -222,78 +222,28 @@ const InferencePanel = ({ dataset }) => {
         <button
           onClick={handleStartInference}
           disabled={isRunning}
-          className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-3 px-4 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+          className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 text-sm"
         >
-          <Zap size={18} />
+          <Zap size={16} />
           <span>Infer</span>
         </button>
       </div>
 
-      {/* Settings */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
-          <Settings className="w-4 h-4 text-gray-600 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Settings</h3>
-        </div>
-        
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Confidence Threshold: {modelSettings.confidence}
-            </label>
-            <input
-              type="range"
-              min="0.1"
-              max="1"
-              step="0.1"
-              value={modelSettings.confidence}
-              onChange={(e) => handleSettingChange('confidence', parseFloat(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Batch Size: {modelSettings.batchSize}
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="16"
-              step="1"
-              value={modelSettings.batchSize}
-              onChange={(e) => handleSettingChange('batchSize', parseInt(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">Use GPU</label>
-            <input
-              type="checkbox"
-              checked={modelSettings.useGPU}
-              onChange={(e) => handleSettingChange('useGPU', e.target.checked)}
-              className="rounded"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Progress (when running) */}
       {isRunning && (
-        <div className="mb-6">
-          <div className="flex items-center mb-3">
+        <div className="mb-5">
+          <div className="flex items-center mb-2">
             <Clock className="w-4 h-4 text-teal-600 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Progress</h3>
+            <h3 className="text-base font-medium text-gray-900">Progress</h3>
           </div>
           
-          <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="bg-gray-50 p-3 rounded-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Processed</span>
               <span className="text-sm font-medium">{mockProgress.processed}/{mockProgress.totalImages}</span>
             </div>
             
-            <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
               <div 
                 className="bg-teal-600 h-2 rounded-full transition-all"
                 style={{ width: `${(mockProgress.processed / mockProgress.totalImages) * 100}%` }}

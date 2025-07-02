@@ -180,7 +180,7 @@ const DatasetGallery = () => {
       {/* Main Content */}
       <div className="max-w-full mx-auto flex h-[calc(100vh-73px)]">
         {/* Left Sidebar - Dataset Info */}
-                <div className="w-80 bg-white border-r border-gray-200 flex-shrink-0">
+        <div className="w-100 bg-white border-r border-gray-200 flex-shrink-0">
           <DatasetInfo 
             dataset={dataset}
             stats={stats}
@@ -195,11 +195,12 @@ const DatasetGallery = () => {
           <ImageGallery 
             images={images}
             onImageClick={handleImageClick}
+            dataset={dataset}
           />
         </div>
 
         {/* Right Sidebar - Inference Model */}
-        <div className="w-80 bg-white border-l border-gray-200 flex-shrink-0">
+        <div className="w-96 bg-white border-l border-gray-200 flex-shrink-0">
           <InferencePanel dataset={dataset} />
         </div>
       </div>
