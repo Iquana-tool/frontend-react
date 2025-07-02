@@ -430,8 +430,6 @@ const AnnotationPage = ({ initialImageId = null }) => {
           availableImages={availableImages}
           loading={imageLoading || isSegmenting || fetchingFinalMask || isTransitioning}
           error={error}
-          viewMode={viewMode}
-          setViewMode={setViewMode}
           handleFileUpload={handleFileUploadWrapper}
           handleImageSelect={imageNavigation.handleImageSelect}
           selectedModel={selectedModel}
