@@ -53,8 +53,6 @@ const AnnotationPage = ({ initialImageId = null }) => {
     setPromptType,
     currentLabel,
     setCurrentLabel,
-    viewMode,
-    setViewMode,
     isSidebarCollapsed,
     setIsSidebarCollapsed,
     successMessage,

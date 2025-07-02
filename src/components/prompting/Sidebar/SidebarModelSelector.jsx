@@ -23,7 +23,7 @@ const SidebarModelSelector = ({
     }, []);
     return (
         <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
+            <label className="text-sm font-medium text-gray-700 mb-2 flex items-center">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-4 w-4 mr-1 text-teal-600"
