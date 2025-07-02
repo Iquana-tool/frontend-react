@@ -46,8 +46,9 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
         failedCount++;
         console.error(`Error uploading ${file.name}:`, err);
       } finally {
-        uploadedCount++;
-        setUploadProgress(prev => ({ ...prev, current: uploadedCount }));
+        const newCount = uploadedCount + 1;
+        uploadedCount = newCount;
+        setUploadProgress(prev => ({ ...prev, current: newCount }));
       }
     }
 

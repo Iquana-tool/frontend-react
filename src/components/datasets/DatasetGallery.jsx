@@ -92,7 +92,7 @@ const DatasetGallery = () => {
     };
 
     fetchDatasetData();
-  }, [dataset]);
+  }, [dataset, getAnnotationProgress]);
 
   const handleStartAnnotation = async () => {
     try {

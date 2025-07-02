@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { 
   Brain, 
-  Settings, 
   Pause, 
   BarChart3, 
   Clock,
@@ -12,11 +11,6 @@ import {
 const InferencePanel = ({ dataset }) => {
   const [selectedModel, setSelectedModel] = useState("sam2");
   const [isRunning, setIsRunning] = useState(false);
-  const [modelSettings, setModelSettings] = useState({
-    confidence: 0.7,
-    batchSize: 4,
-    useGPU: true
-  });
 
   // Mock model data
   const availableModels = [
@@ -59,13 +53,6 @@ const InferencePanel = ({ dataset }) => {
 
   const handleStartInference = () => {
     setIsRunning(!isRunning);
-  };
-
-  const handleSettingChange = (setting, value) => {
-    setModelSettings(prev => ({
-      ...prev,
-      [setting]: value
-    }));
   };
 
   const selectedModelData = availableModels.find(m => m.id === selectedModel);
