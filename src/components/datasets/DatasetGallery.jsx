@@ -7,6 +7,8 @@ import ImageGallery from "./gallery/ImageGallery";
 import InferencePanel from "./gallery/InferencePanel";
 import * as api from "../../api";
 
+const BATCH_SIZE = 50; // Load images in batches of 50
+
 const DatasetGallery = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
@@ -60,25 +62,29 @@ const DatasetGallery = () => {
         if (imagesResponse.success) {
           const imageList = imagesResponse.images || [];
           
-          // Fetch thumbnails for first few images
-          const imagesWithThumbnails = await Promise.all(
-            imageList.slice(0, 20).map(async (img) => {
-              try {
-                const imageData = await api.getImageById(img.id, true);
-                return {
-                  ...img,
-                  thumbnail: imageData[img.id] ? `data:image/jpeg;base64,${imageData[img.id]}` : null
-                };
-              } catch (err) {
-                return { ...img, thumbnail: null };
-              }
-            })
-          );
-          
-          // Add remaining images without thumbnails initially
-          const remainingImages = imageList.slice(20).map(img => ({ ...img, thumbnail: null }));
-          
-          setImages([...imagesWithThumbnails, ...remainingImages]);
+          // Load initial batch of thumbnails
+          const initialBatch = imageList.slice(0, BATCH_SIZE);
+          const remainingImages = imageList.slice(BATCH_SIZE);
+
+          try {
+            const imageData = await api.getImages(initialBatch.map(img => img.id), true);
+            const imagesWithThumbnails = initialBatch.map(img => ({
+              ...img,
+              thumbnail: imageData.images[img.id] ? `data:image/jpeg;base64,${imageData.images[img.id]}` : null
+            }));
+
+            // Add remaining images without thumbnails initially
+            const allImages = [
+              ...imagesWithThumbnails,
+              ...remainingImages.map(img => ({ ...img, thumbnail: null }))
+            ];
+            
+            setImages(allImages);
+          } catch (err) {
+            console.error("Error loading initial thumbnails:", err);
+            // If thumbnail loading fails, still show the images without thumbnails
+            setImages(imageList.map(img => ({ ...img, thumbnail: null })));
+          }
         }
 
         setLabels(Array.isArray(labelsResponse) ? labelsResponse : labelsResponse?.labels || []);
@@ -199,8 +205,8 @@ const DatasetGallery = () => {
           />
         </div>
 
-        {/* Right Sidebar - Inference Model */}
-        <div className="w-96 bg-white border-l border-gray-200 flex-shrink-0">
+        {/* Right Sidebar - Inference Panel */}
+        <div className="w-100 bg-white border-l border-gray-200 flex-shrink-0">
           <InferencePanel dataset={dataset} />
         </div>
       </div>

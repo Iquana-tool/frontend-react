@@ -12,7 +12,9 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [uploadingFiles, setUploadingFiles] = useState([]);
   const [uploadErrors, setUploadErrors] = useState([]);
+  const [loadingErrors, setLoadingErrors] = useState(new Map());
   const observerRef = useRef();
+  const retryTimeoutsRef = useRef(new Map());
 
   const onDrop = useCallback((acceptedFiles) => {
     setUploadingFiles(prev => [...prev, ...acceptedFiles]);
@@ -25,6 +27,76 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
     },
     multiple: true
   });
+
+  // Batch load images
+  const loadImageThumbnails = useCallback(async (imageIds) => {
+    const newIds = imageIds.filter(id => !loadedImages.has(id) && !loadingErrors.has(id));
+    if (newIds.length === 0) return;
+    
+    try {
+      const imageData = await api.getImages(newIds, true);
+      if (imageData && imageData.images) {
+        setLoadedImages(prev => new Set([...prev, ...newIds]));
+        // Update images in place
+        newIds.forEach(id => {
+          const imgElement = document.querySelector(`[data-image-id="${id}"] img`);
+          if (imgElement && imageData.images[id]) {
+            imgElement.src = `data:image/jpeg;base64,${imageData.images[id]}`;
+            imgElement.classList.remove("opacity-50");
+          }
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to load thumbnails:`, error);
+      // Track failed loads for retry
+      newIds.forEach(id => {
+        setLoadingErrors(prev => new Map(prev).set(id, (prev.get(id) || 0) + 1));
+        // Schedule retry if we haven't tried too many times
+        if ((loadingErrors.get(id) || 0) < 3) {
+          if (retryTimeoutsRef.current.has(id)) {
+            clearTimeout(retryTimeoutsRef.current.get(id));
+          }
+          const timeoutId = setTimeout(() => {
+            loadImageThumbnails([id]);
+          }, 2000 * (loadingErrors.get(id) || 1)); // Exponential backoff
+          retryTimeoutsRef.current.set(id, timeoutId);
+        }
+      });
+    }
+  }, [loadedImages, loadingErrors]);
+
+  // Intersection Observer setup with improved configuration
+  useEffect(() => {
+    const timeoutsRef = retryTimeoutsRef.current;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const intersectingIds = entries
+          .filter(entry => entry.isIntersecting)
+          .map(entry => parseInt(entry.target.dataset.imageId))
+          .filter(id => id && !loadedImages.has(id));
+
+        if (intersectingIds.length > 0) {
+          // Load images in batches of 10
+          for (let i = 0; i < intersectingIds.length; i += 10) {
+            const batch = intersectingIds.slice(i, i + 10);
+            loadImageThumbnails(batch);
+          }
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '100% 0px' // Start loading images when they're 100% of the viewport height away
+      }
+    );
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+      timeoutsRef.forEach(timeoutId => clearTimeout(timeoutId));
+      timeoutsRef.clear();
+    };
+  }, [loadImageThumbnails, loadedImages]);
 
   const handleUpload = async () => {
     if (uploadingFiles.length === 0) return;
@@ -81,54 +153,6 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
     
     return matchesSearch && matchesFilter;
   });
-
-  // Lazy load image thumbnails
-  const loadImageThumbnail = useCallback(async (imageId) => {
-    if (loadedImages.has(imageId)) return;
-    
-    try {
-      const imageData = await api.getImageById(imageId, true);
-      if (imageData && imageData[imageId]) {
-        const thumbnail = `data:image/jpeg;base64,${imageData[imageId]}`;
-        
-        // Update the specific image in the parent component would be ideal,
-        // but for now we'll track loaded images
-        setLoadedImages(prev => new Set([...prev, imageId]));
-        
-        // Update image in place
-        const imgElement = document.querySelector(`[data-image-id="${imageId}"] img`);
-        if (imgElement) {
-          imgElement.src = thumbnail;
-          imgElement.classList.remove("opacity-50");
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to load thumbnail for image ${imageId}:`, error);
-    }
-  }, [loadedImages]);
-
-  // Intersection observer for lazy loading
-  useEffect(() => {
-    observerRef.current = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const imageId = entry.target.dataset.imageId;
-            if (imageId && !loadedImages.has(parseInt(imageId))) {
-              loadImageThumbnail(parseInt(imageId));
-            }
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [loadImageThumbnail, loadedImages]);
 
   // Setup intersection observer for visible image elements
   useEffect(() => {
@@ -451,4 +475,4 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
   );
 };
 
-export default ImageGallery; 
+export default ImageGallery;
