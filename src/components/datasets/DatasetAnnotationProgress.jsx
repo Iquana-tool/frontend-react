@@ -10,7 +10,11 @@ import {
 const COLORS = ["#3B82F6", "#10B981", "#EF4444"]; // Blue, Green, Red
 
 const DatasetAnnotationProgress = ({ stats }) => {
-  const total = stats.manuallyAnnotated + stats.autoAnnotated + stats.missing;
+  // Ensure we have valid numbers, default to 0 if undefined/null
+  const manuallyAnnotated = stats?.manuallyAnnotated || 0;
+  const autoAnnotated = stats?.autoAnnotated || 0;
+  const missing = stats?.missing || 0;
+  const total = manuallyAnnotated + autoAnnotated + missing;
 
   if (total === 0) {
     return (
@@ -21,52 +25,54 @@ const DatasetAnnotationProgress = ({ stats }) => {
   }
 
   const data = [
-    { name: "Manual", value: stats.manuallyAnnotated },
-    { name: "Auto", value: stats.autoAnnotated },
-    { name: "Missing", value: stats.missing }
+    { name: "Manual", value: manuallyAnnotated },
+    { name: "Auto", value: autoAnnotated },
+    { name: "Missing", value: missing }
   ];
 
   return (
-    <div className="mb-4 flex items-start gap-4">
+    <div className="mb-4">
       {/* Text Summary */}
-      <div className="flex-1 space-y-1 text-sm">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">
+      <div className="space-y-2 text-sm">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">
           Annotation status:
         </h4>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
-          <span>
-            Manually annotated: {stats.manuallyAnnotated} ({Math.round((stats.manuallyAnnotated / total) * 100)}%)
-          </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+            <span>Manually annotated:</span>
+          </div>
+          <span className="font-medium">{manuallyAnnotated} ({Math.round((manuallyAnnotated / total) * 100)}%)</span>
         </div>
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
-          <span>
-            Auto annotated: {stats.autoAnnotated} ({Math.round((stats.autoAnnotated / total) * 100)}%)
-          </span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+            <span>Auto annotated:</span>
+          </div>
+          <span className="font-medium">{autoAnnotated} ({Math.round((autoAnnotated / total) * 100)}%)</span>
         </div>
-        {stats.missing > 0 && (
+        <div className="flex items-center justify-between">
           <div className="flex items-center">
             <div className="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
-            <span>
-              Missing: {stats.missing} ({Math.round((stats.missing / total) * 100)}%)
-            </span>
+            <span>Missing:</span>
           </div>
-        )}
+          <span className="font-medium">{missing} ({Math.round((missing / total) * 100)}%)</span>
+        </div>
       </div>
 
-      {/* Pie Chart */}
-      <div className="w-24 h-24">
+      {/* Compact Pie Chart */}
+      <div className="w-16 h-16 mx-auto mt-3">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              outerRadius={40}
+              outerRadius={25}
               fill="#8884d8"
               dataKey="value"
-              stroke="none"
+              stroke="white"
+              strokeWidth={1}
             >
               {data.map((_, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
