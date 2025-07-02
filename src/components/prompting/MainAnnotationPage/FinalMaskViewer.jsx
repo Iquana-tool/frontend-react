@@ -470,12 +470,14 @@ const FinalMaskViewer = ({
 
       {/* Bottom spacing to match the button area height */}
       <div>
-        <div className="viewer-controls flex justify-end items-center mt-2 gap-4 px-4 py-3 pr-8">
-          <FinishButton
-            maskId={finalMask?.id}
-          />
-          <NextButton />
-        </div>
+        {finalMasks.length > 0 && (
+          <div className="viewer-controls flex justify-end items-center mt-2 gap-4 px-4 py-3 pr-8">
+            <FinishButton
+              maskId={finalMask?.id}
+            />
+            <NextButton />
+          </div>
+        )}
       </div>
     </div>
   );

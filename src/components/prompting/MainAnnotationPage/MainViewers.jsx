@@ -62,9 +62,8 @@ const MainViewers = ({
   }
 
   const showFinalMaskViewer =
-      (finalMasks.length > 0 &&
-          finalMasks.some((mask) => mask.contours?.length > 0)) ||
-      selectedContours.length > 0;
+      finalMasks.length > 0 &&
+      finalMasks.some((mask) => mask.contours?.length > 0);
 
   return (
     <div className={`flex ${showFinalMaskViewer ? 'flex-col xl:flex-row' : 'flex-col'} gap-3 mb-4`}>
