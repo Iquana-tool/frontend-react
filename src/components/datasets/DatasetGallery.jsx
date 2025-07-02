@@ -10,7 +10,7 @@ import * as api from "../../api";
 const DatasetGallery = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
-  const { datasets, currentDataset, selectDataset, loading } = useDataset();
+  const { datasets, currentDataset, selectDataset, loading, getAnnotationProgress } = useDataset();
   
   const [dataset, setDataset] = useState(null);
   const [images, setImages] = useState([]);
@@ -54,7 +54,7 @@ const DatasetGallery = () => {
         const [imagesResponse, labelsResponse, statsResponse] = await Promise.all([
           api.fetchImages(dataset.id),
           api.fetchLabels(dataset.id).catch(() => []),
-          api.getAnnotationProgress(dataset.id).catch(() => ({ manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 }))
+          getAnnotationProgress(dataset.id)
         ]);
 
         if (imagesResponse.success) {
