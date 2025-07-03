@@ -370,3 +370,63 @@ export const deleteImage = async (imageId) => {
         throw error;
     }
 };
+
+// Get multiple images by IDs
+export const getImages = async (imageIds, low_res) => {
+    try {
+        const maxRetries = 3;
+        let retries = 0;
+        let lastError = null;
+
+        while (retries < maxRetries) {
+            try {
+                const url = new URL(`${API_BASE_URL}/images/get_images`);
+                url.searchParams.append('image_ids', JSON.stringify(imageIds));
+                url.searchParams.append('low_res', low_res);
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    // If we get a 404, don't retry - the images don't exist
+                    if (response.status === 404) {
+                        throw new Error(`Images not found`);
+                    }
+
+                    // For other errors, retry
+                    throw new Error(`Failed to fetch images: ${response.statusText}`);
+                }
+
+                // Try to parse as JSON, retry if parsing fails
+                try {
+                    const data = await response.json();
+                    return data;
+                } catch (parseError) {
+                    throw new Error("Invalid response format from server");
+                }
+            } catch (err) {
+                lastError = err;
+                retries++;
+
+                if (retries >= maxRetries) {
+                    break;
+                }
+
+                // Wait before retrying, with increasing backoff
+                const delay = 300 * retries;
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+
+        throw (
+            lastError ||
+            new Error(`Failed to fetch images after ${maxRetries} attempts`)
+        );
+    } catch (error) {
+        throw error;
+    }
+};
