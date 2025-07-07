@@ -85,7 +85,7 @@ export const segmentImage = async (
             });
         }
 
-        const response = await fetch(`${API_BASE_URL}/segmentation/segment_image`, {
+        const response = await fetch(`${API_BASE_URL}/prompted_segmentation/segment_image`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
