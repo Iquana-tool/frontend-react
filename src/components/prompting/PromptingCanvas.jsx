@@ -1,25 +1,26 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Trash2, Play, Loader2 } from "lucide-react";
+import { Trash2, Play, Loader2, Check, } from "lucide-react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
 import { useInstantSegmentation } from './hooks/useInstantSegmentation';
 import CanvasRenderer from './components/CanvasRenderer';
-import SegmentationOverlay from './components/SegmentationOverlay';
+
 import PromptSelectionOverlay from './components/PromptSelectionOverlay';
+import ManualContourOverlay from './components/ManualContourOverlay';
 
 // This component allows users to add different types of prompts to an image for segmentation tasks.
 const PromptingCanvas = forwardRef(({
   image,
   onPromptingComplete,
-  selectedMask: selectedMaskProp,
   promptType,
   currentLabel,
   selectedContour,
   onContourSelect,
   onAddToFinalMask,
-  onClearSegmentationResults,
   selectedFinalMaskContour,
   finalMasks,
+  segmentationMasks = [],
+  selectedContourIds = [],
   enableInstantSegmentation = false,
   instantSegmentationDebounce = 1000,
   onInstantSegmentationStateChange,
@@ -32,11 +33,12 @@ const PromptingCanvas = forwardRef(({
   // Basic state
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [initialScale, setInitialScale] = useState(1);
-  const [selectedMask, setSelectedMask] = useState(null);
   const [activeTool, setActiveTool] = useState("point");
-  const [selectedContours, setSelectedContours] = useState([]);
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
   const [forceRender, setForceRender] = useState(0);
+
+  // Add loading state for manual contour addition
+  const [manualAddLoading, setManualAddLoading] = useState(false);
 
   // Initialize pan/zoom hook
   const panZoom = usePanZoom(image, canvasSize, initialScale);
@@ -64,13 +66,18 @@ const PromptingCanvas = forwardRef(({
     prompts,
     currentShape,
     currentPolygon,
+    currentManualContour,
+    manualContours,
     cursorPos,
     handlePromptMouseDown,
     handlePromptMouseMove,
     handlePromptMouseUp,
     handlePromptDoubleClick,
     clearPrompts,
-    getFormattedPrompts
+    clearManualContours,
+    removeManualContour,
+    getFormattedPrompts,
+    getFormattedManualContours,
   } = promptDrawing;
 
   // Initialize instant segmentation hook
@@ -102,16 +109,24 @@ const PromptingCanvas = forwardRef(({
     }
   }, [isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, onInstantSegmentationStateChange]);
 
+  // Synchronize local contour selection with parent component/state
   useEffect(() => {
-    if (selectedMaskProp) {
-      setSelectedMask(selectedMaskProp);
+    if (onContourSelect) {
+      onContourSelect([]);
     }
-  }, [selectedMaskProp]);
+  }, [onContourSelect]);
 
   // Redraw function for canvas renderer
   const redrawCanvasCallback = useCallback((customPanOffset) => {
     // Force a re-render by incrementing the counter
     setForceRender(prev => prev + 1);
+  }, []);
+
+  // Handle manual contour completion
+  const handleManualContourComplete = useCallback((contour) => {
+    // Do nothing here—just let the contour appear in the overlay for user review
+    // (Previously, this would call onAddToFinalMask, but that's not desired)
+    return;
   }, []);
 
   // Expose methods to parent component via ref
@@ -120,18 +135,10 @@ const PromptingCanvas = forwardRef(({
     clearPrompts: () => {
       clearPrompts();
     },
-    updateSelectedMask: (mask) => {
-      if (!selectedMask || mask === null || selectedMask.id !== mask?.id) {
-        setSelectedMask(mask);
-      }
-    },
     setActiveTool: (tool) => {
       setActiveTool(tool);
     },
-    getSelectedContours: () => selectedContours,
-    clearSelectedContours: () => {
-      setSelectedContours([]);
-    },
+    getSelectedContours: () => [],
     setZoomParameters: setZoomParameters,
     zoomIn: () => zoomIn(redrawCanvasCallback),
     zoomOut: () => zoomOut(redrawCanvasCallback),
@@ -141,8 +148,14 @@ const PromptingCanvas = forwardRef(({
     setInstantSegmentationEnabled: setIsInstantSegmentationEnabled,
     isInstantSegmentationEnabled,
     isInstantSegmenting,
-    shouldSuppressLoadingModal
-  }), [prompts, clearPrompts, selectedMask, setSelectedMask, setActiveTool, selectedContours, setSelectedContours, setZoomParameters, zoomIn, zoomOut, resetView, redrawCanvasCallback, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal]);
+    shouldSuppressLoadingModal,
+    // Manual contour controls
+    getManualContours: () => manualContours,
+    clearManualContours,
+    getFormattedManualContours,
+    // Force redraw for external updates
+    forceRedraw: () => setForceRender(prev => prev + 1),
+    }), [prompts, clearPrompts, setActiveTool, setZoomParameters, zoomIn, zoomOut, resetView, redrawCanvasCallback, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, manualContours, clearManualContours, getFormattedManualContours, setForceRender]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -153,7 +166,6 @@ const PromptingCanvas = forwardRef(({
 
     if (!currentLabel) {
       console.warn("No label selected. Please select a label before segmenting.");
-      // You could also show a toast notification here if you have a notification system
       return;
     }
 
@@ -211,69 +223,20 @@ const PromptingCanvas = forwardRef(({
     };
   }, [updateCanvasSize]);
 
-  // Function to check if a point is inside a contour
-  const isPointInContour = useCallback((x, y, contour) => {
-    if (!contour || !contour.x || !contour.y || contour.x.length < 3) return false;
-    
-    let inside = false;
-    const n = contour.x.length;
-    
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-      const xi = contour.x[i] * image.width;
-      const yi = contour.y[i] * image.height;
-      const xj = contour.x[j] * image.width;
-      const yj = contour.y[j] * image.height;
-      
-      const intersect = ((yi > y) !== (yj > y)) &&
-        (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-    }
-    
-    return inside;
-  }, [image]);
+
 
   // Handle mouse down event
   const handleMouseDown = useCallback((e) => {
-    if (!canvasRef.current || !image) return;
-
-    // Get canvas-relative coordinates
+    if (!image || !canvasRef.current) return;
+    
     const rect = canvasRef.current.getBoundingClientRect();
     const canvasX = e.clientX - rect.left;
     const canvasY = e.clientY - rect.top;
-
-    // Convert to image coordinates
+    
     const imageCoords = canvasToImageCoords(canvasX, canvasY);
     if (!imageCoords) return;
 
-    // Handle contour selection if activeTool is 'select'
-    if (
-      activeTool === "select" &&
-      selectedMask &&
-      selectedMask.contours &&
-      selectedMask.contours.length > 0
-    ) {
-      let foundContourIndex = -1;
-      for (let i = 0; i < selectedMask.contours.length; i++) {
-        const contour = selectedMask.contours[i];
-        if (isPointInContour(imageCoords.x, imageCoords.y, contour)) {
-          foundContourIndex = i;
-          break;
-        }
-      }
-      if (foundContourIndex !== -1) {
-        // Toggle selection state of this contour
-        const newSelectedContours = [...selectedContours];
-        const contourIndex = newSelectedContours.indexOf(foundContourIndex);
-        if (contourIndex !== -1) {
-          newSelectedContours.splice(contourIndex, 1);
-        } else {
-          newSelectedContours.push(foundContourIndex);
-        }
-        setSelectedContours(newSelectedContours);
-        if (onContourSelect) onContourSelect(newSelectedContours);
-        return;
-      }
-    }
+
 
     // Handle prompt selection if select tool is active
     if (activeTool === "select" && prompts.length > 0) {
@@ -317,22 +280,18 @@ const PromptingCanvas = forwardRef(({
     if (e.button === 0 || e.button === 2) { // Left or right mouse button
       if (!isPanning) {
         const isRightClick = e.button === 2;
-        handlePromptMouseDown(canvasX, canvasY, isRightClick);
+        const drawingResult = handlePromptMouseDown(canvasX, canvasY, isRightClick);
+        
+        // If we're drawing a manual contour and it was just completed, handle it
+        if (promptType === "manual-contour" && drawingResult && typeof drawingResult === 'object') {
+          // This is a completed manual contour
+          setTimeout(() => {
+            handleManualContourComplete(drawingResult);
+          }, 50);
+        }
       }
     }
-  }, [
-    image, 
-    canvasToImageCoords, 
-    activeTool, 
-    selectedMask, 
-    selectedContours, 
-    prompts, 
-    isPointInContour, 
-    onContourSelect, 
-    handlePanStart, 
-    isPanning, 
-    handlePromptMouseDown
-  ]);
+  }, [image, canvasToImageCoords, activeTool, prompts, handlePanStart, isPanning, handlePromptMouseDown, promptType, handleManualContourComplete]);
 
   // Handle mouse move event
   const handleMouseMove = useCallback((e) => {
@@ -348,9 +307,12 @@ const PromptingCanvas = forwardRef(({
       return;
     }
 
-    // Handle prompt drawing
-    handlePromptMouseMove(x, y);
-  }, [image, isDraggingRef, handlePanMove, redrawCanvasCallback, handlePromptMouseMove]);
+    // Only update cursor position when actively drawing to reduce re-renders
+    if (isDrawing || (promptType === "polygon" && currentPolygon && currentPolygon.length > 0) || 
+        (promptType === "manual-contour" && currentManualContour && currentManualContour.length > 0)) {
+      handlePromptMouseMove(x, y);
+    }
+  }, [image, isDraggingRef, handlePanMove, redrawCanvasCallback, handlePromptMouseMove, isDrawing, promptType, currentPolygon, currentManualContour]);
 
   // Handle mouse up event
   const handleMouseUp = useCallback((e) => {
@@ -369,10 +331,18 @@ const PromptingCanvas = forwardRef(({
     }
   }, [image, handlePanEnd, isDrawing, handlePromptMouseUp]);
 
-  // Handle double click for completing polygons
+  // Handle double click for completing polygons and manual contours
   const handleDoubleClick = useCallback((e) => {
-    handlePromptDoubleClick();
-  }, [handlePromptDoubleClick]);
+    const result = handlePromptDoubleClick();
+    
+    // If we're drawing a manual contour and it was just completed, handle it
+    if (promptType === "manual-contour" && result && typeof result === 'object') {
+      // This is a completed manual contour
+      setTimeout(() => {
+        handleManualContourComplete(result);
+      }, 50);
+    }
+  }, [handlePromptDoubleClick, promptType, handleManualContourComplete]);
 
   // Handle context menu (right-click) to prevent default browser menu
   const handleContextMenu = useCallback((e) => {
@@ -381,73 +351,31 @@ const PromptingCanvas = forwardRef(({
   }, []);
 
   // Update canvas cursor based on active tool and panning state
-  useEffect(() => {
-    if (containerRef.current) {
-      if (isDraggingRef.current) {
-        containerRef.current.style.cursor = "grabbing";
-      } else if (activeTool === "drag") {
-        containerRef.current.style.cursor = "grab";
-      } else {
-        containerRef.current.style.cursor = "crosshair";
-      }
+  const getCursor = useCallback(() => {
+    if (activeTool === "drag" || isPanning) {
+      return isPanning ? "grabbing" : "grab";
     }
-  }, [activeTool, isDraggingRef]);
+    if (promptType === "manual-contour") {
+      return "crosshair";
+    }
+    return "crosshair";
+  }, [activeTool, isPanning, promptType]);
 
-  // Event listener management
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const handleCanvasWheel = (e) => {
-      handleWheel(e, redrawCanvasCallback);
-    };
-
-    // Attach canvas events
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('mouseleave', handleMouseUp);
-    canvas.addEventListener('dblclick', handleDoubleClick);
-    canvas.addEventListener('contextmenu', handleContextMenu);
-    canvas.addEventListener('wheel', handleCanvasWheel, { passive: false });
-
-    // Global mouse events for smooth panning outside canvas
-    const handleGlobalMouseMove = (e) => {
-      if (isDraggingRef.current) {
-        handlePanMove(e, redrawCanvasCallback);
-      }
-    };
-
-    const handleGlobalMouseUp = () => {
-      if (isDraggingRef.current) {
-        handlePanEnd();
-      }
-    };
-
-    document.addEventListener('mousemove', handleGlobalMouseMove);
-    document.addEventListener('mouseup', handleGlobalMouseUp);
-
-    return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('mouseleave', handleMouseUp);
-      canvas.removeEventListener('dblclick', handleDoubleClick);
-      canvas.removeEventListener('contextmenu', handleContextMenu);
-      canvas.removeEventListener('wheel', handleCanvasWheel);
-
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [handleMouseDown, handleMouseMove, handleMouseUp, handleDoubleClick, handleContextMenu, handleWheel, handlePanMove, handlePanEnd, redrawCanvasCallback, isDraggingRef]);
+  // Don't render if no image
+  if (!image) {
+    return (
+      <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg">
+        <p className="text-gray-500">No image loaded</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
       <div 
         ref={containerRef}
-        className="relative flex-1 overflow-hidden pt-4"
-        style={{ cursor: activeTool === "drag" || isPanning ? (isPanning ? "grabbing" : "grab") : "crosshair" }}
+        className="relative flex-1 overflow-hidden p-2"
+        style={{ cursor: getCursor() }}
       >
         <CanvasRenderer
           image={image}
@@ -460,21 +388,43 @@ const PromptingCanvas = forwardRef(({
           selectedPromptIndex={selectedPromptIndex}
           currentShape={currentShape}
           currentPolygon={currentPolygon}
+          currentManualContour={currentManualContour}
+          manualContours={manualContours}
           cursorPos={cursorPos}
           promptType={promptType}
           currentLabel={currentLabel}
-          selectedMask={selectedMask}
-          selectedContours={selectedContours}
+
+          selectedContours={[]}
           finalMasks={finalMasks}
           selectedFinalMaskContour={selectedFinalMaskContour}
+          segmentationMasks={segmentationMasks}
+          selectedContourIds={selectedContourIds}
           forceRender={forceRender}
           onCanvasRef={(canvas) => { canvasRef.current = canvas; }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onDoubleClick={handleDoubleClick}
+          onContextMenu={handleContextMenu}
+          onWheel={handleWheel}
         />
 
         {/* Status messages */}
         {!isDrawing && promptType === "polygon" && currentPolygon && currentPolygon.length > 0 && (
           <div className="absolute bottom-2 left-2 bg-white bg-opacity-75 px-2 py-1 rounded-md text-xs">
             Double-click to finish polygon
+          </div>
+        )}
+
+        {/* Manual contour status messages */}
+        {!isDrawing && promptType === "manual-contour" && currentManualContour && currentManualContour.length > 0 && (
+          <div className="absolute bottom-2 left-2 bg-purple-100 bg-opacity-90 px-3 py-2 rounded-md text-sm shadow-md">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+              <span className="text-purple-700 font-medium">
+                {currentManualContour.length} points • Double-click to finish
+              </span>
+            </div>
           </div>
         )}
         
@@ -503,7 +453,6 @@ const PromptingCanvas = forwardRef(({
             <div className="font-medium mb-1">Polygon Prompts:</div>
             <div className="mb-1">Left-click to add points</div>
             <div className="mb-1">Double-click to finish</div>
-            
           </div>
         )}
 
@@ -514,7 +463,6 @@ const PromptingCanvas = forwardRef(({
             <div className="mb-1">Click and drag to draw box</div>
           </div>
         )}
-
         {/* Drag tool instructions */}
         {activeTool === "drag" && (
           <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
@@ -525,27 +473,7 @@ const PromptingCanvas = forwardRef(({
           </div>
         )}
 
-        <SegmentationOverlay
-          selectedMask={selectedMask}
-          selectedContours={selectedContours}
-          onClearSegmentationResults={() => {
-            if (onClearSegmentationResults) {
-              onClearSegmentationResults();
-            }
-            setSelectedMask(null);
-            setSelectedContours([]);
-          }}
-          onAddToFinalMask={(contours) => {
-            if (onAddToFinalMask) {
-              onAddToFinalMask(contours);
-              setSelectedMask(null);
-              setSelectedContours([]);
-            }
-          }}
-          onResetSelection={() => {
-            setSelectedContours([]);
-          }}
-        />
+        {/* AI segmentation results are now handled by SegmentationOverlay in AnnotationPage.jsx */}
 
         <PromptSelectionOverlay
           selectedPromptIndex={selectedPromptIndex}
@@ -558,92 +486,137 @@ const PromptingCanvas = forwardRef(({
           }}
           onCancel={() => setSelectedPromptIndex(null)}
         />
+
+        {/* Manual Contour Management Overlay */}
+        {promptType === "manual-contour" && (
+          <ManualContourOverlay
+            manualContours={manualContours}
+            onAddToFinalMask={async (contours) => {
+              if (onAddToFinalMask) {
+                setManualAddLoading(true);
+                // Format contours for the masks API
+                const formattedContours = contours.map(contour => ({
+                  coordinates: contour.coordinates.map(point => ({
+                    x: point.x / image.width,
+                    y: point.y / image.height
+                  })),
+                  label: contour.label
+                }));
+                await onAddToFinalMask(formattedContours);
+                setManualAddLoading(false);
+                // Remove added contours from manual contours list
+                contours.forEach(contour => removeManualContour(contour.id));
+              }
+            }}
+            onRemoveContour={removeManualContour}
+            onClearAll={clearManualContours}
+            currentLabel={currentLabel}
+            manualAddLoading={manualAddLoading}
+          />
+        )}
       </div>
 
-      <div className="flex flex-col gap-2 mt-4">
-        {isInstantSegmentationEnabled && (
-          <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 bg-blue-500/90 text-white text-xs px-4 py-2 rounded-full shadow-sm transition-all duration-300 ease-in-out">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span className="font-medium">Instant Segmentation Active</span>
-              <span className="text-blue-200">•</span>
-              <span>Just place your prompt to segment</span>
-            </div>
-          </div>
-        )}
-
-        <div className="flex justify-between items-center gap-4 px-6 py-3">
-          <div>
-            {!isInstantSegmentationEnabled && prompts.length > 0 && (
-              <button
-                className="
-                  group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
-                  transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
-                  shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
-                  bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 
-                  shadow-red-500/25 hover:shadow-red-500/40
-                  min-w-[100px] relative overflow-hidden
-                  before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
-                  hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
-                "
-                onClick={() => {
-                  clearPrompts();
-                  setSelectedPromptIndex(null);
-                }}
-              >
-                <Trash2 className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
-                <span>Clear Prompts</span>
-                
-                {/* Shine effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                             opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
-                             transition-all duration-700 ease-out"></div>
-              </button>
+      {/* Complete segmentation button - Always show for non-manual contour tools */}
+      {promptType !== "manual-contour" && (
+        <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {prompts.length > 0 ? (
+              <span className="text-sm text-gray-600">
+                {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} added
+              </span>
+            ) : (
+              <span className="text-sm text-gray-500 italic">
+                Draw prompts on the image to segment objects
+              </span>
             )}
+            
           </div>
-          {!isInstantSegmentationEnabled && (
+          <div className="flex items-center gap-2">
             <button
-              className={`
-                group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
-                transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
-                shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
-                ${
-                  prompts.length === 0 || isInstantSegmenting || !currentLabel
-                    ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
-                    : "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-blue-500/25 hover:shadow-blue-500/40"
-                }
-                min-w-[140px] relative overflow-hidden
-                before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
-                hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
-              `}
+              onClick={clearPrompts}
+              disabled={prompts.length === 0}
+              className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors ${
+                prompts.length === 0
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear
+            </button>
+            <button
               onClick={handleComplete}
-              disabled={prompts.length === 0 || isInstantSegmenting || !currentLabel}
-              title={!currentLabel ? "Please select a label before segmenting" : ""}
+              disabled={!currentLabel || isSegmenting || prompts.length === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                !currentLabel || isSegmenting || prompts.length === 0
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               {isSegmenting ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="animate-pulse">Segmenting...</span>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Segmenting...
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4 group-hover:scale-110 transition-transform duration-300" />
-                  <span>Segment Object</span>
+                  <Play className="w-4 h-4" />
+                  Segment Object
                 </>
               )}
-              
-              {/* Shine effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent 
-                           opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] 
-                           transition-all duration-700 ease-out"></div>
             </button>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Manual contour completion info */}
+      {promptType === "manual-contour" && manualContours.length > 0 && (
+        <div className="p-4 bg-purple-50 border-t border-purple-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+            <span className="text-sm text-purple-700">
+              {manualContours.length} manual contour{manualContours.length !== 1 ? 's' : ''} ready
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={async () => {
+                if (onAddToFinalMask && manualContours.length > 0) {
+                  setManualAddLoading(true);
+                  // Format all contours for the masks API
+                  const formattedContours = manualContours.map(contour => ({
+                    coordinates: contour.coordinates.map(point => ({
+                      x: point.x / image.width,
+                      y: point.y / image.height
+                    })),
+                    label: contour.label
+                  }));
+                  await onAddToFinalMask(formattedContours);
+                  setManualAddLoading(false);
+                  clearManualContours();
+                }
+              }}
+              disabled={manualAddLoading}
+              className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              {manualAddLoading ? (
+                <span className="flex items-center gap-1"><Loader2 className="w-4 h-4 animate-spin" /> Adding...</span>
+              ) : (
+                <><Check className="w-4 h-4" /> Add All to Final Mask</>
+              )}
+            </button>
+            <button
+              onClick={clearManualContours}
+              className="flex items-center gap-1 px-3 py-1 text-sm text-purple-600 hover:text-purple-800 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear All
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
-
-PromptingCanvas.displayName = "PromptingCanvas";
 
 export default PromptingCanvas; 
