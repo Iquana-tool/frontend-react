@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useCanvasDrawing } from '../hooks/useCanvasDrawing';
+import { getContourStyle } from '../../../utils/labelColors';
 
 const CanvasRenderer = ({
   image,
@@ -12,21 +13,29 @@ const CanvasRenderer = ({
   selectedPromptIndex,
   currentShape,
   currentPolygon,
+  currentManualContour,
+  manualContours,
   cursorPos,
   promptType,
   currentLabel,
-  selectedMask,
   selectedContours,
   finalMasks,
   selectedFinalMaskContour,
+  segmentationMasks,
+  selectedContourIds,
   forceRender,
-  onCanvasRef
+  onCanvasRef,
+  onMouseDown,
+  onMouseMove,
+  onMouseUp,
+  onDoubleClick,
+  onContextMenu,
+  onWheel
 }) => {
   const canvasRef = useRef(null);
   
   const { 
     drawAllPrompts, 
-    drawMaskOverlay, 
     drawFinalMaskContour 
   } = useCanvasDrawing(image, initialScale, zoomLevel);
 
@@ -38,69 +47,100 @@ const CanvasRenderer = ({
   }, [onCanvasRef]);
 
   // Function to redraw the canvas
-  const redrawCanvas = useCallback((customPanOffset = null) => {
-    if (!canvasRef.current || !image) return;
-
+  const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    if (!canvas || !image || canvasSize.width === 0 || canvasSize.height === 0) return;
 
-    // Set canvas pixel dimensions (accounting for device pixel ratio for crisp rendering)
-    const pixelRatio = window.devicePixelRatio || 1;
-    canvas.width = canvasSize.width * pixelRatio;
-    canvas.height = canvasSize.height * pixelRatio;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Set canvas CSS dimensions
-    canvas.style.width = `${canvasSize.width}px`;
-    canvas.style.height = `${canvasSize.height}px`;
+    // Set canvas dimensions
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
 
-    // Scale context for high-DPI displays
-    ctx.scale(pixelRatio, pixelRatio);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
-
-    // Apply view transformations
+    // Save the canvas context
     ctx.save();
 
-    // Center the image in the canvas
-    const scale = initialScale;
-    const scaledWidth = image.width * scale * zoomLevel;
-    const scaledHeight = image.height * scale * zoomLevel;
+    // Apply zoom and pan transformations
+    const scale = initialScale * zoomLevel;
+    const centerX = canvasSize.width / 2;
+    const centerY = canvasSize.height / 2;
 
-    // Calculate centering offsets
-    let centerX = (canvasSize.width - scaledWidth) / 2;
-    let centerY = (canvasSize.height - scaledHeight) / 2;
-    
-    // If zoomCenter is provided, adjust centering to focus on that point
-    if (zoomCenter && zoomLevel > 1) {
-      // Calculate how much to offset the center based on zoomCenter
-      const zoomCenterOffsetX = (zoomCenter.x - 0.5) * scaledWidth;
-      const zoomCenterOffsetY = (zoomCenter.y - 0.5) * scaledHeight;
-      centerX -= zoomCenterOffsetX;
-      centerY -= zoomCenterOffsetY;
-    }
-
-    // Use custom pan offset if provided (for smooth panning), otherwise use state
-    const currentPanOffset = customPanOffset || panOffset;
-
-    // Apply transformations: first panOffset, then zoom
-    ctx.translate(currentPanOffset.x + centerX, currentPanOffset.y + centerY);
-    ctx.scale(scale * zoomLevel, scale * zoomLevel);
+    // Calculate image position
+    const imageWidth = image.width * scale;
+    const imageHeight = image.height * scale;
+    const imageX = centerX - (imageWidth / 2) + panOffset.x;
+    const imageY = centerY - (imageHeight / 2) + panOffset.y;
 
     // Draw the image
-    ctx.drawImage(image, 0, 0);
+    ctx.drawImage(image, imageX, imageY, imageWidth, imageHeight);
 
-    // If there's a selected mask, draw the mask overlay
-    if (selectedMask) {
-      drawMaskOverlay(ctx, selectedMask, selectedContours, scale);
-    }
+    // Transform context for drawing on image coordinates
+    ctx.translate(imageX, imageY);
+    ctx.scale(scale, scale);
+
+    // AI segmentation drawing 
 
     // Draw selected final mask contour if available
     if (finalMasks && finalMasks.length > 0 && finalMasks[0].contours && selectedFinalMaskContour) {
       drawFinalMaskContour(ctx, finalMasks, selectedFinalMaskContour, scale);
     }
 
-    // Draw all prompts on top
+    // Draw AI segmentation results contours
+    if (segmentationMasks && segmentationMasks.length > 0) {
+      segmentationMasks.forEach((mask, maskIndex) => {
+        if (!mask.contours) return;
+        
+        mask.contours.forEach((contour, contourIndex) => {
+          if (!contour?.x?.length) return;
+
+          const contourId = contour.id || `${mask.id}-${contourIndex}`;
+          const isSelected = selectedContourIds.includes(contourId);
+          
+          // Use label-based styling for AI segmentation contours
+          const style = getContourStyle(isSelected, contour.label, contour.label_name);
+          
+          ctx.lineWidth = style.lineWidth;
+          ctx.strokeStyle = style.strokeStyle;
+          ctx.fillStyle = style.fillStyle;
+          ctx.shadowColor = style.shadowColor;
+          ctx.shadowBlur = style.shadowBlur;
+
+          ctx.beginPath();
+          ctx.moveTo(contour.x[0] * image.width, contour.y[0] * image.height);
+          for (let i = 1; i < contour.x.length; i++) {
+            ctx.lineTo(contour.x[i] * image.width, contour.y[i] * image.height);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+
+          // Draw "AI" badge for selected contours using label color
+          if (isSelected) {
+            const centerX = contour.x.reduce((sum, x) => sum + x, 0) / contour.x.length * image.width;
+            const centerY = contour.y.reduce((sum, y) => sum + y, 0) / contour.y.length * image.height;
+            
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            
+            // Draw badge background using the label color
+            ctx.fillStyle = style.strokeStyle;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw "AI" text
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText('AI', centerX, centerY + 3);
+          }
+        });
+      });
+    }
+
+    // Draw all prompts and manual contours on top
     drawAllPrompts(
       ctx, 
       prompts, 
@@ -109,38 +149,65 @@ const CanvasRenderer = ({
       currentPolygon, 
       cursorPos, 
       promptType, 
-      currentLabel
+      currentLabel,
+      currentManualContour,
+      manualContours
     );
 
     // Restore the canvas context
     ctx.restore();
-  }, [
-    image, 
-    canvasSize, 
-    initialScale, 
-    zoomLevel, 
-    panOffset, 
-    zoomCenter, 
-    prompts, 
-    selectedPromptIndex, 
-    currentShape, 
-    currentPolygon, 
-    cursorPos, 
-    promptType, 
-    currentLabel, 
-    selectedMask, 
-    selectedContours, 
-    finalMasks, 
-    selectedFinalMaskContour,
-    drawAllPrompts,
-    drawMaskOverlay,
-    drawFinalMaskContour
-  ]);
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset, prompts, selectedPromptIndex, currentShape, currentPolygon, currentManualContour, manualContours, cursorPos, promptType, currentLabel, finalMasks, selectedFinalMaskContour, segmentationMasks, selectedContourIds, drawAllPrompts, drawFinalMaskContour]);
 
-  // Redraw whenever the selectedFinalMaskContour changes
+  // Redraw whenever dependencies change
   useEffect(() => {
     redrawCanvas();
-  }, [image, canvasSize, initialScale, zoomLevel, panOffset, zoomCenter, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, selectedMask, selectedContours, finalMasks, selectedFinalMaskContour, forceRender, redrawCanvas]);
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset, zoomCenter, prompts, selectedPromptIndex, currentShape, currentPolygon, currentManualContour, manualContours, cursorPos, promptType, currentLabel, selectedContours, finalMasks, selectedFinalMaskContour, segmentationMasks, selectedContourIds, forceRender, redrawCanvas]);
+
+  // Add event listeners
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleMouseDown = (e) => {
+      if (onMouseDown) onMouseDown(e);
+    };
+
+    const handleMouseMove = (e) => {
+      if (onMouseMove) onMouseMove(e);
+    };
+
+    const handleMouseUp = (e) => {
+      if (onMouseUp) onMouseUp(e);
+    };
+
+    const handleDoubleClick = (e) => {
+      if (onDoubleClick) onDoubleClick(e);
+    };
+
+    const handleContextMenu = (e) => {
+      if (onContextMenu) onContextMenu(e);
+    };
+
+    const handleWheel = (e) => {
+      if (onWheel) onWheel(e);
+    };
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('dblclick', handleDoubleClick);
+    canvas.addEventListener('contextmenu', handleContextMenu);
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mousemove', handleMouseMove);
+      canvas.removeEventListener('mouseup', handleMouseUp);
+      canvas.removeEventListener('dblclick', handleDoubleClick);
+      canvas.removeEventListener('contextmenu', handleContextMenu);
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [onMouseDown, onMouseMove, onMouseUp, onDoubleClick, onContextMenu, onWheel]);
 
   return (
     <canvas
