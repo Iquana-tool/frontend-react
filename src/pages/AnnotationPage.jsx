@@ -118,7 +118,7 @@ const AnnotationPage = () => {
         </div>
       </nav>
 
-      <main className="max-w-[98%] mx-auto py-5 px-2">
+      <main className="max-w-[98%] mx-auto py-4 px-2">
         <ImageViewerWithPrompting initialImageId={imageId ? parseInt(imageId) : null} />
       </main>
     </div>

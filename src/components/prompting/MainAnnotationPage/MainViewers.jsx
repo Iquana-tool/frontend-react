@@ -107,10 +107,28 @@ const MainViewers = ({
     
     setIsAddingManualToFinalMask(true);
     try {
+      // handleAddManualContoursToFinalMask doesn't return a value, but throws on error
       await handleAddManualContoursToFinalMask(contours);
+      
+      // Only clean up if we reach this point (no error was thrown)
       // Remove added contours from manual contours and selection
-      contours.forEach(contour => handleDeleteManualContour(contour.id));
+      contours.forEach(contour => {
+        handleDeleteManualContour(contour.id);
+      });
       setSelectedManualContourIds([]);
+      
+      // Force multiple refreshes to ensure cleanup
+      setManualContourRefresh(prev => prev + 1);
+      
+      // Force canvas redraw to clear the removed contours from annotation area
+      setTimeout(() => {
+        if (promptingCanvasRef.current) {
+          promptingCanvasRef.current.forceRedraw?.();
+        }
+        // Additional refresh after redraw
+        setManualContourRefresh(prev => prev + 1);
+      }, 100);
+      
     } catch (error) {
       console.error("Error adding manual contours to final mask:", error);
       if (setError) {
@@ -119,16 +137,34 @@ const MainViewers = ({
     } finally {
       setIsAddingManualToFinalMask(false);
     }
-  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError]);
+  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError, promptingCanvasRef]);
 
   const handleAddSingleManualToFinal = React.useCallback(async (contours) => {
     if (!contours || contours.length === 0) return;
     
     setIsAddingManualToFinalMask(true);
     try {
+      // handleAddManualContoursToFinalMask doesn't return a value, but throws on error
       await handleAddManualContoursToFinalMask(contours);
+      
+      // Only clean up if we reach this point (no error was thrown)
       // Remove added contour from manual contours and selection
-      contours.forEach(contour => handleDeleteManualContour(contour.id));
+      contours.forEach(contour => {
+        handleDeleteManualContour(contour.id);
+      });
+      
+      // Force multiple refreshes to ensure cleanup
+      setManualContourRefresh(prev => prev + 1);
+      
+      // Force canvas redraw to clear the removed contours from annotation area
+      setTimeout(() => {
+        if (promptingCanvasRef.current) {
+          promptingCanvasRef.current.forceRedraw?.();
+        }
+        // Additional refresh after redraw
+        setManualContourRefresh(prev => prev + 1);
+      }, 100);
+      
     } catch (error) {
       console.error("Error adding manual contour to final mask:", error);
       if (setError) {
@@ -137,7 +173,7 @@ const MainViewers = ({
     } finally {
       setIsAddingManualToFinalMask(false);
     }
-  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError]);
+  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError, promptingCanvasRef]);
 
   // Refresh manual contours when a new one is completed (listen for double-click events)
   React.useEffect(() => {
@@ -160,7 +196,7 @@ const MainViewers = ({
                               (finalMasks && finalMasks.length > 0 && finalMasks.some(mask => mask.contours && mask.contours.length > 0));
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       <div className="flex h-[600px]">
         {/* Left Panel - Segmentation Results */}
         <SegmentationResultsPanel
