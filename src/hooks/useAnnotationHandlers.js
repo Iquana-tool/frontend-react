@@ -88,12 +88,6 @@ export const useAnnotationHandlers = ({
           promptingCanvasRef.current.clearPrompts();
         }
 
-        // Set prompt type to select after successful segmentation
-        setPromptType("select");
-        if (promptingCanvasRef.current) {
-          promptingCanvasRef.current.setActiveTool("select");
-        }
-
         // Handle zoom state restoration if needed
         if (result.zoomState && result.zoomState.level && result.zoomState.center) {
           setTimeout(() => {
@@ -113,7 +107,7 @@ export const useAnnotationHandlers = ({
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel, setPromptType, promptingCanvasRef]);
+  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel, promptingCanvasRef]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {

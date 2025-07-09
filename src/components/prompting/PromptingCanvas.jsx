@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Trash2, Play, Loader2, Check, } from "lucide-react";
+import { Trash2, Play, Loader2, } from "lucide-react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
 import { useInstantSegmentation } from './hooks/useInstantSegmentation';
 import CanvasRenderer from './components/CanvasRenderer';
 
 import PromptSelectionOverlay from './components/PromptSelectionOverlay';
-import ManualContourOverlay from './components/ManualContourOverlay';
 
 // This component allows users to add different types of prompts to an image for segmentation tasks.
 const PromptingCanvas = forwardRef(({
@@ -36,9 +35,6 @@ const PromptingCanvas = forwardRef(({
   const [activeTool, setActiveTool] = useState("point");
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
   const [forceRender, setForceRender] = useState(0);
-
-  // Add loading state for manual contour addition
-  const [manualAddLoading, setManualAddLoading] = useState(false);
 
   // Initialize pan/zoom hook
   const panZoom = usePanZoom(image, canvasSize, initialScale);
@@ -152,10 +148,11 @@ const PromptingCanvas = forwardRef(({
     // Manual contour controls
     getManualContours: () => manualContours,
     clearManualContours,
+    removeManualContour,
     getFormattedManualContours,
     // Force redraw for external updates
     forceRedraw: () => setForceRender(prev => prev + 1),
-    }), [prompts, clearPrompts, setActiveTool, setZoomParameters, zoomIn, zoomOut, resetView, redrawCanvasCallback, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, manualContours, clearManualContours, getFormattedManualContours, setForceRender]);
+    }), [setZoomParameters, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, clearManualContours, removeManualContour, getFormattedManualContours, prompts, clearPrompts, zoomIn, redrawCanvasCallback, zoomOut, resetView, manualContours]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -487,33 +484,7 @@ const PromptingCanvas = forwardRef(({
           onCancel={() => setSelectedPromptIndex(null)}
         />
 
-        {/* Manual Contour Management Overlay */}
-        {promptType === "manual-contour" && (
-          <ManualContourOverlay
-            manualContours={manualContours}
-            onAddToFinalMask={async (contours) => {
-              if (onAddToFinalMask) {
-                setManualAddLoading(true);
-                // Format contours for the masks API
-                const formattedContours = contours.map(contour => ({
-                  coordinates: contour.coordinates.map(point => ({
-                    x: point.x / image.width,
-                    y: point.y / image.height
-                  })),
-                  label: contour.label
-                }));
-                await onAddToFinalMask(formattedContours);
-                setManualAddLoading(false);
-                // Remove added contours from manual contours list
-                contours.forEach(contour => removeManualContour(contour.id));
-              }
-            }}
-            onRemoveContour={removeManualContour}
-            onClearAll={clearManualContours}
-            currentLabel={currentLabel}
-            manualAddLoading={manualAddLoading}
-          />
-        )}
+        {/* Manual contours are managed by the unified SegmentationResultsPanel in the left column */}
       </div>
 
       {/* Complete segmentation button - Always show for non-manual contour tools */}
@@ -569,49 +540,25 @@ const PromptingCanvas = forwardRef(({
         </div>
       )}
 
-      {/* Manual contour completion info */}
-      {promptType === "manual-contour" && manualContours.length > 0 && (
-        <div className="p-4 bg-purple-50 border-t border-purple-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+      {/* Manual contour help info when tool is selected but no contours yet */}
+      {promptType === "manual-contour" && manualContours.length === 0 && (
+        <div className="p-4 bg-purple-50 border-t border-purple-200">
+          <div className="flex items-center gap-2 text-sm text-purple-700">
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-            <span className="text-sm text-purple-700">
-              {manualContours.length} manual contour{manualContours.length !== 1 ? 's' : ''} ready
-            </span>
+            <span>Click to draw manual contours directly on the image</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={async () => {
-                if (onAddToFinalMask && manualContours.length > 0) {
-                  setManualAddLoading(true);
-                  // Format all contours for the masks API
-                  const formattedContours = manualContours.map(contour => ({
-                    coordinates: contour.coordinates.map(point => ({
-                      x: point.x / image.width,
-                      y: point.y / image.height
-                    })),
-                    label: contour.label
-                  }));
-                  await onAddToFinalMask(formattedContours);
-                  setManualAddLoading(false);
-                  clearManualContours();
-                }
-              }}
-              disabled={manualAddLoading}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
-            >
-              {manualAddLoading ? (
-                <span className="flex items-center gap-1"><Loader2 className="w-4 h-4 animate-spin" /> Adding...</span>
-              ) : (
-                <><Check className="w-4 h-4" /> Add All to Final Mask</>
-              )}
-            </button>
-            <button
-              onClick={clearManualContours}
-              className="flex items-center gap-1 px-3 py-1 text-sm text-purple-600 hover:text-purple-800 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear All
-            </button>
+        </div>
+      )}
+
+      {/* Show info about manual contours being managed in left panel */}
+      {promptType === "manual-contour" && manualContours.length > 0 && (
+        <div className="p-4 bg-purple-50 border-t border-purple-200">
+          <div className="flex items-center gap-2 text-sm text-purple-700">
+            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+            <span>
+              {manualContours.length} manual contour{manualContours.length !== 1 ? 's' : ''} ready • 
+              Manage in left panel
+            </span>
           </div>
         </div>
       )}

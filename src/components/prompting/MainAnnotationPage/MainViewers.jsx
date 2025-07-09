@@ -54,29 +54,113 @@ const MainViewers = ({
   onAddSingleContourToFinalMask,
   isAddingToFinalMask,
 }) => {
-  if (!selectedImage) {
-    return (
-      <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
-        <p className="text-gray-500">Select an image to start prompting</p>
-      </div>
-    );
-  }
+  // State for manual contour selection
+  const [selectedManualContourIds, setSelectedManualContourIds] = React.useState([]);
+  const [isAddingManualToFinalMask, setIsAddingManualToFinalMask] = React.useState(false);
+  const [manualContourRefresh, setManualContourRefresh] = React.useState(0);
 
-  if (!imageObject) {
-    return (
-      <div className="flex items-center justify-center h-[500px] bg-gray-100 rounded-md">
-        <div className="flex flex-col items-center">
-          <div className="w-8 h-8 border-4 border-t-teal-600 border-r-teal-300 border-b-teal-200 border-l-teal-400 rounded-full loading-spinner mb-2"></div>
-          <p>Loading image...</p>
-        </div>
-      </div>
-    );
-  }
+  // Get manual contours from PromptingCanvas ref
+  const manualContours = React.useMemo(() => {
+    // This dependency ensures we re-fetch when manualContourRefresh changes
+    return promptingCanvasRef?.current?.getManualContours?.() || [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptingCanvasRef, manualContourRefresh]);
 
-  const showFinalMaskViewer = finalMasks.length > 0 && finalMasks.some((mask) => mask.contours?.length > 0);
+  // Manual contour handlers
+  const handleToggleManualContourSelection = React.useCallback((contourId) => {
+    setSelectedManualContourIds(prev => 
+      prev.includes(contourId) 
+        ? prev.filter(id => id !== contourId)
+        : [...prev, contourId]
+    );
+  }, []);
+
+  const handleDeleteManualContour = React.useCallback((contourId) => {
+    if (promptingCanvasRef?.current?.removeManualContour) {
+      promptingCanvasRef.current.removeManualContour(contourId);
+      setSelectedManualContourIds(prev => prev.filter(id => id !== contourId));
+      // Trigger refresh
+      setManualContourRefresh(prev => prev + 1);
+    }
+  }, [promptingCanvasRef]);
+
+  const handleSelectAllManualContours = React.useCallback(() => {
+    const allIds = manualContours.map(contour => contour.id);
+    setSelectedManualContourIds(allIds);
+  }, [manualContours]);
+
+  const handleClearManualContourSelection = React.useCallback(() => {
+    setSelectedManualContourIds([]);
+  }, []);
+
+  const handleClearAllManualContours = React.useCallback(() => {
+    if (promptingCanvasRef?.current?.clearManualContours) {
+      promptingCanvasRef.current.clearManualContours();
+      setSelectedManualContourIds([]);
+      // Trigger refresh
+      setManualContourRefresh(prev => prev + 1);
+    }
+  }, [promptingCanvasRef]);
+
+  const handleAddManualToFinal = React.useCallback(async (contours) => {
+    if (!contours || contours.length === 0) return;
+    
+    setIsAddingManualToFinalMask(true);
+    try {
+      await handleAddManualContoursToFinalMask(contours);
+      // Remove added contours from manual contours and selection
+      contours.forEach(contour => handleDeleteManualContour(contour.id));
+      setSelectedManualContourIds([]);
+    } catch (error) {
+      console.error("Error adding manual contours to final mask:", error);
+      if (setError) {
+        setError("Failed to add manual contours to final mask");
+      }
+    } finally {
+      setIsAddingManualToFinalMask(false);
+    }
+  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError]);
+
+  const handleAddSingleManualToFinal = React.useCallback(async (contours) => {
+    if (!contours || contours.length === 0) return;
+    
+    setIsAddingManualToFinalMask(true);
+    try {
+      await handleAddManualContoursToFinalMask(contours);
+      // Remove added contour from manual contours and selection
+      contours.forEach(contour => handleDeleteManualContour(contour.id));
+    } catch (error) {
+      console.error("Error adding manual contour to final mask:", error);
+      if (setError) {
+        setError("Failed to add manual contour to final mask");
+      }
+    } finally {
+      setIsAddingManualToFinalMask(false);
+    }
+  }, [handleAddManualContoursToFinalMask, handleDeleteManualContour, setError]);
+
+  // Refresh manual contours when a new one is completed (listen for double-click events)
+  React.useEffect(() => {
+    const handleDoubleClick = () => {
+      if (promptType === "manual-contour") {
+        // Small delay to ensure the contour is added before refreshing
+        setTimeout(() => {
+          setManualContourRefresh(prev => prev + 1);
+        }, 50);
+      }
+    };
+
+    // Listen for double-click events that complete manual contours
+    document.addEventListener('dblclick', handleDoubleClick);
+    return () => document.removeEventListener('dblclick', handleDoubleClick);
+  }, [promptType]);
+
+  // Determine if we should show the final mask viewer
+  const showFinalMaskViewer = (finalMask && finalMask.contours && finalMask.contours.length > 0) || 
+                              (finalMasks && finalMasks.length > 0 && finalMasks.some(mask => mask.contours && mask.contours.length > 0));
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-4">
+    <div className="flex flex-col h-full">
       <div className="flex h-[600px]">
         {/* Left Panel - Segmentation Results */}
         <SegmentationResultsPanel
@@ -90,6 +174,18 @@ const MainViewers = ({
           onAddToFinalMask={onAddToFinalMask}
           onAddSingleContourToFinalMask={onAddSingleContourToFinalMask}
           isAddingToFinalMask={isAddingToFinalMask}
+          // Manual contour props
+          manualContours={manualContours}
+          selectedManualContourIds={selectedManualContourIds}
+          onToggleManualContourSelection={handleToggleManualContourSelection}
+          onDeleteManualContour={handleDeleteManualContour}
+          onSelectAllManualContours={handleSelectAllManualContours}
+          onClearManualContourSelection={handleClearManualContourSelection}
+          onClearAllManualContours={handleClearAllManualContours}
+          onAddManualContoursToFinalMask={handleAddManualToFinal}
+          onAddSingleManualContourToFinalMask={handleAddSingleManualToFinal}
+          isAddingManualToFinalMask={isAddingManualToFinalMask}
+          currentLabel={currentLabel}
         />
 
         {/* Center Panel - Annotation Drawing Area */}
