@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Trash2, Brain, Layers, Sparkles } from 'lucide-react';
-import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
+import { Check, X, Trash2, Brain, Sparkles } from 'lucide-react';
 import { useDataset } from '../../../contexts/DatasetContext';
 import * as api from '../../../api';
 
@@ -66,12 +65,6 @@ const SegmentationResultsPanel = ({
     if (onAddSingleContourToFinalMask) {
       onAddSingleContourToFinalMask([contour]);
     }
-  };
-
-  const getContourPointCount = (contour) => {
-    if (contour.coordinates) return contour.coordinates.length;
-    if (contour.x) return contour.x.length;
-    return 'N/A';
   };
 
   const getContourLabelName = (contour, allContours, currentIndex) => {
