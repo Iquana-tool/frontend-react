@@ -57,8 +57,6 @@ const FinalMaskViewer = ({
     }
   }, [drawFinalMaskCanvas, canvasImage, finalMasks]);
 
-
-
   // Handle mouse events for panning
   const handleMouseDown = (e) => {
     // Check for panning conditions: Alt key, middle mouse, or right click
@@ -132,32 +130,45 @@ const FinalMaskViewer = ({
   };
 
   return (
-    <div className="viewer-panel flex-1 w-full xl:min-w-[400px] 2xl:min-w-[450px]">
-      <div className="viewer-header flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-blue-600" />
-          <span>Final Mask</span>
-        </div>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Layers className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800">Final Mask</h3>
+              <p className="text-xs text-slate-500">
+                {finalMasks.length > 0 && finalMasks[0].contours ? 
+                  `${finalMasks[0].contours.length} contour${finalMasks[0].contours.length !== 1 ? 's' : ''}` :
+                  'No contours yet'
+                }
+              </p>
+            </div>
+          </div>
 
-        {finalMasks.length > 0 && (
-          <button
-            onClick={() => {
-              if (window.confirm("Are you sure you want to clear all masks?")) {
-                clearAllFinalMaskContours();
-              }
-            }}
-            className="text-xs px-2 py-1 text-red-600 border border-red-200 rounded hover:bg-red-50 flex items-center gap-1 transition-colors"
-          >
-            <Trash2 className="h-3 w-3" />
-            Clear All
-          </button>
-        )}
+          {finalMasks.length > 0 && (
+            <button
+              onClick={() => {
+                if (window.confirm("Are you sure you want to clear all masks?")) {
+                  clearAllFinalMaskContours();
+                }
+              }}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+              title="Clear all masks"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Adjusted height to account for missing Clear/Complete buttons */}
+      {/* Canvas Container */}
       <div
         ref={containerRef}
-        className="h-[340px] sm:h-[420px] relative overflow-hidden py-5"
+        className="flex-1 relative overflow-hidden bg-slate-50 p-4"
         style={{
           cursor: isPanning ? 'grabbing' : 'default'
         }}
@@ -216,15 +227,12 @@ const FinalMaskViewer = ({
                 let x = relativeX * canvas.width;
                 let y = relativeY * canvas.height;
                 
-
-                
                 // Account for zoom transformation (exactly like useCanvasOperations.js)
                 if (zoomLevel > 1 && zoomCenter) {
                   const centerX = zoomCenter.x * canvas.width;
                   const centerY = zoomCenter.y * canvas.height;
                   x = (x - centerX) / zoomLevel + centerX;
                   y = (y - centerY) / zoomLevel + centerY;
-
                 }
                 
                 // Look for clicked contour
@@ -246,8 +254,6 @@ const FinalMaskViewer = ({
                     for (let j = 0; j < contour.x.length; j++) {
                       points.push([contour.x[j] * canvasWidth, contour.y[j] * canvasHeight]);
                     }
-                    
-
 
                     let inside = false;
                     for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
@@ -262,44 +268,31 @@ const FinalMaskViewer = ({
 
                     // Check proximity to edges if not inside (within 5 pixels)
                     if (!inside) {
-                      for (let j = 0, k = points.length - 1; j < points.length; k = j++) {
-                        const xi = points[j][0], yi = points[j][1];
-                        const xj = points[k][0], yj = points[k][1];
-
-                        const lineLength = Math.sqrt((xj - xi) ** 2 + (yj - yi) ** 2);
-                        if (lineLength === 0) continue;
-
-                        const t = Math.max(
-                          0,
-                          Math.min(
-                            1,
-                            ((x - xi) * (xj - xi) + (y - yi) * (yj - yi)) /
-                              (lineLength * lineLength)
-                          )
-                        );
-                        const projX = xi + t * (xj - xi);
-                        const projY = yi + t * (yj - yi);
-                        const distance = Math.sqrt((x - projX) ** 2 + (y - projY) ** 2);
-
-                        if (distance < 5) {
+                      for (let j = 0; j < points.length; j++) {
+                        const [px, py] = points[j];
+                        const distance = Math.sqrt((x - px) ** 2 + (y - py) ** 2);
+                        if (distance <= 5) {
                           inside = true;
                           break;
                         }
                       }
                     }
-                    
+
                     if (inside) {
                       foundMask = mask;
                       foundContourIndex = i;
                       break;
                     }
                   }
+                  
                   if (foundMask) break;
                 }
                 
-                // Handle contour selection
                 if (foundMask && foundContourIndex !== -1) {
-                  handleFinalMaskContourSelect(foundMask, foundContourIndex);
+                  // If a contour was clicked, handle selection through the provided handler
+                  if (handleFinalMaskContourSelect) {
+                    handleFinalMaskContourSelect(foundMask, foundContourIndex);
+                  }
                 } else if (zoomLevel > 1) {
                   // If no contour was clicked but we're zoomed in, reset zoom to default
                   setSelectedFinalMaskContour(null);
@@ -334,7 +327,7 @@ const FinalMaskViewer = ({
 
         {/* Zoom Controls - only visible when a contour is selected */}
         {selectedFinalMaskContour && (
-          <div className="absolute bottom-2 right-2 flex items-center space-x-1 bg-white/95 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-gray-200">
+          <div className="absolute bottom-4 right-4 flex items-center space-x-1 bg-white/95 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-gray-200">
             {/* Zoom level indicator */}
             <span className="text-xs text-gray-600 px-1 font-mono">
               {zoomLevel % 1 === 0 ? `${zoomLevel}x` : `${zoomLevel.toFixed(1)}x`}
@@ -391,7 +384,7 @@ const FinalMaskViewer = ({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Zoom out with 1x increments - no reset logic
+                // Zoom out with 1x increments
                 const newZoomLevel = Math.max(zoomLevel - 1, 1);
                 setZoomLevel(newZoomLevel);
                 
@@ -468,17 +461,15 @@ const FinalMaskViewer = ({
         )}
       </div>
 
-      {/* Bottom spacing to match the button area height */}
-      <div>
-        {finalMasks.length > 0 && (
-          <div className="viewer-controls flex justify-end items-center mt-2 gap-4 px-4 py-3 pr-8">
-            <FinishButton
-              maskId={finalMask?.id}
-            />
+      {/* Footer with action buttons */}
+      {finalMasks.length > 0 && (
+        <div className="p-4 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
+          <div className="flex justify-end items-center gap-3">
+            <FinishButton maskId={finalMask?.id} />
             <NextButton />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

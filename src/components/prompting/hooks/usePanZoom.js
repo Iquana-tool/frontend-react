@@ -324,12 +324,56 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
 
   // Set zoom parameters (for external control)
   const setZoomParameters = useCallback((level, center, redrawCallback) => {
+    if (!image) return;
+
+    // Set zoom level if provided
+    let newZoomLevel = zoomLevel;
     if (typeof level === 'number' && level > 0) {
+      newZoomLevel = level;
       setZoomLevel(level);
     }
     
+    // Set zoom center and calculate proper pan offset if center is provided
     if (center && typeof center.x === 'number' && typeof center.y === 'number') {
       setZoomCenter({...center});
+      
+      // Calculate the pan offset needed to center the view on the specified point
+      if (newZoomLevel > 1) {
+        const scale = initialScale * newZoomLevel;
+        const imageWidth = image.width * scale;
+        const imageHeight = image.height * scale;
+        
+        // Calculate where the center point would be in canvas coordinates
+        const targetX = center.x * imageWidth;
+        const targetY = center.y * imageHeight;
+        
+        // Calculate the base position of the image (centered)
+        const baseImageX = (canvasSize.width - imageWidth) / 2;
+        const baseImageY = (canvasSize.height - imageHeight) / 2;
+        
+        // Calculate pan offset to move the target point to canvas center
+        const canvasCenterX = canvasSize.width / 2;
+        const canvasCenterY = canvasSize.height / 2;
+        
+        const newPanOffsetX = canvasCenterX - (baseImageX + targetX);
+        const newPanOffsetY = canvasCenterY - (baseImageY + targetY);
+        
+        // Apply boundary constraints
+        const constrainedPanOffset = clampPanOffset(
+          { x: newPanOffsetX, y: newPanOffsetY }, 
+          image, 
+          canvasSize, 
+          initialScale, 
+          newZoomLevel
+        );
+        
+        setPanOffset(constrainedPanOffset);
+        panOffsetRef.current = { ...constrainedPanOffset };
+      } else {
+        // At zoom level 1, reset pan offset
+        setPanOffset({ x: 0, y: 0 });
+        panOffsetRef.current = { x: 0, y: 0 };
+      }
     }
     
     // Force multiple redraws to ensure updates are applied
@@ -346,7 +390,7 @@ export const usePanZoom = (image, canvasSize, initialScale) => {
       appliedLevel: level,
       appliedCenter: center
     };
-  }, []);
+  }, [image, zoomLevel, initialScale, canvasSize, clampPanOffset]);
 
   return {
     // State

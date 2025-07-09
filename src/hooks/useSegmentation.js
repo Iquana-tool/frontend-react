@@ -10,6 +10,7 @@ export const useSegmentation = () => {
   const [processedMaskImages, setProcessedMaskImages] = useState({});
   const [maskImagesLoading, setMaskImagesLoading] = useState({});
   const [selectedModel, setSelectedModel] = useState("SAM2Tiny");
+  const [selectedContourIds, setSelectedContourIds] = useState([]);
 
   // Utility function to check if a point is inside a contour
   const isPointInContour = useCallback((x, y, contour) => {
@@ -178,21 +179,54 @@ export const useSegmentation = () => {
         );
 
       if (response && response.original_masks && response.original_masks.length > 0) {
-        const newMasks = response.original_masks.map((mask, index) => ({
-          id: Date.now() + index,
-          base64: response.base64_masks[index],
-          quality: response.quality[index],
-          contours: mask.contours,
-          contour: mask.contours.length > 0 ? mask.contours[0] : null,
-          quantifications: mask.contours.length > 0 ? mask.contours[0].quantifications : null,
-        }));
+        const newMasks = response.original_masks.map((mask, index) => {
+          const maskId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
+          
+          // Ensure all contours have proper IDs
+          const contoursWithIds = (mask.contours || []).map((contour, contourIndex) => ({
+            ...contour,
+            id: contour.id || `${maskId}-${contourIndex}`,
+          }));
+          
+          return {
+            id: maskId,
+            base64: response.base64_masks[index],
+            quality: response.quality[index],
+            contours: contoursWithIds,
+            contour: contoursWithIds.length > 0 ? contoursWithIds[0] : null,
+            quantifications: contoursWithIds.length > 0 ? contoursWithIds[0].quantifications : null,
+          };
+        });
 
         const validMasks = newMasks.filter((mask) => mask !== null);
 
         if (validMasks.length > 0) {
           const highestConfidenceMask = [...validMasks].sort((a, b) => b.quality - a.quality)[0];
 
-          setSegmentationMasks((prev) => [...prev, ...validMasks]);
+          setSegmentationMasks((prev) => {
+            console.log(`Adding ${validMasks.length} new segmentation results. Previous count: ${prev.length}, New total: ${prev.length + validMasks.length}`);
+            console.log('New mask IDs:', validMasks.map(m => m.id));
+            console.log('Existing mask IDs:', prev.map(m => m.id));
+            
+            // Safety check: ensure no duplicate IDs
+            const existingIds = new Set(prev.map(m => m.id));
+            const uniqueNewMasks = validMasks.filter(mask => !existingIds.has(mask.id));
+            
+            if (uniqueNewMasks.length !== validMasks.length) {
+              console.warn(`Filtered out ${validMasks.length - uniqueNewMasks.length} duplicate mask(s)`);
+            }
+            
+            const newMasks = [...prev, ...uniqueNewMasks];
+            
+            // Select ALL contours by default (not just new ones)
+            const allContourIds = newMasks.flatMap(mask => 
+              (mask.contours || []).map(contour => contour.id)
+            );
+            console.log('🔄 Selecting all contours by default:', allContourIds);
+            setSelectedContourIds(allContourIds);
+            
+            return newMasks;
+          });
           setBestMask(highestConfidenceMask);
 
           return {
@@ -208,7 +242,7 @@ export const useSegmentation = () => {
       } finally {
       setIsSegmenting(false);
     }
-  }, [selectedModel]);
+  }, [findParentContourForPrompt, selectedModel]);
 
   const adjustPromptsForZoom = (prompts, promptType, zoomLevel, zoomCenter, canvasImage) => {
     return prompts.map((p) => {
@@ -334,12 +368,17 @@ export const useSegmentation = () => {
   }, [segmentationMasks, processedMaskImages, maskImagesLoading, generateMaskImageFromContours]);
 
   const resetSegmentationState = useCallback(() => {
+    console.log('🔄 resetSegmentationState called - clearing all segmentation results');
+    console.log('📍 Stack trace for debugging:');
+    console.trace();
+    
     setSegmentationMasks([]);
     setSelectedMask(null);
     setBestMask(null);
     setIsSegmenting(false);
     setProcessedMaskImages({});
     setMaskImagesLoading({});
+    setSelectedContourIds([]);
   }, []);
 
   const handleModelChange = useCallback((event) => {
@@ -355,6 +394,7 @@ export const useSegmentation = () => {
     processedMaskImages,
     maskImagesLoading,
     selectedModel,
+    selectedContourIds,
 
     // Actions
     handlePromptingComplete,
@@ -369,5 +409,6 @@ export const useSegmentation = () => {
     setSelectedMask,
     setBestMask,
     setIsSegmenting,
+    setSelectedContourIds,
   };
 }; 

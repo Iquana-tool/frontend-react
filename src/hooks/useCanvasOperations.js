@@ -99,13 +99,15 @@ export const useCanvasOperations = () => {
   }, []);
 
   const drawAnnotationCanvas = useCallback(
-    (bestMask, canvasImage, selectedContours, selectedFinalMaskContour) => {
+    (bestMask, canvasImage, selectedContours, selectedFinalMaskContour, segmentationMasks = [], selectedContourIds = []) => {
       // Store current parameters so animation can reuse them
       annotationDrawParamsRef.current = {
         bestMask,
         canvasImage,
         selectedContours,
         selectedFinalMaskContour,
+        segmentationMasks,
+        selectedContourIds,
       };
 
       renderAnnotationCanvas({
@@ -114,6 +116,8 @@ export const useCanvasOperations = () => {
         canvasImage,
         selectedContours,
         selectedFinalMaskContour,
+        segmentationMasks,
+        selectedContourIds,
         zoomLevel,
         zoomCenter,
       });
@@ -129,7 +133,9 @@ export const useCanvasOperations = () => {
         params.bestMask,
         params.canvasImage,
         params.selectedContours,
-        params.selectedFinalMaskContour
+        params.selectedFinalMaskContour,
+        params.segmentationMasks,
+        params.selectedContourIds
       );
     }
 
@@ -391,9 +397,9 @@ export const useCanvasOperations = () => {
                   annotationCanvasRef.current.width,
                   annotationCanvasRef.current.height
                 );
-                if (drawAnnotationCanvas) {
-                  drawAnnotationCanvas();
-                }
+                              if (drawAnnotationCanvas) {
+                drawAnnotationCanvas(null, canvasImage, [], null, [], []);
+              }
               }, 0);
             }
 
@@ -452,7 +458,7 @@ export const useCanvasOperations = () => {
                 annotationCanvasRef.current.height
               );
               if (drawAnnotationCanvas) {
-                drawAnnotationCanvas();
+                drawAnnotationCanvas(null, canvasImage, [], null, [], []);
               }
             }, 0);
           }
@@ -509,7 +515,7 @@ export const useCanvasOperations = () => {
               annotationCanvasRef.current.height
             );
 
-            drawAnnotationCanvas(bestMask, canvasImage, [], null);
+            drawAnnotationCanvas(bestMask, canvasImage, [], null, [], []);
           }
         }, 100);
 
@@ -572,7 +578,9 @@ export const useCanvasOperations = () => {
                   maskId: mask.id,
                   contourIndex: contourIndex,
                   contour: contour,
-                }
+                },
+                [],
+                []
               );
             }
           }, 200);

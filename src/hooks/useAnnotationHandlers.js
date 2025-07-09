@@ -83,6 +83,11 @@ export const useAnnotationHandlers = ({
       );
 
       if (result) {
+        // Clear prompts after successful segmentation since they've served their purpose
+        if (promptingCanvasRef.current) {
+          promptingCanvasRef.current.clearPrompts();
+        }
+
         // Set prompt type to select after successful segmentation
         setPromptType("select");
         if (promptingCanvasRef.current) {
@@ -189,7 +194,7 @@ export const useAnnotationHandlers = ({
       bestMask,
       findMatchingContour,
       (bMask, cImage, sContours, sFinalMaskContour) =>
-        drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour),
+        drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour, [], []),
       imageObject,
       selectedFinalMaskContour
     );
@@ -221,7 +226,7 @@ export const useAnnotationHandlers = ({
       setZoomLevel,
       setSelectedContours,
       imageObject,
-      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour),
+      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour, [], []),
       handleFinalMaskContourSelectRef,
       isPointInContour
     );

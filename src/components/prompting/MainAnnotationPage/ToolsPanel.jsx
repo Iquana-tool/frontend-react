@@ -8,7 +8,8 @@ import {
   Pointer, 
   ZoomIn, 
   ZoomOut, 
-  RotateCcw 
+  RotateCcw,
+  PenTool
 } from 'lucide-react';
 import LabelSelector from '../LabelSelector';
 
@@ -173,6 +174,19 @@ const ToolsPanel = ({
           >
             <Pentagon className="w-4 h-4" />
           </button>
+
+          {/* Manual Contour Tool */}
+          <button
+            className={`p-2 transition-colors ${
+              promptType === "manual-contour"
+                ? "bg-purple-500 text-white"
+                : "hover:bg-gray-100"
+            }`}
+            onClick={() => handleToolChange("manual-contour")}
+            title="Manual Contour Tool (Draw contours directly)"
+          >
+            <PenTool className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Zoom Controls */}
@@ -220,47 +234,39 @@ const ToolsPanel = ({
           />
         </div>
 
-        {/* Instant Segmentation Toggle */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md">
-          <span className="text-sm font-medium text-gray-700">Instant Segmentation</span>
-          <button
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-              !currentLabel 
-                ? 'bg-gray-200 cursor-not-allowed opacity-50'
-                : isInstantSegmentationEnabled
-                ? 'bg-blue-600' 
-                : 'bg-gray-300'
-            }`}
-            onClick={() => {
-              if (!currentLabel) {
-                return; // Prevent toggle when no label is selected
-              }
-              if (promptingCanvasRef.current?.toggleInstantSegmentation) {
-                promptingCanvasRef.current.toggleInstantSegmentation();
-              }
-            }}
-            disabled={!currentLabel}
-            title={!currentLabel ? "Please select a label before enabling instant segmentation" : "Toggle automatic segmentation on prompt placement"}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                isInstantSegmentationEnabled && currentLabel
-                  ? 'translate-x-4' 
-                  : 'translate-x-0.5'
+        {/* Instant Segmentation Toggle - Hide for manual contour tool */}
+        {promptType !== "manual-contour" && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-md">
+            <span className="text-sm font-medium text-gray-700">Instant Segmentation</span>
+            <button
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                !currentLabel 
+                  ? 'bg-gray-200 cursor-not-allowed opacity-50'
+                  : isInstantSegmentationEnabled
+                  ? 'bg-blue-600' 
+                  : 'bg-gray-300'
               }`}
-            />
-          </button>
-        </div>
-
-        {/* Export Button */}
-        {/* <button
-          className="p-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5"
-          onClick={() => {}}
-          title="Export quantifications as CSV"
-        >
-          <Download className="w-4 h-4" />
-          <span>Export</span>
-        </button> */}
+              onClick={() => {
+                if (!currentLabel) {
+                  return; // Prevent toggle when no label is selected
+                }
+                if (promptingCanvasRef.current?.toggleInstantSegmentation) {
+                  promptingCanvasRef.current.toggleInstantSegmentation();
+                }
+              }}
+              disabled={!currentLabel}
+              title={!currentLabel ? "Please select a label before enabling instant segmentation" : "Toggle automatic segmentation on prompt placement"}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  isInstantSegmentationEnabled && currentLabel
+                    ? 'translate-x-4' 
+                    : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Label Selection Warning */}
@@ -273,6 +279,22 @@ const ToolsPanel = ({
             <span className="text-sm text-orange-700 font-medium">
               Please select a label before drawing prompts or enabling segmentation
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Contour Tool Instructions */}
+      {promptType === "manual-contour" && (
+        <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+          <div className="flex items-center mb-2">
+            <PenTool className="w-4 h-4 text-purple-500 mr-2" />
+            <span className="text-sm text-purple-700 font-medium">Manual Contour Drawing</span>
+          </div>
+          <div className="text-sm text-purple-600 space-y-1">
+            <div>• Click to add points for polygon mode</div>
+            <div>• Double-click to finish the contour</div>
+            <div>• Contour will be added directly to Final Mask</div>
+            <div>• No AI segmentation needed</div>
           </div>
         </div>
       )}
