@@ -2,9 +2,13 @@ import React, { useState, useEffect } from "react";
 import {
   getBaseModels,
   getTrainedModels,
+    startTraining
   // ... other API imports
 } from "../../../api";
-import { Brain, Info } from "lucide-react";
+import { Brain, Info, Cpu } from "lucide-react";
+import InferenceModelSelect from "./inference_panel/InferenceModelSelect"
+import InferenceModelCard from "./inference_panel/InferenceModelCard";
+import InferenceTrainingCard from "./inference_panel/InferenceTrainingCard";
 
 // Helper to parse select value to get type/IDs
 function parseSelectedModel(val, trainedModels, baseModels) {
@@ -27,6 +31,8 @@ const InferencePanel = ({ dataset }) => {
   const [selectedModelValue, setSelectedModelValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [training, setTraining] = useState(false);
+  const [trainError, setTrainError] = useState(null);
   function getDiceColor(score) {
     // score is 0.86 for 86%
     if (score === null || score === undefined || isNaN(score)) return "text-gray-400";
@@ -39,6 +45,30 @@ const InferencePanel = ({ dataset }) => {
     // Formats to "85%" etc.
     if (score === null || score === undefined || isNaN(score) || score < 0) return "--";
     return Math.round(score * 100) + "%";
+  }
+
+  async function handleStartTraining() {
+    setTraining(true);
+    setTrainError(null);
+    try {
+      // selectedModel is a base model here!
+      await startTraining({
+        dataset_id: dataset.id,
+        model_identifier: selectedModel.model_identifier,   // e.g. "unet"
+        // you can pass parameters as needed, or add an input for the user
+        overwrite: false,
+        augment: true,
+        image_size: [256, 256],
+        early_stopping: true,
+      });
+      // Optionally, show a toast/notification or reload trained models
+      // You might also want to poll for status or reload model list
+      // (see note below)
+    } catch (err) {
+      setTrainError(err?.message || "Failed to start training.");
+    } finally {
+      setTraining(false);
+    }
   }
   // Fetch models when dataset changes
   useEffect(() => {
@@ -68,6 +98,10 @@ const InferencePanel = ({ dataset }) => {
     // eslint-disable-next-line
   }, [dataset]);
 
+  useEffect(() => {
+
+  }, [selectedModelValue]);
+
   // Determine which model is currently selected
   const selectedModel = parseSelectedModel(selectedModelValue, trainedModels, baseModels);
 
@@ -89,101 +123,24 @@ const InferencePanel = ({ dataset }) => {
         {/* Model Selection */}
         <div className="mb-5">
           <h3 className="text-base font-medium text-gray-900 mb-2">Model</h3>
-          <select
-              value={selectedModelValue}
-              onChange={e => setSelectedModelValue(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
-          >
-            {trainedModels.length > 0 && (
-                <optgroup label="Trained Models">
-                  {trainedModels.map(model => (
-                      <option
-                          key={"trained-" + model.model_identifier + "-" + model.job_id}
-                          value={model.model_identifier + "#trained#" + model.job_id}
-                      >
-                        {model.Name} (trained, job #{model.job_id})
-                      </option>
-                  ))}
-                </optgroup>
-            )}
-            {baseModels.length > 0 && (
-                <optgroup label="Base Models">
-                  {baseModels.map(model => (
-                      <option
-                          key={"base-" + model.model_identifier}
-                          value={model.model_identifier + "#base"}
-                      >
-                        {model.Name} (from scratch)
-                      </option>
-                  ))}
-                </optgroup>
-            )}
-          </select>
+          <InferenceModelSelect baseModels={baseModels} trainedModels={trainedModels}
+                                setSelectedModelValue={setSelectedModelValue} onChange={setSelectedModelValue} />
 
           {/* Selected Model Info */}
-          {selectedModel && (
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 mt-2">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900">
-                      {selectedModel.Name}
-                    </h4>
-                    <p className="text-sm text-gray-600">{selectedModel.Description}</p>
-                  </div>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                      selectedModel.job_id !== undefined
-                          ? "bg-green-100 text-green-800"
-                          : "bg-blue-100 text-blue-800"
-                  }`}>
-                {selectedModel.job_id !== undefined ? "Trained" : "Base"}
-              </span>
-                </div>
-                <div className="flex flex-col space-y-1 text-sm text-gray-500">
-                  <span>Training speed: {selectedModel["Training speed"]}</span>
-                  <span>Model size: {selectedModel["Model size"]}</span>
-                  {selectedModel.job_id !== undefined && (
-                      <>
-                        <span>Training rounds: {selectedModel.epoch}</span>
-                      </>
-                  )}
-                  {selectedModel.job_id !== undefined && (
-                      <div className="mt-2">
-                        <div className="flex items-center mb-2 space-x-2">
-                          <span className="font-semibold text-gray-700">Dice Scores</span>
-                          <div className="relative group inline-block align-middle cursor-pointer">
-                            <Info size={15} className="text-gray-400" />
-                            <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100
-                         absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-60 z-10
-                         p-2 text-xs text-gray-700 bg-white border border-gray-300 rounded shadow-lg transition-opacity">
-                              <b>Dice score</b> measures segmentation accuracy. 100% means perfect overlap between prediction and ground truth.
-                            </span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div>
-                            <div className="text-xs text-gray-500">Train</div>
-                            <div className={`text-base font-bold ${getDiceColor(selectedModel.train_dice)}`}>
-                              {formatDice(selectedModel.train_dice)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500">Validation</div>
-                            <div className={`text-base font-bold ${getDiceColor(selectedModel.val_dice)}`}>
-                              {formatDice(selectedModel.val_dice)}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-gray-500">Test</div>
-                            <div className={`text-base font-bold ${getDiceColor(selectedModel.test_dice)}`}>
-                              {formatDice(selectedModel.test_dice)}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                  )}
-                </div>
-              </div>
-          )}
+          {selectedModel && <InferenceModelCard model={selectedModel}/>}
+        </div>
+        <div className="mb-5">
+          {selectedModel && <InferenceTrainingCard
+              model={selectedModel}
+              loading={training}
+              onStart={async params => {
+                setTraining(true);
+                await startTraining({ ...params,
+                  dataset_id: dataset.id });
+                setTraining(false);
+
+              }}
+          />}
         </div>
       </div>
   );
