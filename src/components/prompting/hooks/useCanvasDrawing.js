@@ -99,8 +99,32 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
     }
   }, [initialScale, zoomLevel]);
 
-  const drawManualContour = useCallback((ctx, points, label, isInProgress = false) => {
+  const drawManualContour = useCallback((ctx, points, label, isInProgress = false, isSelected = false) => {
     if (!points || points.length < 2) return;
+
+    // Get the label color - use label ID if available, otherwise fall back to purple
+    let baseColor = "rgba(147, 51, 234, 0.9)"; // Default purple fallback
+    let fillColor = "rgba(147, 51, 234, 0.15)";
+    let pointColor = "rgba(147, 51, 234, 0.8)";
+    
+    if (label) {
+      try {
+        const labelColorHex = typeof label === 'string' ? getLabelColorByName(label) : getLabelColor(label);
+        if (labelColorHex) {
+          // Convert hex to rgba for stroke
+          const rgbaColor = hexToRgba(labelColorHex, 0.9);
+          const rgbaFillColor = hexToRgba(labelColorHex, 0.15);
+          const rgbaPointColor = hexToRgba(labelColorHex, 0.8);
+          
+          baseColor = rgbaColor;
+          fillColor = rgbaFillColor;
+          pointColor = rgbaPointColor;
+        }
+      } catch (error) {
+        console.warn("Error getting label color:", error);
+        // Keep default purple colors as fallback
+      }
+    }
 
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
@@ -116,21 +140,43 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
       ctx.closePath();
     }
     
-    // Use purple color for manual contours to distinguish them
-    ctx.strokeStyle = "rgba(147, 51, 234, 0.9)"; // Purple color
-    ctx.lineWidth = 3 / (initialScale * zoomLevel); // Slightly thicker for visibility
+    // Use different styles for selected vs normal contours
+    if (isSelected) {
+      // For selected contours, use a brighter/more saturated version
+      ctx.strokeStyle = baseColor.replace(/[\d.]+\)$/, '1)'); // Full opacity
+      ctx.lineWidth = 5 / (initialScale * zoomLevel); // Thicker for selected
+      
+      // Add a subtle glow effect for selected contours
+      ctx.shadowColor = baseColor;
+      ctx.shadowBlur = 4 / (initialScale * zoomLevel);
+    } else {
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 3 / (initialScale * zoomLevel); // Normal thickness
+      ctx.shadowBlur = 0; // No glow for normal contours
+    }
     ctx.stroke();
 
     if (!isInProgress && points.length > 2) {
-      // Fill with transparent purple
-      ctx.fillStyle = "rgba(147, 51, 234, 0.15)"; // Purple fill
+      // Fill with appropriate color (slightly more opaque for selected)
+      if (isSelected) {
+        ctx.fillStyle = fillColor.replace(/[\d.]+\)$/, '0.25)'); // More opaque for selected
+      } else {
+        ctx.fillStyle = fillColor;
+      }
       ctx.fill();
     }
 
+    // Reset shadow for points
+    ctx.shadowBlur = 0;
+
     // Add small circles at each point for manual contours
     if (points.length > 0) {
-      ctx.fillStyle = "rgba(147, 51, 234, 0.8)";
-      const pointRadius = 4 / (initialScale * zoomLevel);
+      if (isSelected) {
+        ctx.fillStyle = pointColor.replace(/[\d.]+\)$/, '1)'); // Full opacity for selected points
+      } else {
+        ctx.fillStyle = pointColor;
+      }
+      const pointRadius = isSelected ? 6 / (initialScale * zoomLevel) : 4 / (initialScale * zoomLevel);
       
       points.forEach(point => {
         if (point && typeof point.x === 'number' && typeof point.y === 'number') {
@@ -143,7 +189,7 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
   }, [initialScale, zoomLevel]);
 
   // Function to draw all prompts on the canvas
-  const drawAllPrompts = useCallback((ctx, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, currentManualContour, manualContours) => {
+  const drawAllPrompts = useCallback((ctx, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, currentManualContour, manualContours, selectedManualContourIds = []) => {
     prompts.forEach((prompt, i) => {
       try {
         // Highlight if selected
@@ -251,10 +297,24 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
         if (cursorPos && currentManualContour.length > 0) {
           const lastPoint = currentManualContour[currentManualContour.length - 1];
           if (lastPoint && typeof lastPoint.x === 'number' && cursorPos && typeof cursorPos.x === 'number') {
+            // Get the label color for the cursor line as well
+            let cursorLineColor = "rgba(147, 51, 234, 0.6)"; // Default purple fallback
+            
+            if (currentLabel) {
+              try {
+                const labelColorHex = typeof currentLabel === 'string' ? getLabelColorByName(currentLabel) : getLabelColor(currentLabel);
+                if (labelColorHex) {
+                  cursorLineColor = hexToRgba(labelColorHex, 0.6);
+                }
+              } catch (error) {
+                console.warn("Error getting label color for cursor line:", error);
+              }
+            }
+            
             ctx.beginPath();
             ctx.moveTo(lastPoint.x, lastPoint.y);
             ctx.lineTo(cursorPos.x, cursorPos.y);
-            ctx.strokeStyle = "rgba(147, 51, 234, 0.6)";  // purple color
+            ctx.strokeStyle = cursorLineColor;
             ctx.lineWidth = 3 / (initialScale * zoomLevel);
             ctx.stroke();
           }
@@ -269,7 +329,8 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
       manualContours.forEach((contour, i) => {
         try {
           if (contour.coordinates && Array.isArray(contour.coordinates)) {
-            drawManualContour(ctx, contour.coordinates, contour.label, false);
+            const isSelected = selectedManualContourIds.includes(contour.id);
+            drawManualContour(ctx, contour.coordinates, contour.label, false, isSelected);
           }
         } catch (error) {
           console.error("Error drawing manual contour:", error, contour);

@@ -115,8 +115,8 @@ const ToolsPanel = ({
   return (
     <div className="mb-4">
       <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-        {/* Tool Selection */}
-        <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
+        {/* Selection and Dragging Tools */}
+        <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5" title="Selection & Dragging">
           {/* Select tool */}
           <button
             className={`p-2 transition-colors ${
@@ -142,7 +142,10 @@ const ToolsPanel = ({
           >
             <Move className="w-4 h-4" />
           </button>
-          
+        </div>
+
+        {/* AI Tools */}
+        <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5" title="AI Tools">
           {/* Point tool */}
           <button
             className={`p-2 transition-colors ${
@@ -194,7 +197,10 @@ const ToolsPanel = ({
           >
             <Pentagon className="w-4 h-4" />
           </button>
+        </div>
 
+        {/* Manual Tools */}
+        <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5" title="Manual Tools">
           {/* Manual Contour Tool */}
           <button
             className={`p-2 transition-colors ${
@@ -330,7 +336,6 @@ const ToolsPanel = ({
           <div className="text-sm text-purple-600 space-y-1">
             <div>• Click to add points for polygon mode</div>
             <div>• Double-click to finish the contour</div>
-            <div>• Contour will be added directly to Final Mask</div>
             <div>• No AI segmentation needed</div>
           </div>
         </div>

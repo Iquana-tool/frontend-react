@@ -20,6 +20,7 @@ const PromptingCanvas = forwardRef(({
   finalMasks,
   segmentationMasks = [],
   selectedContourIds = [],
+  selectedManualContourIds = [],
   enableInstantSegmentation = false,
   instantSegmentationDebounce = 1000,
   onInstantSegmentationStateChange,
@@ -413,6 +414,7 @@ const PromptingCanvas = forwardRef(({
           currentPolygon={currentPolygon}
           currentManualContour={currentManualContour}
           manualContours={manualContours}
+          selectedManualContourIds={selectedManualContourIds}
           cursorPos={cursorPos}
           promptType={promptType}
           currentLabel={currentLabel}
@@ -522,28 +524,9 @@ const PromptingCanvas = forwardRef(({
         </div>
       )}
 
-      {/* Manual contour help info when tool is selected but no contours yet */}
-      {promptType === "manual-contour" && manualContours.length === 0 && (
-        <div className="p-4 bg-purple-50 border-t border-purple-200">
-          <div className="flex items-center gap-2 text-sm text-purple-700">
-            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-            <span>Click to draw manual contours directly on the image</span>
-          </div>
-        </div>
-      )}
 
-      {/* Show info about manual contours being managed in left panel */}
-      {promptType === "manual-contour" && manualContours.length > 0 && (
-        <div className="p-4 bg-purple-50 border-t border-purple-200">
-          <div className="flex items-center gap-2 text-sm text-purple-700">
-            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-            <span>
-              {manualContours.length} manual contour{manualContours.length !== 1 ? 's' : ''} ready • 
-              Manage in left panel
-            </span>
-          </div>
-        </div>
-      )}
+
+
     </div>
   );
 });

@@ -15,6 +15,7 @@ const CanvasRenderer = ({
   currentPolygon,
   currentManualContour,
   manualContours,
+  selectedManualContourIds,
   cursorPos,
   promptType,
   currentLabel,
@@ -151,12 +152,13 @@ const CanvasRenderer = ({
       promptType, 
       currentLabel,
       currentManualContour,
-      manualContours
+      manualContours,
+      selectedManualContourIds
     );
 
     // Restore the canvas context
     ctx.restore();
-  }, [image, canvasSize, initialScale, zoomLevel, panOffset, prompts, selectedPromptIndex, currentShape, currentPolygon, currentManualContour, manualContours, cursorPos, promptType, currentLabel, finalMasks, selectedFinalMaskContour, segmentationMasks, selectedContourIds, drawAllPrompts, drawFinalMaskContour]);
+  }, [image, canvasSize, initialScale, zoomLevel, panOffset, prompts, selectedPromptIndex, currentShape, currentPolygon, currentManualContour, manualContours, selectedManualContourIds, cursorPos, promptType, currentLabel, finalMasks, selectedFinalMaskContour, segmentationMasks, selectedContourIds, drawAllPrompts, drawFinalMaskContour]);
 
   // Redraw whenever dependencies change
   useEffect(() => {
