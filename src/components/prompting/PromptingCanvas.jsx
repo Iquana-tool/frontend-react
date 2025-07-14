@@ -175,8 +175,9 @@ const PromptingCanvas = forwardRef(({
     if (!containerRef.current || !image) return;
 
     const container = containerRef.current;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+    // Use offsetWidth/Height to include padding, since canvas CSS is 100% of container
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
 
     // Set canvas to container size
     setCanvasSize({
@@ -227,8 +228,14 @@ const PromptingCanvas = forwardRef(({
     if (!image || !canvasRef.current) return;
     
     const rect = canvasRef.current.getBoundingClientRect();
-    const canvasX = e.clientX - rect.left;
-    const canvasY = e.clientY - rect.top;
+    let canvasX = e.clientX - rect.left;
+    let canvasY = e.clientY - rect.top;
+    
+    // Scale mouse coordinates to match canvas internal dimensions
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    canvasX *= scaleX;
+    canvasY *= scaleY;
     
     const imageCoords = canvasToImageCoords(canvasX, canvasY);
     if (!imageCoords) return;
@@ -295,8 +302,14 @@ const PromptingCanvas = forwardRef(({
     if (!image || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    
+    // Scale mouse coordinates to match canvas internal dimensions
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    x *= scaleX;
+    y *= scaleY;
 
     // Handle panning if active
     if (isDraggingRef.current) {
@@ -316,8 +329,14 @@ const PromptingCanvas = forwardRef(({
     if (!image) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    
+    // Scale mouse coordinates to match canvas internal dimensions
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    x *= scaleX;
+    y *= scaleY;
 
     // Handle pan end
     handlePanEnd();
