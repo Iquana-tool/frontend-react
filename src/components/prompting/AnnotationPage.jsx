@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { Typography } from "@mui/material";
 
 // Modular Hooks and Utilities
@@ -27,6 +27,9 @@ import HelpSection from "./HelpSection";
 import "./AnnotationPage.css";
 
 const AnnotationPage = ({ initialImageId = null }) => {
+  // Label warning highlighting state
+  const [highlightLabelWarning, setHighlightLabelWarning] = useState(false);
+
   // Use the consolidated state management hook
   const state = useAnnotationPageState(initialImageId);
 
@@ -248,6 +251,8 @@ const AnnotationPage = ({ initialImageId = null }) => {
             handleAnnotationZoomIn={zoomHandlers.handleAnnotationZoomInWrapper}
             handleAnnotationZoomOut={zoomHandlers.handleAnnotationZoomOutWrapper}
             handleAnnotationResetView={zoomHandlers.handleAnnotationResetViewWrapper}
+            highlightLabelWarning={highlightLabelWarning}
+            setHighlightLabelWarning={setHighlightLabelWarning}
           />
 
           <MainViewers
@@ -283,6 +288,7 @@ const AnnotationPage = ({ initialImageId = null }) => {
             imageError={error}
             setError={setError}
             handleFileUpload={wrapperHandlers.handleFileUploadWrapper}
+            setHighlightLabelWarning={setHighlightLabelWarning}
             handleImageSelect={imageNavigation.handleImageSelect}
             resetImageState={imageManagement.resetImageState}
             labelOptions={annotationState.labelOptions}

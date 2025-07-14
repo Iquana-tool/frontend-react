@@ -54,6 +54,7 @@ const MainViewers = ({
   onAddSingleContourToFinalMask,
   isAddingToFinalMask,
   onMaskStatusChange,
+  setHighlightLabelWarning,
 }) => {
   // State for manual contour selection
   const [selectedManualContourIds, setSelectedManualContourIds] = React.useState([]);
@@ -252,6 +253,7 @@ const MainViewers = ({
             onInstantSegmentationStateChange={onInstantSegmentationStateChange}
             finalMasks={finalMasks}
             selectedContourIds={selectedContourIds}
+            setHighlightLabelWarning={setHighlightLabelWarning}
             // Remove segmentation overlay since it's now in the left panel
             showOverlay={false}
           />

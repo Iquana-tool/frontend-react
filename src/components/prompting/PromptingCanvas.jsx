@@ -24,6 +24,8 @@ const PromptingCanvas = forwardRef(({
   instantSegmentationDebounce = 1000,
   onInstantSegmentationStateChange,
   isSegmenting = false,
+  setError,
+  setHighlightLabelWarning,
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
@@ -56,7 +58,7 @@ const PromptingCanvas = forwardRef(({
   } = panZoom;
 
   // Initialize prompt drawing hook
-  const promptDrawing = usePromptDrawing(image, promptType, currentLabel, canvasToImageCoords);
+  const promptDrawing = usePromptDrawing(image, promptType, currentLabel, canvasToImageCoords, setHighlightLabelWarning);
   const {
     isDrawing,
     prompts,
@@ -157,12 +159,16 @@ const PromptingCanvas = forwardRef(({
   // Handle completing prompting
   const handleComplete = () => {
     if (prompts.length === 0) {
-      console.warn("No prompts to complete");
+      if (setError) {
+        setError("No prompts to complete. Please draw prompts on the image first.");
+      }
       return;
     }
 
     if (!currentLabel) {
-      console.warn("No label selected. Please select a label before segmenting.");
+      if (setHighlightLabelWarning) {
+        setHighlightLabelWarning(true);
+      }
       return;
     }
 

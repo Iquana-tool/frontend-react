@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageCoords) => {
+export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageCoords, setHighlightLabelWarning) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStartPos, setDrawStartPos] = useState(null);
   const [currentShape, setCurrentShape] = useState(null);
@@ -43,7 +43,9 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
 
     // Check if a label is selected before allowing prompt creation
     if (!currentLabel) {
-      console.warn("No label selected. Please select a label before drawing prompts.");
+      if (setHighlightLabelWarning) {
+        setHighlightLabelWarning(true);
+      }
       return false;
     }
 
@@ -98,7 +100,7 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
       default:
         return false;
     }
-  }, [image, promptType, currentLabel, canvasToImageCoords, addPointPrompt, currentPolygon, currentManualContour]);
+  }, [image, currentLabel, canvasToImageCoords, promptType, setHighlightLabelWarning, addPointPrompt, currentPolygon, currentManualContour]);
 
   // Handle mouse move for prompt creation
   const handlePromptMouseMove = useCallback((canvasX, canvasY) => {

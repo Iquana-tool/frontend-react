@@ -23,6 +23,7 @@ const AnnotationViewer = ({
     handleDeleteSelectedContours,
     setSelectedContours,
     selectedContourIds,
+    setHighlightLabelWarning,
     showOverlay = true, // Control whether to show the overlay (now false by default for new layout)
 }) => {
     return (
@@ -61,6 +62,8 @@ const AnnotationViewer = ({
                     segmentationMasks={segmentationMasks}
                     selectedContourIds={selectedContourIds}
                     isSegmenting={isSegmenting}
+                    setError={setError}
+                    setHighlightLabelWarning={setHighlightLabelWarning}
                 />
             </div>
         </div>
