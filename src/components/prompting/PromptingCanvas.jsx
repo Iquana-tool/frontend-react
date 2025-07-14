@@ -471,7 +471,7 @@ const PromptingCanvas = forwardRef(({
 
       {/* Complete segmentation button - Always show for non-manual contour tools */}
       {promptType !== "manual-contour" && (
-        <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+        <div className="px-4 py-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm h-[60px] flex items-center justify-between">
           <div className="flex items-center gap-2">
             {prompts.length > 0 ? (
               <span className="text-sm text-gray-600">

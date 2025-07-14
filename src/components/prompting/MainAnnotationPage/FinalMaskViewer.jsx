@@ -133,8 +133,8 @@ const FinalMaskViewer = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-200 bg-white/50 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-slate-200 bg-white/50 backdrop-blur-sm h-[65px] flex items-center">
+        <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-100 rounded-lg">
               <Layers className="h-5 w-5 text-green-600" />
@@ -479,11 +479,18 @@ const FinalMaskViewer = ({
       </div>
 
       {/* Footer with action buttons */}
-      {finalMasks.length > 0 && (
-        <div className="p-4 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
-          <div className="flex justify-end items-center gap-3">
+      {finalMasks.length > 0 ? (
+        <div className="px-4 py-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm h-[60px] flex items-center justify-end">
+          <div className="flex items-center gap-3">
             <FinishButton maskId={finalMask?.id} onStatusChange={onMaskStatusChange} />
             <NextButton />
+          </div>
+        </div>
+      ) : (
+        <div className="px-4 py-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm h-[60px] flex items-center">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+            <span>Final mask will appear here</span>
           </div>
         </div>
       )}
