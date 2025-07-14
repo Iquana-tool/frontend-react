@@ -53,6 +53,7 @@ const MainViewers = ({
   onAddToFinalMask,
   onAddSingleContourToFinalMask,
   isAddingToFinalMask,
+  onMaskStatusChange,
 }) => {
   // State for manual contour selection
   const [selectedManualContourIds, setSelectedManualContourIds] = React.useState([]);
@@ -289,6 +290,7 @@ const MainViewers = ({
               setAnnotationZoomLevel={setAnnotationZoomLevel}
               setAnnotationZoomCenter={setAnnotationZoomCenter}
               promptingCanvasRef={promptingCanvasRef}
+              onMaskStatusChange={onMaskStatusChange}
             />
           </div>
         )}

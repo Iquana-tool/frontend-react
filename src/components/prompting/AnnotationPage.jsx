@@ -146,6 +146,20 @@ const AnnotationPage = ({ initialImageId = null }) => {
     handleDeleteContourFromTable: contourOps.handleDeleteContourFromTable,
   });
 
+  // Handle mask status changes to update sidebar gallery
+  const handleMaskStatusChange = (isFinished) => {
+    const currentImageId = imageManagement.selectedImageId;
+    if (currentImageId) {
+      imageManagement.setAvailableImages(prevImages => 
+        prevImages.map(img => 
+          img.id === currentImageId 
+            ? { ...img, finished: isFinished }
+            : img
+        )
+      );
+    }
+  };
+
   // Use the effects hook to handle all useEffect logic
   useAnnotationPageEffects({
     currentDataset,
@@ -338,6 +352,7 @@ const AnnotationPage = ({ initialImageId = null }) => {
               contourAdditionHandlers.handleAddSingleContourToFinalMask
             }
             isAddingToFinalMask={isAddingToFinalMask}
+            onMaskStatusChange={handleMaskStatusChange}
           />
 
           {/* Help Section */}

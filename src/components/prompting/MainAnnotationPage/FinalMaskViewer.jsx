@@ -33,6 +33,7 @@ const FinalMaskViewer = ({
   setAnnotationZoomLevel,
   setAnnotationZoomCenter,
   promptingCanvasRef,
+  onMaskStatusChange,
 }) => {
 
   // Add panning state (simplified - only for user-initiated panning)
@@ -481,7 +482,7 @@ const FinalMaskViewer = ({
       {finalMasks.length > 0 && (
         <div className="p-4 border-t border-slate-200 bg-white/50 backdrop-blur-sm">
           <div className="flex justify-end items-center gap-3">
-            <FinishButton maskId={finalMask?.id} />
+            <FinishButton maskId={finalMask?.id} onStatusChange={onMaskStatusChange} />
             <NextButton />
           </div>
         </div>
