@@ -98,17 +98,15 @@ export const createQuantificationTableHandlers = ({
       }
 
       // Force redraw of annotation canvas with updated zoom state
-      setTimeout(() => {
-        renderAnnotationCanvas({
-          canvasRef: annotationCanvasRef,
-          bestMask,
-          canvasImage: imageObject,
-          selectedContours: [],
-          selectedFinalMaskContour: null,
-          zoomLevel: 1,
-          zoomCenter: { x: 0.5, y: 0.5 },
-        });
-      }, 50); // Longer delay to ensure state updates
+      renderAnnotationCanvas({
+        canvasRef: annotationCanvasRef,
+        bestMask,
+        canvasImage: imageObject,
+        selectedContours: [],
+        selectedFinalMaskContour: null,
+        zoomLevel: 1,
+        zoomCenter: { x: 0.5, y: 0.5 },
+      });
 
       return;
     }

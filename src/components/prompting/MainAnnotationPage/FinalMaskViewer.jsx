@@ -348,6 +348,14 @@ const FinalMaskViewer = ({
                 // Apply zoom to prompting canvas if available
                 if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
                   promptingCanvasRef.current.setZoomParameters(newZoomLevel, zoomCenter);
+                  
+                  // Add a small delay to ensure state synchronization before any coordinate transformations
+                  setTimeout(() => {
+                    // Force a redraw to ensure everything is properly updated
+                    if (promptingCanvasRef.current && promptingCanvasRef.current.forceRedraw) {
+                      promptingCanvasRef.current.forceRedraw();
+                    }
+                  }, 50);
                 }
               }}
               onMouseDown={(e) => {
@@ -396,6 +404,14 @@ const FinalMaskViewer = ({
                 // Apply zoom to prompting canvas if available
                 if (promptingCanvasRef && promptingCanvasRef.current && promptingCanvasRef.current.setZoomParameters) {
                   promptingCanvasRef.current.setZoomParameters(newZoomLevel, zoomCenter);
+                  
+                  // Add a small delay to ensure state synchronization before any coordinate transformations
+                  setTimeout(() => {
+                    // Force a redraw to ensure everything is properly updated
+                    if (promptingCanvasRef.current && promptingCanvasRef.current.forceRedraw) {
+                      promptingCanvasRef.current.forceRedraw();
+                    }
+                  }, 50);
                 }
               }}
               onMouseDown={(e) => {
