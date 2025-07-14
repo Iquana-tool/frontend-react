@@ -136,6 +136,7 @@ const PromptingCanvas = forwardRef(({
     setActiveTool: (tool) => {
       setActiveTool(tool);
     },
+    getActiveTool: () => activeTool,
     getSelectedContours: () => [],
     setZoomParameters: setZoomParameters,
     zoomIn: () => zoomIn(redrawCanvasCallback),
@@ -154,7 +155,7 @@ const PromptingCanvas = forwardRef(({
     getFormattedManualContours,
     // Force redraw for external updates
     forceRedraw: () => setForceRender(prev => prev + 1),
-    }), [setZoomParameters, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, clearManualContours, removeManualContour, getFormattedManualContours, prompts, clearPrompts, zoomIn, redrawCanvasCallback, zoomOut, resetView, manualContours]);
+    }), [activeTool, setZoomParameters, toggleInstantSegmentation, setIsInstantSegmentationEnabled, isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, clearManualContours, removeManualContour, getFormattedManualContours, prompts, clearPrompts, zoomIn, redrawCanvasCallback, zoomOut, resetView, manualContours]);
 
   // Handle completing prompting
   const handleComplete = () => {
@@ -449,51 +450,7 @@ const PromptingCanvas = forwardRef(({
             </div>
           </div>
         )}
-        
-        {/* Point prompt instructions */}
-        {promptType === "point" && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
-            <div className="font-medium mb-1">Point Prompts:</div>
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 bg-green-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">+</span>
-              </div>
-              <span>Left-click for positive points</span>
-            </div>
-            <div className="flex items-center gap-1 mb-1">
-              <div className="w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-white text-xs font-bold">−</span>
-              </div>
-              <span>Right-click for negative points</span>
-            </div>
-          </div>
-        )}
 
-        {/* Polygon prompt instructions */}
-        {promptType === "polygon" && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
-            <div className="font-medium mb-1">Polygon Prompts:</div>
-            <div className="mb-1">Left-click to add points</div>
-            <div className="mb-1">Double-click to finish</div>
-          </div>
-        )}
-
-        {/* Box prompt instructions */}
-        {promptType === "box" && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
-            <div className="font-medium mb-1">Box Prompts:</div>
-            <div className="mb-1">Click and drag to draw box</div>
-          </div>
-        )}
-        {/* Drag tool instructions */}
-        {activeTool === "drag" && (
-          <div className="absolute top-2 left-2 bg-white bg-opacity-90 px-3 py-2 rounded-md text-xs shadow-md">
-            <div className="font-medium mb-1">Drag Tool Active:</div>
-            <div className="mb-1">Click and drag to pan</div>
-            <div className="mb-1">Ctrl/Cmd + Mouse Wheel to zoom</div>
-            <div className="text-gray-600">Switch tools to draw prompts</div>
-          </div>
-        )}
 
         {/* AI segmentation results are now handled by SegmentationOverlay in AnnotationPage.jsx */}
 

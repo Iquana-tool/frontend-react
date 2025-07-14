@@ -9,7 +9,8 @@ import {
   ZoomIn, 
   ZoomOut, 
   RotateCcw,
-  PenTool
+  PenTool,
+  X
 } from 'lucide-react';
 import LabelSelector from '../LabelSelector';
 
@@ -30,6 +31,7 @@ const ToolsPanel = ({
   setHighlightLabelWarning
 }) => {
   const [isInstantSegmentationEnabled, setIsInstantSegmentationEnabled] = useState(false);
+  const [showManualContourInstructions, setShowManualContourInstructions] = useState(true);
 
   // Poll for instant segmentation state changes
   useEffect(() => {
@@ -62,6 +64,10 @@ const ToolsPanel = ({
   
   const handleToolChange = (tool) => {
     setPromptType(tool);
+    // Reset manual contour instructions visibility when switching to manual-contour tool
+    if (tool === "manual-contour") {
+      setShowManualContourInstructions(true);
+    }
     if (promptingCanvasRef.current) {
       promptingCanvasRef.current.setActiveTool(tool === 'point' ? 'point' : tool);
     }
@@ -306,11 +312,20 @@ const ToolsPanel = ({
       )}
 
       {/* Manual Contour Tool Instructions */}
-      {promptType === "manual-contour" && (
+      {promptType === "manual-contour" && showManualContourInstructions && (
         <div className="mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="flex items-center mb-2">
-            <PenTool className="w-4 h-4 text-purple-500 mr-2" />
-            <span className="text-sm text-purple-700 font-medium">Manual Contour Drawing</span>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <PenTool className="w-4 h-4 text-purple-500 mr-2" />
+              <span className="text-sm text-purple-700 font-medium">Manual Contour Drawing</span>
+            </div>
+            <button
+              onClick={() => setShowManualContourInstructions(false)}
+              className="p-1 hover:bg-purple-100 rounded transition-colors"
+              title="Close instructions"
+            >
+              <X className="w-4 h-4 text-purple-500" />
+            </button>
           </div>
           <div className="text-sm text-purple-600 space-y-1">
             <div>• Click to add points for polygon mode</div>
