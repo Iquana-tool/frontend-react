@@ -77,8 +77,6 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
                     });
                   }
                 });
-              } else {
-                console.warn(`No quantification data for mask ${mask.id}`);
               }
             }
           } catch (err) {

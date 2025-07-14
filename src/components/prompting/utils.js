@@ -185,6 +185,8 @@ export const getPromptTypeDescription = (type) => {
       return "Click and drag to create a circle";
     case "polygon":
       return "Click to add points, double-click to complete polygon";
+    case "manual-contour":
+      return "Click to add contour points, double-click to finish and add to Final Mask";
     default:
       return "";
   }

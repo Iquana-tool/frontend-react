@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 
 const FinishButton = ({
-    maskId, // Assuming mask is passed as a prop
+    maskId, 
+    onStatusChange, 
                       }) => {
     const [finished, setFinished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +24,7 @@ const FinishButton = ({
             try {
                 const response = await getMaskAnnotationStatus(maskId);
                 console.log("Mask status response:", response.status);
-                setFinished(response.status === "finished"); // Assuming response contains a boolean isFinal
+                setFinished(response.status === "finished"); 
             } catch (error) {
                 console.error("Error checking mask status:", error);
             }
@@ -41,6 +42,11 @@ const FinishButton = ({
                 .then(() => {
                     // Handle success, e.g., show a success message or redirect
                     console.log("Mask marked as final successfully");
+                    setFinished(true);
+                    // Call the callback to notify parent components
+                    if (onStatusChange) {
+                        onStatusChange(true);
+                    }
                 })
                 .catch((error) => {
                     // Handle error, e.g., show an error message
@@ -50,13 +56,17 @@ const FinishButton = ({
                 .finally(() => {
                     setIsLoading(false);
                 });
-            setFinished(true);
         } else {
             console.log("Finish button triggered with finished mask with id ", maskId, ". Marking mask as unfinished.");
             await markMaskAsUnfinished(maskId)
             .then(() => {
                     // Handle success, e.g., show a success message or redirect
                     console.log("Mask marked as unfinished successfully");
+                    setFinished(false);
+                    // Call the callback to notify parent components
+                    if (onStatusChange) {
+                        onStatusChange(false);
+                    }
                 })
             .catch((error) => {
                 // Handle error, e.g., show an error message
@@ -66,7 +76,6 @@ const FinishButton = ({
             .finally(() => {
                 setIsLoading(false);
             });
-            setFinished(false);
         }
 
     };

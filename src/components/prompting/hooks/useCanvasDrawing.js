@@ -72,46 +72,78 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
   }, [initialScale, zoomLevel]);
 
   const drawPolygon = useCallback((ctx, points, label, isInProgress = false) => {
-    if (!points || !Array.isArray(points) || points.length < 2) return;
-    
-    // Make sure all points have valid x and y coordinates
-    const validPoints = points.filter(point => point && typeof point.x === 'number' && typeof point.y === 'number');
-    
-    if (validPoints.length < 2) return;
-    
+    if (!points || points.length < 2) return;
+
     ctx.beginPath();
-    ctx.moveTo(validPoints[0].x, validPoints[0].y);
-
-    for (let i = 1; i < validPoints.length; i++) {
-      ctx.lineTo(validPoints[i].x, validPoints[i].y);
+    ctx.moveTo(points[0].x, points[0].y);
+    
+    for (let i = 1; i < points.length; i++) {
+      if (points[i] && typeof points[i].x === 'number' && typeof points[i].y === 'number') {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
     }
-
-    if (validPoints.length > 2 && !isInProgress) {
+    
+    // Close the polygon if not in progress
+    if (!isInProgress && points.length > 2) {
       ctx.closePath();
     }
-
+    
     ctx.strokeStyle = "rgba(16, 185, 129, 0.9)"; // Always use green
     ctx.lineWidth = 2 / (initialScale * zoomLevel);
     ctx.stroke();
 
-    if (validPoints.length > 2 && !isInProgress) {
+    if (!isInProgress && points.length > 2) {
       // Fill with transparent color
       ctx.fillStyle = "rgba(16, 185, 129, 0.1)"; // Always use green
       ctx.fill();
     }
+  }, [initialScale, zoomLevel]);
 
-    // Draw vertices for polygons
-    const vertexSize = 3 / (initialScale * zoomLevel);
-    validPoints.forEach((point) => {
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, vertexSize, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(16, 185, 129, 0.8)"; // Always use green
+  const drawManualContour = useCallback((ctx, points, label, isInProgress = false) => {
+    if (!points || points.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    
+    for (let i = 1; i < points.length; i++) {
+      if (points[i] && typeof points[i].x === 'number' && typeof points[i].y === 'number') {
+        ctx.lineTo(points[i].x, points[i].y);
+      }
+    }
+    
+    // Close the contour if not in progress
+    if (!isInProgress && points.length > 2) {
+      ctx.closePath();
+    }
+    
+    // Use purple color for manual contours to distinguish them
+    ctx.strokeStyle = "rgba(147, 51, 234, 0.9)"; // Purple color
+    ctx.lineWidth = 3 / (initialScale * zoomLevel); // Slightly thicker for visibility
+    ctx.stroke();
+
+    if (!isInProgress && points.length > 2) {
+      // Fill with transparent purple
+      ctx.fillStyle = "rgba(147, 51, 234, 0.15)"; // Purple fill
       ctx.fill();
-    });
+    }
+
+    // Add small circles at each point for manual contours
+    if (points.length > 0) {
+      ctx.fillStyle = "rgba(147, 51, 234, 0.8)";
+      const pointRadius = 4 / (initialScale * zoomLevel);
+      
+      points.forEach(point => {
+        if (point && typeof point.x === 'number' && typeof point.y === 'number') {
+          ctx.beginPath();
+          ctx.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    }
   }, [initialScale, zoomLevel]);
 
   // Function to draw all prompts on the canvas
-  const drawAllPrompts = useCallback((ctx, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel) => {
+  const drawAllPrompts = useCallback((ctx, prompts, selectedPromptIndex, currentShape, currentPolygon, cursorPos, promptType, currentLabel, currentManualContour, manualContours) => {
     prompts.forEach((prompt, i) => {
       try {
         // Highlight if selected
@@ -209,7 +241,42 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
         console.error("Error drawing current polygon:", error);
       }
     }
-  }, [drawPoint, drawBox, drawCircle, drawPolygon, initialScale, zoomLevel]);
+
+    // Draw current in-progress manual contour
+    if (currentManualContour && Array.isArray(currentManualContour) && currentManualContour.length > 0) {
+      try {
+        drawManualContour(ctx, currentManualContour, currentLabel, true);
+        
+        // Draw line from last point to cursor if we have a cursor position
+        if (cursorPos && currentManualContour.length > 0) {
+          const lastPoint = currentManualContour[currentManualContour.length - 1];
+          if (lastPoint && typeof lastPoint.x === 'number' && cursorPos && typeof cursorPos.x === 'number') {
+            ctx.beginPath();
+            ctx.moveTo(lastPoint.x, lastPoint.y);
+            ctx.lineTo(cursorPos.x, cursorPos.y);
+            ctx.strokeStyle = "rgba(147, 51, 234, 0.6)";  // purple color
+            ctx.lineWidth = 3 / (initialScale * zoomLevel);
+            ctx.stroke();
+          }
+        }
+      } catch (error) {
+        console.error("Error drawing current manual contour:", error);
+      }
+    }
+
+    // Draw completed manual contours
+    if (manualContours && Array.isArray(manualContours) && manualContours.length > 0) {
+      manualContours.forEach((contour, i) => {
+        try {
+          if (contour.coordinates && Array.isArray(contour.coordinates)) {
+            drawManualContour(ctx, contour.coordinates, contour.label, false);
+          }
+        } catch (error) {
+          console.error("Error drawing manual contour:", error, contour);
+        }
+      });
+    }
+  }, [drawPoint, drawBox, drawCircle, drawPolygon, drawManualContour, initialScale, zoomLevel]);
 
   // Draw mask overlay
   const drawMaskOverlay = useCallback((ctx, selectedMask, selectedContours, scale) => {
@@ -392,6 +459,7 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
     drawPolygon,
     drawAllPrompts,
     drawMaskOverlay,
-    drawFinalMaskContour
+    drawFinalMaskContour,
+    drawManualContour
   };
 }; 

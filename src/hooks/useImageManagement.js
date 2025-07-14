@@ -270,5 +270,6 @@ export const useImageManagement = (fetchFinalMask = null) => {
     setSelectedImage: setSelectedImageMetadata,
     setImageObject: setSelectedImageBase64,
     setImageLoaded,
+    setAvailableImages,
   };
 }; 

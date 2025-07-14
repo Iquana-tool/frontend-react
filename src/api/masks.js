@@ -438,8 +438,42 @@ export async function getFinalMask(imageId) {
 
                 if (contoursResponse.ok) {
                     const contoursData = await contoursResponse.json();
+                    
                     if (contoursData.success && contoursData.contours) {
                         finalMask.contours = contoursData.contours;
+                        
+                        // Try to fetch quantifications for the final mask
+                        try {
+                            const quantResponse = await fetch(
+                                `${API_BASE_URL}/export/get_quantification/${finalMask.id}`,
+                                {
+                                    method: "GET",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                    },
+                                }
+                            );
+                            
+                            if (quantResponse.ok) {
+                                const quantData = await quantResponse.json();
+                                
+                                if (quantData.quantifications && Array.isArray(quantData.quantifications)) {
+                                    // Merge quantification data with contours
+                                    finalMask.contours.forEach((contour, index) => {
+                                        if (quantData.quantifications[index]) {
+                                            const quant = quantData.quantifications[index];
+                                            contour.area = quant.area;
+                                            contour.perimeter = quant.perimeter;
+                                            contour.circularity = quant.circularity;
+                                            contour.diameters = quant.diameters;
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (quantError) {
+                            console.warn("Could not fetch quantifications for final mask:", quantError);
+                            // Don't fail the entire operation if quantifications can't be fetched
+                        }
                     } else {
                         finalMask.contours = [];
                     }
@@ -447,6 +481,7 @@ export async function getFinalMask(imageId) {
                     finalMask.contours = [];
                 }
             } catch (contoursError) {
+                console.error("❌ Error fetching contours:", contoursError);
                 finalMask.contours = [];
             }
 

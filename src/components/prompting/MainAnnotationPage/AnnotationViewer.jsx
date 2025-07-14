@@ -1,79 +1,142 @@
 import PromptingCanvas from "../PromptingCanvas";
-import AddContourModal from "./AddContourModal";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { PenTool } from "lucide-react";
 
 const AnnotationViewer = ({
     promptingCanvasRef,
     imageObject,
     handlePromptingComplete,
-    selectedMask,
     promptType,
     currentLabel,
     handleContourSelect,
     handleAddSelectedContoursToFinalMask,
-    handleClearSegmentationResults,
+    handleAddManualContoursToFinalMask,
     zoomLevel,
     zoomCenter,
     selectedFinalMaskContour,
     finalMasks,
     onInstantSegmentationStateChange,
-    selectedContours,
     isSegmenting,
     segmentationMasks,
     loading,
     setError,
     handleDeleteSelectedContours,
     setSelectedContours,
+    selectedContourIds,
+    setHighlightLabelWarning,
+    showOverlay = true, // Control whether to show the overlay (now false by default for new layout)
 }) => {
+    const [activeTool, setActiveTool] = useState("point");
+
+    // Update activeTool when promptType changes or when canvas ref becomes available
+    useEffect(() => {
+        if (promptingCanvasRef.current && promptingCanvasRef.current.getActiveTool) {
+            const currentActiveTool = promptingCanvasRef.current.getActiveTool();
+            setActiveTool(currentActiveTool);
+        } else {
+            // Fallback to promptType if canvas ref is not available
+            setActiveTool(promptType);
+        }
+    }, [promptType, promptingCanvasRef]);
+
+    // Poll for activeTool changes since it's managed internally by the canvas
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (promptingCanvasRef.current && promptingCanvasRef.current.getActiveTool) {
+                const currentActiveTool = promptingCanvasRef.current.getActiveTool();
+                setActiveTool(prev => prev !== currentActiveTool ? currentActiveTool : prev);
+            }
+        }, 100); // Check every 100ms
+
+        return () => clearInterval(interval);
+    }, [promptingCanvasRef]);
+
     return (
-        <div className="viewer-panel flex-1 w-full">
-            <div className="viewer-header flex items-center">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4 mr-2 text-blue-600"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                >
-                    <path
-                        fillRule="evenodd"
-                        d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-                        clipRule="evenodd"
-                    />
-                </svg>
-                <span>Annotation Drawing Area</span>
+        <div className="flex flex-col h-full">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-slate-200 bg-white/50 backdrop-blur-sm h-[65px] flex items-center">
+                <div className="flex items-center gap-3 w-full">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                        <PenTool className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-semibold text-slate-800">Annotation Drawing Area</h3>
+                        <div className="flex items-center gap-4 mt-0.5">
+                            <p className="text-xs text-slate-500">Draw prompts to segment the image</p>
+                            
+                            {/* Instructions inline */}
+                            {promptType === "point" && (
+                                <div className="flex items-center gap-3 text-xs text-slate-600">
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                        <span>Left Click (+ Annotation)</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                        <span>Right Click (− Annotation)</span>
+                                    </div>
+                                </div>
+                            )}
+                            {promptType === "polygon" && (
+                                <div className="text-xs text-slate-600">
+                                    Click to add • Double-click to finish
+                                </div>
+                            )}
+                            {promptType === "box" && (
+                                <div className="text-xs text-slate-600">
+                                    Click and drag
+                                </div>
+                            )}
+                            {promptType === "manual-contour" && (
+                                <div className="text-xs text-slate-600">
+                                    Click to draw • Double-click to finish
+                                </div>
+                            )}
+                            {activeTool === "drag" && (
+                                <div className="text-xs text-slate-600">
+                                    Drag to pan • Ctrl+Wheel to zoom
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div className="h-[400px] sm:h-[500px] lg:h-[600px] relative">
-                {/* Use the PromptingCanvas for adding annotations */}
+
+            {/* Canvas Container */}
+            <div className="flex-1 relative bg-slate-50 overflow-hidden">
                 <PromptingCanvas
                     ref={promptingCanvasRef}
                     image={imageObject}
                     onPromptingComplete={handlePromptingComplete}
-                    selectedMask={selectedMask}
                     promptType={promptType}
                     activeTool={promptType}
                     currentLabel={currentLabel}
                     onContourSelect={handleContourSelect}
-                    onAddToFinalMask={handleAddSelectedContoursToFinalMask}
-                    onClearSegmentationResults={handleClearSegmentationResults}
+                    onAddToFinalMask={
+                        promptType === "manual-contour" 
+                        ? handleAddManualContoursToFinalMask 
+                        : handleAddSelectedContoursToFinalMask
+                    }
                     onInstantSegmentationStateChange={onInstantSegmentationStateChange}
                     selectedFinalMaskContour={selectedFinalMaskContour}
                     finalMasks={finalMasks}
+                    segmentationMasks={segmentationMasks}
+                    selectedContourIds={selectedContourIds}
                     isSegmenting={isSegmenting}
+                    setError={setError}
+                    setHighlightLabelWarning={setHighlightLabelWarning}
                 />
-
-                {/* Overlay segmentation controls when segmentation is complete and we have masks */}
-                {segmentationMasks.length > 0 && selectedMask && (
-                    <AddContourModal
-                        selectedContours={selectedContours}
-                        isSegmenting={isSegmenting}
-                        loading={loading}
-                        handleAddSelectedContoursToFinalMask={handleAddSelectedContoursToFinalMask}
-                        handleDeleteSelectedContours={handleDeleteSelectedContours}
-                        setSelectedContours={setSelectedContours}
-                        setError={setError}
-                    />
-                )}
             </div>
+
+            {/* Footer for manual contour tools */}
+            {promptType === "manual-contour" && (
+                <div className="px-4 py-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm h-[60px] flex items-center">
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
+                        <span>Manual contours are added directly to final mask</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
