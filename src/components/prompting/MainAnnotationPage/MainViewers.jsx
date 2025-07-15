@@ -248,6 +248,7 @@ const MainViewers = ({
             canvasImage={canvasImage}
             handleDeleteSelectedContours={handleDeleteSelectedContours}
             setSelectedContours={setSelectedContours}
+            selectedManualContourIds={selectedManualContourIds}
             handleRunNewSegmentation={handleRunNewSegmentation}
             setError={setError}
             onInstantSegmentationStateChange={onInstantSegmentationStateChange}

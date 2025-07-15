@@ -23,10 +23,12 @@ const AnnotationViewer = ({
     handleDeleteSelectedContours,
     setSelectedContours,
     selectedContourIds,
+    selectedManualContourIds,
     setHighlightLabelWarning,
     showOverlay = true, // Control whether to show the overlay (now false by default for new layout)
 }) => {
     const [activeTool, setActiveTool] = useState("point");
+    const [manualContourCount, setManualContourCount] = useState(0);
 
     // Update activeTool when promptType changes or when canvas ref becomes available
     useEffect(() => {
@@ -45,6 +47,19 @@ const AnnotationViewer = ({
             if (promptingCanvasRef.current && promptingCanvasRef.current.getActiveTool) {
                 const currentActiveTool = promptingCanvasRef.current.getActiveTool();
                 setActiveTool(prev => prev !== currentActiveTool ? currentActiveTool : prev);
+            }
+        }, 100); // Check every 100ms
+
+        return () => clearInterval(interval);
+    }, [promptingCanvasRef]);
+
+    // Poll for manual contour count changes to update footer
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (promptingCanvasRef.current && promptingCanvasRef.current.getManualContours) {
+                const manualContours = promptingCanvasRef.current.getManualContours();
+                const currentCount = manualContours.length;
+                setManualContourCount(prev => prev !== currentCount ? currentCount : prev);
             }
         }, 100); // Check every 100ms
 
@@ -122,6 +137,7 @@ const AnnotationViewer = ({
                     finalMasks={finalMasks}
                     segmentationMasks={segmentationMasks}
                     selectedContourIds={selectedContourIds}
+                    selectedManualContourIds={selectedManualContourIds}
                     isSegmenting={isSegmenting}
                     setError={setError}
                     setHighlightLabelWarning={setHighlightLabelWarning}
@@ -132,8 +148,20 @@ const AnnotationViewer = ({
             {promptType === "manual-contour" && (
                 <div className="px-4 py-3 border-t border-slate-200 bg-white/50 backdrop-blur-sm h-[60px] flex items-center">
                     <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <div className="w-1 h-1 bg-purple-500 rounded-full"></div>
-                        <span>Manual contours are added directly to final mask</span>
+                        {manualContourCount > 0 ? (
+                            <>
+                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                <span>
+                                    {manualContourCount} manual contour{manualContourCount !== 1 ? 's' : ''} ready • 
+                                    Manage in left panel
+                                </span>
+                            </>
+                        ) : (
+                            <>
+                                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                                <span>Click to draw manual contours directly on the image</span>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
