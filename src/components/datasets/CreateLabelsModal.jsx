@@ -3,7 +3,6 @@ import { X, Plus, ChevronRight, ChevronDown, Clock, Tag } from 'lucide-react';
 import * as api from '../../api';
 import { getNextAvailableColor } from '../../utils/labelColors';
 import { 
-  buildLabelHierarchy, 
   hasChildren, 
   flattenHierarchy 
 } from '../../utils/labelHierarchy';
