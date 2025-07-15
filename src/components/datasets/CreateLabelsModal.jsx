@@ -1,79 +1,34 @@
 import React, { useState } from 'react';
-import { X, Plus, ChevronRight, Clock, Tag } from 'lucide-react';
+import { X, Plus, ChevronRight, ChevronDown, Clock, Tag } from 'lucide-react';
 import * as api from '../../api';
 import { getNextAvailableColor } from '../../utils/labelColors';
+import { 
+  buildLabelHierarchy, 
+  hasChildren, 
+  flattenHierarchy 
+} from '../../utils/labelHierarchy';
 
 const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
-  const [labels, setLabels] = useState([]);
+  const [labelHierarchy, setLabelHierarchy] = useState([]);
   const [expandedLabels, setExpandedLabels] = useState(new Set());
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [showLabelCreation, setShowLabelCreation] = useState(false);
+  const [labelIdCounter, setLabelIdCounter] = useState(1);
 
   const getNextColor = () => {
-    const usedColors = labels.map(label => label.color);
+    const flatLabels = flattenHierarchy(labelHierarchy);
+    const usedColors = flatLabels.map(label => label.color);
     return getNextAvailableColor(usedColors);
   };
 
-  const handleAddLabel = () => {
-    const newLabel = {
-      id: Date.now(),
-      name: '',
-      color: getNextColor(),
-      subLabels: []
-    };
-    setLabels([...labels, newLabel]);
+  const getNextId = () => {
+    const nextId = labelIdCounter;
+    setLabelIdCounter(prev => prev + 1);
+    return nextId;
   };
 
-  const handleAddSubLabel = (parentId) => {
-    const newSubLabel = {
-      id: Date.now(),
-      name: '',
-      parentId
-    };
-    
-    setLabels(labels.map(label => 
-      label.id === parentId 
-        ? { ...label, subLabels: [...label.subLabels, newSubLabel] }
-        : label
-    ));
-    setExpandedLabels(prev => new Set([...prev, parentId]));
-  };
-
-  const handleLabelNameChange = (id, name, isSubLabel = false, parentId = null) => {
-    if (isSubLabel) {
-      setLabels(labels.map(label => 
-        label.id === parentId 
-          ? { 
-              ...label, 
-              subLabels: label.subLabels.map(sub => 
-                sub.id === id ? { ...sub, name } : sub
-              )
-            }
-          : label
-      ));
-    } else {
-      setLabels(labels.map(label => 
-        label.id === id ? { ...label, name } : label
-      ));
-    }
-  };
-
-  const handleDeleteLabel = (id, isSubLabel = false, parentId = null) => {
-    if (isSubLabel) {
-      setLabels(labels.map(label => 
-        label.id === parentId 
-          ? { 
-              ...label, 
-              subLabels: label.subLabels.filter(sub => sub.id !== id)
-            }
-          : label
-      ));
-    } else {
-      setLabels(labels.filter(label => label.id !== id));
-    }
-  };
-
+  // Toggle expanded state for a label
   const toggleExpanded = (labelId) => {
     const newExpanded = new Set(expandedLabels);
     if (newExpanded.has(labelId)) {
@@ -84,12 +39,68 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
     setExpandedLabels(newExpanded);
   };
 
+  const handleAddLabel = (parentLabel = null) => {
+    const newLabel = {
+      id: getNextId(),
+      name: '',
+      color: getNextColor(),
+      parent_id: parentLabel ? parentLabel.id : null,
+      children: []
+    };
+    
+    if (parentLabel) {
+      // Add to parent's children
+      const updateLabelHierarchy = (labels) => {
+        return labels.map(label => {
+          if (label.id === parentLabel.id) {
+            return { ...label, children: [...label.children, newLabel] };
+          } else if (label.children) {
+            return { ...label, children: updateLabelHierarchy(label.children) };
+          }
+          return label;
+        });
+      };
+      setLabelHierarchy(updateLabelHierarchy(labelHierarchy));
+      // Auto-expand the parent
+      setExpandedLabels(prev => new Set([...prev, parentLabel.id]));
+    } else {
+      // Add as root label
+      setLabelHierarchy([...labelHierarchy, newLabel]);
+    }
+  };
+
+
+
+  const handleLabelNameChange = (id, name) => {
+    const updateLabelName = (labels) => {
+      return labels.map(label => {
+        if (label.id === id) {
+          return { ...label, name };
+        } else if (label.children) {
+          return { ...label, children: updateLabelName(label.children) };
+        }
+        return label;
+      });
+    };
+    setLabelHierarchy(updateLabelName(labelHierarchy));
+  };
+
+  const handleDeleteLabel = (id) => {
+    const deleteLabel = (labels) => {
+      return labels
+        .filter(label => label.id !== id)
+        .map(label => ({
+          ...label,
+          children: label.children ? deleteLabel(label.children) : []
+        }));
+    };
+    setLabelHierarchy(deleteLabel(labelHierarchy));
+  };
+
   const handleCreateLabels = async () => {
     // Validate that all labels have names
-    const hasEmptyLabels = labels.some(label => 
-      !label.name.trim() || 
-      label.subLabels.some(sub => !sub.name.trim())
-    );
+    const flatLabels = flattenHierarchy(labelHierarchy);
+    const hasEmptyLabels = flatLabels.some(label => !label.name.trim());
 
     if (hasEmptyLabels) {
       setError('Please provide names for all labels');
@@ -100,32 +111,26 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
     setError(null);
 
     try {
-      // Create parent labels first
-      const createdLabels = [];
-      
-      for (const label of labels) {
-        if (label.name.trim()) {
-          const result = await api.createLabel(
-            { name: label.name.trim(), parent_id: null },
-            dataset.id
-          );
-          
-          if (result.success) {
-            const createdLabel = { ...label, apiId: result.class_id };
-            createdLabels.push(createdLabel);
+      // Create labels recursively starting from root
+      const createLabelsRecursive = async (labels, parentApiId = null) => {
+        for (const label of labels) {
+          if (label.name.trim()) {
+            const result = await api.createLabel(
+              { name: label.name.trim(), parent_id: parentApiId },
+              dataset.id
+            );
             
-            // Create sub-labels
-            for (const subLabel of label.subLabels) {
-              if (subLabel.name.trim()) {
-                await api.createLabel(
-                  { name: subLabel.name.trim(), parent_id: result.class_id },
-                  dataset.id
-                );
+            if (result.success) {
+              // Recursively create children
+              if (label.children && label.children.length > 0) {
+                await createLabelsRecursive(label.children, result.class_id);
               }
             }
           }
         }
-      }
+      };
+      
+      await createLabelsRecursive(labelHierarchy);
       
       onLabelsCreated();
       onClose();
@@ -149,8 +154,80 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
 
   const handleBackToChoice = () => {
     setShowLabelCreation(false);
-    setLabels([]);
+    setLabelHierarchy([]);
     setError(null);
+  };
+
+  // Recursive component to render label hierarchy
+  const renderLabelHierarchy = (labels, depth = 0) => {
+    return labels.map((label) => {
+      const hasChildLabels = hasChildren(label);
+      const isExpanded = expandedLabels.has(label.id);
+      const marginLeft = depth * 20; // Indent based on depth
+      
+      return (
+        <div key={label.id} className="border rounded-lg mb-3">
+          {/* Main Label */}
+          <div className="flex items-center p-3">
+            {hasChildLabels && (
+              <button
+                onClick={() => toggleExpanded(label.id)}
+                className="p-1 mr-2 text-gray-500 hover:text-gray-700"
+                title={isExpanded ? "Collapse" : "Expand"}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-4 h-4" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            )}
+            
+            <div 
+              className="w-6 h-6 rounded-full mr-3 flex-shrink-0" 
+              style={{ backgroundColor: label.color, marginLeft: `${marginLeft}px` }}
+            ></div>
+            
+            <input
+              type="text"
+              value={label.name}
+              onChange={(e) => handleLabelNameChange(label.id, e.target.value)}
+              placeholder={depth > 0 ? "Sublabel name" : "Label name"}
+              className="flex-1 px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-0"
+            />
+            
+            {hasChildLabels && (
+              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full mr-2">
+                {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            
+            <button
+              onClick={() => handleAddLabel(label)}
+              className="p-1 text-gray-500 hover:text-gray-700 mr-2"
+              title="Add sublabel"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+            
+            <button
+              onClick={() => handleDeleteLabel(label.id)}
+              className="p-1 text-red-500 hover:text-red-700"
+              title="Delete label"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Children Labels */}
+          {hasChildLabels && isExpanded && label.children && (
+            <div className="border-t bg-gray-50 p-3">
+              {renderLabelHierarchy(label.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   if (!isOpen) return null;
@@ -226,93 +303,19 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
 
               {/* Labels List */}
               <div className="space-y-3">
-                {labels.length === 0 ? (
+                {labelHierarchy.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <p className="text-sm">No labels created yet</p>
                     <p className="text-xs mt-1">Click "Add new label" to get started</p>
                   </div>
                 ) : (
-                  labels.map((label) => (
-                  <div key={label.id} className="border rounded-lg">
-                    {/* Main Label */}
-                    <div className="flex items-center p-3">
-                      <div 
-                        className="w-6 h-6 rounded-full mr-3 flex-shrink-0" 
-                        style={{ backgroundColor: label.color }}
-                      ></div>
-                      
-                      <input
-                        type="text"
-                        value={label.name}
-                        onChange={(e) => handleLabelNameChange(label.id, e.target.value)}
-                        placeholder="Label name"
-                        className="flex-1 px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-0"
-                      />
-                      
-                      <button
-                        onClick={() => handleAddSubLabel(label.id)}
-                        className="p-1 text-gray-500 hover:text-gray-700 mr-2"
-                        title="Add sublabel"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                      
-                      {label.subLabels.length > 0 && (
-                        <button
-                          onClick={() => toggleExpanded(label.id)}
-                          className="p-1 text-gray-500 hover:text-gray-700 mr-2"
-                        >
-                          <ChevronRight 
-                            className={`w-4 h-4 transition-transform ${
-                              expandedLabels.has(label.id) ? 'rotate-90' : ''
-                            }`} 
-                          />
-                        </button>
-                      )}
-                      
-                      {labels.length > 1 && (
-                        <button
-                          onClick={() => handleDeleteLabel(label.id)}
-                          className="p-1 text-red-500 hover:text-red-700"
-                          title="Delete label"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Sub Labels */}
-                    {expandedLabels.has(label.id) && label.subLabels.length > 0 && (
-                      <div className="border-t bg-gray-50">
-                        {label.subLabels.map((subLabel) => (
-                          <div key={subLabel.id} className="flex items-center p-3 pl-12">
-                            <input
-                              type="text"
-                              value={subLabel.name}
-                              onChange={(e) => handleLabelNameChange(subLabel.id, e.target.value, true, label.id)}
-                              placeholder="Sublabel name"
-                              className="flex-1 px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-0"
-                            />
-                            
-                            <button
-                              onClick={() => handleDeleteLabel(subLabel.id, true, label.id)}
-                              className="p-1 text-red-500 hover:text-red-700 ml-2"
-                              title="Delete sublabel"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
+                  renderLabelHierarchy(labelHierarchy)
                 )}
               </div>
 
               {/* Add New Label Button */}
               <button
-                onClick={handleAddLabel}
+                onClick={() => handleAddLabel()}
                 className="w-full mt-4 p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-600 transition-colors flex items-center justify-center"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -342,7 +345,7 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
               </button>
               <button
                 onClick={handleCreateLabels}
-                disabled={isCreating || labels.every(label => !label.name.trim())}
+                disabled={isCreating || flattenHierarchy(labelHierarchy).every(label => !label.name.trim())}
                 className="flex-1 bg-teal-600 text-white py-3 px-6 rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {isCreating ? 'Creating...' : 'Create Labels'}
