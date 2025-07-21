@@ -40,7 +40,7 @@ const MissionSection = ({ scrollY }) => {
             <span className="text-cyan-600 font-bold bg-gradient-to-r from-cyan-50 to-blue-50 px-2 py-1 rounded-lg">
               Helmholtz Institute for Functional Marine Biodiversity (HIFMB)
             </span>.
-            This interdisciplinary initiative harnesses cutting-edge artificial intelligence to revolutionize coral reef research with intelligent, scalable tools for marine ecosystem analysis.
+            This interdisciplinary initiative uses advanced artificial intelligence to enhance coral reef research with smart, scalable tools for marine ecosystem analysis.
           </p>
         </div>
       </div>
