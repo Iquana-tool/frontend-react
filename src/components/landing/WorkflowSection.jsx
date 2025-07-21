@@ -4,7 +4,7 @@ import { Target, CheckCircle } from "lucide-react";
 const WorkflowSection = ({ scrollY, workflowSteps, capabilities }) => {
   return (
     <section 
-      className="relative py-24"
+      className="relative py-6"
       style={{
         transform: `translate3d(0, ${scrollY * 0.03}px, 0)`
       }}
@@ -51,7 +51,7 @@ const WorkflowSection = ({ scrollY, workflowSteps, capabilities }) => {
             }}
           >
             <div className="bg-gradient-to-br from-teal-500 via-cyan-500 to-blue-600 rounded-3xl p-8 text-white shadow-2xl">
-              <h3 className="text-2xl font-bold mb-8 flex items-center">
+              <h3 className="text-2xl font-bold mb-4 flex items-center">
                 <Target className="w-8 h-8 mr-3" />
                 Key Capabilities
               </h3>

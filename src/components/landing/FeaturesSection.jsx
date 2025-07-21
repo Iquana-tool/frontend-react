@@ -28,13 +28,13 @@ const FeaturesSection = ({ scrollY, features }) => {
                 transform: `translate3d(0, ${scrollY * (0.01 + index * 0.003)}px, 0)`
               }}
             >
-              <div className={`inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r ${feature.gradient} rounded-2xl mb-6 text-white group-hover:scale-110 transition-transform duration-300`}>
+              <div className={`flex items-center justify-center w-16 h-16 bg-gradient-to-r ${feature.gradient} rounded-2xl mb-6 text-white group-hover:scale-110 transition-transform duration-300 mx-auto`}>
                 {feature.icon}
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className="text-gray-600 leading-relaxed text-center">
                 {feature.description}
               </p>
               <div className={`absolute inset-0 bg-gradient-to-r ${feature.gradient} rounded-3xl opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>

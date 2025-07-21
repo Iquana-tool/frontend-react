@@ -43,7 +43,7 @@ const HeroSection = ({ scrollY, stats }) => {
           }}
         >
            Semi-automated coral segmentation platform powered by cutting-edge AI. 
-          <span className="text-teal-600 font-medium">Transform marine biodiversity research</span> with intelligent tools for coral reef analysis.
+          <span className="text-teal-600 font-medium"> Transform marine biodiversity research</span> with intelligent tools for coral reef analysis.
         </p>
         
         <div 

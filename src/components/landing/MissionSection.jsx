@@ -4,7 +4,7 @@ import { Waves } from "lucide-react";
 const MissionSection = ({ scrollY }) => {
   return (
     <section 
-      className="relative py-24"
+      className="relative py-6"
       style={{
         transform: `translate3d(0, ${scrollY * 0.05}px, 0)`
       }}

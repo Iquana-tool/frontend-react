@@ -1,38 +1,37 @@
-import { 
-  Brain, 
-  Database, 
+import {Database, 
   Award,
   TrendingUp,
-  Users, 
-  BarChart3,
-  Microscope,
-  Target
+  Users,
+  Layers,
+  Cpu,
+  MousePointer,
+  Activity
 } from "lucide-react";
 
 export const features = [
   {
-    icon: <Microscope className="w-8 h-8" />,
+    icon: <Layers className="w-8 h-8" />,
     title: "Coral & Polyp Segmentation",
     description: "Semi-automated tool specifically designed for coral and polyp image segmentation using advanced AI models.",
-    gradient: "from-emerald-400 to-teal-600"
+    gradient: "from-teal-400 to-cyan-600"
   },
   {
-    icon: <Brain className="w-8 h-8" />,
+    icon: <Cpu className="w-8 h-8" />,
     title: "Deep Learning + Prompting",
     description: "Combines deep learning and prompt-based models for both automatic and interactive segmentation workflows.",
-    gradient: "from-blue-400 to-cyan-600"
+    gradient: "from-teal-400 to-cyan-600"
   },
   {
-    icon: <Target className="w-8 h-8" />,
+    icon: <MousePointer className="w-8 h-8" />,
     title: "Multi-Modal Prompting",
     description: "Support for point, box, circle, and polygon prompts with positive/negative labeling for precise control.",
-    gradient: "from-purple-400 to-indigo-600"
+    gradient: "from-teal-400 to-cyan-600"
   },
   {
-    icon: <BarChart3 className="w-8 h-8" />,
+    icon: <Activity className="w-8 h-8" />,
     title: "Morphological Analysis",
     description: "Quantify morphological traits and changes with visual overlays and downloadable reports.",
-    gradient: "from-orange-400 to-red-500"
+    gradient: "from-teal-400 to-cyan-600"
   }
 ];
 
@@ -57,24 +56,24 @@ export const workflowSteps = [
     step: "1",
     title: "Select or Upload Images",
     description: "Choose coral images from the left panel or upload your own datasets",
-    color: "from-emerald-400 to-teal-500"
+    color: "from-teal-400 to-cyan-600"
   },
   {
     step: "2",
     title: "Choose Prompting Tools",
     description: "Use point, box, circle, or polygon prompts for precise segmentation control",
-    color: "from-blue-400 to-indigo-500"
+    color: "from-teal-400 to-cyan-600"
   },
   {
     step: "3",
     title: "Interactive Annotation",
     description: "Left-click for positive point Annotations, right-click for negative point Annotations",
-    color: "from-purple-400 to-pink-500"
+    color: "from-teal-400 to-cyan-600"
   },
   {
     step: "4",
     title: "Analyze & Export",
     description: "Use zoom controls for detailed work and save quantification reports",
-    color: "from-orange-400 to-red-500"
+    color: "from-teal-400 to-cyan-600"
   }
 ]; 
