@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   MousePointer,
   Square,
-  Circle,
   Pentagon,
   Move, 
   Pointer, 
@@ -172,18 +171,7 @@ const ToolsPanel = ({
             <Square className="w-4 h-4" />
           </button>
           
-          {/* Circle tool */}
-          <button
-            className={`p-2 transition-colors ${
-              promptType === "circle"
-                ? "bg-blue-500 text-white"
-                : "hover:bg-gray-100"
-            }`}
-            onClick={() => handleToolChange("circle")}
-            title="Circle Tool"
-          >
-            <Circle className="w-4 h-4" />
-          </button>
+
           
           {/* Polygon tool */}
           <button

@@ -72,15 +72,6 @@ export const segmentImage = async (
                             vertices: vertices,
                         };
                     }
-                } else if (prompt.type === "circle") {
-                    // Only take the first circle prompt (backend schema allows only one)
-                    if (!requestData.hasOwnProperty("circle_prompt")) {
-                        requestData.circle_prompt = {
-                            center_x: prompt.coordinates.centerX,
-                            center_y: prompt.coordinates.centerY,
-                            radius: prompt.coordinates.radius,
-                        };
-                    }
                 }
             });
         }

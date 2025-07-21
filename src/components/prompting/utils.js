@@ -30,15 +30,7 @@ export const formatPrompts = (prompts, image) => {
           endY: parseFloat((prompt.endY / image.height).toFixed(4)),
         };
         break;
-      case "circle":
-        formattedPrompt.coordinates = {
-          centerX: parseFloat((prompt.centerX / image.width).toFixed(4)),
-          centerY: parseFloat((prompt.centerY / image.height).toFixed(4)),
-          radius: parseFloat(
-            (prompt.radius / Math.max(image.width, image.height)).toFixed(4)
-          ),
-        };
-        break;
+
       case "polygon":
         formattedPrompt.coordinates = prompt.points.map((point) => ({
           x: parseFloat((point.x / image.width).toFixed(4)),
@@ -181,8 +173,7 @@ export const getPromptTypeDescription = (type) => {
       return "Click to place points";
     case "box":
       return "Click and drag to create a box";
-    case "circle":
-      return "Click and drag to create a circle";
+
     case "polygon":
       return "Click to add points, double-click to complete polygon";
     case "manual-contour":
@@ -426,13 +417,7 @@ export const remapPromptsToCrop = (prompts, crop) => {
           endY: (prompt.coordinates.endY - crop.min_y) / cropHeight,
         };
         break;
-      case "circle":
-        remapped.coordinates = {
-          centerX: (prompt.coordinates.centerX - crop.min_x) / cropWidth,
-          centerY: (prompt.coordinates.centerY - crop.min_y) / cropHeight,
-          radius: prompt.coordinates.radius / Math.max(cropWidth, cropHeight),
-        };
-        break;
+
       case "polygon":
         remapped.coordinates = prompt.coordinates.map((pt) => ({
           x: (pt.x - crop.min_x) / cropWidth,

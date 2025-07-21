@@ -55,9 +55,7 @@ export const useSegmentation = () => {
       // Use centroid of polygon
       promptX = prompt.coordinates.reduce((sum, p) => sum + p.x, 0) / prompt.coordinates.length;
       promptY = prompt.coordinates.reduce((sum, p) => sum + p.y, 0) / prompt.coordinates.length;
-    } else if (prompt.type === "circle") {
-      promptX = prompt.coordinates.centerX;
-      promptY = prompt.coordinates.centerY;
+
     } else {
       return null;
     }

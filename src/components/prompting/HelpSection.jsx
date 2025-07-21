@@ -10,7 +10,7 @@ const HelpSection = ({ selectedImage, imageLoading }) => {
       <h3 className="font-medium mb-2">How to use:</h3>
       <ol className="list-decimal list-inside text-sm">
         <li className="mb-1">Select or upload an image from the left panel</li>
-        <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
+        <li className="mb-1">Choose a prompting tool (point, box, or polygon)</li>
         <li className="mb-1">Select foreground (1) or background (0) label</li>
         <li className="mb-1">
           <strong>For point prompts:</strong>
