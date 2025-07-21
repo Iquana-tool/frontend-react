@@ -4,6 +4,7 @@ import { DatasetProvider } from "./contexts/DatasetContext";
 import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPage from "./pages/AnnotationPage";
+import CTScanPage from "./pages/CTScanPage";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/dataset/:datasetId/annotate/:imageId" element={<AnnotationPage />} />
           {/* Catch-all route - redirect unknown routes to datasets page */}
           <Route path="*" element={<Navigate to="/datasets" replace />} />
+          <Route path="/ctscan" element={<CTScanPage />} />
         </Routes>
       </Router>
     </DatasetProvider>

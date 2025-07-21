@@ -26,9 +26,12 @@ export const DatasetProvider = ({ children }) => {
       if (response.success) {
         setDatasets(response.datasets);
         // If no current dataset is selected and datasets exist, select the first one
-        if (!currentDataset && response.datasets.length > 0) {
-          setCurrentDataset(response.datasets[0]);
-        }
+        setCurrentDataset(prevDataset => {
+          if (!prevDataset && response.datasets.length > 0) {
+            return response.datasets[0];
+          }
+          return prevDataset;
+        });
         return response.datasets;
       }
       return [];
@@ -39,7 +42,7 @@ export const DatasetProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentDataset]);
+  }, []);
 
   // Get annotation progress for a dataset
   const getAnnotationProgress = async (datasetId) => {

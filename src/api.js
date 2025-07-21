@@ -7,3 +7,4 @@ export * from "./api/contours";
 export * from "./api/datasets";
 export * from "./api/models";
 export * from "./api/quantifications";
+export * from "./api/scans";
