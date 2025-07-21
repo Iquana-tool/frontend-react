@@ -1,14 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDataset } from "../contexts/DatasetContext";
 import ImageViewerWithPrompting from "../components/prompting";
-import { BugIcon, ArrowLeft } from "lucide-react";
+import { BugIcon, ArrowLeft, Layers } from "lucide-react";
 
 const AnnotationPage = () => {
   const navigate = useNavigate();
   const { datasetId, imageId } = useParams();
+  const [searchParams] = useSearchParams();
   const { datasets, currentDataset, selectDataset, loading } = useDataset();
   const [datasetNotFound, setDatasetNotFound] = useState(false);
+
+  // Get CT scan context from URL parameters
+  const scanId = searchParams.get('scan');
+  const sliceIndex = searchParams.get('slice');
 
   // Select the dataset based on the URL parameter
   useEffect(() => {
@@ -84,17 +89,36 @@ const AnnotationPage = () => {
     );
   }
 
+  // Determine back navigation based on context
+  const getBackNavigation = () => {
+    if (scanId) {
+      // If we're annotating a CT scan slice, go back to the scan viewer
+      return {
+        path: `/ctscan?dataset=${datasetId}&scan=${scanId}`,
+        label: 'Back to CT Scan'
+      };
+    } else {
+      // Regular image annotation, go back to gallery
+      return {
+        path: `/dataset/${datasetId}/gallery`,
+        label: 'Back to Gallery'
+      };
+    }
+  };
+
+  const backNav = getBackNavigation();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-[98%] mx-auto px-2 py-2.5 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => navigate(`/dataset/${datasetId}/gallery`)}
+              onClick={() => navigate(backNav.path)}
               className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
             >
               <ArrowLeft size={20} />
-              <span>Back to Gallery</span>
+              <span>{backNav.label}</span>
             </button>
             <div className="h-6 w-px bg-teal-400"></div>
             <h1 className="text-2xl font-bold">AquaMorph</h1>
@@ -102,6 +126,15 @@ const AnnotationPage = () => {
               <>
                 <div className="h-6 w-px bg-teal-400"></div>
                 <span className="text-lg font-medium">{currentDataset.name}</span>
+              </>
+            )}
+            {scanId && (
+              <>
+                <div className="h-6 w-px bg-teal-400"></div>
+                <div className="flex items-center space-x-2">
+                  <Layers size={16} />
+                  <span className="text-sm">CT Scan Slice {parseInt(sliceIndex || 0) + 1}</span>
+                </div>
               </>
             )}
           </div>
@@ -119,7 +152,10 @@ const AnnotationPage = () => {
       </nav>
 
       <main className="max-w-[98%] mx-auto py-4 px-2">
-        <ImageViewerWithPrompting initialImageId={imageId ? parseInt(imageId) : null} />
+        <ImageViewerWithPrompting 
+          initialImageId={imageId ? parseInt(imageId) : null}
+          scanContext={scanId ? { scanId, sliceIndex: parseInt(sliceIndex || 0) } : null}
+        />
       </main>
     </div>
   );

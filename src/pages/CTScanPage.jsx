@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Upload, Plus, Activity, Database } from 'lucide-react';
+import { ArrowLeft, Upload, Plus, Activity, Database, Eye, } from 'lucide-react';
 import { useDataset } from '../contexts/DatasetContext';
 import AddCTScanDatasetModal from '../components/ctscan/AddCTScanDatasetModal';
 import DeleteDatasetModal from '../components/datasets/DeleteDatasetModal';
 import CTScanUploader from '../components/ctscan/CTScanUploader';
+import CTScanList from '../components/ctscan/CTScanList';
+import CTScanViewer from '../components/ctscan/CTScanViewer';
 import { useDeleteDataset } from '../hooks/useDeleteDataset';
 
 const CTScanPage = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedDatasetId = searchParams.get('dataset');
+  const selectedScanId = searchParams.get('scan');
 
   const {
     datasets,
@@ -21,6 +24,8 @@ const CTScanPage = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showUploader, setShowUploader] = useState(false);
+  const [selectedScan, setSelectedScan] = useState(null);
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'viewer'
 
   // Use the delete functionality hook
   const {
@@ -47,9 +52,20 @@ const CTScanPage = () => {
     }
   }, [selectedDatasetId, scanDatasets, selectDataset]);
 
+  // Handle scan selection from URL
+  useEffect(() => {
+    if (selectedScanId) {
+      setViewMode('viewer');
+    } else {
+      setViewMode('list');
+    }
+  }, [selectedScanId]);
+
   const handleSelectDataset = (dataset) => {
     selectDataset(dataset);
     setSearchParams({ dataset: dataset.id.toString() });
+    setSelectedScan(null);
+    setViewMode('list');
   };
 
   const handleCreateDataset = () => {
@@ -67,13 +83,34 @@ const CTScanPage = () => {
   const handleUploadComplete = (result) => {
     console.log('CT Scan upload completed:', result);
     setShowUploader(false);
-    // TODO: Refresh CT scans list for this dataset
+    // Refresh the scan list
+    setViewMode('list');
   };
 
   const handleDeleteDataset = (dataset) => {
     initiateDelete(dataset);
   };
 
+  const handleScanSelect = (scan) => {
+    setSelectedScan(scan);
+    setSearchParams({ 
+      dataset: selectedDatasetId, 
+      scan: scan.id.toString() 
+    });
+    setViewMode('viewer');
+  };
+
+  const handleAnnotateScan = (scanId, sliceIndex = 0) => {
+    // Navigate to annotation page with scan context
+    navigate(`/dataset/${selectedDatasetId}/annotate?scan=${scanId}&slice=${sliceIndex}`);
+  };
+
+  const handleBackToList = () => {
+    setSearchParams({ dataset: selectedDatasetId });
+    setSelectedScan(null);
+    setViewMode('list');
+  };
+  
   // Dataset selection view
   if (!currentDataset || !selectedDatasetId || currentDataset.dataset_type === 'image') {
     return (
@@ -173,7 +210,7 @@ const CTScanPage = () => {
                         </div>
                         <div className="flex items-center space-x-1 text-teal-600">
                           <Activity size={14} />
-                          <span>Select to upload</span>
+                          <span>Select to view</span>
                         </div>
                       </div>
                     </div>
@@ -213,6 +250,8 @@ const CTScanPage = () => {
               onClick={() => {
                 setSearchParams({});
                 selectDataset(null);
+                setSelectedScan(null);
+                setViewMode('list');
               }}
               className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
             >
@@ -223,15 +262,34 @@ const CTScanPage = () => {
             <h1 className="text-2xl font-bold">CT Scans</h1>
             <div className="h-6 w-px bg-teal-400"></div>
             <span className="text-lg font-medium">{currentDataset.name}</span>
+            {selectedScan && (
+              <>
+                <div className="h-6 w-px bg-teal-400"></div>
+                <span className="text-lg font-medium">{selectedScan.name}</span>
+              </>
+            )}
           </div>
 
-          <button
-            onClick={() => setShowUploader(true)}
-            className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <Upload size={16} />
-            <span>Upload CT Scan</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            {viewMode === 'list' && (
+              <button
+                onClick={() => setShowUploader(true)}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                <Upload size={16} />
+                <span>Upload CT Scan</span>
+              </button>
+            )}
+            {viewMode === 'viewer' && (
+              <button
+                onClick={handleBackToList}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                <Eye size={16} />
+                <span>Back to List</span>
+              </button>
+            )}
+          </div>
         </div>
       </nav>
 
@@ -254,22 +312,18 @@ const CTScanPage = () => {
               onUploadComplete={handleUploadComplete}
             />
           </div>
+        ) : viewMode === 'viewer' && selectedScan ? (
+          <CTScanViewer
+            scanId={selectedScan.id}
+            onAnnotateSlice={(scanId, sliceIndex) => handleAnnotateScan(scanId, sliceIndex)}
+          />
         ) : (
-          <div className="text-center py-12">
-            <Activity className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              No CT scans in {currentDataset.name}
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Upload your first CT scan to this dataset to get started
-            </p>
-            <button
-              onClick={() => setShowUploader(true)}
-              className="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors"
-            >
-              Upload CT Scan
-            </button>
-          </div>
+          <CTScanList
+            datasetId={currentDataset.id}
+            onScanSelect={handleScanSelect}
+            onAnnotateScan={handleAnnotateScan}
+            onUploadClick={() => setShowUploader(true)}
+          />
         )}
       </div>
     </div>

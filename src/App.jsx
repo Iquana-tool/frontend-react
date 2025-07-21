@@ -16,9 +16,9 @@ function App() {
           <Route path="/dataset/:datasetId/gallery" element={<DatasetGalleryPage />} />
           <Route path="/dataset/:datasetId/annotate" element={<AnnotationPage />} />
           <Route path="/dataset/:datasetId/annotate/:imageId" element={<AnnotationPage />} />
+          <Route path="/ctscan" element={<CTScanPage />} />
           {/* Catch-all route - redirect unknown routes to datasets page */}
           <Route path="*" element={<Navigate to="/datasets" replace />} />
-          <Route path="/ctscan" element={<CTScanPage />} />
         </Routes>
       </Router>
     </DatasetProvider>
