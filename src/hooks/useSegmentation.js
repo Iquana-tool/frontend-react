@@ -72,31 +72,20 @@ export const useSegmentation = () => {
     return null;
   }, [isPointInContour]);
 
-  const handlePromptingComplete = useCallback(async (
-    prompts, 
-    promptType, 
-    selectedImage, 
-    currentLabel, 
-    isZoomedContourRefinement = false,
-    zoomLevel = 1,
-    zoomCenter = null,
-    canvasImage = null,
-    selectedContours = [],
-    bestMask = null,
-    finalMask = null
+  // Helper function to process prompts sequentially
+  const processPromptsSequentially = useCallback(async (
+    prompts,
+    selectedImage,
+    currentLabel,
+    isZoomedContourRefinement,
+    zoomLevel,
+    zoomCenter,
+    canvasImage,
+    selectedContours,
+    bestMask,
+    finalMask,
+    promptType
   ) => {
-    console.log("handlePromptingComplete called with promptType:", promptType);
-
-    const currentZoomLevel = isZoomedContourRefinement ? zoomLevel : null;
-    const currentZoomCenter = isZoomedContourRefinement ? zoomCenter : null;
-
-    if (prompts.length === 0) {
-      console.error("No prompts provided to handlePromptingComplete");
-      return;
-    }
-
-    setIsSegmenting(true);
-
     let adjustedPrompts = [];
     let roi = null;
 
@@ -106,7 +95,6 @@ export const useSegmentation = () => {
       selectedContours.length > 0 &&
       bestMask
     ) {
-      console.log("Adjusting prompts for zoomed contour refinement");
       const selectedContour = bestMask.contours[selectedContours[0]];
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -137,110 +125,186 @@ export const useSegmentation = () => {
       adjustedPrompts = [...prompts];
     }
 
-    try {
-      const promptsForAPI = remapPromptsToCrop(
-        adjustedPrompts,
-        roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }
-      );
+    const promptsForAPI = remapPromptsToCrop(
+      adjustedPrompts,
+      roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }
+    );
 
-      // Extract mask_id from finalMask if available
-      const maskId = finalMask && finalMask.id ? finalMask.id : null;
-      
-      // Detect parent contour for nested segmentation
-      let parentContourId = null;
-      if (prompts.length > 0 && finalMask) {
-        try {
-          // Use original prompts (before adjustment) for parent contour detection
-          // since they contain image-relative coordinates
-          parentContourId = findParentContourForPrompt(prompts[0], finalMask);
-          if (parentContourId) {
-            console.log("Detected parent contour ID:", parentContourId, "for prompt:", prompts[0]);
-          } else {
-            console.log("No parent contour found for prompt:", prompts[0]);
-          }
-        } catch (error) {
-          console.warn("Error detecting parent contour:", error);
-          parentContourId = null;
+    // Extract mask_id from finalMask if available
+    const maskId = finalMask && finalMask.id ? finalMask.id : null;
+    
+    // Detect parent contour for nested segmentation
+    let parentContourId = null;
+    if (prompts.length > 0 && finalMask) {
+      try {
+        // Use original prompts (before adjustment) for parent contour detection
+        // since they contain image-relative coordinates
+        parentContourId = findParentContourForPrompt(prompts[0], finalMask);
+      } catch (error) {
+        parentContourId = null;
+      }
+    }
+
+    const response = await api.segmentImage(
+      selectedImage.id,
+      selectedModel,
+      promptsForAPI,
+      roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
+      currentLabel,
+      maskId,
+      parentContourId
+    );
+
+    if (response && response.original_masks && response.original_masks.length > 0) {
+      const newMasks = response.original_masks.map((mask, index) => {
+        const maskId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
+        
+        // Ensure all contours have proper IDs
+        const contoursWithIds = (mask.contours || []).map((contour, contourIndex) => ({
+          ...contour,
+          id: contour.id || `${maskId}-${contourIndex}`,
+        }));
+        
+        return {
+          id: maskId,
+          base64: response.base64_masks[index],
+          quality: response.quality[index],
+          contours: contoursWithIds,
+          contour: contoursWithIds.length > 0 ? contoursWithIds[0] : null,
+          quantifications: contoursWithIds.length > 0 ? contoursWithIds[0].quantifications : null,
+        };
+      });
+
+      return newMasks.filter((mask) => mask !== null);
+    }
+
+    return [];
+  }, [selectedModel, findParentContourForPrompt]);
+
+  const handlePromptingComplete = useCallback(async (
+    prompts, 
+    promptType, 
+    selectedImage, 
+    currentLabel, 
+    isZoomedContourRefinement = false,
+    zoomLevel = 1,
+    zoomCenter = null,
+    canvasImage = null,
+    selectedContours = [],
+    bestMask = null,
+    finalMask = null
+  ) => {
+    const currentZoomLevel = isZoomedContourRefinement ? zoomLevel : null;
+    const currentZoomCenter = isZoomedContourRefinement ? zoomCenter : null;
+
+    if (prompts.length === 0) {
+      return;
+    }
+
+    setIsSegmenting(true);
+
+    try {
+      // Group prompts by type to process them efficiently
+      const pointPrompts = prompts.filter(p => p.type === "point");
+      const boxPrompts = prompts.filter(p => p.type === "box");
+      const polygonPrompts = prompts.filter(p => p.type === "polygon");
+
+      let allResults = [];
+
+      // Process point prompts (backend supports multiple points)
+      if (pointPrompts.length > 0) {
+        const pointResult = await processPromptsSequentially(
+          pointPrompts,
+          selectedImage,
+          currentLabel,
+          isZoomedContourRefinement,
+          zoomLevel,
+          zoomCenter,
+          canvasImage,
+          selectedContours,
+          bestMask,
+          finalMask,
+          "point"
+        );
+        if (pointResult) {
+          allResults.push(...pointResult);
         }
       }
-      
-      console.log("Segmenting with mask_id:", maskId, "parent_contour_id:", parentContourId);
 
-      const response = await api.segmentImage(
-        selectedImage.id,
-        selectedModel,
-        promptsForAPI,
-        roi || { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
-        currentLabel,
-        maskId,
-        parentContourId
+      // Process box prompts sequentially (backend only accepts one at a time)
+      for (const boxPrompt of boxPrompts) {
+        const boxResult = await processPromptsSequentially(
+          [boxPrompt],
+          selectedImage,
+          currentLabel,
+          isZoomedContourRefinement,
+          zoomLevel,
+          zoomCenter,
+          canvasImage,
+          selectedContours,
+          bestMask,
+          finalMask,
+          "box"
         );
-
-      if (response && response.original_masks && response.original_masks.length > 0) {
-        const newMasks = response.original_masks.map((mask, index) => {
-          const maskId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${index}`;
-          
-          // Ensure all contours have proper IDs
-          const contoursWithIds = (mask.contours || []).map((contour, contourIndex) => ({
-            ...contour,
-            id: contour.id || `${maskId}-${contourIndex}`,
-          }));
-          
-          return {
-            id: maskId,
-            base64: response.base64_masks[index],
-            quality: response.quality[index],
-            contours: contoursWithIds,
-            contour: contoursWithIds.length > 0 ? contoursWithIds[0] : null,
-            quantifications: contoursWithIds.length > 0 ? contoursWithIds[0].quantifications : null,
-          };
-        });
-
-        const validMasks = newMasks.filter((mask) => mask !== null);
-
-        if (validMasks.length > 0) {
-          const highestConfidenceMask = [...validMasks].sort((a, b) => b.quality - a.quality)[0];
-
-          setSegmentationMasks((prev) => {
-            console.log(`Adding ${validMasks.length} new segmentation results. Previous count: ${prev.length}, New total: ${prev.length + validMasks.length}`);
-            console.log('New mask IDs:', validMasks.map(m => m.id));
-            console.log('Existing mask IDs:', prev.map(m => m.id));
-            
-            // Safety check: ensure no duplicate IDs
-            const existingIds = new Set(prev.map(m => m.id));
-            const uniqueNewMasks = validMasks.filter(mask => !existingIds.has(mask.id));
-            
-            if (uniqueNewMasks.length !== validMasks.length) {
-              console.warn(`Filtered out ${validMasks.length - uniqueNewMasks.length} duplicate mask(s)`);
-            }
-            
-            const newMasks = [...prev, ...uniqueNewMasks];
-            
-            // Select ALL contours by default (not just new ones)
-            const allContourIds = newMasks.flatMap(mask => 
-              (mask.contours || []).map(contour => contour.id)
-            );
-            console.log('🔄 Selecting all contours by default:', allContourIds);
-            setSelectedContourIds(allContourIds);
-            
-            return newMasks;
-          });
-          setBestMask(highestConfidenceMask);
-
-          return {
-            masks: validMasks,
-            bestMask: highestConfidenceMask,
-            zoomState: { level: currentZoomLevel, center: currentZoomCenter }
-          };
+        if (boxResult) {
+          allResults.push(...boxResult);
         }
+      }
+
+      // Process polygon prompts sequentially (backend only accepts one at a time)
+      for (const polygonPrompt of polygonPrompts) {
+        const polygonResult = await processPromptsSequentially(
+          [polygonPrompt],
+          selectedImage,
+          currentLabel,
+          isZoomedContourRefinement,
+          zoomLevel,
+          zoomCenter,
+          canvasImage,
+          selectedContours,
+          bestMask,
+          finalMask,
+          "polygon"
+        );
+        if (polygonResult) {
+          allResults.push(...polygonResult);
+        }
+      }
+
+      // Combine all results
+      if (allResults.length > 0) {
+        const validMasks = allResults.flat();
+        const highestConfidenceMask = [...validMasks].sort((a, b) => b.quality - a.quality)[0];
+
+        setSegmentationMasks((prev) => {
+          // Safety check: ensure no duplicate IDs
+          const existingIds = new Set(prev.map(m => m.id));
+          const uniqueNewMasks = validMasks.filter(mask => !existingIds.has(mask.id));
+          
+          const newMasks = [...prev, ...uniqueNewMasks];
+          
+          // Select ALL contours by default (not just new ones)
+          const allContourIds = newMasks.flatMap(mask => 
+            (mask.contours || []).map(contour => contour.id)
+          );
+          setSelectedContourIds(allContourIds);
+          
+          return newMasks;
+        });
+        setBestMask(highestConfidenceMask);
+
+        return {
+          masks: validMasks,
+          bestMask: highestConfidenceMask,
+          zoomState: { level: currentZoomLevel, center: currentZoomCenter }
+        };
       }
     } catch (error) {
-      console.error("Segmentation error:", error);
       throw new Error(`Segmentation failed: ${error.message || "Unknown error"}`);
-      } finally {
+    } finally {
       setIsSegmenting(false);
     }
-  }, [findParentContourForPrompt, selectedModel]);
+  }, [processPromptsSequentially]);
 
   const adjustPromptsForZoom = (prompts, promptType, zoomLevel, zoomCenter, canvasImage) => {
     return prompts.map((p) => {
@@ -315,7 +379,6 @@ export const useSegmentation = () => {
 
       return canvas.toDataURL("image/png").split(",")[1];
     } catch (error) {
-      console.error("Error generating mask image:", error);
       return null;
     }
   }, []);
@@ -343,7 +406,7 @@ export const useSegmentation = () => {
             newProcessedMasks[mask.id] = base64Image;
           }
         } catch (error) {
-          console.error(`Error processing mask ${mask.id}:`, error);
+          // Error handling 
         } finally {
           newMaskImagesLoading[mask.id] = false;
         }
@@ -366,10 +429,6 @@ export const useSegmentation = () => {
   }, [segmentationMasks, processedMaskImages, maskImagesLoading, generateMaskImageFromContours]);
 
   const resetSegmentationState = useCallback(() => {
-    console.log('🔄 resetSegmentationState called - clearing all segmentation results');
-    console.log('📍 Stack trace for debugging:');
-    console.trace();
-    
     setSegmentationMasks([]);
     setSelectedMask(null);
     setBestMask(null);

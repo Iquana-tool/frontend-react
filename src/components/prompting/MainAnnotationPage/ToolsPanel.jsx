@@ -166,7 +166,7 @@ const ToolsPanel = ({
                 : "hover:bg-gray-100"
             }`}
             onClick={() => handleToolChange("box")}
-            title="Box Tool"
+            title="Box Tool - Multiple boxes will be processed one by one"
           >
             <Square className="w-4 h-4" />
           </button>
@@ -181,7 +181,7 @@ const ToolsPanel = ({
                 : "hover:bg-gray-100"
             }`}
             onClick={() => handleToolChange("polygon")}
-            title="Polygon Tool"
+            title="Polygon Tool - Multiple polygons will be processed one by one"
           >
             <Pentagon className="w-4 h-4" />
           </button>
