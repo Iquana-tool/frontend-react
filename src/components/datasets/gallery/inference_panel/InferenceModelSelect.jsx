@@ -28,7 +28,7 @@ export default function InferenceModelSelect({
                             key={"trained-" + model.model_identifier + "-" + model.job_id}
                             value={model.model_identifier + "#trained#" + model.job_id}
                         >
-                            {model.Name} (trained, job #{model.job_id})
+                            {model.Name} #{model.job_id}
                         </option>
                     ))}
                 </optgroup>
