@@ -80,10 +80,17 @@ export const createContourAdditionHandlers = ({
   setSelectedContourIds,
   promptingCanvasRef,
   setIsAddingToFinalMask,
+  annotationState,
 }) => {
   const handleAddFromSegmentationToFinal = async (contoursToAdd) => {
     if (!selectedImage || contoursToAdd.length === 0) {
       setError("No image selected or no contours to add.");
+      return;
+    }
+
+    // Check if mask is finished and prevent adding contours
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
       return;
     }
 
@@ -157,6 +164,12 @@ export const createContourAdditionHandlers = ({
       return;
     }
 
+    // Check if mask is finished and prevent adding contours
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
+      return;
+    }
+
     setIsAddingToFinalMask(true);
 
     try {
@@ -219,36 +232,25 @@ export const createContourAdditionHandlers = ({
   };
 
   const handleAddManualContoursToFinalMask = async (contours) => {
-    if (!selectedImage || !contours || contours.length === 0) {
-      setError("No image selected or no contours provided");
+    if (!selectedImage || contours.length === 0) {
+      setError("No image selected or no contours to add.");
+      return;
+    }
+
+    // Check if mask is finished and prevent adding contours
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
       return;
     }
 
     try {
-      // Format contours for the masks API with proper coordinate normalization
-      const formattedContours = contours.map((contour) => {
-        // Check if coordinates are already normalized (values between 0-1)
-        const firstPoint = contour.coordinates[0];
-        const isAlreadyNormalized = firstPoint && firstPoint.x <= 1 && firstPoint.y <= 1;
-        
-        if (isAlreadyNormalized) {
-          // Already normalized, use as-is
-          return {
-            x: contour.coordinates.map((point) => point.x),
-            y: contour.coordinates.map((point) => point.y),
-            label: contour.label || 0,
-          };
-        } else {
-          // Need to normalize from pixel coordinates to 0-1 range
-          return {
-            x: contour.coordinates.map((point) => point.x / selectedImage.width),
-            y: contour.coordinates.map((point) => point.y / selectedImage.height),
-            label: contour.label || 0,
-          };
-        }
-      });
+      // Format contours for API
+      const formattedContours = contours.map((contour) => ({
+        x: contour.coordinates.map((p) => p.x),
+        y: contour.coordinates.map((p) => p.y),
+        label: contour.label || 0,
+      }));
 
-      // Add directly to final mask using masks API
       const response = await addContoursToFinalMask(
         selectedImage.id,
         formattedContours

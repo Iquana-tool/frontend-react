@@ -4,13 +4,18 @@ import * as api from '../api';
 export const useAnnotationHandlers = ({
   currentDataset,
   selectedImage,
+  currentLabel,
+  setCurrentLabel,
   setLabelOptions,
   resetImageState,
   resetSegmentationState,
   resetContourState,
   resetCanvasState,
   setPromptType,
-  setCurrentLabel,
+  segmentationPromptingComplete,
+  zoomLevel,
+  zoomCenter,
+  imageObject,
   selectedContours,
   setSelectedContours,
   bestMask,
@@ -23,22 +28,19 @@ export const useAnnotationHandlers = ({
   findMatchingContour,
   isPointInContour,
   drawAnnotationCanvas,
-  imageObject,
   canvasOps,
   setError,
-  segmentationPromptingComplete,
-  currentLabel,
-  zoomLevel,
-  zoomCenter,
   setSuccessMessageWithTimeout,
+  setSelectedContourIds,
+  setSegmentationMasks,
+  setBestMask,
   contourAddToFinalMask,
   contourDeleteSelected,
   selectedMask,
   setSelectedMask,
-  setBestMask,
-  setSegmentationMasks,
   fetchFinalMask,
   promptingCanvasRef,
+  annotationState,
 }) => {
   // Fetch labels from backend
   const fetchLabels = useCallback(async () => {
@@ -64,6 +66,12 @@ export const useAnnotationHandlers = ({
   const handlePromptingComplete = useCallback(async (prompts, promptType) => {
     if (!selectedImage || !selectedImage) {
       setError("No image selected for segmentation");
+      return;
+    }
+
+    // Check if mask is finished and prevent segmentation
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
       return;
     }
 
@@ -107,7 +115,7 @@ export const useAnnotationHandlers = ({
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel, promptingCanvasRef]);
+  }, [selectedImage, annotationState.isMaskFinished, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, promptingCanvasRef, setZoomLevel, setSuccessMessageWithTimeout]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {

@@ -8,11 +8,17 @@ import {
 
 const FinishButton = ({
     maskId, 
-    onStatusChange, 
-                      }) => {
+    onStatusChange,
+    isMaskFinished: externalIsMaskFinished,
+    setIsMaskFinished,
+}) => {
     const [finished, setFinished] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [showTooltip, setShowTooltip] = useState(false);
+
+    // Use external state if provided, otherwise use local state
+    const isFinished = externalIsMaskFinished !== undefined ? externalIsMaskFinished : finished;
+    const setIsFinished = setIsMaskFinished || setFinished;
 
     useEffect(() => {
         if (maskId === undefined) {
@@ -24,25 +30,26 @@ const FinishButton = ({
             try {
                 const response = await getMaskAnnotationStatus(maskId);
                 console.log("Mask status response:", response.status);
-                setFinished(response.status === "finished"); 
+                const isFinishedStatus = response.status === "finished";
+                setIsFinished(isFinishedStatus);
             } catch (error) {
                 console.error("Error checking mask status:", error);
             }
         };
         checkMaskStatus();
         setIsLoading(false);
-    }, [maskId]);
+    }, [maskId, setIsFinished]);
 
     const onClick = async () => {
         setIsLoading(true);
         // Simulate an async operation, e.g., saving data
-        if (!finished){
+        if (!isFinished){
             console.log("Finish button triggered with unfinished mask. Marking mask with ID ", maskId, " as final.");
             await markMaskAsFinal(maskId)
                 .then(() => {
                     // Handle success, e.g., show a success message or redirect
                     console.log("Mask marked as final successfully");
-                    setFinished(true);
+                    setIsFinished(true);
                     // Call the callback to notify parent components
                     if (onStatusChange) {
                         onStatusChange(true);
@@ -62,7 +69,7 @@ const FinishButton = ({
             .then(() => {
                     // Handle success, e.g., show a success message or redirect
                     console.log("Mask marked as unfinished successfully");
-                    setFinished(false);
+                    setIsFinished(false);
                     // Call the callback to notify parent components
                     if (onStatusChange) {
                         onStatusChange(false);
@@ -93,7 +100,7 @@ const FinishButton = ({
                 ${
                     isLoading
                         ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
-                        : (!finished
+                        : (!isFinished
                             ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-500/25 hover:shadow-emerald-500/40"
                             : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/25 hover:shadow-amber-500/40"
                         )
@@ -109,7 +116,7 @@ const FinishButton = ({
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="animate-pulse">Processing...</span>
                 </>
-            ) : finished ? (
+            ) : isFinished ? (
                 <>
                     <Pencil className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
                     <span>Edit Mask</span>
@@ -131,7 +138,7 @@ const FinishButton = ({
             {showTooltip && (
                 <div className="absolute bottom-[60px] left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
                     <span className="text-xs">
-                        {finished ? "Mark mask as incomplete to continue editing" : "Mark this mask as complete"}
+                        {isFinished ? "Mark mask as incomplete to continue editing" : "Mark this mask as complete"}
                     </span>
                     {/* Arrow pointing down */}
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-gray-800"></div>

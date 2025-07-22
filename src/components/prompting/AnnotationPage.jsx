@@ -71,6 +71,8 @@ const AnnotationPage = ({ initialImageId = null }) => {
     finalMask: contourOps.finalMask,
   });
 
+
+
   // Create segmentation handlers
   const segmentationHandlers = createSegmentationHandlers({
     setSelectedContourIds: segmentation.setSelectedContourIds,
@@ -94,6 +96,7 @@ const AnnotationPage = ({ initialImageId = null }) => {
     setSelectedContourIds: segmentation.setSelectedContourIds,
     promptingCanvasRef,
     setIsAddingToFinalMask,
+    annotationState,
   });
 
   // Create zoom handlers
@@ -161,6 +164,9 @@ const AnnotationPage = ({ initialImageId = null }) => {
         )
       );
     }
+    
+    // Update the local finished state
+    annotationState.setIsMaskFinished(isFinished);
   };
 
   // Use the effects hook to handle all useEffect logic
@@ -276,7 +282,6 @@ const AnnotationPage = ({ initialImageId = null }) => {
             finalMaskCanvasRef={canvasOps.finalMaskCanvasRef}
             drawFinalMaskCanvasWrapper={drawFinalMaskCanvasWrapper}
             handleAnnotationCanvasClick={wrapperHandlers.handleAnnotationCanvasClickWrapper}
-            handleFinalMaskCanvasClick={wrapperHandlers.handleFinalMaskCanvasClickWrapper}
             handleFinalMaskContourSelect={wrapperHandlers.handleFinalMaskContourSelectWrapper}
             resetCanvasState={canvasOps.resetCanvasState}
             setZoomLevel={canvasOps.setZoomLevel}
@@ -288,69 +293,31 @@ const AnnotationPage = ({ initialImageId = null }) => {
             imageError={error}
             setError={setError}
             handleFileUpload={wrapperHandlers.handleFileUploadWrapper}
-            setHighlightLabelWarning={setHighlightLabelWarning}
-            handleImageSelect={imageNavigation.handleImageSelect}
-            resetImageState={imageManagement.resetImageState}
-            labelOptions={annotationState.labelOptions}
             promptType={annotationState.promptType}
-            setPromptType={annotationState.setPromptType}
             currentLabel={annotationState.currentLabel}
-            setCurrentLabel={annotationState.setCurrentLabel}
-            handleAddSelectedContoursToFinalMask={
-              handlers.handleAddSelectedContoursToFinalMask
-            }
-            handleAddManualContoursToFinalMask={
-              contourAdditionHandlers.handleAddManualContoursToFinalMask
-            }
-            handleDeleteSelectedContours={handlers.handleDeleteSelectedContours}
-            selectedContours={contourOps.selectedContours}
+            handleContourSelect={contourOps.handleContourSelect}
+            handleAddSelectedContoursToFinalMask={contourOps.handleAddSelectedContoursToFinalMask}
+            handleAddManualContoursToFinalMask={contourOps.handleAddManualContoursToFinalMask}
+            handleClearSegmentationResults={segmentation.resetSegmentationState}
+            canvasImage={imageManagement.imageObject}
+            handleDeleteSelectedContours={contourOps.handleDeleteSelectedContours}
             setSelectedContours={contourOps.setSelectedContours}
-            handleDeleteFinalMaskContour={
-              utilityFunctions.handleDeleteFinalMaskContourWrapper
-            }
-            clearAllFinalMaskContours={
-              utilityFunctions.clearAllFinalMaskContoursWrapper
-            }
-            handleDeleteContourFromTable={contourOps.handleDeleteContourFromTable}
-            exportQuantificationsAsCsv={utilityFunctions.exportQuantificationsAsCsv}
-            showSaveMaskDialog={annotationState.showSaveMaskDialog}
-            setShowSaveMaskDialog={annotationState.setShowSaveMaskDialog}
-            savingMaskIndex={annotationState.savingMaskIndex}
-            setSavingMaskIndex={annotationState.setSavingMaskIndex}
-            saveMaskLabel={annotationState.saveMaskLabel}
-            setSaveMaskLabel={annotationState.setSaveMaskLabel}
-            customSaveMaskLabel={annotationState.customSaveMaskLabel}
-            setCustomSaveMaskLabel={annotationState.setCustomSaveMaskLabel}
-            saveSelectedMask={utilityFunctions.saveSelectedMask}
-            instantSegmentationState={annotationState.instantSegmentationState}
-            setInstantSegmentationState={annotationState.setInstantSegmentationState}
-            fetchFinalMask={contourOps.fetchFinalMask}
             finalMasks={contourOps.finalMasks}
             finalMask={contourOps.finalMask}
             selectedFinalMaskContour={contourOps.selectedFinalMaskContour}
+            handleDeleteFinalMaskContour={contourOps.handleDeleteFinalMaskContour}
+            clearAllFinalMaskContours={contourOps.clearAllFinalMaskContours}
             setSelectedFinalMaskContour={contourOps.setSelectedFinalMaskContour}
-            handleContourSelect={contourOps.handleContourSelect}
-            findMatchingContour={contourOps.findMatchingContour}
-            isPointInContour={contourOps.isPointInContour}
-            drawFinalMaskCanvas={drawFinalMaskCanvasWrapper}
+            drawFinalMaskCanvas={canvasOps.drawFinalMaskCanvas}
+            onInstantSegmentationStateChange={annotationState.setInstantSegmentationState}
             annotationZoomLevel={annotationZoom.annotationZoomLevel}
             annotationZoomCenter={annotationZoom.annotationZoomCenter}
             setAnnotationZoomLevel={annotationZoom.setAnnotationZoomLevel}
             setAnnotationZoomCenter={annotationZoom.setAnnotationZoomCenter}
-            // Segmentation panel props (replacing the overlay)
             selectedContourIds={segmentation.selectedContourIds}
             onToggleContourSelection={segmentationHandlers.handleToggleContourSelection}
-            onDeleteContour={(contourId) =>
-              segmentationHandlers.handleDeleteSegmentationContour(
-                contourId,
-                segmentation.bestMask
-              )
-            }
-            onSelectAllContours={() =>
-              segmentationHandlers.handleSelectAllSegmentationContours(
-                segmentation.segmentationMasks
-              )
-            }
+            onDeleteContour={segmentationHandlers.handleDeleteSegmentationContour}
+            onSelectAllContours={segmentationHandlers.handleSelectAllSegmentationContours}
             onClearContourSelection={segmentationHandlers.handleClearSegmentationSelection}
             onClearAllResults={segmentationHandlers.handleClearAllSegmentationResults}
             onAddToFinalMask={contourAdditionHandlers.handleAddFromSegmentationToFinal}
@@ -359,6 +326,9 @@ const AnnotationPage = ({ initialImageId = null }) => {
             }
             isAddingToFinalMask={isAddingToFinalMask}
             onMaskStatusChange={handleMaskStatusChange}
+            setHighlightLabelWarning={setHighlightLabelWarning}
+            isMaskFinished={annotationState.isMaskFinished}
+            setIsMaskFinished={annotationState.setIsMaskFinished}
           />
 
           {/* Help Section */}
