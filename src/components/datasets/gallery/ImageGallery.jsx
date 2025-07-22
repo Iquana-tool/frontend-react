@@ -30,13 +30,24 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
 
   // Batch load images
   const loadImageThumbnails = useCallback(async (imageIds) => {
+    // Only load images that haven't been loaded or errored
     const newIds = imageIds.filter(id => !loadedImages.has(id) && !loadingErrors.has(id));
     if (newIds.length === 0) return;
     
     try {
       const imageData = await api.getImages(newIds, true);
       if (imageData && imageData.images) {
-        setLoadedImages(prev => new Set([...prev, ...newIds]));
+        // Update loaded images state
+        setLoadedImages(prev => {
+          const updated = new Set(prev);
+          newIds.forEach(id => {
+            if (imageData.images[id]) {
+              updated.add(id);
+            }
+          });
+          return updated;
+        });
+
         // Update images in place
         newIds.forEach(id => {
           const imgElement = document.querySelector(`[data-image-id="${id}"] img`);
@@ -191,6 +202,11 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
     );
   };
 
+  // effect to reset loadedImages when filter changes
+  useEffect(() => {
+    setLoadedImages(new Set());
+  }, [filterStatus]);
+
   if (images.length === 0) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
@@ -256,7 +272,10 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
             <Filter size={16} className="text-gray-400" />
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setLoadedImages(new Set()); // Reset loaded images when filter changes
+              }}
               className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             >
               <option value="all">All Images</option>
@@ -318,7 +337,7 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
               >
                 <div className="w-12 h-12 flex-shrink-0 mr-3 relative">
                   <img
-                    src={image.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi/+Cjwvc3ZnPgo='}
+                    src={image.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1zbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi/+Cjwvc3ZnPgo='}
                     alt={image.file_name || image.name}
                     className={`w-full h-full object-cover rounded ${!image.thumbnail && !loadedImages.has(image.id) ? 'opacity-50 bg-gray-100' : ''}`}
                   />
