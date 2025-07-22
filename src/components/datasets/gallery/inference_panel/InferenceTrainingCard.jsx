@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Cpu, Loader } from "lucide-react";
-import { getTrainingStatus } from "../../../../api";
+import {getTrainingStatus, startTraining} from "../../../../api";
 
 const IMAGE_SIZE_PRESETS = [
     [256, 256], [512, 512], [1024, 1024],
@@ -9,8 +9,8 @@ const IMAGE_SIZE_PRESETS = [
 export default function InferenceTrainingCard({
                                                   model,
                                                   datasetId,
-                                                  onStart, // calls startTraining with params
-                                                  loadingExternal
+                                                  loadingExternal,
+                                                  setTraining,
                                               }) {
     const [overwrite, setOverwrite] = useState(false);
     const [augment, setAugment] = useState(true);
@@ -23,6 +23,23 @@ export default function InferenceTrainingCard({
 
     // The unique job identifier is just the model_identifier!
     const jobId = model?.model_identifier;
+
+    async function handleStartTraining() {
+        setTraining(true);
+        setTrainError(null);
+        try {
+          await startTraining({
+            dataset_id: datasetId,
+            model_identifier: model.model_identifier,   // e.g. "unet"
+            overwrite: false,
+            augment: augment,
+            image_size: imageSize,
+            early_stopping: earlyStopping,
+          });
+        } catch (err) {
+          setTrainError(err?.message || "Failed to start training.");
+        }
+  }
 
     const checkJobStatus = useCallback(async () => {
         if (!jobId) return setJobStatus(null);
@@ -65,26 +82,6 @@ export default function InferenceTrainingCard({
         if (m) setImageSize([parseInt(m[1]), parseInt(m[2])]);
         else setImageSize("");
     }
-    async function handleStartTraining() {
-        setApiLoading(true);
-        setTrainError(null);
-        try {
-            await onStart({
-                model_identifier: model.model_identifier,
-                overwrite,
-                augment,
-                image_size: imageSize,
-                early_stopping: earlyStopping,
-            });
-            // optionally, re-fetch job status right after
-            checkJobStatus();
-        } catch (e) {
-            setTrainError(e?.message || "Failed to start training.");
-        } finally {
-            setApiLoading(false);
-        }
-    }
-
     const trainingRunning = jobStatus?.status === "running";
     const anyLoading = apiLoading || loadingExternal;
 
@@ -93,12 +90,6 @@ export default function InferenceTrainingCard({
             <h3 className="text-base font-medium text-gray-900 mb-3">Training Settings</h3>
             <div className="space-y-3">
                 {/* Controls */}
-                <div>
-                    <label className="flex items-center cursor-pointer">
-                        <input type="checkbox" checked={overwrite} onChange={e=>setOverwrite(e.target.checked)} className="mr-2" disabled={trainingRunning||anyLoading}/>
-                        Overwrite existing model (reset training)
-                    </label>
-                </div>
                 <div>
                     <label className="flex items-center cursor-pointer">
                         <input type="checkbox" checked={augment} onChange={e=>setAugment(e.target.checked)} className="mr-2" disabled={trainingRunning||anyLoading}/>

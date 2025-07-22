@@ -25,6 +25,16 @@ export const getTrainedModels = async (dataset_id) => {
         throw error;
     }
 }
+
+/* Get the model with the given job ID. */
+export const fetchModel = async (jobID) => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/automatic_segmentation/get_model_metadata/${jobID}`);
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}
 /* Upload the currently annotated images in the dataset to the automatic segmentation services.*/
 export const uploadDataset = async (dataset_id) => {
     try {

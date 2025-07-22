@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
+  fetchModel,
   getBaseModels,
   getTrainedModels,
-    startTraining
+  startTraining
   // ... other API imports
 } from "../../../api";
 import { Brain, Info, Cpu } from "lucide-react";
@@ -28,48 +29,13 @@ function parseSelectedModel(val, trainedModels, baseModels) {
 const InferencePanel = ({ dataset }) => {
   const [baseModels, setBaseModels] = useState([]);
   const [trainedModels, setTrainedModels] = useState([]);
+  const [selectedModelInfo, setSelectedModelInfo] = useState(null);
   const [selectedModelValue, setSelectedModelValue] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [training, setTraining] = useState(false);
   const [trainError, setTrainError] = useState(null);
-  function getDiceColor(score) {
-    // score is 0.86 for 86%
-    if (score === null || score === undefined || isNaN(score)) return "text-gray-400";
-    if (score >= 0.85) return "text-green-600";
-    if (score >= 0.7) return "text-orange-500";
-    return "text-red-600";
-  }
 
-  function formatDice(score) {
-    // Formats to "85%" etc.
-    if (score === null || score === undefined || isNaN(score) || score < 0) return "--";
-    return Math.round(score * 100) + "%";
-  }
-
-  async function handleStartTraining() {
-    setTraining(true);
-    setTrainError(null);
-    try {
-      // selectedModel is a base model here!
-      await startTraining({
-        dataset_id: dataset.id,
-        model_identifier: selectedModel.model_identifier,   // e.g. "unet"
-        // you can pass parameters as needed, or add an input for the user
-        overwrite: false,
-        augment: true,
-        image_size: [256, 256],
-        early_stopping: true,
-      });
-      // Optionally, show a toast/notification or reload trained models
-      // You might also want to poll for status or reload model list
-      // (see note below)
-    } catch (err) {
-      setTrainError(err?.message || "Failed to start training.");
-    } finally {
-      setTraining(false);
-    }
-  }
   // Fetch models when dataset changes
   useEffect(() => {
     if (!dataset) return;
@@ -95,15 +61,13 @@ const InferencePanel = ({ dataset }) => {
         })
         .catch((err) => setError("Failed to load models: " + err.message))
         .finally(() => setLoading(false));
-    // eslint-disable-next-line
   }, [dataset]);
-
-  useEffect(() => {
-
-  }, [selectedModelValue]);
 
   // Determine which model is currently selected
   const selectedModel = parseSelectedModel(selectedModelValue, trainedModels, baseModels);
+  useEffect(() => {
+        console.log("Selected model value changed:", selectedModel);
+    }, [selectedModel]);
 
   if (loading) return <div>Loading models...</div>;
   if (error) return <div className="text-red-600">{error}</div>;
@@ -132,14 +96,9 @@ const InferencePanel = ({ dataset }) => {
         <div className="mb-5">
           {selectedModel && <InferenceTrainingCard
               model={selectedModel}
+              datasetId={dataset.id}
               loading={training}
-              onStart={async params => {
-                setTraining(true);
-                await startTraining({ ...params,
-                  dataset_id: dataset.id });
-                setTraining(false);
-
-              }}
+              setTraining={setTraining}
           />}
         </div>
       </div>
