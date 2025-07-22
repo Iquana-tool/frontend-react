@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import * as api from "../../../api";
+import { 
+  buildLabelHierarchy, 
+  hasChildren 
+} from "../../../utils/labelHierarchy";
 
 const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
-  const [localLabels, setLocalLabels] = useState([]);
+  const [labelHierarchy, setLabelHierarchy] = useState([]);
+  const [expandedLabels, setExpandedLabels] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -13,35 +18,25 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
   const [labelToDelete, setLabelToDelete] = useState(null);
   
   // Add label form
-  const [addModalType, setAddModalType] = useState(null); // 'class' or 'subclass'
   const [newLabelName, setNewLabelName] = useState('');
-  const [targetParentClass, setTargetParentClass] = useState(null);
+  const [targetParentLabel, setTargetParentLabel] = useState(null);
 
   // Edit label states - temporarily disabled until API is available
   // const [editingLabel, setEditingLabel] = useState(null);
   // const [editLabelName, setEditLabelName] = useState('');
 
-  // Transform flat labels into hierarchical structure
-  const transformLabelsToHierarchy = (flatLabels) => {
-    const parentLabels = flatLabels.filter(label => !label.parent_id);
-    
-    return parentLabels.map(parent => ({
-      ...parent,
-      subclasses: flatLabels.filter(label => label.parent_id === parent.id)
-    }));
-  };
-
   // Update local labels when props change
   useEffect(() => {
-    setLocalLabels(transformLabelsToHierarchy(labels));
+    const hierarchy = buildLabelHierarchy(labels);
+    setLabelHierarchy(hierarchy);
   }, [labels]);
 
   // Refresh labels from backend
   const refreshLabels = async () => {
     try {
       const updatedLabels = await api.fetchLabels(dataset.id);
-      const hierarchicalLabels = transformLabelsToHierarchy(updatedLabels || []);
-      setLocalLabels(hierarchicalLabels);
+      const hierarchy = buildLabelHierarchy(updatedLabels || []);
+      setLabelHierarchy(hierarchy);
       if (onLabelsUpdated) {
         onLabelsUpdated(updatedLabels || []);
       }
@@ -61,7 +56,7 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
     try {
       const labelData = {
         name: newLabelName.trim(),
-        parent_id: addModalType === 'subclass' ? targetParentClass.id : null
+        parent_id: targetParentLabel ? targetParentLabel.id : null
       };
       
       const result = await api.createLabel(labelData, dataset.id);
@@ -70,7 +65,7 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
         await refreshLabels();
         setShowAddModal(false);
         setNewLabelName('');
-        setTargetParentClass(null);
+        setTargetParentLabel(null);
       } else {
         setError('Failed to create label');
       }
@@ -122,10 +117,20 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
   //   }
   // };
 
+  // Toggle expanded state for a label
+  const toggleExpanded = (labelId) => {
+    const newExpanded = new Set(expandedLabels);
+    if (newExpanded.has(labelId)) {
+      newExpanded.delete(labelId);
+    } else {
+      newExpanded.add(labelId);
+    }
+    setExpandedLabels(newExpanded);
+  };
+
   // Open add modal
-  const openAddModal = (type, parentClass = null) => {
-    setAddModalType(type);
-    setTargetParentClass(parentClass);
+  const openAddModal = (parentLabel = null) => {
+    setTargetParentLabel(parentLabel);
     setNewLabelName('');
     setShowAddModal(true);
   };
@@ -134,6 +139,82 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
   const openDeleteModal = (label) => {
     setLabelToDelete(label);
     setShowDeleteModal(true);
+  };
+
+  // Recursive component to render label hierarchy
+  const renderLabelHierarchy = (labels, depth = 0) => {
+    return labels.map((label) => {
+      const hasChildLabels = hasChildren(label);
+      const isExpanded = expandedLabels.has(label.id);
+      const marginLeft = depth * 20; // Indent based on depth
+      
+      return (
+        <div key={label.id} className="mb-2">
+          {/* Parent label */}
+          <div 
+            className="border border-gray-200 rounded-lg p-3 bg-white"
+            style={{ marginLeft: `${marginLeft}px` }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center flex-1">
+                {hasChildLabels && (
+                  <button
+                    onClick={() => toggleExpanded(label.id)}
+                    className="p-1 mr-2 text-gray-600 hover:bg-gray-100 rounded"
+                    title={isExpanded ? "Collapse" : "Expand"}
+                  >
+                    {isExpanded ? (
+                      <ChevronDown size={16} />
+                    ) : (
+                      <ChevronRight size={16} />
+                    )}
+                  </button>
+                )}
+                
+                <div
+                  className="w-4 h-4 rounded-full mr-3"
+                  style={{
+                    backgroundColor: `hsl(${(label.id * 137.508) % 360}, 70%, 50%)`
+                  }}
+                ></div>
+                
+                <span className="font-medium text-gray-900">{label.name}</span>
+                
+                {hasChildLabels && (
+                  <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                    {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => openAddModal(label)}
+                  className="p-1 text-teal-600 hover:bg-teal-100 rounded"
+                  title="Add sublabel"
+                >
+                  <Plus size={14} />
+                </button>
+                <button
+                  onClick={() => openDeleteModal(label)}
+                  className="p-1 text-red-600 hover:bg-red-100 rounded"
+                  title="Delete label"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          {/* Children labels */}
+          {hasChildLabels && isExpanded && label.children && (
+            <div className="mt-2">
+              {renderLabelHierarchy(label.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
   };
 
   // Start editing a label - temporarily disabled
@@ -158,11 +239,11 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
       )}
 
       {/* Labels list */}
-      {localLabels.length === 0 ? (
+      {labelHierarchy.length === 0 ? (
         <div className="text-center py-6">
           <p className="text-gray-500 text-sm mb-3">No labels created yet</p>
           <button
-            onClick={() => openAddModal('class')}
+            onClick={() => openAddModal()}
             className="inline-flex items-center px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
           >
             <Plus size={16} className="mr-1" />
@@ -171,74 +252,11 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {localLabels.map((label) => (
-            <div key={label.id} className="border border-gray-200 rounded-lg p-3 bg-white">
-              {/* Parent label */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center flex-1">
-                  <div
-                    className="w-4 h-4 rounded-full mr-3"
-                    style={{
-                      backgroundColor: `hsl(${(label.id * 137.508) % 360}, 70%, 50%)`
-                    }}
-                  ></div>
-                  
-                  <span className="font-medium text-gray-900">{label.name}</span>
-                </div>
-                
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => openAddModal('subclass', label)}
-                    className="p-1 text-teal-600 hover:bg-teal-100 rounded"
-                    title="Add sublabel"
-                  >
-                    <Plus size={14} />
-                  </button>
-                  <button
-                    onClick={() => openDeleteModal(label)}
-                    className="p-1 text-red-600 hover:bg-red-100 rounded"
-                    title="Delete label"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              
-              {/* Sublabels */}
-              {label.subclasses && label.subclasses.length > 0 && (
-                <div className="mt-2 ml-7 space-y-1">
-                  {label.subclasses.map((subclass) => (
-                    <div key={subclass.id} className="flex items-center justify-between">
-                      <div className="flex items-center flex-1">
-                        <div
-                          className="w-3 h-3 rounded-full mr-2"
-                          style={{
-                            backgroundColor: `hsl(${(subclass.id * 137.508) % 360}, 70%, 60%)`
-                          }}
-                        ></div>
-                        
-                        <span className="text-sm text-gray-700">{subclass.name}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <button
-                          onClick={() => openDeleteModal(subclass)}
-                          className="p-1 text-red-600 hover:bg-red-100 rounded"
-                          title="Delete sublabel"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {renderLabelHierarchy(labelHierarchy)}
           
-          {/* Add new class button */}
+          {/* Add new label button */}
           <button
-            onClick={() => openAddModal('class')}
+            onClick={() => openAddModal()}
             className="w-full flex items-center justify-center px-3 py-2 text-sm border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-teal-500 hover:text-teal-600 transition-colors"
           >
             <Plus size={16} className="mr-1" />
@@ -258,9 +276,9 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
             <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-6 pt-6 pb-4">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Add New {addModalType === 'class' ? 'Label' : 'Sublabel'}
-                  {addModalType === 'subclass' && targetParentClass && (
-                    <span className="text-sm text-gray-500 font-normal"> to {targetParentClass.name}</span>
+                  Add New {targetParentLabel ? 'Sublabel' : 'Label'}
+                  {targetParentLabel && (
+                    <span className="text-sm text-gray-500 font-normal"> to {targetParentLabel.name}</span>
                   )}
                 </h3>
                 

@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react';
 
-export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageCoords) => {
+export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageCoords, setHighlightLabelWarning) => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawStartPos, setDrawStartPos] = useState(null);
   const [currentShape, setCurrentShape] = useState(null);
   const [currentPolygon, setCurrentPolygon] = useState([]);
+  const [currentManualContour, setCurrentManualContour] = useState([]);
   const [cursorPos, setCursorPos] = useState(null);
   const [prompts, setPrompts] = useState([]);
+  const [manualContours, setManualContours] = useState([]);
 
   // Add point prompt
   const addPointPrompt = useCallback((x, y, label) => {
@@ -20,13 +22,30 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
     return newPrompt;
   }, []);
 
+  // Add manual contour
+  const addManualContour = useCallback((points, label) => {
+    if (points.length < 3) return null;
+    
+    const newContour = {
+      type: "manual-contour",
+      coordinates: points,
+      label,
+      id: Date.now() + Math.random() // Unique ID for tracking
+    };
+    
+    setManualContours(prev => [...prev, newContour]);
+    return newContour;
+  }, []);
+
   // Handle mouse down for prompt creation
   const handlePromptMouseDown = useCallback((canvasX, canvasY, isRightClick = false) => {
     if (!image) return false;
 
     // Check if a label is selected before allowing prompt creation
     if (!currentLabel) {
-      console.warn("No label selected. Please select a label before drawing prompts.");
+      if (setHighlightLabelWarning) {
+        setHighlightLabelWarning(true);
+      }
       return false;
     }
 
@@ -70,10 +89,18 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
         }
         return true;
 
+      case "manual-contour":
+        if (!currentManualContour || currentManualContour.length === 0) {
+          setCurrentManualContour([{ x: imageCoords.x, y: imageCoords.y }]);
+        } else {
+          setCurrentManualContour([...currentManualContour, { x: imageCoords.x, y: imageCoords.y }]);
+        }
+        return true;
+
       default:
         return false;
     }
-  }, [image, promptType, currentLabel, canvasToImageCoords, addPointPrompt, currentPolygon]);
+  }, [image, currentLabel, canvasToImageCoords, promptType, setHighlightLabelWarning, addPointPrompt, currentPolygon, currentManualContour]);
 
   // Handle mouse move for prompt creation
   const handlePromptMouseMove = useCallback((canvasX, canvasY) => {
@@ -149,33 +176,58 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
     return true;
   }, [image, isDrawing, promptType, drawStartPos, currentLabel, canvasToImageCoords]);
 
-  // Handle double click for completing polygons
+  // Handle double click for completing polygons and manual contours
   const handlePromptDoubleClick = useCallback(() => {
-    if (!image || promptType !== "polygon") return false;
-    if (!currentPolygon || !Array.isArray(currentPolygon) || currentPolygon.length < 3) return false;
+    if (!image) return false;
 
-    // Add the polygon prompt
-    const newPrompt = {
-      type: "polygon",
-      coordinates: [...currentPolygon], // Create a copy to avoid reference issues
-      label: currentLabel,
-    };
-    setPrompts((prev) => [...prev, newPrompt]);
+    if (promptType === "polygon") {
+      if (!currentPolygon || !Array.isArray(currentPolygon) || currentPolygon.length < 3) return false;
 
-    // Reset the current polygon
-    setCurrentPolygon([]);
+      // Add the polygon prompt
+      const newPrompt = {
+        type: "polygon",
+        coordinates: [...currentPolygon], // Create a copy to avoid reference issues
+        label: currentLabel,
+      };
+      setPrompts((prev) => [...prev, newPrompt]);
+
+      // Reset the current polygon
+      setCurrentPolygon([]);
+    } else if (promptType === "manual-contour") {
+      if (!currentManualContour || !Array.isArray(currentManualContour) || currentManualContour.length < 3) return false;
+
+      // Add the manual contour directly
+      const newContour = addManualContour([...currentManualContour], currentLabel);
+      
+      // Reset the current manual contour
+      setCurrentManualContour([]);
+      
+      return newContour;
+    }
 
     return true;
-  }, [image, promptType, currentPolygon, currentLabel]);
+  }, [image, promptType, currentPolygon, currentManualContour, currentLabel, addManualContour]);
 
-  // Clear all prompts
+  // Clear all prompts and manual contours
   const clearPrompts = useCallback(() => {
     setPrompts([]);
     setCurrentPolygon([]);
+    setCurrentManualContour([]);
     setCurrentShape(null);
     setIsDrawing(false);
     setDrawStartPos(null);
     setCursorPos(null);
+  }, []);
+
+  // Clear only manual contours
+  const clearManualContours = useCallback(() => {
+    setManualContours([]);
+    setCurrentManualContour([]);
+  }, []);
+
+  // Remove a specific manual contour
+  const removeManualContour = useCallback((contourId) => {
+    setManualContours(prev => prev.filter(contour => contour.id !== contourId));
   }, []);
 
   // Format prompts for API
@@ -229,16 +281,34 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
     }).filter(Boolean);
   }, [image, prompts]);
 
+  // Format manual contours for API
+  const getFormattedManualContours = useCallback(() => {
+    if (!image || manualContours.length === 0) return [];
+
+    return manualContours.map(contour => ({
+      type: "manual-contour",
+      coordinates: contour.coordinates.map(point => ({
+        x: point.x / image.width,
+        y: point.y / image.height
+      })),
+      label: contour.label,
+      id: contour.id
+    }));
+  }, [image, manualContours]);
+
   return {
     // State
     isDrawing,
     prompts,
     currentShape,
     currentPolygon,
+    currentManualContour,
+    manualContours,
     cursorPos,
     
     // Setters
     setPrompts,
+    setManualContours,
     setCursorPos,
     
     // Functions
@@ -247,6 +317,10 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
     handlePromptMouseUp,
     handlePromptDoubleClick,
     clearPrompts,
-    getFormattedPrompts
+    clearManualContours,
+    removeManualContour,
+    getFormattedPrompts,
+    getFormattedManualContours,
+    addManualContour
   };
 }; 

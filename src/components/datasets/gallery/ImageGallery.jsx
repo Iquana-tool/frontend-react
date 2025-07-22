@@ -284,18 +284,15 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
                 className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all cursor-pointer"
                 onClick={() => onImageClick(image)}
               >
-                <div className="aspect-square">
-                  {image.thumbnail ? (
-                    <img
-                      src={image.thumbnail}
-                      alt={image.file_name || image.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                      <div className="opacity-50">
-                        <ImageIcon className="w-8 h-8 text-gray-400" />
-                      </div>
+                <div className="aspect-square relative">
+                  <img
+                    src={image.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo='}
+                    alt={image.file_name || image.name}
+                    className={`w-full h-full object-cover ${!image.thumbnail && !loadedImages.has(image.id) ? 'opacity-50 bg-gray-100' : ''}`}
+                  />
+                  {!image.thumbnail && !loadedImages.has(image.id) && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-8 h-8 text-gray-400" />
                     </div>
                   )}
                 </div>
@@ -319,16 +316,15 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
                 className="flex items-center p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer"
                 onClick={() => onImageClick(image)}
               >
-                <div className="w-12 h-12 flex-shrink-0 mr-3">
-                  {image.thumbnail ? (
-                    <img
-                      src={image.thumbnail}
-                      alt={image.file_name || image.name}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 rounded flex items-center justify-center">
-                      <ImageIcon className="w-6 h-6 text-gray-400" />
+                <div className="w-12 h-12 flex-shrink-0 mr-3 relative">
+                  <img
+                    src={image.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi/+Cjwvc3ZnPgo='}
+                    alt={image.file_name || image.name}
+                    className={`w-full h-full object-cover rounded ${!image.thumbnail && !loadedImages.has(image.id) ? 'opacity-50 bg-gray-100' : ''}`}
+                  />
+                  {!image.thumbnail && !loadedImages.has(image.id) && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-4 h-4 text-gray-400" />
                     </div>
                   )}
                 </div>

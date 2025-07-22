@@ -7,8 +7,6 @@ import ImageGallery from "./gallery/ImageGallery";
 import InferencePanel from "./gallery/InferencePanel";
 import * as api from "../../api";
 
-const BATCH_SIZE = 50; // Load images in batches of 50
-
 const DatasetGallery = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
@@ -61,30 +59,8 @@ const DatasetGallery = () => {
 
         if (imagesResponse.success) {
           const imageList = imagesResponse.images || [];
-          
-          // Load initial batch of thumbnails
-          const initialBatch = imageList.slice(0, BATCH_SIZE);
-          const remainingImages = imageList.slice(BATCH_SIZE);
-
-          try {
-            const imageData = await api.getImages(initialBatch.map(img => img.id), true);
-            const imagesWithThumbnails = initialBatch.map(img => ({
-              ...img,
-              thumbnail: imageData.images[img.id] ? `data:image/jpeg;base64,${imageData.images[img.id]}` : null
-            }));
-
-            // Add remaining images without thumbnails initially
-            const allImages = [
-              ...imagesWithThumbnails,
-              ...remainingImages.map(img => ({ ...img, thumbnail: null }))
-            ];
-            
-            setImages(allImages);
-          } catch (err) {
-            console.error("Error loading initial thumbnails:", err);
-            // If thumbnail loading fails, still show the images without thumbnails
-            setImages(imageList.map(img => ({ ...img, thumbnail: null })));
-          }
+          // Set all images without pre-loading thumbnails - ImageGallery will handle lazy loading
+          setImages(imageList.map(img => ({ ...img, thumbnail: null })));
         }
 
         setLabels(Array.isArray(labelsResponse) ? labelsResponse : labelsResponse?.labels || []);

@@ -3,18 +3,19 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  Move,
   Download,
   Undo,
   Redo,
   Save,
   Trash2,
-  Image,
   MousePointer,
   Square,
   Circle,
   Pentagon,
   Target,
+  Move,
+  Brush,
+  Eraser,
 } from "lucide-react";
 
 //  A reusable panel of tools for image editing and prompting.
@@ -32,13 +33,24 @@ const ToolsPanel = ({
   onDownload,
   disabled = false,
 }) => {
-  // Tool definitions
-  const tools = [
+  // Selection and Dragging tools
+  const selectionTools = [
     { id: "pointer", icon: <MousePointer size={18} />, label: "Select" },
+    { id: "pan", icon: <Move size={18} />, label: "Pan" },
+  ];
+
+  // AI tools for prompting
+  const aiTools = [
     { id: "point", icon: <Target size={18} />, label: "Point Prompt" },
     { id: "box", icon: <Square size={18} />, label: "Box Prompt" },
     { id: "circle", icon: <Circle size={18} />, label: "Circle Prompt" },
-    { id: "polygon", icon: <Pentagon size={18} />, label: "Polygon Prompt" },
+  ];
+
+  // Manual annotation tools
+  const manualTools = [
+    { id: "polygon", icon: <Pentagon size={18} />, label: "Polygon" },
+    { id: "brush", icon: <Brush size={18} />, label: "Brush" },
+    { id: "eraser", icon: <Eraser size={18} />, label: "Eraser" },
   ];
 
   // Actions
@@ -81,32 +93,42 @@ const ToolsPanel = ({
     },
   ];
 
+  const renderToolSection = (tools, title, gridCols = "grid-cols-3") => (
+    <div className="p-2 border-b border-gray-200">
+      <h3 className="text-xs font-medium text-gray-500 mb-2">{title}</h3>
+      <div className={`grid ${gridCols} gap-1`}>
+        {tools.map((tool) => (
+          <button
+            key={tool.id}
+            className={`p-2 rounded flex flex-col items-center justify-center text-xs transition-colors duration-200 ${
+              selectedTool === tool.id
+                ? "bg-teal-100 text-teal-700"
+                : "text-gray-700 hover:bg-gray-100"
+            } ${
+              disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+            }`}
+            onClick={() => onToolSelect && !disabled && onToolSelect(tool.id)}
+            disabled={disabled}
+            title={tool.label}
+          >
+            {tool.icon}
+            <span className="mt-1">{tool.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="bg-white border border-gray-200 rounded-md shadow-sm">
-      {/* Tools section */}
-      <div className="p-2 border-b border-gray-200">
-        <h3 className="text-xs font-medium text-gray-500 mb-2">Tools</h3>
-        <div className="grid grid-cols-5 gap-1">
-          {tools.map((tool) => (
-            <button
-              key={tool.id}
-              className={`p-2 rounded flex flex-col items-center justify-center text-xs transition-colors duration-200 ${
-                selectedTool === tool.id
-                  ? "bg-teal-100 text-teal-700"
-                  : "text-gray-700 hover:bg-gray-100"
-              } ${
-                disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-              }`}
-              onClick={() => onToolSelect && !disabled && onToolSelect(tool.id)}
-              disabled={disabled}
-              title={tool.label}
-            >
-              {tool.icon}
-              <span className="mt-1">{tool.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Selection and Dragging Tools */}
+      {renderToolSection(selectionTools, "Selection & Dragging", "grid-cols-2")}
+
+      {/* AI Tools */}
+      {renderToolSection(aiTools, "AI Tools", "grid-cols-3")}
+
+      {/* Manual Tools */}
+      {renderToolSection(manualTools, "Manual Tools", "grid-cols-3")}
 
       {/* Actions section */}
       <div className="p-2">

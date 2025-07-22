@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as api from '../api';
 
 const DatasetContext = createContext();
@@ -18,7 +18,7 @@ export const DatasetProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   // Fetch all datasets
-  const fetchDatasets = async () => {
+  const fetchDatasets = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -39,7 +39,7 @@ export const DatasetProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDataset]);
 
   // Get annotation progress for a dataset
   const getAnnotationProgress = async (datasetId) => {
@@ -124,7 +124,7 @@ export const DatasetProvider = ({ children }) => {
   // Initialize datasets on mount
   useEffect(() => {
     fetchDatasets();
-  }, []);
+  }, [fetchDatasets]);
 
   const value = {
     datasets,

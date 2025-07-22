@@ -83,10 +83,9 @@ export const useAnnotationHandlers = ({
       );
 
       if (result) {
-        // Set prompt type to select after successful segmentation
-        setPromptType("select");
+        // Clear prompts after successful segmentation since they've served their purpose
         if (promptingCanvasRef.current) {
-          promptingCanvasRef.current.setActiveTool("select");
+          promptingCanvasRef.current.clearPrompts();
         }
 
         // Handle zoom state restoration if needed
@@ -108,7 +107,7 @@ export const useAnnotationHandlers = ({
       console.error("Segmentation failed:", error);
       setError(error.message);
     }
-  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel, setPromptType, promptingCanvasRef]);
+  }, [selectedImage, setError, segmentationPromptingComplete, currentLabel, zoomLevel, zoomCenter, imageObject, selectedContours, bestMask, finalMask, setSuccessMessageWithTimeout, setZoomLevel, promptingCanvasRef]);
 
   // Enhanced contour operations
   const handleAddSelectedContoursToFinalMask = useCallback(async () => {
@@ -189,7 +188,7 @@ export const useAnnotationHandlers = ({
       bestMask,
       findMatchingContour,
       (bMask, cImage, sContours, sFinalMaskContour) =>
-        drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour),
+        drawAnnotationCanvas(bMask, cImage, sContours, sFinalMaskContour, [], []),
       imageObject,
       selectedFinalMaskContour
     );
@@ -221,7 +220,7 @@ export const useAnnotationHandlers = ({
       setZoomLevel,
       setSelectedContours,
       imageObject,
-      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour),
+      () => drawAnnotationCanvas(bestMask, imageObject, selectedContours, selectedFinalMaskContour, [], []),
       handleFinalMaskContourSelectRef,
       isPointInContour
     );
