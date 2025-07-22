@@ -259,6 +259,7 @@ const AnnotationPage = ({ initialImageId = null }) => {
             handleAnnotationResetView={zoomHandlers.handleAnnotationResetViewWrapper}
             highlightLabelWarning={highlightLabelWarning}
             setHighlightLabelWarning={setHighlightLabelWarning}
+            isMaskFinished={annotationState.isMaskFinished}
           />
 
           <MainViewers
