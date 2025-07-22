@@ -10,7 +10,6 @@ import {
   Trash2,
   MousePointer,
   Square,
-  Circle,
   Pentagon,
   Target,
   Move,
@@ -43,7 +42,6 @@ const ToolsPanel = ({
   const aiTools = [
     { id: "point", icon: <Target size={18} />, label: "Point Prompt" },
     { id: "box", icon: <Square size={18} />, label: "Box Prompt" },
-    { id: "circle", icon: <Circle size={18} />, label: "Circle Prompt" },
   ];
 
   // Manual annotation tools

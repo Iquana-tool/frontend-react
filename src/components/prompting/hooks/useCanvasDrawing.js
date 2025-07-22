@@ -59,17 +59,7 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
     ctx.fill();
   }, [initialScale, zoomLevel]);
 
-  const drawCircle = useCallback((ctx, centerX, centerY, radius, label) => {
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.9)"; // Always use green
-    ctx.lineWidth = 2 / (initialScale * zoomLevel);
-    ctx.stroke();
 
-    // Fill with transparent color
-    ctx.fillStyle = "rgba(16, 185, 129, 0.1)"; // Always use green
-    ctx.fill();
-  }, [initialScale, zoomLevel]);
 
   const drawPolygon = useCallback((ctx, points, label, isInProgress = false) => {
     if (!points || points.length < 2) return;
@@ -217,17 +207,7 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
               );
             }
             break;
-          case "circle":
-            if (prompt.coordinates && typeof prompt.coordinates.centerX === 'number') {
-              drawCircle(
-                ctx,
-                prompt.coordinates.centerX,
-                prompt.coordinates.centerY,
-                prompt.coordinates.radius,
-                prompt.label
-              );
-            }
-            break;
+
           case "polygon":
             if (prompt.coordinates && Array.isArray(prompt.coordinates)) {
               drawPolygon(ctx, prompt.coordinates, prompt.label);
@@ -255,14 +235,6 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
           currentShape.endY,
           currentLabel
         );
-      } else if (promptType === "circle") {
-        const centerX = (currentShape.startX + currentShape.endX) / 2;
-        const centerY = (currentShape.startY + currentShape.endY) / 2;
-        const radius = Math.sqrt(
-          Math.pow(currentShape.endX - currentShape.startX, 2) +
-          Math.pow(currentShape.endY - currentShape.startY, 2)
-        ) / 2;
-        drawCircle(ctx, centerX, centerY, radius, currentLabel);
       }
     }
 
@@ -337,7 +309,7 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
         }
       });
     }
-  }, [drawPoint, drawBox, drawCircle, drawPolygon, drawManualContour, initialScale, zoomLevel]);
+  }, [drawPoint, drawBox, drawPolygon, drawManualContour, initialScale, zoomLevel]);
 
   // Draw mask overlay
   const drawMaskOverlay = useCallback((ctx, selectedMask, selectedContours, scale) => {
@@ -516,7 +488,6 @@ export const useCanvasDrawing = (image, initialScale, zoomLevel) => {
   return {
     drawPoint,
     drawBox,
-    drawCircle,
     drawPolygon,
     drawAllPrompts,
     drawMaskOverlay,
