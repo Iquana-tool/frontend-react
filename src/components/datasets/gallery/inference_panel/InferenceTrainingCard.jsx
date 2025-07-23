@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Cpu, Loader, StopCircle } from "lucide-react";
+import {Cpu, Loader, StopCircle, Info} from "lucide-react";
 import {startTraining, cancelTraining, fetchModel} from "../../../../api";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const IMAGE_SIZE_PRESETS = [
     [256, 256], [512, 512], [1024, 1024],
@@ -27,19 +28,21 @@ function ProgressBar({ current, total }) {
 
 export default function InferenceTrainingCard({
                                               model,
-                                                  setSelectedModel,
+                                              setSelectedModel,
                                               datasetId,
                                               }) {
-    const [overwrite, setOverwrite] = useState(false);
+    const [epochs, setEpochs] = useState(100);
     const [augment, setAugment] = useState(true);
     const [earlyStopping, setEarlyStopping] = useState(true);
     const [imageSize, setImageSize] = useState([256, 256]);
     const [customImageSize, setCustomImageSize] = useState("");
+    const [tab, setTab] = useState(0);
 
     const [isStopping, setIsStopping] = useState(false);
     const [trainError, setTrainError] = useState(null);
     const isTraining = model && model.training === "in progress";
     const isStarting = model && model.training === "starting";
+    const isTrained = model && model.job_id;
 
     // The unique job identifier is just the model_identifier!
     const jobId = model?.model_identifier;
@@ -63,13 +66,14 @@ export default function InferenceTrainingCard({
     }
 
     async function handleCancelTraining() {
-        if (!model || !model.job_id) return;
+        setIsStopping(true);
         // Cancel the training
         await cancelTraining(model.job_id);
-        // Wait 3 seconds for cancellation to process
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        // Reset the model state
-        setSelectedModel(null);
+        while (model.training === "in progress") {
+            // Wait for cancellation to complete
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        setIsStopping(false);
     }
 
     // Polling logic
@@ -103,6 +107,10 @@ export default function InferenceTrainingCard({
         };
     }, [model, isTraining, isStarting]);
 
+    useEffect(() => {
+        setImageSize(model.image_size);
+    },  [isTrained]);
+
     function handleImageSizeChange(e) {
         if (e.target.value === "custom") {
             setImageSize("");
@@ -119,52 +127,79 @@ export default function InferenceTrainingCard({
 
     return (
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5">
-            <h3 className="text-base font-medium text-gray-900 mb-3">Training Settings</h3>
+            <div className="flex items-center mb-3 space-x-2">
+                <Cpu className="w-6 h-6 text-blue-600 mb-2" />
+                <h3 className="text-base font-medium text-gray-900 mb-3">Training</h3>
+            </div>
             <div className="space-y-3">
-                {/* Controls */}
-                <div>
-                    <label className="flex items-center cursor-pointer">
-                        <input type="checkbox" checked={augment}
-                               onChange={e=>setAugment(e.target.checked)}
-                               className="mr-2"
-                               disabled={isTraining || isStarting}/>
-                        Data Augmentation
-                    </label>
+            {!isTraining && (
+                <div className="space-y-3">
+                    {/* Controls */}
+                    <div>
+                        <label className={`flex items-center cursor-pointer ${isTraining || isStarting ? "opacity-50" : ""}`}>
+                            <span className="ml-2 text-sm text-gray-700">Steps: {epochs}</span>
+                            <input type={"range"} min={0} max={500} step={20} value={epochs}
+                                   onChange={e=>setEpochs(e.target.value)}
+                                     className="ml-2 w-full"
+                                   disabled={isTraining || isStarting}/>
+                        </label>
+                    </div>
+                    <div>
+                        <label className="flex items-center cursor-pointer">
+                            <input type="checkbox" checked={augment}
+                                   onChange={e=>setAugment(e.target.checked)}
+                                   className="mr-2"
+                                   disabled={isTraining || isStarting}/>
+                            Data Augmentation
+                        </label>
+                    </div>
+                    <div>
+                        <label className="flex items-center cursor-pointer">
+                            <input type="checkbox"
+                                   checked={earlyStopping}
+                                   onChange={e=>setEarlyStopping(e.target.checked)}
+                                   className="mr-2"
+                                   disabled={isTraining || isStarting}/>
+                            Early Stopping
+                        </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-700">Image Size:</label>
+                        <select
+                            value={IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize)) ? JSON.stringify(imageSize) : "custom"}
+                            onChange={handleImageSizeChange}
+                            className="px-2 py-1 border rounded"
+                            disabled={isTraining || isStarting|| isTrained}
+                        >
+                            {IMAGE_SIZE_PRESETS.map(sz => (
+                                <option key={sz.join("x")} value={JSON.stringify(sz)}>{sz[0]} x {sz[1]}</option>
+                            ))}
+                            <option value="custom">Custom</option>
+                        </select>
+                        {(!IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize))) && (
+                            <input
+                                type="text"
+                                placeholder="e.g. 128x128"
+                                className="px-2 py-1 border rounded w-24"
+                                value={customImageSize}
+                                onChange={handleCustomImageSize}
+                                disabled={isTraining || isStarting || isTrained}
+                            />
+                        )}
+                        {isTrained && (
+                            <span className="relative inline-flex items-center cursor-pointer group">
+                                <Info size={15} className="text-gray-400 ml-1" />
+                                <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100
+                                                 absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-60 z-10
+                                                 p-2 text-xs text-gray-700 bg-white border border-gray-300 rounded shadow-lg transition-opacity">
+                                    {"Cannot change the image size of already trained models."}
+                                </span>
+                            </span>
+                        )}
+                    </div>
                 </div>
-                <div>
-                    <label className="flex items-center cursor-pointer">
-                        <input type="checkbox"
-                               checked={earlyStopping}
-                               onChange={e=>setEarlyStopping(e.target.checked)}
-                               className="mr-2"
-                               disabled={isTraining || isStarting}/>
-                        Early Stopping
-                    </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <label className="text-sm font-medium text-gray-700">Image Size:</label>
-                    <select
-                        value={IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize)) ? JSON.stringify(imageSize) : "custom"}
-                        onChange={handleImageSizeChange}
-                        className="px-2 py-1 border rounded"
-                        disabled={isTraining || isStarting}
-                    >
-                        {IMAGE_SIZE_PRESETS.map(sz => (
-                            <option key={sz.join("x")} value={JSON.stringify(sz)}>{sz[0]} x {sz[1]}</option>
-                        ))}
-                        <option value="custom">Custom</option>
-                    </select>
-                    {(!IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize))) && (
-                        <input
-                            type="text"
-                            placeholder="e.g. 128x128"
-                            className="px-2 py-1 border rounded w-24"
-                            value={customImageSize}
-                            onChange={handleCustomImageSize}
-                            disabled={isTraining || isStarting}
-                        />
-                    )}
-                </div>
+                )}
+
                 {/* Button/Progress */}
                 {!isTraining
                     ? <button
@@ -177,15 +212,62 @@ export default function InferenceTrainingCard({
                     </button>
                     :
                     <div>
+                            <div>
+                                {/* Progress Tabs */}
+                                <div className="flex space-x-2 mt-2 mb-3">
+                                    {["Dice", "IoU", "Loss"].map((tabName, idx) => (
+                                        <button
+                                            key={tabName}
+                                            className={`text-xs px-3 py-1 rounded ${tab === idx 
+                                                ? "bg-blue-500 text-white"
+                                                : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}
+                                            onClick={() => setTab(idx)}
+                                            type="button"
+                                        >
+                                            {tabName}
+                                        </button>
+                                    ))}
+                                </div>
+                                {/* Tab Contents */}
+                                <div className="w-full h-40">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart
+                                            data={
+                                                // prepare data array with columns: epoch, train, val
+                                                (()=>{
+                                                    const keys = [
+                                                        ["train_dice", "val_dice"],
+                                                        ["train_iou", "val_iou"],
+                                                        ["train_loss", "val_loss"]
+                                                    ][tab];
+                                                    if (!model[keys[0]] || !model[keys[1]]) return [];
+                                                    return (model[keys[0]] || []).map((val, i) => ({
+                                                        epoch: i+1,
+                                                        Train: val,
+                                                        Val: (model[keys[1]][i] ?? null)
+                                                    }));
+                                                })()
+                                            }
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="epoch" tick={{fontSize:10}} />
+                                            <YAxis tick={{fontSize:10}} />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Line type="monotone" dataKey="Train" stroke="#2563EB" dot={false} />
+                                            <Line type="monotone" dataKey="Val" stroke="#16A34A" dot={false} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         <ProgressBar current={model.epoch} total={model.total_epochs}/>
                         <div>
                             <button
-                                onclick={handleCancelTraining}
+                                onClick={handleCancelTraining}
                                 className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
                                 >
-                                <StopCircle size={16} />
-
-                                <span>Stop Training</span>
+                                {isStopping ? <Loader className="animate-spin" size={16} /> : <StopCircle size={16} />}
+                                <span>{isStopping ? "Stopping" : "Stop Training"}</span>
                             </button>
                         </div>
                     </div>
