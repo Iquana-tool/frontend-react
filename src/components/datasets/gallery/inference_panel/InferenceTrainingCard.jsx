@@ -59,6 +59,11 @@ export default function InferenceTrainingCard({
                 early_stopping: earlyStopping,
               });
           const modelData = await fetchModel(response.job_id);
+          while (!(modelData)) {
+            // Wait for the model data to be available
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const modelData = await fetchModel(response.job_id);
+          }
           setSelectedModel(modelData.metadata);
         } catch (err) {
           setTrainError(err?.message || "Failed to start training.");
@@ -78,7 +83,7 @@ export default function InferenceTrainingCard({
 
     // Polling logic
     useEffect(() => {
-        if (!model || !model.job_id) return;
+        if (!model || !model.job_id || !(isTraining || isStarting)) return;
         let cancelled = false;
 
         const interval = setInterval(async () => {
