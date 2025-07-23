@@ -37,6 +37,7 @@ export default function InferenceModelSelect({
     const [trainedModels, setTrainedModels] = useState([]);
     const [trainingModels, setTrainingModels] = useState([]);
     const [selectedModelValue, setSelectedModelValue] = useState("");
+    const selectedModelId = selectedModel?.job_id || selectedModel?.model_identifier || "";
 
     // Fetch models when dataset changes
     useEffect(() => {
@@ -71,7 +72,7 @@ export default function InferenceModelSelect({
                   }
               }
             })
-      }, [dataset, selectedModel]);
+      }, [dataset, selectedModelId]);
 
     return (
         <select
