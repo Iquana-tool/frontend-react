@@ -104,17 +104,18 @@ export const cancelTraining = async (jobID) => {
 /* Segment a batch of images via a model identifier */
 export const segmentBatchOfImages = async (model_identifier, ImageIDs) => {
     try {
+        // Model ID in query string, body is the array only!
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/segment_batch`, {
-                method: 'POST',
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    "model_id": model_identifier,
-                    "image_ids": ImageIDs,
-                }),
-            })
+            await fetch(
+                `${API_BASE_URL}/automatic_segmentation/segment_batch/${encodeURIComponent(model_identifier)}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(ImageIDs), // ImageIDs should be an array
+                }
+            )
         );
     } catch (error) {
         throw error;

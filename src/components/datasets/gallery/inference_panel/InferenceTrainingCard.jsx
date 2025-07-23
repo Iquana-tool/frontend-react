@@ -132,9 +132,9 @@ export default function InferenceTrainingCard({
 
     return (
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5">
-            <div className="flex items-center mb-3 space-x-2">
-                <Cpu className="w-6 h-6 text-blue-600 mb-2" />
-                <h3 className="text-base font-medium text-gray-900 mb-3">Training</h3>
+            <div className="flex items-center gap-2 mb-4">
+                <Cpu size={20} className="text-blue-600" />
+                <h3 className="text-lg font-semibold">Training</h3>
             </div>
             <div className="space-y-3">
             {!isTraining && (
@@ -213,7 +213,7 @@ export default function InferenceTrainingCard({
                         disabled={!model}
                     >
                         {isStarting ? <Loader className="animate-spin" size={16} /> : <Cpu size={16}/>}
-                        <span>{isStarting ? "Starting" : "Start Training"}</span>
+                        <span>{isStarting ? "Starting" : (isTrained ? "Continue Training" : "Start Training")}</span>
                     </button>
                     :
                     <div>

@@ -3,6 +3,7 @@ import { Brain, Info, Cpu } from "lucide-react";
 import InferenceModelSelect from "./inference_panel/InferenceModelSelect"
 import InferenceModelCard from "./inference_panel/InferenceModelCard";
 import InferenceTrainingCard from "./inference_panel/InferenceTrainingCard";
+import InferenceInferenceCard from "./inference_panel/InferenceInferenceCard";
 
 const InferencePanel = ({ dataset }) => {
   const [selectedModel, setSelectedModel] = useState(null);
@@ -33,6 +34,9 @@ const InferencePanel = ({ dataset }) => {
               setSelectedModel={setSelectedModel}
               datasetId={dataset.id}
           />}
+        </div>
+        <div className="mb-5">
+          {selectedModel && <InferenceInferenceCard model={selectedModel} setModel={setSelectedModel} dataset={dataset}/>}
         </div>
       </div>
   );
