@@ -36,6 +36,7 @@ export default function InferenceTrainingCard({
     const [imageSize, setImageSize] = useState([256, 256]);
     const [customImageSize, setCustomImageSize] = useState("");
 
+    const [isStopping, setIsStopping] = useState(false);
     const [trainError, setTrainError] = useState(null);
     const isTraining = model && model.training === "in progress";
     const isStarting = model && model.training === "starting";
@@ -61,7 +62,7 @@ export default function InferenceTrainingCard({
         }
     }
 
-    async function cancelTraining() {
+    async function handleCancelTraining() {
         if (!model || !model.job_id) return;
         // Cancel the training
         await cancelTraining(model.job_id);
@@ -73,7 +74,7 @@ export default function InferenceTrainingCard({
 
     // Polling logic
     useEffect(() => {
-        if (!model || !model.job_id || model.training !== "in progress") return;
+        if (!model || !model.job_id) return;
         let cancelled = false;
 
         const interval = setInterval(async () => {
@@ -100,8 +101,7 @@ export default function InferenceTrainingCard({
             cancelled = true;
             clearInterval(interval);
         };
-        // Only reset effect if job_id changes
-    }, [model, isTraining]);
+    }, [model, isTraining, isStarting]);
 
     function handleImageSizeChange(e) {
         if (e.target.value === "custom") {
@@ -180,7 +180,7 @@ export default function InferenceTrainingCard({
                         <ProgressBar current={model.epoch} total={model.total_epochs}/>
                         <div>
                             <button
-                                onclick={cancelTraining}
+                                onclick={handleCancelTraining}
                                 className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
                                 >
                                 <StopCircle size={16} />
