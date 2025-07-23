@@ -293,8 +293,15 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
         </div>
       )}
 
-      <TableContainer component={Paper} sx={{ mt: 1 }}>
-        <Table size="small">
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          mt: 1,
+          maxHeight: 400,
+          overflow: 'auto'
+        }}
+      >
+        <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
               {displayColumns.map((column) => (

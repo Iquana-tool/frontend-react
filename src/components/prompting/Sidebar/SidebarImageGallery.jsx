@@ -42,7 +42,7 @@ const SidebarImageGallery = ({
             </div>
             <div
                 className={`${
-                    isSidebarCollapsed ? "max-h-[calc(100vh-150px)]" : "max-h-96"
+                    isSidebarCollapsed ? "max-h-[calc(100vh-150px)]" : "max-h-[calc(100vh-200px)]"
                 } overflow-y-auto`}
             >
                 {loading && !selectedImage ? (
