@@ -298,7 +298,7 @@ const AnnotationPage = ({ initialImageId = null }) => {
             currentLabel={annotationState.currentLabel}
             handleContourSelect={contourOps.handleContourSelect}
             handleAddSelectedContoursToFinalMask={contourOps.handleAddSelectedContoursToFinalMask}
-            handleAddManualContoursToFinalMask={contourOps.handleAddManualContoursToFinalMask}
+            handleAddManualContoursToFinalMask={contourAdditionHandlers.handleAddManualContoursToFinalMask}
             handleClearSegmentationResults={segmentation.resetSegmentationState}
             canvasImage={imageManagement.imageObject}
             handleDeleteSelectedContours={contourOps.handleDeleteSelectedContours}
