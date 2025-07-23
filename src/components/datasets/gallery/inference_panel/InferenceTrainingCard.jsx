@@ -1,73 +1,107 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Cpu, Loader } from "lucide-react";
-import {getTrainingStatus, startTraining} from "../../../../api";
+import { Cpu, Loader, StopCircle } from "lucide-react";
+import {startTraining, cancelTraining, fetchModel} from "../../../../api";
 
 const IMAGE_SIZE_PRESETS = [
     [256, 256], [512, 512], [1024, 1024],
 ];
 
+function ProgressBar({ current, total }) {
+    if (!total || total === 0) return null;
+    const percent = Math.min(100, Math.round((current / total) * 100));
+    return (
+        <div className="mt-3">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Training Progress:</span>
+                <span>{current} / {total} epochs</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded h-2">
+                <div
+                    className="bg-blue-500 h-2 rounded"
+                    style={{ width: `${percent}%`, transition: 'width 0.5s' }}
+                />
+            </div>
+        </div>
+    );
+}
+
 export default function InferenceTrainingCard({
-                                                  model,
-                                                  datasetId,
-                                                  loadingExternal,
-                                                  setTraining,
+                                              model,
+                                                  setSelectedModel,
+                                              datasetId,
                                               }) {
     const [overwrite, setOverwrite] = useState(false);
     const [augment, setAugment] = useState(true);
     const [earlyStopping, setEarlyStopping] = useState(true);
     const [imageSize, setImageSize] = useState([256, 256]);
     const [customImageSize, setCustomImageSize] = useState("");
-    const [apiLoading, setApiLoading] = useState(false);
-    const [jobStatus, setJobStatus] = useState(null);
+
     const [trainError, setTrainError] = useState(null);
+    const isTraining = model && model.training === "in progress";
+    const isStarting = model && model.training === "starting";
 
     // The unique job identifier is just the model_identifier!
     const jobId = model?.model_identifier;
 
     async function handleStartTraining() {
-        setTraining(true);
         setTrainError(null);
         try {
-          await startTraining({
-            dataset_id: datasetId,
-            model_identifier: model.model_identifier,   // e.g. "unet"
-            overwrite: false,
-            augment: augment,
-            image_size: imageSize,
-            early_stopping: earlyStopping,
-          });
+          const response = await startTraining({
+                dataset_id: datasetId,
+                model_identifier: model.model_identifier,   // e.g. "unet"
+                overwrite: false,
+                augment: augment,
+                image_size: imageSize,
+                early_stopping: earlyStopping,
+              });
+          const modelData = await fetchModel(response.job_id);
+          setSelectedModel(modelData.metadata);
         } catch (err) {
           setTrainError(err?.message || "Failed to start training.");
         }
-  }
+    }
 
-    const checkJobStatus = useCallback(async () => {
-        if (!jobId) return setJobStatus(null);
-        try {
-            const res = await getTrainingStatus(jobId);
-            setJobStatus(res);
-        } catch (err) {
-            setJobStatus({ status: "error", message: err?.message || "Training status fetch failed." });
-        }
-    }, [jobId]);
+    async function cancelTraining() {
+        if (!model || !model.job_id) return;
+        // Cancel the training
+        await cancelTraining(model.job_id);
+        // Wait 3 seconds for cancellation to process
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Reset the model state
+        setSelectedModel(null);
+    }
 
-    // Check status on mount and on new model
+    // Polling logic
     useEffect(() => {
-        setJobStatus(null);
-        if (jobId) checkJobStatus();
-        // Optional: could add interval polling, e.g. every 10s, if you want live bar while running
-        // See below for simple polling
-    }, [jobId, checkJobStatus]);
+        if (!model || !model.job_id || model.training !== "in progress") return;
+        let cancelled = false;
 
-    // Optional: polling while job running
-    useEffect(() => {
-        if (!jobId || jobStatus?.status !== "In progress") return;
-        const intv = setInterval(() => {
-            checkJobStatus();
-        }, 8000);
-        return () => clearInterval(intv);
-        // Only runs while job running!
-    }, [jobId, jobStatus?.status, checkJobStatus]);
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetchModel(model.job_id);
+                // Check structure: use response, response.metadata, etc.
+                // For best robustness, merge or fallback with initialModel:
+                // If your API returns {metadata: {...}}, use:
+                let updatedModel = response.metadata;
+
+                if (!cancelled && updatedModel) {
+                    setSelectedModel(updatedModel);
+                    if (updatedModel.training !== "in progress") {
+                        clearInterval(interval); // Stop polling when done
+                    }
+                }
+            } catch (e) {
+                // silently ignore for now (could add error state)
+                console.error("Error fetching training status:", e);
+            }
+        }, 5000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
+        // Only reset effect if job_id changes
+    }, [model, isTraining]);
 
     function handleImageSizeChange(e) {
         if (e.target.value === "custom") {
@@ -82,8 +116,6 @@ export default function InferenceTrainingCard({
         if (m) setImageSize([parseInt(m[1]), parseInt(m[2])]);
         else setImageSize("");
     }
-    const trainingRunning = jobStatus?.status === "running";
-    const anyLoading = apiLoading || loadingExternal;
 
     return (
         <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5">
@@ -92,13 +124,20 @@ export default function InferenceTrainingCard({
                 {/* Controls */}
                 <div>
                     <label className="flex items-center cursor-pointer">
-                        <input type="checkbox" checked={augment} onChange={e=>setAugment(e.target.checked)} className="mr-2" disabled={trainingRunning||anyLoading}/>
+                        <input type="checkbox" checked={augment}
+                               onChange={e=>setAugment(e.target.checked)}
+                               className="mr-2"
+                               disabled={isTraining || isStarting}/>
                         Data Augmentation
                     </label>
                 </div>
                 <div>
                     <label className="flex items-center cursor-pointer">
-                        <input type="checkbox" checked={earlyStopping} onChange={e=>setEarlyStopping(e.target.checked)} className="mr-2" disabled={trainingRunning||anyLoading}/>
+                        <input type="checkbox"
+                               checked={earlyStopping}
+                               onChange={e=>setEarlyStopping(e.target.checked)}
+                               className="mr-2"
+                               disabled={isTraining || isStarting}/>
                         Early Stopping
                     </label>
                 </div>
@@ -108,7 +147,7 @@ export default function InferenceTrainingCard({
                         value={IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize)) ? JSON.stringify(imageSize) : "custom"}
                         onChange={handleImageSizeChange}
                         className="px-2 py-1 border rounded"
-                        disabled={trainingRunning||anyLoading}
+                        disabled={isTraining || isStarting}
                     >
                         {IMAGE_SIZE_PRESETS.map(sz => (
                             <option key={sz.join("x")} value={JSON.stringify(sz)}>{sz[0]} x {sz[1]}</option>
@@ -122,50 +161,35 @@ export default function InferenceTrainingCard({
                             className="px-2 py-1 border rounded w-24"
                             value={customImageSize}
                             onChange={handleCustomImageSize}
-                            disabled={trainingRunning||anyLoading}
+                            disabled={isTraining || isStarting}
                         />
                     )}
                 </div>
                 {/* Button/Progress */}
-                {!trainingRunning
+                {!isTraining
                     ? <button
                         onClick={handleStartTraining}
                         className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm mt-3"
-                        disabled={anyLoading || !model.model_identifier}
+                        disabled={!model}
                     >
-                        <Cpu size={16}/>
-                        <span>{anyLoading ? "Starting..." : "Start Training"}</span>
+                        {isStarting ? <Loader className="animate-spin" size={16} /> : <Cpu size={16}/>}
+                        <span>{isStarting ? "Starting" : "Start Training"}</span>
                     </button>
-                    : <div className="flex flex-col items-center py-2">
-                        <div className="flex items-center justify-center space-x-2">
-                            <Loader className="animate-spin" size={16} />
-                            <span className="text-blue-700">Training in progress...</span>
+                    :
+                    <div>
+                        <ProgressBar current={model.epoch} total={model.total_epochs}/>
+                        <div>
+                            <button
+                                onclick={cancelTraining}
+                                className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
+                                >
+                                <StopCircle size={16} />
+
+                                <span>Stop Training</span>
+                            </button>
                         </div>
-                        {jobStatus && jobStatus.current_epoch !== undefined && (
-                            <div className="w-full mt-2">
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-blue-500 h-2 rounded-full transition-all"
-                                        style={{
-                                            width: `${Math.round(
-                                                100 * ((jobStatus.current_epoch + 1) / (jobStatus.max_epochs || 1))
-                                            )}%`,
-                                        }}
-                                    ></div>
-                                </div>
-                                <div className="flex justify-between text-xs mt-1">
-                                    <span>Epoch {jobStatus.current_epoch + 1} / {jobStatus.max_epochs}</span>
-                                    <span>Status: {jobStatus.status}</span>
-                                </div>
-                            </div>
-                        )}
-                        {jobStatus && jobStatus.status && jobStatus.status !== "running" && (
-                            <div className="text-sm text-gray-600 mt-2">
-                                Status: {jobStatus.status}
-                                {jobStatus.message && " - " + jobStatus.message}
-                            </div>
-                        )}
-                    </div>}
+                    </div>
+            }
                 {trainError && (
                     <div className="text-red-700 text-sm">{trainError}</div>
                 )}

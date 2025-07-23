@@ -35,6 +35,7 @@ export default function InferenceModelSelect({
                                     }) {
     const [baseModels, setBaseModels] = useState([]);
     const [trainedModels, setTrainedModels] = useState([]);
+    const [trainingModels, setTrainingModels] = useState([]);
     const [selectedModelValue, setSelectedModelValue] = useState("");
 
     // Fetch models when dataset changes

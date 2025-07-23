@@ -6,8 +6,6 @@ import InferenceTrainingCard from "./inference_panel/InferenceTrainingCard";
 
 const InferencePanel = ({ dataset }) => {
   const [selectedModel, setSelectedModel] = useState(null);
-  const [training, setTraining] = useState(false);
-  const [trainError, setTrainError] = useState(null);
 
   return (
       <div className="p-5 h-full overflow-y-auto">
@@ -24,7 +22,7 @@ const InferencePanel = ({ dataset }) => {
         {/* Model Selection */}
         <div className="mb-5">
           <h3 className="text-base font-medium text-gray-900 mb-2">Model</h3>
-          <InferenceModelSelect dataset={dataset} onChange={setSelectedModel} />
+          <InferenceModelSelect dataset={dataset} selectedModel={selectedModel} onChange={setSelectedModel} />
 
           {/* Selected Model Info */}
           {selectedModel && <InferenceModelCard model={selectedModel} setModel={setSelectedModel}/>}
@@ -32,9 +30,8 @@ const InferencePanel = ({ dataset }) => {
         <div className="mb-5">
           {selectedModel && <InferenceTrainingCard
               model={selectedModel}
+              setSelectedModel={setSelectedModel}
               datasetId={dataset.id}
-              loading={training}
-              setTraining={setTraining}
           />}
         </div>
       </div>

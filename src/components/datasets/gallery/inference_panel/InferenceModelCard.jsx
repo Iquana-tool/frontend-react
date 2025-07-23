@@ -33,25 +33,6 @@ function InfoRow({ icon, label, value, tooltip }) {
     );
 }
 
-function ProgressBar({ current, total }) {
-    if (!total || total === 0) return null;
-    const percent = Math.min(100, Math.round((current / total) * 100));
-    return (
-        <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Training Progress</span>
-                <span>{current} / {total} epochs</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded h-2">
-                <div
-                    className="bg-blue-500 h-2 rounded"
-                    style={{ width: `${percent}%`, transition: 'width 0.5s' }}
-                />
-            </div>
-        </div>
-    );
-}
-
 /**
  * ModelCard: Display info about a selected model.
  *
@@ -73,40 +54,6 @@ export default function InferenceModelCard({ model, setModel}) {
         "Pre-trained": "Indicates if the model was initialized with weights from a pre-trained model, which can improve performance on small datasets.",
     };
 
-    // Polling logic
-    useEffect(() => {
-        if (!model || !model.job_id || model.training !== "in progress") return;
-        let cancelled = false;
-
-        const interval = setInterval(async () => {
-            try {
-                const response = await fetchModel(model.job_id);
-                // Check structure: use response, response.metadata, etc.
-                // For best robustness, merge or fallback with initialModel:
-                // If your API returns {metadata: {...}}, use:
-                let updatedModel = response.metadata;
-
-                if (!cancelled && updatedModel) {
-                    setModel((prev) => ({
-                        ...prev,
-                        ...updatedModel, // Prefer updated fields, but fallback to previous (avoid empty fields)
-                    }));
-                    if (updatedModel.training !== "in progress") {
-                        clearInterval(interval); // Stop polling when done
-                    }
-                }
-            } catch (e) {
-                // silently ignore for now (could add error state)
-            }
-        }, 5000);
-
-        return () => {
-            cancelled = true;
-            clearInterval(interval);
-        };
-        // Only reset effect if job_id changes
-    }, [model]);
-
 
     if (!model) return null;
 
@@ -121,9 +68,11 @@ export default function InferenceModelCard({ model, setModel}) {
                     <p className="text-sm text-gray-600 whitespace-normal break-words">{model.Description}</p>
                 </div>
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                    isTrained ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+                    isTrained ? (
+                        isTraining ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800")
+                        : "bg-blue-100 text-blue-800"
                 }`}>
-                    {isTrained ? "Trained" : "Base"}
+                    {isTrained ? (isTraining? "Training" : "Trained") : "Base"}
                 </span>
             </div>
             <div className="flex flex-col space-y-1 text-sm text-gray-500">
@@ -168,9 +117,6 @@ export default function InferenceModelCard({ model, setModel}) {
                          value={model["Pre-trained"] ? "Yes" : "No"}
                          tooltip={tooltips["Pre-trained"]}
                 />
-                {isTraining && (
-                    <ProgressBar current={model.epoch} total={model.total_epochs} />
-                )}
 
                 {/* DICE Score Panel, only if trained */}
                 {isTrained && (
