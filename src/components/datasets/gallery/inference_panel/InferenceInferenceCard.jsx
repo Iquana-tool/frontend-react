@@ -99,7 +99,7 @@ export default function InferenceInferenceCard({ model, dataset }) {
                 <Brain size={20} className="text-violet-600" />
                 <h3 className="text-lg font-semibold">Inference</h3>
             </div>
-            {isTrained && (
+            {isTrained && !isTraining && (
                 <div className="mb-4">
                     <p className="text-sm text-gray-600 mb-2">
                         Run inference on the dataset using the selected model.
