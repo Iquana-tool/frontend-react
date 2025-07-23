@@ -58,10 +58,10 @@ function ProgressBar({ current, total }) {
  * Props:
  * - model: the full model object (base or trained)
  */
-export default function InferenceModelCard({ model: initialModel }) {
-    const [model, setModel] = useState(initialModel);
-    const isTrained = model.job_id !== undefined;
-    const isTraining = model.training === "in progress";
+export default function InferenceModelCard({ model, setModel}) {
+    const model_not_null = !(model === null || model === undefined)
+    const isTrained = model_not_null && "job_id" in model
+    const isTraining = model_not_null && model.training === "in progress";
 
     const tooltips = {
         num_classes: "Number of target categories the model predicts. More classes generally means increased complexity and may need more data.",
@@ -105,7 +105,7 @@ export default function InferenceModelCard({ model: initialModel }) {
             clearInterval(interval);
         };
         // Only reset effect if job_id changes
-    }, [model.job_id]);
+    }, [model]);
 
 
     if (!model) return null;
