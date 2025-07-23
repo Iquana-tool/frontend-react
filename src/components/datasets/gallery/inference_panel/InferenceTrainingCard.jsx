@@ -53,7 +53,7 @@ export default function InferenceTrainingCard({
           const response = await startTraining({
                 dataset_id: datasetId,
                 model_identifier: model.model_identifier,   // e.g. "unet"
-                overwrite: false,
+                epochs: epochs,
                 augment: augment,
                 image_size: imageSize,
                 early_stopping: earlyStopping,
