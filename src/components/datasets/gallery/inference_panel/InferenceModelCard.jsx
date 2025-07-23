@@ -42,7 +42,7 @@ function InfoRow({ icon, label, value, tooltip }) {
 export default function InferenceModelCard({ model, setModel}) {
     const model_not_null = !(model === null || model === undefined)
     const isTrained = model_not_null && "job_id" in model
-    const isTraining = model_not_null && model.training === "in progress";
+    const isTraining = model_not_null && (model.training === "in progress" || model.training === "starting");
 
     const tooltips = {
         num_classes: "Number of target categories the model predicts. More classes generally means increased complexity and may need more data.",
@@ -77,10 +77,10 @@ export default function InferenceModelCard({ model, setModel}) {
             </div>
             <div className="flex flex-col space-y-1 text-sm text-gray-500">
                 { isTrained && (
-                    <div>
+                    <div className="flex flex-col space-y-1 text-sm text-gray-500">
                     <InfoRow
                     icon="🧩"
-                    label="Classes"
+                    label="Labels"
                     value={model.num_classes}
                     tooltip={tooltips.num_classes}
                 />
@@ -95,7 +95,14 @@ export default function InferenceModelCard({ model, setModel}) {
                     label="Number of Train Images"
                     value={model.num_input_images}
                     tooltip={tooltips.num_input_images}
-                /> </div>)
+                />
+                <InfoRow
+                    icon="🕒"
+                    label="Training Steps"
+                    value={model.best_epoch}
+                    tooltip="Total number of training steps completed."
+                />
+                </div>)
                 }
                 <InfoRow
                     icon="⚡"
@@ -135,20 +142,20 @@ export default function InferenceModelCard({ model, setModel}) {
                         <div className="grid grid-cols-3 gap-2 text-center">
                             <div>
                                 <div className="text-xs text-gray-500">Train</div>
-                                <div className={`text-base font-bold ${getDiceColor(model.train_dice)}`}>
-                                    {formatDice(model.train_dice)}
+                                <div className={`text-base font-bold ${getDiceColor(model.best_train_dice)}`}>
+                                    {formatDice(model.best_train_dice)}
                                 </div>
                             </div>
                             <div>
                                 <div className="text-xs text-gray-500">Validation</div>
-                                <div className={`text-base font-bold ${getDiceColor(model.val_dice)}`}>
-                                    {formatDice(model.val_dice)}
+                                <div className={`text-base font-bold ${getDiceColor(model.best_val_dice)}`}>
+                                    {formatDice(model.best_val_dice)}
                                 </div>
                             </div>
                             <div>
                                 <div className="text-xs text-gray-500">Test</div>
-                                <div className={`text-base font-bold ${getDiceColor(model.test_dice)}`}>
-                                    {formatDice(model.test_dice)}
+                                <div className={`text-base font-bold ${getDiceColor(model.best_test_dice)}`}>
+                                    {formatDice(model.best_test_dice)}
                                 </div>
                             </div>
                         </div>
