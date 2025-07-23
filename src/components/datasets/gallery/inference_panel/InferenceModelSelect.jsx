@@ -1,4 +1,23 @@
-import React from "react";
+import React, {useState, useEffect} from "react";
+import {
+  getBaseModels,
+  getTrainedModels,
+} from "../../../../api";
+
+// Helper to parse select value to get type/IDs
+function parseSelectedModel(val, trainedModels, baseModels) {
+  if (!val) return null;
+  const [model_identifier, type, job_id] = val.split("#");
+  if (type === "trained") {
+    return trainedModels.find(
+        m => m.model_identifier === model_identifier && String(m.job_id) === job_id
+    );
+  }
+  if (type === "base") {
+    return baseModels.find(m => m.model_identifier === model_identifier);
+  }
+  return null;
+}
 
 /**
  * ModelSelect: renders a select for base and trained models.
@@ -10,15 +29,47 @@ import React from "react";
  * - onChange: function(newValue: string): void    // called when user selects a new model value
  */
 export default function InferenceModelSelect({
-                                        baseModels,
-                                        trainedModels,
-                                        selectedModelValue,
-                                        onChange,
+                                    dataset,
+                                    onChange,
                                     }) {
+    const [baseModels, setBaseModels] = useState([]);
+    const [trainedModels, setTrainedModels] = useState([]);
+    const [selectedModelValue, setSelectedModelValue] = useState("");
+
+    // Fetch models when dataset changes
+    useEffect(() => {
+        if (!dataset) return;
+
+        Promise.all([
+          getBaseModels(),
+          getTrainedModels(dataset.id)
+        ])
+            .then(([baseRes, trainedRes]) => {
+              const base = baseRes?.models || [];
+              const trained = trainedRes?.models || [];
+              setBaseModels(base);
+              setTrainedModels(trained);
+
+              // Set default selection preference: first trained model, else first base model
+              if (trained.length > 0) {
+                setSelectedModelValue(trained[0].model_identifier + "#trained#" + trained[0].job_id);
+                onChange(trained[0]);
+              } else if (base.length > 0) {
+                setSelectedModelValue(base[0].model_identifier + "#base");
+                onChange(base[0]);
+              }
+            })
+      }, [dataset]);
+
     return (
         <select
             value={selectedModelValue}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+                onChange(parseSelectedModel(e.target.value,
+                trainedModels, baseModels));
+                setSelectedModelValue(e.target.value);
+            }
+            }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
         >
             {trainedModels.length > 0 && (
