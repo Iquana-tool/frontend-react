@@ -5,7 +5,7 @@ import {
 } from "../../../../api";
 
 // Helper to parse select value to get type/IDs
-function parseSelectedModel(val, trainedModels, baseModels) {
+function findSelectedModelByIdentifier(val, trainedModels, baseModels) {
   if (!val) return null;
   const [model_identifier, type, job_id] = val.split("#");
   if (type === "trained") {
@@ -30,6 +30,7 @@ function parseSelectedModel(val, trainedModels, baseModels) {
  */
 export default function InferenceModelSelect({
                                     dataset,
+                                    selectedModel,
                                     onChange,
                                     }) {
     const [baseModels, setBaseModels] = useState([]);
@@ -49,23 +50,33 @@ export default function InferenceModelSelect({
               const trained = trainedRes?.models || [];
               setBaseModels(base);
               setTrainedModels(trained);
-
-              // Set default selection preference: first trained model, else first base model
-              if (trained.length > 0) {
-                setSelectedModelValue(trained[0].model_identifier + "#trained#" + trained[0].job_id);
-                onChange(trained[0]);
-              } else if (base.length > 0) {
-                setSelectedModelValue(base[0].model_identifier + "#base");
-                onChange(base[0]);
+              if (selectedModel){
+                  if (selectedModel.job_id) {
+                    // If selectedModel is a trained model, set value with job_id
+                    setSelectedModelValue(selectedModel.model_identifier + "#trained#" + selectedModel.job_id);
+                  } else {
+                      // If selectedModel is a base model, set value without job_id
+                      setSelectedModelValue(selectedModel.model_identifier + "#base");
+                  }
+              } else {
+                  // If no selectedModel, set default selection
+                  // Set default selection preference: first trained model, else first base model
+                  if (trained.length > 0) {
+                      setSelectedModelValue(trained[0].model_identifier + "#trained#" + trained[0].job_id);
+                      onChange(trained[0]);
+                  } else if (base.length > 0) {
+                      setSelectedModelValue(base[0].model_identifier + "#base");
+                      onChange(base[0]);
+                  }
               }
             })
-      }, [dataset]);
+      }, [dataset, selectedModel]);
 
     return (
         <select
             value={selectedModelValue}
             onChange={e => {
-                onChange(parseSelectedModel(e.target.value,
+                onChange(findSelectedModelByIdentifier(e.target.value,
                 trainedModels, baseModels));
                 setSelectedModelValue(e.target.value);
             }
