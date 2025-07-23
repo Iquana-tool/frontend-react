@@ -77,17 +77,17 @@ const AnnotationViewer = ({
                     <div className="flex-1">
                         <h3 className="font-semibold text-slate-800">Annotation Drawing Area</h3>
                         <div className="flex items-center gap-4 mt-0.5">
-                            <p className="text-xs text-slate-500">Draw prompts to segment the image</p>
+                            <p className="text-xs text-slate-500 whitespace-nowrap">Draw prompts to segment the image</p>
                             
                             {/* Instructions inline */}
                             {promptType === "point" && (
-                                <div className="flex items-center gap-3 text-xs text-slate-600">
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <div className="flex items-center gap-3 text-xs text-slate-600 flex-shrink-0">
+                                    <div className="flex items-center gap-1 whitespace-nowrap">
+                                        <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
                                         <span>Left Click (+ Annotation)</span>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                                    <div className="flex items-center gap-1 whitespace-nowrap">
+                                        <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
                                         <span>Right Click (− Annotation)</span>
                                     </div>
                                 </div>
