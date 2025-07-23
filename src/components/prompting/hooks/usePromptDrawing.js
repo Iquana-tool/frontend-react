@@ -71,15 +71,7 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
         });
         return true;
 
-      case "circle":
-        setDrawStartPos({ x: imageCoords.x, y: imageCoords.y });
-        setCurrentShape({
-          startX: imageCoords.x,
-          startY: imageCoords.y,
-          endX: imageCoords.x,
-          endY: imageCoords.y
-        });
-        return true;
+
 
       case "polygon":
         if (!currentPolygon || currentPolygon.length === 0) {
@@ -114,8 +106,8 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
 
     if (!isDrawing) return;
 
-    if (promptType === "box" || promptType === "circle") {
-      // For box and circle prompts, update the current shape
+    if (promptType === "box") {
+      // For box prompts, update the current shape
       if (drawStartPos) {
         setCurrentShape({
           startX: drawStartPos.x,
@@ -143,25 +135,6 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
           startY: Math.min(drawStartPos.y, imageCoords.y),
           endX: Math.max(drawStartPos.x, imageCoords.x),
           endY: Math.max(drawStartPos.y, imageCoords.y),
-        },
-        label: currentLabel,
-      };
-      setPrompts((prev) => [...prev, newPrompt]);
-    } else if (promptType === "circle") {
-      // Add circle prompt
-      const centerX = (drawStartPos.x + imageCoords.x) / 2;
-      const centerY = (drawStartPos.y + imageCoords.y) / 2;
-      const radius = Math.sqrt(
-        Math.pow(imageCoords.x - drawStartPos.x, 2) +
-        Math.pow(imageCoords.y - drawStartPos.y, 2)
-      ) / 2;
-
-      const newPrompt = {
-        type: "circle",
-        coordinates: {
-          centerX,
-          centerY,
-          radius,
         },
         label: currentLabel,
       };
@@ -256,16 +229,7 @@ export const usePromptDrawing = (image, promptType, currentLabel, canvasToImageC
             },
             label: prompt.label
           };
-        case "circle":
-          return {
-            type: "circle",
-            coordinates: {
-              centerX: prompt.coordinates.centerX / image.width,
-              centerY: prompt.coordinates.centerY / image.height,
-              radius: prompt.coordinates.radius / Math.max(image.width, image.height)
-            },
-            label: prompt.label
-          };
+
         case "polygon":
           return {
             type: "polygon",

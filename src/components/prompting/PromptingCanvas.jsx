@@ -38,6 +38,8 @@ const PromptingCanvas = forwardRef(({
   const [activeTool, setActiveTool] = useState("point");
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(null);
   const [forceRender, setForceRender] = useState(0);
+  const [isSequentialProcessing, setIsSequentialProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState("");
 
   // Initialize pan/zoom hook
   const panZoom = usePanZoom(image, canvasSize, initialScale);
@@ -108,6 +110,14 @@ const PromptingCanvas = forwardRef(({
     }
   }, [isInstantSegmentationEnabled, isInstantSegmenting, shouldSuppressLoadingModal, onInstantSegmentationStateChange]);
 
+  // Reset sequential processing state when segmentation completes
+  useEffect(() => {
+    if (!isSegmenting && isSequentialProcessing) {
+      setIsSequentialProcessing(false);
+      setProcessingStatus("");
+    }
+  }, [isSegmenting, isSequentialProcessing]);
+
   // Synchronize local contour selection with parent component/state
   useEffect(() => {
     if (onContourSelect) {
@@ -172,6 +182,35 @@ const PromptingCanvas = forwardRef(({
         setHighlightLabelWarning(true);
       }
       return;
+    }
+
+    // Check if we have multiple prompts of the same type that will be processed sequentially
+    const pointPrompts = prompts.filter(p => p.type === "point");
+    const boxPrompts = prompts.filter(p => p.type === "box");
+    const polygonPrompts = prompts.filter(p => p.type === "polygon");
+    
+    const hasMultipleBoxes = boxPrompts.length > 1;
+    const hasMultiplePolygons = polygonPrompts.length > 1;
+    const hasMultipleTypes = (boxPrompts.length > 0 && polygonPrompts.length > 0) || 
+                           (boxPrompts.length > 0 && pointPrompts.length > 0) || 
+                           (polygonPrompts.length > 0 && pointPrompts.length > 0);
+
+    // Show informative message about sequential processing
+    if (hasMultipleBoxes || hasMultiplePolygons || hasMultipleTypes) {
+      setIsSequentialProcessing(true);
+      let message = "Processing multiple prompts sequentially";
+      if (hasMultipleBoxes) {
+        message += ` (${boxPrompts.length} boxes)`;
+      }
+      if (hasMultiplePolygons) {
+        message += ` (${polygonPrompts.length} polygons)`;
+      }
+      if (hasMultipleTypes) {
+        message += " (mixed types)";
+      }
+      
+      setProcessingStatus(message);
+      console.log(message);
     }
 
     const formattedPrompts = getFormattedPrompts();
@@ -485,13 +524,22 @@ const PromptingCanvas = forwardRef(({
               </span>
             )}
             
+            {/* Show sequential processing status */}
+            {isSequentialProcessing && (
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span>{processingStatus}</span>
+              </div>
+            )}
+
+
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={clearPrompts}
-              disabled={prompts.length === 0}
+              disabled={prompts.length === 0 || isSegmenting}
               className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors ${
-                prompts.length === 0
+                prompts.length === 0 || isSegmenting
                   ? 'text-gray-400 cursor-not-allowed'
                   : 'text-gray-600 hover:text-gray-800'
               }`}
@@ -511,7 +559,7 @@ const PromptingCanvas = forwardRef(({
               {isSegmenting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Segmenting...
+                  {isSequentialProcessing ? "Processing..." : "Segmenting..."}
                 </>
               ) : (
                 <>

@@ -10,7 +10,7 @@ const HelpSection = ({ selectedImage, imageLoading }) => {
       <h3 className="font-medium mb-2">How to use:</h3>
       <ol className="list-decimal list-inside text-sm">
         <li className="mb-1">Select or upload an image from the left panel</li>
-        <li className="mb-1">Choose a prompting tool (point, box, circle, or polygon)</li>
+        <li className="mb-1">Choose a prompting tool (point, box, or polygon)</li>
         <li className="mb-1">Select foreground (1) or background (0) label</li>
         <li className="mb-1">
           <strong>For point prompts:</strong>
@@ -23,6 +23,16 @@ const HelpSection = ({ selectedImage, imageLoading }) => {
         <li className="mb-1">Use zoom and pan controls for detailed work</li>
         <li>Save your prompts when finished</li>
       </ol>
+      
+      <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+        <h4 className="font-medium text-amber-800 mb-2">Multiple Prompts:</h4>
+        <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
+          <li><strong>Point prompts:</strong> Multiple points are processed together</li>
+          <li><strong>Box/Polygon prompts:</strong> Multiple boxes or polygons are processed one by one (sequential processing)</li>
+          <li>You'll see a status indicator when processing multiple prompts</li>
+          <li>All results will be combined and displayed together</li>
+        </ul>
+      </div>
     </div>
   );
 };

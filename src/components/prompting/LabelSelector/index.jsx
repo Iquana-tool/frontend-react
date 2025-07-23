@@ -281,7 +281,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
 
       {/* Expanded Tree View */}
       {expanded && (
-        <div className="absolute z-10 w-72 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+        <div className="absolute z-10 w-80 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="p-4">
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
@@ -313,27 +313,50 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                 </div>
               ) : (
                 <>
-                  {/* Breadcrumb navigation */}
+                  {/* Breadcrumb navigation - only show when in a sub-level */}
                   {currentPath.length > 0 && (
-                    <div className="p-3 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-teal-50 rounded-lg mb-3">
-                      <div className="flex items-center text-sm">
+                    <div className="mb-3 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex items-center text-xs text-gray-600">
                         <button
                           onClick={() => handleNavigateToLevel(-1)}
-                          className="text-blue-700 hover:text-teal-600 font-semibold px-2 py-1 rounded hover:bg-white/50 transition-all"
+                          className="text-blue-600 hover:text-blue-800 font-medium hover:underline"
                         >
                           All Labels
                         </button>
-                        {currentPath.map((pathLabel, index) => (
-                          <React.Fragment key={pathLabel.id}>
-                            <ChevronRightIcon className="w-4 h-4 mx-2 text-blue-400" />
-                            <button
-                              onClick={() => handleNavigateToLevel(index)}
-                              className="text-blue-600 hover:text-teal-600 font-medium px-2 py-1 rounded hover:bg-white/50 transition-all"
-                            >
-                              {pathLabel.name}
-                            </button>
-                          </React.Fragment>
-                        ))}
+                        {currentPath.length <= 3 ? (
+                          // Show all labels if 3 or fewer
+                          currentPath.map((pathLabel, index) => (
+                            <React.Fragment key={pathLabel.id}>
+                              <ChevronRightIcon className="w-3 h-3 mx-1 text-gray-400" />
+                              <button
+                                onClick={() => handleNavigateToLevel(index)}
+                                className="text-gray-700 hover:text-gray-900 font-medium hover:underline"
+                              >
+                                {pathLabel.name}
+                              </button>
+                            </React.Fragment>
+                          ))
+                        ) : (
+                          // Show ellipsis + last 3 parent labels
+                          <>
+                            <ChevronRightIcon className="w-3 h-3 mx-1 text-gray-400" />
+                            <span className="text-gray-500 mx-1">...</span>
+                            {currentPath.slice(-3).map((pathLabel, index) => {
+                              const actualIndex = currentPath.length - 3 + index;
+                              return (
+                                <React.Fragment key={pathLabel.id}>
+                                  <ChevronRightIcon className="w-3 h-3 mx-1 text-gray-400" />
+                                  <button
+                                    onClick={() => handleNavigateToLevel(actualIndex)}
+                                    className="text-gray-700 hover:text-gray-900 font-medium hover:underline"
+                                  >
+                                    {pathLabel.name}
+                                  </button>
+                                </React.Fragment>
+                              );
+                            })}
+                          </>
+                        )}
                       </div>
                     </div>
                   )}
@@ -345,15 +368,15 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                     
                     return (
                       <div key={label.id} className="relative">
-                        <div className={`flex items-center p-2 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${isSelected ? 'bg-blue-50 border border-blue-200' : ''}`}>
+                        <div className={`flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors duration-150 ${isSelected ? 'bg-blue-50 border border-blue-200' : ''}`}>
                           {/* Selection area (checkbox + label name) */}
                           <button
                             onClick={() => handleLabelSelect(label)}
-                            className="flex items-center flex-grow text-left hover:bg-blue-50 rounded-md p-1 -m-1 transition-colors duration-150"
+                            className="flex items-center flex-grow text-left hover:bg-blue-50 rounded-md p-1 -m-1 transition-colors duration-150 min-w-0"
                             title={`Select ${label.name}`}
                           >
                             <div 
-                              className={`w-4 h-4 rounded border-2 mr-3 flex items-center justify-center ${
+                              className={`w-4 h-4 rounded border-2 mr-3 flex-shrink-0 flex items-center justify-center ${
                                 isSelected 
                                   ? 'border-2' 
                                   : 'border-gray-300 hover:border-gray-400'
@@ -373,7 +396,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                                 </svg>
                               )}
                             </div>
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-sm font-medium text-gray-900 truncate">
                               {label.name}
                             </span>
                           </button>
@@ -413,13 +436,13 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
               )}
 
               {/* Add new label option */}
-              <div className="pt-3 mt-3 border-t border-gray-200">
+              <div className="pt-3 mt-3 border-t border-gray-200 pb-2">
                 <button
                   onClick={() => handleAddNewLabelClick(currentPath.length > 0 ? currentPath[currentPath.length - 1] : null)}
-                  className="flex items-center w-full p-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150"
+                  className="flex items-center w-full p-3 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-150 font-medium"
                 >
                   <PlusIcon className="w-4 h-4 mr-3" />
-                  <span className="font-medium">Add new label</span>
+                  <span>Add new label</span>
                 </button>
               </div>
             </div>
