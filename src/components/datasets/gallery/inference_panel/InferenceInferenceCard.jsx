@@ -38,7 +38,7 @@ export default function InferenceInferenceCard({ model, dataset }) {
     const cancelInferenceRef = useRef(false);
     const [cancelInference, setCancelInference] = useState(false);
     const isTrained = model && "job_id" in model;
-    const isTraining = model && (model.training === "in progress" || model.training === "starting");
+    const isTraining = model && (model.training_status === "in progress" || model.training_status === "starting");
 
     useEffect(() => {
         console.log("Cancel Triggered");

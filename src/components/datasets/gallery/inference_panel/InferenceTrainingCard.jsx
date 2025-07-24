@@ -40,8 +40,8 @@ export default function InferenceTrainingCard({
 
     const [isStopping, setIsStopping] = useState(false);
     const [trainError, setTrainError] = useState(null);
-    const isTraining = model && model.training === "in progress";
-    const isStarting = model && model.training === "starting";
+    const isTraining = model && model.training_status === "in progress";
+    const isStarting = model && model.training_status === "starting";
     const isTrained = model && model.job_id;
 
     // The unique job identifier is just the model_identifier!

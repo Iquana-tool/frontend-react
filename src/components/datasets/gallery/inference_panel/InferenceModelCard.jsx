@@ -42,7 +42,7 @@ function InfoRow({ icon, label, value, tooltip }) {
 export default function InferenceModelCard({ model, setModel}) {
     const model_not_null = !(model === null || model === undefined)
     const isTrained = model_not_null && "job_id" in model
-    const isTraining = model_not_null && (model.training === "in progress" || model.training === "starting");
+    const isTraining = model_not_null && (model.training_status === "in progress" || model.training_status === "starting");
 
     const tooltips = {
         num_classes: "Number of target categories the model predicts. More classes generally means increased complexity and may need more data.",
