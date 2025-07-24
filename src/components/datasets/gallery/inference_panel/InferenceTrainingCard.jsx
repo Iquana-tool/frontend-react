@@ -74,7 +74,7 @@ export default function InferenceTrainingCard({
         setIsStopping(true);
         // Cancel the training
         await cancelTraining(model.job_id);
-        while (model.training === "in progress") {
+        while (model.training_status === "in progress") {
             // Wait for cancellation to complete
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
