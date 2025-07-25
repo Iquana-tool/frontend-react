@@ -50,14 +50,16 @@ export default function InferenceTrainingCard({
     async function handleStartTraining() {
         setTrainError(null);
         try {
-          const response = await startTraining({
+            const data = {
                 dataset_id: datasetId,
-                model_identifier: model.model_identifier,   // e.g. "unet"
+                model_identifier: `${model?.job_id ? model.job_id : model.model_identifier}`,   // e.g. "unet"
                 epochs: epochs,
                 augment: augment,
                 image_size: imageSize,
                 early_stopping: earlyStopping,
-              });
+              }
+          console.log("Starting training with data:", data);
+          const response = await startTraining(data);
           const modelData = await fetchModel(response.job_id);
           while (!(modelData)) {
             // Wait for the model data to be available
@@ -66,7 +68,7 @@ export default function InferenceTrainingCard({
           }
           setSelectedModel(modelData.metadata);
         } catch (err) {
-          setTrainError(err?.message || "Failed to start training.");
+            setTrainError(err?.message || "Failed to start training.");
         }
     }
 
@@ -265,7 +267,7 @@ export default function InferenceTrainingCard({
                                     </ResponsiveContainer>
                                 </div>
                             </div>
-                        <ProgressBar current={model.epoch} total={model.total_epochs}/>
+                        <ProgressBar current={model.epoch} total={epochs}/>
                         <div>
                             <button
                                 onClick={handleCancelTraining}
