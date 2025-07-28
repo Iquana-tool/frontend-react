@@ -23,7 +23,7 @@ const InferencePanel = ({ dataset }) => {
         {/* Model Selection */}
         <div className="mb-5">
           <h3 className="text-base font-medium text-gray-900 mb-2">Model</h3>
-          <InferenceModelSelect dataset={dataset} selectedModel={selectedModel} onChange={setSelectedModel} />
+          <InferenceModelSelect dataset={dataset} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
 
           {/* Selected Model Info */}
           {selectedModel && <InferenceModelCard model={selectedModel} setModel={setSelectedModel}/>}
