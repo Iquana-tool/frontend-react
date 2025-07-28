@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Trash2, Play, Loader2, } from "lucide-react";
+import { Trash2, Play, Loader2, Brain } from "lucide-react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
 import { useInstantSegmentation } from './hooks/useInstantSegmentation';
 import CanvasRenderer from './components/CanvasRenderer';
-
+import InferImageButton from "./MainAnnotationPage/components/InferImageButton";
 import PromptSelectionOverlay from './components/PromptSelectionOverlay';
 
 // This component allows users to add different types of prompts to an image for segmentation tasks.
@@ -547,6 +547,7 @@ const PromptingCanvas = forwardRef(({
               <Trash2 className="w-4 h-4" />
               Clear
             </button>
+            <InferImageButton image={image}/>
             <button
               onClick={handleComplete}
               disabled={!currentLabel || isSegmenting || prompts.length === 0}
@@ -571,10 +572,6 @@ const PromptingCanvas = forwardRef(({
           </div>
         </div>
       )}
-
-
-
-
     </div>
   );
 });
