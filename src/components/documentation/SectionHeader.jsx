@@ -2,7 +2,7 @@ import React from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 const SectionHeader = ({ id, title, icon: Icon, expanded, onToggle, children }) => (
-  <div className="border-b border-gray-200">
+  <div id={`section-${id}`} className="border-b border-gray-200">
     <button
       onClick={() => onToggle(id)}
       className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors"

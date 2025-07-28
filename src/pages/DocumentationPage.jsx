@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   BookOpen, 
   FileText, 
@@ -22,6 +23,7 @@ import {
 } from "../components/documentation";
 
 const DocumentationPage = () => {
+  const navigate = useNavigate();
   const [expandedSections, setExpandedSections] = useState({
     gettingStarted: true,
     datasets: false,
@@ -31,12 +33,48 @@ const DocumentationPage = () => {
     export: false,
     troubleshooting: false
   });
+  const [lastSelectedTab, setLastSelectedTab] = useState('gettingStarted');
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const handleTabClick = (sectionId) => {
+    // Update the last selected tab
+    setLastSelectedTab(sectionId);
+    
+    // Ensure the section is expanded first
+    if (!expandedSections[sectionId]) {
+      setExpandedSections(prev => ({
+        ...prev,
+        [sectionId]: true
+      }));
+    }
+    
+    // Wait a bit for the section to expand, then scroll
+    setTimeout(() => {
+      const element = document.getElementById(`section-${sectionId}`);
+      if (element) {
+        element.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start',
+          inline: 'nearest'
+        });
+        
+        // Additional offset for the fixed tabs bar
+        const offset = 120; // Account for navbar + tabs bar height
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   };
 
   const sections = [
@@ -86,13 +124,58 @@ const DocumentationPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <DocumentationHeader />
+      {/* Application Navbar */}
+      <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
+        <div className="max-w-[98%] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/datasets")}
+              className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
+            >
+              <BookOpen className="w-5 h-5" />
+              <span>Back to Datasets</span>
+            </button>
+            <div className="h-6 w-px bg-teal-400"></div>
+            <h1 className="text-2xl font-bold">AquaMorph</h1>
+            <div className="h-6 w-px bg-teal-400"></div>
+            <span className="text-lg font-medium">Documentation</span>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/datasets")}
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Datasets</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Documentation Content */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-[98%] mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <BookOpen className="w-8 h-8 text-teal-600" />
+              <h1 className="text-3xl font-bold text-gray-900">User Manual</h1>
+            </div>
+          </div>
+          <p className="text-gray-600 text-lg max-w-4xl">
+          A complete guide to use the AquaMorph application for efficient dataset management, AI-driven image segmentation, and quantification analysis.
+          </p>
+        </div>
+      </div>
+
       <DocumentationNavigation 
         expandedSections={expandedSections}
         toggleSection={toggleSection}
+        onTabClick={handleTabClick}
+        lastSelectedTab={lastSelectedTab}
       />
 
-      <div className="max-w-[98%] mx-auto px-6 py-8">
+      <div className="max-w-[98%] mx-auto px-6 py-8 scroll-mt-20">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {sections.map(({ id, title, icon: Icon, component: Component }) => (
             <SectionHeader
