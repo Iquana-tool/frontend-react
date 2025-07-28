@@ -4,6 +4,7 @@ import { DatasetProvider } from "./contexts/DatasetContext";
 import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPage from "./pages/AnnotationPage";
+import DocumentationPage from "./pages/DocumentationPage";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Routes>
           <Route path="/" element={<DatasetsPage />} />
           <Route path="/datasets" element={<DatasetsPage />} />
+          <Route path="/docs" element={<DocumentationPage />} />
           <Route path="/dataset/:datasetId/gallery" element={<DatasetGalleryPage />} />
           <Route path="/dataset/:datasetId/annotate" element={<AnnotationPage />} />
           <Route path="/dataset/:datasetId/annotate/:imageId" element={<AnnotationPage />} />

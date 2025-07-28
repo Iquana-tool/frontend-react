@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, FolderOpen } from "lucide-react";
+import { Plus, FolderOpen, BookOpen } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
@@ -10,6 +11,7 @@ import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
+  const navigate = useNavigate();
   const {
     datasets,
     loading,
@@ -188,6 +190,15 @@ const DatasetsOverview = ({ onOpenDataset }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold">AquaMorph</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate("/docs")}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Documentation</span>
+              </button>
             </div>
           </div>
         </div>
