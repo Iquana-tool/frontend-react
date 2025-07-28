@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDataset } from "../contexts/DatasetContext";
 import ImageViewerWithPrompting from "../components/prompting";
-import { BugIcon, ArrowLeft } from "lucide-react";
+import { BugIcon, ArrowLeft, BookOpen } from "lucide-react";
 
 const AnnotationPage = () => {
   const navigate = useNavigate();
@@ -106,15 +106,24 @@ const AnnotationPage = () => {
             )}
           </div>
           
-          <a 
-            href="https://github.com/yapat-app/AquaMorph/issues" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <BugIcon size={16} />
-            <span>Report Bug</span>
-          </a>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/docs")}
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Documentation</span>
+            </button>
+            <a 
+              href="https://github.com/yapat-app/AquaMorph/issues" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <BugIcon size={16} />
+              <span>Report Bug</span>
+            </a>
+          </div>
         </div>
       </nav>
 

@@ -18,7 +18,7 @@ const DocumentationHeader = () => {
             className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to App</span>
+            <span>Back to Home</span>
           </button>
         </div>
         <p className="text-teal-100 text-lg max-w-4xl">

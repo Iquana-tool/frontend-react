@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
-import { ArrowLeft, Play } from "lucide-react";
+import { ArrowLeft, Play, BookOpen } from "lucide-react";
 import DatasetInfo from "./gallery/DatasetInfo";
 import ImageGallery from "./gallery/ImageGallery";
 import InferencePanel from "./gallery/InferencePanel";
@@ -149,13 +149,22 @@ const DatasetGallery = () => {
             <span className="text-lg font-medium">{dataset.name}</span>
           </div>
 
-          <button
-            onClick={handleStartAnnotation}
-            className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <Play size={16} />
-            <span>Start Annotation</span>
-          </button>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/docs")}
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Documentation</span>
+            </button>
+            <button
+              onClick={handleStartAnnotation}
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              <Play size={16} />
+              <span>Start Annotation</span>
+            </button>
+          </div>
         </div>
       </nav>
 
