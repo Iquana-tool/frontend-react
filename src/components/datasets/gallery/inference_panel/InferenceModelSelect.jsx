@@ -13,7 +13,7 @@ function findSelectedModelByIdentifier(val, trainedModels, baseModels) {
         m => m.model_identifier === model_identifier && String(m.job_id) === job_id
     );
   }
-  if (type === "base") {
+  else if (type === "base") {
     return baseModels.find(m => m.model_identifier === model_identifier);
   }
   return null;
@@ -31,13 +31,20 @@ function findSelectedModelByIdentifier(val, trainedModels, baseModels) {
 export default function InferenceModelSelect({
                                     dataset,
                                     selectedModel,
-                                    onChange,
+                                    setSelectedModel,
                                     }) {
     const [baseModels, setBaseModels] = useState([]);
     const [trainedModels, setTrainedModels] = useState([]);
-    const [trainingModels, setTrainingModels] = useState([]);
-    const [selectedModelValue, setSelectedModelValue] = useState("");
-    const selectedModelId = selectedModel?.job_id || selectedModel?.model_identifier || "";
+    const selectedModelValue = selectedModel ? selectedModel.model_identifier + (selectedModel.job_id ? "#trained#" + selectedModel.job_id : "#base") : "";
+
+    useEffect(() => {
+        if (!selectedModel) {
+            console.log("No selected model provided.");
+            return;
+        }
+        console.log("Selected Model Changed:", selectedModel);
+        console.log("Selected Model ID:", selectedModelValue);
+    }, [selectedModel]);
 
     // Fetch models when dataset changes
     useEffect(() => {
@@ -53,34 +60,27 @@ export default function InferenceModelSelect({
               setBaseModels(base);
               setTrainedModels(trained);
               if (selectedModel){
-                  if (selectedModel.job_id) {
-                    // If selectedModel is a trained model, set value with job_id
-                    setSelectedModelValue(selectedModel.model_identifier + "#trained#" + selectedModel.job_id);
-                  } else {
-                      // If selectedModel is a base model, set value without job_id
-                      setSelectedModelValue(selectedModel.model_identifier + "#base");
-                  }
+                  console.log("Selected model exists:", selectedModel);
+
               } else {
                   // If no selectedModel, set default selection
                   // Set default selection preference: first trained model, else first base model
+                  console.log("No model selected. Setting default model selection.");
                   if (trained.length > 0) {
-                      setSelectedModelValue(trained[0].model_identifier + "#trained#" + trained[0].job_id);
-                      onChange(trained[0]);
+                      setSelectedModel(trained[0]);
                   } else if (base.length > 0) {
-                      setSelectedModelValue(base[0].model_identifier + "#base");
-                      onChange(base[0]);
+                      setSelectedModel(base[0]);
                   }
               }
             })
-      }, [dataset, selectedModelId]);
+      }, [dataset, selectedModel]);
 
     return (
         <select
             value={selectedModelValue}
             onChange={e => {
-                onChange(findSelectedModelByIdentifier(e.target.value,
+                setSelectedModel(findSelectedModelByIdentifier(e.target.value,
                 trainedModels, baseModels));
-                setSelectedModelValue(e.target.value);
             }
             }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
