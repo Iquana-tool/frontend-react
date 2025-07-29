@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Database } from "lucide-react";
+import { Database, BookOpen } from "lucide-react";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -50,6 +50,7 @@ const Navbar = () => {
                   : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
               }`}
             >
+              <BookOpen className="w-4 h-4" />
               <span>Documentation</span>
             </button>
           </div>
