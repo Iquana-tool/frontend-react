@@ -1,7 +1,4 @@
-import {Database, 
-  Award,
-  TrendingUp,
-  Users,
+import {
   Layers,
   Cpu,
   MousePointer,
@@ -35,12 +32,7 @@ export const features = [
   }
 ];
 
-export const stats = [
-  { value: "X%", label: "Segmentation Accuracy", icon: <Award className="w-6 h-6" /> },
-  { value: "X", label: "Faster Analysis", icon: <TrendingUp className="w-6 h-6" /> },
-  { value: "X+", label: "Research Papers", icon: <Database className="w-6 h-6" /> },
-  { value: "X+", label: "Marine Labs", icon: <Users className="w-6 h-6" /> }
-];
+
 
 export const capabilities = [
   "Semi-automated coral structure segmentation",

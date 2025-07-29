@@ -9,10 +9,10 @@ import {
   ParallaxBackground,
   useParallaxScroll,
   features,
-  stats,
   capabilities,
   workflowSteps
 } from "../components/landing";
+import Navbar from "../components/Navbar";
 
 const LandingPage = () => {
   const scrollY = useParallaxScroll();
@@ -60,11 +60,14 @@ const LandingPage = () => {
       `}</style>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 overflow-hidden">
+        {/* Navigation Bar */}
+        <Navbar />
+        
         {/* Professional Parallax Background Elements */}
         <ParallaxBackground scrollY={scrollY} />
 
         {/* Hero Section with Parallax */}
-        <HeroSection scrollY={scrollY} stats={stats} />
+        <HeroSection scrollY={scrollY} />
 
         {/* Mission Section with Light Background */}
         <MissionSection scrollY={scrollY} />

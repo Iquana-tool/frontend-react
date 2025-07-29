@@ -31,7 +31,7 @@ const CTASection = ({ scrollY }) => {
           onClick={() => navigate('/datasets')}
           className="group relative inline-flex items-center justify-center px-12 py-4 text-xl font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl shadow-2xl hover:shadow-cyan-500/25 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
         >
-          <span className="relative z-10">Start Your Research</span>
+          <span className="relative z-10">Start Segmenting</span>
           <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-cyan-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
         </button>
       </div>

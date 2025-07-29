@@ -1,14 +1,14 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Sparkles, Play } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
-const HeroSection = ({ scrollY, stats }) => {
+const HeroSection = ({ scrollY }) => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center">
+    <section className="relative flex items-start justify-center pt-24 pb-8">
       <div 
-        className="relative max-w-7xl mx-auto px-6 py-20 text-center"
+        className="relative max-w-7xl mx-auto px-6 py-8 text-center"
         style={{
           transform: `translate3d(0, ${scrollY * 0.1}px, 0)`
         }}
@@ -25,7 +25,7 @@ const HeroSection = ({ scrollY, stats }) => {
         </div>
         
         <h1 
-          className="text-6xl md:text-8xl font-black text-gray-900 mb-8 leading-tight"
+          className="text-6xl md:text-8xl font-black text-gray-900 mb-6 leading-tight"
           style={{
             transform: `translate3d(0, ${scrollY * 0.08}px, 0)`
           }}
@@ -37,7 +37,7 @@ const HeroSection = ({ scrollY, stats }) => {
         </h1>
         
         <p 
-          className="text-xl md:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed font-light"
+          className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed font-light"
           style={{
             transform: `translate3d(0, ${scrollY * 0.06}px, 0)`
           }}
@@ -47,7 +47,7 @@ const HeroSection = ({ scrollY, stats }) => {
         </p>
         
         <div 
-          className="flex flex-col sm:flex-row gap-6 justify-center mb-16"
+          className="flex flex-col sm:flex-row gap-6 justify-center"
           style={{
             transform: `translate3d(0, ${scrollY * 0.04}px, 0)`
           }}
@@ -62,38 +62,6 @@ const HeroSection = ({ scrollY, stats }) => {
             </span>
             <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-cyan-700 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
           </button>
-          
-          <button
-            onClick={() => document.getElementById('features').scrollIntoView({ behavior: 'smooth' })}
-            className="group inline-flex items-center justify-center px-8 py-4 text-lg font-semibold text-gray-700 bg-white/80 backdrop-blur-sm border border-white/20 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:bg-white/90"
-          >
-            <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-            Watch Demo
-          </button>
-        </div>
-
-        {/* Stats Grid with Parallax */}
-        <div 
-          className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto"
-          style={{
-            transform: `translate3d(0, ${scrollY * 0.02}px, 0)`
-          }}
-        >
-          {stats.map((stat, index) => (
-            <div
-              key={index}
-              className="bg-white/60 backdrop-blur-lg rounded-2xl p-6 border border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 group"
-              style={{
-                transform: `translate3d(0, ${scrollY * (0.01 + index * 0.005)}px, 0)`
-              }}
-            >
-              <div className="text-teal-500 mb-2 flex justify-center group-hover:scale-110 transition-transform">
-                {stat.icon}
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
-              <div className="text-sm text-gray-600 font-medium">{stat.label}</div>
-            </div>
-          ))}
         </div>
       </div>
     </section>

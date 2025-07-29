@@ -1,0 +1,51 @@
+import React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Database } from "lucide-react";
+
+const Navbar = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path) => {
+    return location.pathname === path;
+  };
+
+  return (
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <div 
+            className="flex items-center space-x-2 cursor-pointer"
+            onClick={() => navigate('/')}
+          >
+            <div className="w-8 h-8 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
+              <Database className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold text-gray-900">
+              Aqua<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Morph</span>
+            </span>
+          </div>
+
+          {/* Navigation Links */}
+          <div className="flex items-center space-x-8">
+            
+            <button
+              onClick={() => navigate('/datasets')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                isActive('/datasets') 
+                  ? 'text-teal-600 bg-teal-50' 
+                  : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
+              }`}
+            >
+              <Database className="w-4 h-4" />
+              <span>Datasets</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+export default Navbar; 
