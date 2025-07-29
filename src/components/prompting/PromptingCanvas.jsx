@@ -294,9 +294,9 @@ const PromptingCanvas = forwardRef(({
     x *= scaleX;
     y *= scaleY;
 
-    // Handle panning if active
-    if (isDraggingRef.current) {
-      handlePanStart(e);
+    //  try tostart panning first - let handlePanStart determine if conditions are met
+    const panningStarted = handlePanStart(e, activeTool);
+    if (panningStarted) {
       return;
     }
 
@@ -315,7 +315,7 @@ const PromptingCanvas = forwardRef(({
         }
       }
     }
-  }, [image, isMaskFinished, isDraggingRef, setError, handlePanStart, isPanning, handlePromptMouseDown, promptType, handleManualContourComplete]);
+  }, [image, isMaskFinished, handlePanStart, activeTool, setError, isPanning, handlePromptMouseDown, promptType, handleManualContourComplete]);
 
   // Handle mouse move event
   const handleMouseMove = useCallback((e) => {
