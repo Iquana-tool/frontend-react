@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Grid, List, Filter, Image as ImageIcon, Upload } from "lucide-react";
+import { Search, Filter, Image as ImageIcon, Upload } from "lucide-react";
 import * as api from "../../../api";
 import { useDropzone } from 'react-dropzone';
 
 const ImageGallery = ({ images, onImageClick, dataset }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // grid or list
   const [filterStatus, setFilterStatus] = useState("all"); // all, annotated, missing
   const [loadedImages, setLoadedImages] = useState(new Set());
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -236,21 +235,6 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
             >
               + Add Images
             </button>
-            {/* View Mode Toggle */}
-            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setViewMode("grid")}
-                className={`p-2 ${viewMode === "grid" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-              >
-                <Grid size={16} />
-              </button>
-              <button
-                onClick={() => setViewMode("list")}
-                className={`p-2 ${viewMode === "list" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}
-              >
-                <List size={16} />
-              </button>
-            </div>
           </div>
         </div>
 
@@ -294,7 +278,7 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No results found</h3>
             <p className="text-gray-600">Try adjusting your search or filter criteria.</p>
           </div>
-        ) : viewMode === "grid" ? (
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {filteredImages.map((image) => (
               <div
@@ -322,43 +306,6 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
                 
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
                   {/* Removed image name display */}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {filteredImages.map((image) => (
-              <div
-                key={image.id}
-                data-image-id={image.id}
-                className="flex items-center p-3 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all cursor-pointer"
-                onClick={() => onImageClick(image)}
-              >
-                <div className="w-12 h-12 flex-shrink-0 mr-3 relative">
-                  <img
-                    src={image.thumbnail || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1zbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi/+Cjwvc3ZnPgo='}
-                    alt={image.file_name || image.name}
-                    className={`w-full h-full object-cover rounded ${!image.thumbnail && !loadedImages.has(image.id) ? 'opacity-50 bg-gray-100' : ''}`}
-                  />
-                  {!image.thumbnail && !loadedImages.has(image.id) && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <ImageIcon className="w-4 h-4 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">
-                    {/* Removed image name display */}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {image.width && image.height ? `${image.width} × ${image.height}` : 'Unknown dimensions'}
-                  </p>
-                </div>
-                
-                <div className="flex-shrink-0 ml-3">
-                  {getStatusBadge(image)}
                 </div>
               </div>
             ))}
