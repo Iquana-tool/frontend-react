@@ -24,8 +24,8 @@ export default function InferImageButton({ image }) {
                 </>
             ) : (
                 <>
-                    <Fullscreen className="w-8 h-8"/>
-                    <span>Infer Images</span>
+                    <Fullscreen className="w-6 h-6"/>
+                    <span>Infer Image</span>
                 </>
             )}
         </button>
