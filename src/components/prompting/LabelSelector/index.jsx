@@ -9,7 +9,7 @@ import {
   getFullDisplayName 
 } from '../../../utils/labelHierarchy';
 
-const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
+const LabelSelector = ({ currentLabel, setCurrentLabel, disabled = false }) => {
   // Get current dataset context
   const { currentDataset } = useDataset();
   
@@ -244,10 +244,10 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
     <div className="relative" ref={dropdownRef}>
       {/* Dropdown Button */}
       <button
-        onClick={() => setExpanded(!expanded)}
-        disabled={loading}
+        onClick={() => !disabled && setExpanded(!expanded)}
+        disabled={loading || disabled}
         className={`flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left bg-white border-2 rounded-lg shadow-sm transition-all duration-200 ${
-          loading 
+          loading || disabled
             ? 'opacity-50 cursor-not-allowed border-gray-200' 
             : !currentLabel
             ? 'border-orange-300 hover:bg-orange-50 hover:border-orange-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
@@ -264,7 +264,7 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
             }}
           ></div>
           <span className={`block truncate ${!currentLabel ? 'text-orange-700 font-medium' : 'text-gray-900'}`}>
-            {loading ? 'Loading labels...' : getDisplayName()}
+            {loading ? 'Loading labels...' : disabled ? 'Tool disabled' : getDisplayName()}
           </span>
         </div>
         {loading ? (
@@ -274,13 +274,17 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
               <path fill="currentColor" className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           </div>
+        ) : disabled ? (
+          <svg className="w-5 h-5 ml-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
         ) : (
           <ChevronDownIcon className={`w-5 h-5 ml-2 text-gray-400 transition-transform duration-200 ${expanded ? 'transform rotate-180' : ''}`} />
         )}
       </button>
 
       {/* Expanded Tree View */}
-      {expanded && (
+      {expanded && !disabled && (
         <div className="absolute z-10 w-80 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
           <div className="p-4">
             {error && (
@@ -496,9 +500,9 @@ const LabelSelector = ({ currentLabel, setCurrentLabel }) => {
                 <button
                   type="button"
                   onClick={handleAddNewLabel}
-                  disabled={!newItemName.trim()}
+                  disabled={!newItemName.trim() || loading}
                   className={`w-full inline-flex justify-center rounded-lg px-6 py-3 text-base font-medium text-white sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200 ${
-                    newItemName.trim() 
+                    newItemName.trim() && !loading 
                       ? 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500' 
                       : 'bg-gray-300 cursor-not-allowed'
                   }`}

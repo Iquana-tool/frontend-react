@@ -55,6 +55,8 @@ const MainViewers = ({
   isAddingToFinalMask,
   onMaskStatusChange,
   setHighlightLabelWarning,
+  isMaskFinished,
+  setIsMaskFinished,
 }) => {
   // State for manual contour selection
   const [selectedManualContourIds, setSelectedManualContourIds] = React.useState([]);
@@ -200,31 +202,33 @@ const MainViewers = ({
   return (
     <div className="flex flex-col">
       <div className="flex h-[600px]">
-        {/* Left Panel - Segmentation Results */}
-        <SegmentationResultsPanel
-          segmentationMasks={segmentationMasks}
-          selectedContourIds={selectedContourIds}
-          onToggleContourSelection={onToggleContourSelection}
-          onDeleteContour={onDeleteContour}
-          onSelectAllContours={onSelectAllContours}
-          onClearContourSelection={onClearContourSelection}
-          onClearAllResults={onClearAllResults}
-          onAddToFinalMask={onAddToFinalMask}
-          onAddSingleContourToFinalMask={onAddSingleContourToFinalMask}
-          isAddingToFinalMask={isAddingToFinalMask}
-          // Manual contour props
-          manualContours={manualContours}
-          selectedManualContourIds={selectedManualContourIds}
-          onToggleManualContourSelection={handleToggleManualContourSelection}
-          onDeleteManualContour={handleDeleteManualContour}
-          onSelectAllManualContours={handleSelectAllManualContours}
-          onClearManualContourSelection={handleClearManualContourSelection}
-          onClearAllManualContours={handleClearAllManualContours}
-          onAddManualContoursToFinalMask={handleAddManualToFinal}
-          onAddSingleManualContourToFinalMask={handleAddSingleManualToFinal}
-          isAddingManualToFinalMask={isAddingManualToFinalMask}
-          currentLabel={currentLabel}
-        />
+        {/* Left Panel - Segmentation Results (hidden when mask is finished) */}
+        {!isMaskFinished && (
+          <SegmentationResultsPanel
+            segmentationMasks={segmentationMasks}
+            selectedContourIds={selectedContourIds}
+            onToggleContourSelection={onToggleContourSelection}
+            onDeleteContour={onDeleteContour}
+            onSelectAllContours={onSelectAllContours}
+            onClearContourSelection={onClearContourSelection}
+            onClearAllResults={onClearAllResults}
+            onAddToFinalMask={onAddToFinalMask}
+            onAddSingleContourToFinalMask={onAddSingleContourToFinalMask}
+            isAddingToFinalMask={isAddingToFinalMask}
+            // Manual contour props
+            manualContours={manualContours}
+            selectedManualContourIds={selectedManualContourIds}
+            onToggleManualContourSelection={handleToggleManualContourSelection}
+            onDeleteManualContour={handleDeleteManualContour}
+            onSelectAllManualContours={handleSelectAllManualContours}
+            onClearManualContourSelection={handleClearManualContourSelection}
+            onClearAllManualContours={handleClearAllManualContours}
+            onAddManualContoursToFinalMask={handleAddManualToFinal}
+            onAddSingleManualContourToFinalMask={handleAddSingleManualToFinal}
+            isAddingManualToFinalMask={isAddingManualToFinalMask}
+            currentLabel={currentLabel}
+          />
+        )}
 
         {/* Center Panel - Annotation Drawing Area */}
         <div className={`${showFinalMaskViewer ? 'flex-1 border-r border-slate-200' : 'flex-1'}`}>
@@ -257,6 +261,7 @@ const MainViewers = ({
             setHighlightLabelWarning={setHighlightLabelWarning}
             // Remove segmentation overlay since it's now in the left panel
             showOverlay={false}
+            isMaskFinished={isMaskFinished}
           />
         </div>
 
@@ -294,6 +299,8 @@ const MainViewers = ({
               setAnnotationZoomCenter={setAnnotationZoomCenter}
               promptingCanvasRef={promptingCanvasRef}
               onMaskStatusChange={onMaskStatusChange}
+              isMaskFinished={isMaskFinished}
+              setIsMaskFinished={setIsMaskFinished}
             />
           </div>
         )}

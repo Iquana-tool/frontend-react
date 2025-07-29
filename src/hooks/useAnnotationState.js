@@ -13,6 +13,9 @@ export const useAnnotationState = () => {
   const [customSaveMaskLabel, setCustomSaveMaskLabel] = useState("");
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [labelOptions, setLabelOptions] = useState({});
+  
+  // Mask finished state - prevents editing when true
+  const [isMaskFinished, setIsMaskFinished] = useState(false);
 
   // Instant Segmentation State
   const [instantSegmentationState, setInstantSegmentationState] = useState({
@@ -45,6 +48,10 @@ export const useAnnotationState = () => {
     setIsTransitioning,
     labelOptions,
     setLabelOptions,
+    
+    // Mask finished state
+    isMaskFinished,
+    setIsMaskFinished,
     
     // Instant Segmentation State
     instantSegmentationState,

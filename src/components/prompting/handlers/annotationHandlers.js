@@ -80,10 +80,17 @@ export const createContourAdditionHandlers = ({
   setSelectedContourIds,
   promptingCanvasRef,
   setIsAddingToFinalMask,
+  annotationState,
 }) => {
   const handleAddFromSegmentationToFinal = async (contoursToAdd) => {
     if (!selectedImage || contoursToAdd.length === 0) {
       setError("No image selected or no contours to add.");
+      return;
+    }
+
+    // Check if mask is finished and prevent adding contours
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
       return;
     }
 
@@ -157,6 +164,12 @@ export const createContourAdditionHandlers = ({
       return;
     }
 
+    // Check if mask is finished and prevent adding contours
+    if (annotationState.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
+      return;
+    }
+
     setIsAddingToFinalMask(true);
 
     try {
@@ -221,6 +234,12 @@ export const createContourAdditionHandlers = ({
   const handleAddManualContoursToFinalMask = async (contours) => {
     if (!selectedImage || !contours || contours.length === 0) {
       setError("No image selected or no contours provided");
+      return;
+    }
+
+    // Check if mask is finished and prevent adding contours
+    if (annotationState?.isMaskFinished) {
+      setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
       return;
     }
 
