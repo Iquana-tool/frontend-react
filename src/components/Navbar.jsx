@@ -41,6 +41,17 @@ const Navbar = () => {
               <Database className="w-4 h-4" />
               <span>Datasets</span>
             </button>
+
+            <button
+              onClick={() => navigate('/documentation')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                isActive('/documentation') 
+                  ? 'text-teal-600 bg-teal-50' 
+                  : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
+              }`}
+            >
+              <span>Documentation</span>
+            </button>
           </div>
         </div>
       </div>
