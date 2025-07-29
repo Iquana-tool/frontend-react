@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Database } from "lucide-react";
+import { Database, BookOpen } from "lucide-react";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -43,13 +43,14 @@ const Navbar = () => {
             </button>
 
             <button
-              onClick={() => navigate('/documentation')}
+              onClick={() => navigate('/docs')}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                isActive('/documentation') 
+                isActive('/docs') 
                   ? 'text-teal-600 bg-teal-50' 
                   : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
               }`}
             >
+              <BookOpen className="w-4 h-4" />
               <span>Documentation</span>
             </button>
           </div>
