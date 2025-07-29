@@ -27,7 +27,8 @@ const ToolsPanel = ({
   handleAnnotationZoomOut,
   handleAnnotationResetView,
   highlightLabelWarning,
-  setHighlightLabelWarning
+  setHighlightLabelWarning,
+  isMaskFinished = false
 }) => {
   const [isInstantSegmentationEnabled, setIsInstantSegmentationEnabled] = useState(false);
   const [showManualContourInstructions, setShowManualContourInstructions] = useState(true);
@@ -62,6 +63,11 @@ const ToolsPanel = ({
   }, [highlightLabelWarning, setHighlightLabelWarning]);
   
   const handleToolChange = (tool) => {
+    // Prevent tool changes when mask is finished
+    if (isMaskFinished) {
+      return;
+    }
+    
     setPromptType(tool);
     // Reset manual contour instructions visibility when switching to manual-contour tool
     if (tool === "manual-contour") {
@@ -119,12 +125,15 @@ const ToolsPanel = ({
           {/* Select tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "select"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "select"
                 ? "bg-blue-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("select")}
-            title="Select Tool (Contour selection mode)"
+            onClick={() => !isMaskFinished && handleToolChange("select")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Select Tool (Contour selection mode)"}
           >
             <Pointer className="w-4 h-4" />
           </button>
@@ -132,12 +141,15 @@ const ToolsPanel = ({
           {/* Drag tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "drag"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "drag"
                 ? "bg-blue-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("drag")}
-            title="Drag Tool (Pan image)"
+            onClick={() => !isMaskFinished && handleToolChange("drag")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Drag Tool (Pan image)"}
           >
             <Move className="w-4 h-4" />
           </button>
@@ -148,12 +160,15 @@ const ToolsPanel = ({
           {/* Point tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "point"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "point"
                 ? "bg-blue-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("point")}
-            title="Point Tool"
+            onClick={() => !isMaskFinished && handleToolChange("point")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Point Tool"}
           >
             <MousePointer className="w-4 h-4" />
           </button>
@@ -161,12 +176,15 @@ const ToolsPanel = ({
           {/* Box tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "box"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "box"
                 ? "bg-blue-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("box")}
-            title="Box Tool - Multiple boxes will be processed one by one"
+            onClick={() => !isMaskFinished && handleToolChange("box")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Box Tool - Multiple boxes will be processed one by one"}
           >
             <Square className="w-4 h-4" />
           </button>
@@ -176,12 +194,15 @@ const ToolsPanel = ({
           {/* Polygon tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "polygon"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "polygon"
                 ? "bg-blue-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("polygon")}
-            title="Polygon Tool - Multiple polygons will be processed one by one"
+            onClick={() => !isMaskFinished && handleToolChange("polygon")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Polygon Tool - Multiple polygons will be processed one by one"}
           >
             <Pentagon className="w-4 h-4" />
           </button>
@@ -192,12 +213,15 @@ const ToolsPanel = ({
           {/* Manual Contour Tool */}
           <button
             className={`p-2 transition-colors ${
-              promptType === "manual-contour"
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : promptType === "manual-contour"
                 ? "bg-purple-500 text-white"
                 : "hover:bg-gray-100"
             }`}
-            onClick={() => handleToolChange("manual-contour")}
-            title="Manual Contour Tool (Draw contours directly)"
+            onClick={() => !isMaskFinished && handleToolChange("manual-contour")}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Manual Contour Tool (Draw contours directly)"}
           >
             <PenTool className="w-4 h-4" />
           </button>
@@ -206,23 +230,38 @@ const ToolsPanel = ({
         {/* Zoom Controls */}
         <div className="flex space-x-1 bg-white border border-gray-200 rounded-md overflow-hidden p-0.5">
           <button
-            className="p-2 transition-colors hover:bg-gray-100"
-            onClick={() => handleZoom('in')}
-            title="Zoom In (Ctrl + Scroll Up)"
+            className={`p-2 transition-colors ${
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "hover:bg-gray-100"
+            }`}
+            onClick={() => !isMaskFinished && handleZoom('in')}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Zoom In (Ctrl + Scroll Up)"}
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
-            className="p-2 transition-colors hover:bg-gray-100"
-            onClick={() => handleZoom('out')}
-            title="Zoom Out (Ctrl + Scroll Down)"
+            className={`p-2 transition-colors ${
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "hover:bg-gray-100"
+            }`}
+            onClick={() => !isMaskFinished && handleZoom('out')}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Zoom Out (Ctrl + Scroll Down)"}
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
-            className="p-2 transition-colors hover:bg-gray-100"
-            onClick={handleResetView}
-            title="Reset View"
+            className={`p-2 transition-colors ${
+              isMaskFinished 
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "hover:bg-gray-100"
+            }`}
+            onClick={() => !isMaskFinished && handleResetView()}
+            disabled={isMaskFinished}
+            title={isMaskFinished ? "Tool disabled" : "Reset View"}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -245,6 +284,7 @@ const ToolsPanel = ({
           <LabelSelector
             currentLabel={currentLabel}
             setCurrentLabel={setCurrentLabel}
+            disabled={isMaskFinished}
           />
         </div>
 
@@ -254,22 +294,22 @@ const ToolsPanel = ({
             <span className="text-sm font-medium text-gray-700">Instant Segmentation</span>
             <button
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                !currentLabel 
+                !currentLabel || isMaskFinished
                   ? 'bg-gray-200 cursor-not-allowed opacity-50'
                   : isInstantSegmentationEnabled
                   ? 'bg-blue-600' 
                   : 'bg-gray-300'
               }`}
               onClick={() => {
-                if (!currentLabel) {
-                  return; // Prevent toggle when no label is selected
+                if (!currentLabel || isMaskFinished) {
+                  return; // Prevent toggle when no label is selected or mask is finished
                 }
                 if (promptingCanvasRef.current?.toggleInstantSegmentation) {
                   promptingCanvasRef.current.toggleInstantSegmentation();
                 }
               }}
-              disabled={!currentLabel}
-              title={!currentLabel ? "Please select a label before enabling instant segmentation" : "Toggle automatic segmentation on prompt placement"}
+              disabled={!currentLabel || isMaskFinished}
+              title={!currentLabel || isMaskFinished ? "Please select a label and enable instant segmentation" : "Toggle automatic segmentation on prompt placement"}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -284,7 +324,7 @@ const ToolsPanel = ({
       </div>
       
       {/* Label Selection Warning */}
-      {!currentLabel && (
+      {!currentLabel && !isMaskFinished && (
         <div className={`mt-2 p-3 rounded-lg transition-all duration-300 ${
           highlightLabelWarning 
             ? 'bg-red-100 border-2 border-red-400 shadow-lg animate-pulse' 

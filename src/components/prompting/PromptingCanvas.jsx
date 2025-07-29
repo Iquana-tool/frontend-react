@@ -27,6 +27,7 @@ const PromptingCanvas = forwardRef(({
   isSegmenting = false,
   setError,
   setHighlightLabelWarning,
+  isMaskFinished = false,
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
@@ -273,57 +274,29 @@ const PromptingCanvas = forwardRef(({
   // Handle mouse down event
   const handleMouseDown = useCallback((e) => {
     if (!image || !canvasRef.current) return;
-    
+
+    // Prevent interactions if mask is finished
+    if (isMaskFinished) {
+      e.preventDefault();
+      if (setError) {
+        setError("This mask is marked as finished. Please click 'Edit Mask' to continue editing.");
+      }
+      return;
+    }
+
     const rect = canvasRef.current.getBoundingClientRect();
-    let canvasX = e.clientX - rect.left;
-    let canvasY = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
     
     // Scale mouse coordinates to match canvas internal dimensions
     const scaleX = canvasRef.current.width / rect.width;
     const scaleY = canvasRef.current.height / rect.height;
-    canvasX *= scaleX;
-    canvasY *= scaleY;
-    
-    const imageCoords = canvasToImageCoords(canvasX, canvasY);
-    if (!imageCoords) return;
+    x *= scaleX;
+    y *= scaleY;
 
-
-
-    // Handle prompt selection if select tool is active
-    if (activeTool === "select" && prompts.length > 0) {
-      let foundPrompt = -1;
-      for (let i = 0; i < prompts.length; i++) {
-        const prompt = prompts[i];
-        if (prompt.type === "point") {
-          const dx = imageCoords.x - prompt.coordinates.x;
-          const dy = imageCoords.y - prompt.coordinates.y;
-          if (Math.sqrt(dx * dx + dy * dy) < 10) {
-            foundPrompt = i;
-            break;
-          }
-        } else if (prompt.type === "box") {
-          const { startX, startY, endX, endY } = prompt.coordinates;
-          if (
-            imageCoords.x >= Math.min(startX, endX) &&
-            imageCoords.x <= Math.max(startX, endX) &&
-            imageCoords.y >= Math.min(startY, endY) &&
-            imageCoords.y <= Math.max(startY, endY)
-          ) {
-            foundPrompt = i;
-            break;
-          }
-        }
-      }
-      if (foundPrompt !== -1) {
-        setSelectedPromptIndex(foundPrompt);
-        return;
-      } else {
-        setSelectedPromptIndex(null);
-      }
-    }
-
-    // Handle panning
-    if (handlePanStart(e, activeTool)) {
+    // Handle panning if active
+    if (isDraggingRef.current) {
+      handlePanStart(e);
       return;
     }
 
@@ -331,7 +304,7 @@ const PromptingCanvas = forwardRef(({
     if (e.button === 0 || e.button === 2) { // Left or right mouse button
       if (!isPanning) {
         const isRightClick = e.button === 2;
-        const drawingResult = handlePromptMouseDown(canvasX, canvasY, isRightClick);
+        const drawingResult = handlePromptMouseDown(x, y, isRightClick);
         
         // If we're drawing a manual contour and it was just completed, handle it
         if (promptType === "manual-contour" && drawingResult && typeof drawingResult === 'object') {
@@ -342,7 +315,7 @@ const PromptingCanvas = forwardRef(({
         }
       }
     }
-  }, [image, canvasToImageCoords, activeTool, prompts, handlePanStart, isPanning, handlePromptMouseDown, promptType, handleManualContourComplete]);
+  }, [image, isMaskFinished, isDraggingRef, setError, handlePanStart, isPanning, handlePromptMouseDown, promptType, handleManualContourComplete]);
 
   // Handle mouse move event
   const handleMouseMove = useCallback((e) => {
@@ -509,6 +482,29 @@ const PromptingCanvas = forwardRef(({
 
         {/* Manual contours are managed by the unified SegmentationResultsPanel in the left column */}
       </div>
+
+      {/* Finished Mask Overlay */}
+      {isMaskFinished && (
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm mx-4 text-center border border-amber-100">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-50 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
+              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Mask is Complete</h3>
+            <p className="text-gray-600 mb-4 text-sm">
+              This mask has been marked as finished. To continue annotation, please click the "Edit Mask" button in the Final Mask panel.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-md border border-amber-200">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-medium">Click "Edit Mask" to continue editing</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Complete segmentation button - Always show for non-manual contour tools */}
       {promptType !== "manual-contour" && (
