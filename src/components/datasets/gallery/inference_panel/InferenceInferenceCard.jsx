@@ -27,7 +27,6 @@ function ProgressBar({ current, total }) {
 
 
 export default function InferenceInferenceCard({ model, dataset }) {
-    const [inferenceResult, setInferenceResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [images, setImages] = useState([]);
     const [manualAnnotations, setManualAnnotations] = useState(false);
@@ -43,6 +42,7 @@ export default function InferenceInferenceCard({ model, dataset }) {
     useEffect(() => {
         console.log("Cancel Triggered");
         cancelInferenceRef.current = cancelInference;
+        setInferredImages(0);
     }, [cancelInference]);
 
     const handleInference = async () => {
@@ -62,11 +62,17 @@ export default function InferenceInferenceCard({ model, dataset }) {
                 const result = await segmentBatchOfImages(model.job_id, batch);
                 setInferredImages(prev => prev + batch.length);
             }
+            // wait for 5 seconds before resetting states
             await new Promise(resolve => setTimeout(resolve, 5000));
-            setIsInfering(false);
+            console.log("Inference completed successfully.");
         } catch (error) {
             console.error("Inference error:", error);
+        } finally {
+            // Reset states after inference
+            setIsLoading(false);
             setIsInfering(false);
+            setCancelInference(false);
+            setInferredImages(0);
         }
     };
 
