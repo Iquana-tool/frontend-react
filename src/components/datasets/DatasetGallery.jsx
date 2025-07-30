@@ -174,7 +174,12 @@ const DatasetGallery = () => {
                 <span>Back to Datasets</span>
               </button>
               <div className="h-6 w-px bg-teal-400"></div>
-              <h1 className="text-2xl font-bold">AquaMorph</h1>
+              <h1 
+                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+                onClick={() => navigate('/')}
+              >
+                AquaMorph
+              </h1>
               <div className="h-6 w-px bg-teal-400"></div>
               <span className="text-lg font-medium">{dataset.name}</span>
             </div>

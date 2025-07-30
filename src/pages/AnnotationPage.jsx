@@ -97,7 +97,12 @@ const AnnotationPage = () => {
               <span className="hidden sm:inline text-sm lg:text-base">Back to Gallery</span>
             </button>
             <div className="hidden sm:block h-6 w-px bg-teal-400"></div>
-            <h1 className="text-lg lg:text-2xl font-bold">AquaMorph</h1>
+            <h1 
+              className="text-lg lg:text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+              onClick={() => navigate('/')}
+            >
+              AquaMorph
+            </h1>
             {currentDataset && (
               <>
                 <div className="hidden sm:block h-6 w-px bg-teal-400"></div>
