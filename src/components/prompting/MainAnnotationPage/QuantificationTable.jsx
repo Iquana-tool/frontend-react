@@ -55,8 +55,8 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
               const response = await api.getQuantification(mask.id);
               
               // Check if the response has the expected structure
-              if (response && response.quantifications) {
-                const quantificationData = response.quantifications;
+              if (response && response.quantification) {
+                const quantificationData = response.quantification;
                 
                 // Process each contour's quantification data
                 quantificationData.forEach((quant, contourIdx) => {
