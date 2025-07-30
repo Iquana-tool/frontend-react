@@ -7,13 +7,13 @@ const API_BASE_URL =
 export const getQuantification = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/export/get_quantification/${maskId}`
+            `${API_BASE_URL}/export/get_quantification/${maskId}&flattened=false`,
         );
         const data = await handleApiError(response);
 
         // Check if the data has the expected structure
-        if (!data || !data.quantifications) {
-            return { quantifications: [] };
+        if (!data || !data.quantification) {
+            return { quantification: [] };
         }
 
         return data;
