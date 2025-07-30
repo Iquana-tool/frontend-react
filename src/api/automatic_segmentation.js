@@ -8,7 +8,7 @@ const API_BASE_URL =
 export const getBaseModels = async () => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/available_base_models`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_available_base_models`)
         );
     } catch (error) {
         throw error;
@@ -19,7 +19,7 @@ export const getBaseModels = async () => {
 export const getTrainedModels = async (dataset_id) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/trained_models_of_dataset/${dataset_id}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_trained_models_of_dataset/${dataset_id}`)
         );
     } catch (error) {
         throw error;
@@ -80,10 +80,10 @@ export const startTraining = async ({
 };
 
 /* Check the status of a training run */
-export const getTrainingStatus = async (jobID) => {
+export const getTrainingStatus = async (modelID) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/get_training_status/${jobID}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_training_status/${modelID}`)
         );
     } catch (error) {
         throw error;
@@ -91,10 +91,10 @@ export const getTrainingStatus = async (jobID) => {
 }
 
 /* Cancel a training run */
-export const cancelTraining = async (jobID) => {
+export const cancelTraining = async (modelID) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/cancel_job/${jobID}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/cancel_training_of_model/${modelID}`)
         );
     } catch (error) {
         throw error;
