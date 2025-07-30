@@ -86,26 +86,29 @@ export const segmentImage = async (
 
         const result = await handleApiError(response);
 
+        // Extract the actual data from the new response structure
+        const actualData = result.response || result;
+
         // Handle the new response format (masks with contours instead of base64_masks)
-        if (result.masks && Array.isArray(result.masks)) {
+        if (actualData.masks && Array.isArray(actualData.masks)) {
             // Convert the new response format to the old format for backward compatibility
             // This helps minimize changes in the rest of the application
-            result.base64_masks = [];
-            result.quality = [];
+            actualData.base64_masks = [];
+            actualData.quality = [];
 
-            result.masks.forEach((mask) => {
+            actualData.masks.forEach((mask) => {
                 if (mask.contours && mask.contours.length > 0) {
                     // We'll use a placeholder for base64_masks since we'll use the contours directly
-                    result.base64_masks.push("placeholder");
-                    result.quality.push(mask.predicted_iou);
+                    actualData.base64_masks.push("placeholder");
+                    actualData.quality.push(mask.predicted_iou);
                 }
             });
 
             // Add the original response format to allow proper rendering later
-            result.original_masks = result.masks;
+            actualData.original_masks = actualData.masks;
         }
 
-        return result;
+        return actualData;
     } catch (error) {
         throw error;
     }
