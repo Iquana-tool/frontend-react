@@ -159,7 +159,8 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
     
     const matchesFilter = filterStatus === "all" || 
                          (filterStatus === "annotated" && image.finished) ||
-                         (filterStatus === "missing" && !image.finished);
+                          (filterStatus === "generated" && image.generated && !image.finished) ||
+                         (filterStatus === "missing" && !image.finished && !image.generated);
     
     return matchesSearch && matchesFilter;
   });
@@ -184,21 +185,20 @@ const ImageGallery = ({ images, onImageClick, dataset }) => {
 
   const getStatusBadge = (image) => {
     if (image.finished) {
-      return image.generated ? (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-          Auto
-        </span>
-      ) : (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
           Manual
         </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
+    } else if (image.generated) {
+      return <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+          Auto
+        </span>
+    } else {
+      return (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
         Pending
       </span>
-    );
+      );
+    }
   };
 
   // effect to reset loadedImages when filter changes

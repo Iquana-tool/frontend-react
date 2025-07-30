@@ -445,7 +445,7 @@ export async function getFinalMask(imageId) {
                         // Try to fetch quantifications for the final mask
                         try {
                             const quantResponse = await fetch(
-                                `${API_BASE_URL}/export/get_quantification/${finalMask.id}`,
+                                `${API_BASE_URL}/export/get_quantification/${finalMask.id}&flattened=true`,
                                 {
                                     method: "GET",
                                     headers: {
