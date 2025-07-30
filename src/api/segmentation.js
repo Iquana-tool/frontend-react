@@ -86,6 +86,11 @@ export const segmentImage = async (
 
         const result = await handleApiError(response);
 
+        // Check if the response indicates failure (success: false)
+        if (result && result.success === false) {
+            throw new Error(result.message || "Segmentation failed");
+        }
+
         // Extract the actual data from the new response structure
         const actualData = result.response || result;
 
