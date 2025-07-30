@@ -444,8 +444,9 @@ export async function getFinalMask(imageId) {
                         
                         // Try to fetch quantifications for the final mask
                         try {
+                            // REFACTOR: This shoudnt be like this, import the quantification endpoint
                             const quantResponse = await fetch(
-                                `${API_BASE_URL}/export/get_quantification/${finalMask.id}&flattened=true`,
+                                `${API_BASE_URL}/contours/get_contours_of_mask/${finalMask.id}&flattened=true`,
                                 {
                                     method: "GET",
                                     headers: {
@@ -600,7 +601,7 @@ export async function addContourToFinalMask(imageId, contour) {
         };
 
         // Add parent_contour_id if provided
-        const requestUrl = new URL(`${API_BASE_URL}/masks/add_contour`);
+        const requestUrl = new URL(`${API_BASE_URL}/contours/add_contour`);
         requestUrl.searchParams.append("mask_id", maskId);
 
         // Add parent_contour_id if specified
@@ -711,7 +712,7 @@ export async function addContoursToFinalMask(imageId, contours) {
         const maskId = createResult.mask_id;
 
         // Now add the contours using the correct endpoint
-        const url = new URL(`${API_BASE_URL}/masks/add_contours`);
+        const url = new URL(`${API_BASE_URL}/contours/add_contours`);
         url.searchParams.append("mask_id", maskId);
 
         // Format contours for the backend

@@ -7,7 +7,7 @@ const API_BASE_URL =
 export const getContoursForMask = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`
+            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}`
         );
         return handleApiError(response);
     } catch (error) {
@@ -19,7 +19,7 @@ export const getContoursForMask = async (maskId) => {
 export const deleteContour = async (contourId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/masks/delete_contour/${contourId}`,
+            `${API_BASE_URL}/contours/delete_contour/${contourId}`,
             {
                 method: "DELETE",
             }
