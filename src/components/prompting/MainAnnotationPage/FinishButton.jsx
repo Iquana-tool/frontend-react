@@ -105,7 +105,7 @@ const FinishButton = ({
                             : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/25 hover:shadow-amber-500/40"
                         )
                 }
-                min-w-[120px] relative overflow-hidden
+                min-w-[50px] 2xl:min-w-[120px] relative overflow-hidden
                 before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
                 hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
             `}
@@ -114,17 +114,17 @@ const FinishButton = ({
             {isLoading ? (
                 <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="animate-pulse">Processing...</span>
+                    <span className="animate-pulse hidden 2xl:inline">Processing...</span>
                 </>
             ) : isFinished ? (
                 <>
                     <Pencil className="h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
-                    <span>Edit Mask</span>
+                    <span className="hidden 2xl:inline">Edit Mask</span>
                 </>
             ) : (
                 <>
                     <CheckCircle className="h-4 w-4 group-hover:scale-110 transition-transform duration-300" />
-                    <span>Finish Mask</span>
+                    <span className="hidden 2xl:inline">Finish Mask</span>
                 </>
             )}
 

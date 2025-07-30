@@ -99,7 +99,7 @@ const NextButton = () => {
                             ? "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 shadow-blue-500/25 hover:shadow-blue-500/40"
                             : "bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-indigo-500/25 hover:shadow-indigo-500/40"
                     }
-                    min-w-[100px] relative overflow-hidden
+                    min-w-[50px] 2xl:min-w-[100px] relative overflow-hidden
                     before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
                     hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
                 `}
@@ -107,16 +107,16 @@ const NextButton = () => {
                 {isLoading ? (
                     <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="animate-pulse">Loading...</span>
+                        <span className="animate-pulse hidden 2xl:inline">Loading...</span>
                     </>
                 ) : showCompletionMessage ? (
                     <>
                         <Home className="h-4 w-4" />
-                        <span>Back to Datasets</span>
+                        <span className="hidden 2xl:inline">Back to Datasets</span>
                     </>
                 ) : (
                     <>
-                        <span>Next</span>
+                        <span className="hidden 2xl:inline">Next</span>
                         <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
                     </>
                 )}

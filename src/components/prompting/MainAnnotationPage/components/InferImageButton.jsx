@@ -26,7 +26,7 @@ export default function InferImageButton({ image }) {
                             ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
                             : "bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-violet-500/25 hover:shadow-violet-500/40"
                     }
-                    min-w-[110px] relative overflow-hidden
+                    min-w-[50px] 2xl:min-w-[110px] relative overflow-hidden
                     before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
                     hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
                 `}
@@ -34,12 +34,12 @@ export default function InferImageButton({ image }) {
                 {isInfering ? (
                     <>
                         <Loader2 className="w-4 h-4 animate-spin"/>
-                        <span className="animate-pulse">Inferring...</span>
+                        <span className="animate-pulse hidden 2xl:inline">Inferring...</span>
                     </>
                 ) : (
                     <>
                         <Fullscreen className="w-4 h-4 group-hover:scale-110 transition-transform duration-300"/>
-                        <span>Infer</span>
+                        <span className="hidden 2xl:inline">Infer</span>
                     </>
                 )}
 

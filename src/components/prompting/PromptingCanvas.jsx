@@ -516,7 +516,7 @@ const PromptingCanvas = forwardRef(({
                 {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} added
               </span>
             ) : (
-              <span className="text-sm text-gray-500 italic">
+              <span className="text-sm text-gray-500 italic hidden 2xl:inline">
                 Draw prompts on the image to segment objects
               </span>
             )}
@@ -564,7 +564,7 @@ const PromptingCanvas = forwardRef(({
                       ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
                       : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 shadow-blue-500/25 hover:shadow-blue-500/40"
                   }
-                  min-w-[140px] relative overflow-hidden
+                  min-w-[50px] 2xl:min-w-[140px] relative overflow-hidden
                   before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
                   hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
                 `}
@@ -572,12 +572,12 @@ const PromptingCanvas = forwardRef(({
                 {isSegmenting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="animate-pulse">{isSequentialProcessing ? "Processing..." : "Segmenting..."}</span>
+                    <span className="animate-pulse hidden 2xl:inline">{isSequentialProcessing ? "Processing..." : "Segmenting..."}</span>
                   </>
                 ) : (
                   <>
                     <Play className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
-                    <span>Segment</span>
+                    <span className="hidden 2xl:inline">Segment</span>
                   </>
                 )}
 

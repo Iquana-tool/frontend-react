@@ -201,7 +201,7 @@ const MainViewers = ({
 
   return (
     <div className="flex flex-col">
-      <div className="flex h-[600px]">
+      <div className="flex h-[600px] w-full max-w-full min-w-0 overflow-x-hidden">
         {/* Left Panel - Segmentation Results (hidden when mask is finished) */}
         {!isMaskFinished && (
           <SegmentationResultsPanel
@@ -231,7 +231,7 @@ const MainViewers = ({
         )}
 
         {/* Center Panel - Annotation Drawing Area */}
-        <div className={`${showFinalMaskViewer ? 'flex-1 border-r border-slate-200' : 'flex-1'}`}>
+        <div className={`${showFinalMaskViewer ? 'flex-1 border-r border-slate-200 min-w-0' : 'flex-1'}`}>
           <AnnotationViewer
             imageObject={imageObject}
             loading={loading}
@@ -267,7 +267,7 @@ const MainViewers = ({
 
         {/* Right Panel - Final Mask (only when there are results) */}
         {showFinalMaskViewer && (
-          <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100">
+          <div className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 min-w-0">
             <FinalMaskViewer
               segmentationMasks={segmentationMasks}
               selectedMask={selectedMask}
