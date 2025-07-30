@@ -13,8 +13,8 @@ const DocumentationNavigation = ({ expandedSections, toggleSection, onTabClick, 
 
   return (
     <div className="bg-white border-b border-gray-200 sticky top-[64px] z-40">
-      <div className="max-w-[98%] mx-auto px-6">
-        <nav className="flex space-x-8 overflow-x-auto">
+      <div className="max-w-[98%] mx-auto px-4 sm:px-6">
+        <nav className="flex space-x-2 sm:space-x-8 overflow-x-auto scrollbar-hide">
           {sections.map((section) => (
             <button
               key={section.id}
@@ -22,7 +22,7 @@ const DocumentationNavigation = ({ expandedSections, toggleSection, onTabClick, 
                 toggleSection(section.id);
                 onTabClick(section.id);
               }}
-              className={`py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${
+              className={`py-3 sm:py-4 px-3 sm:px-2 border-b-2 font-medium text-sm whitespace-nowrap transition-colors min-w-fit ${
                 lastSelectedTab === section.id
                   ? "border-teal-500 text-teal-600"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
