@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton } from '@mui/material';
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton, Chip, Box } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import * as api from '../../../api';
 import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
 
@@ -10,6 +11,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
   const [error, setError] = useState(null);
   const [deletingContours, setDeletingContours] = useState(new Set());
   const [selectedContourId, setSelectedContourId] = useState(null);
+  const [selectedFilters, setSelectedFilters] = useState(new Set()); // Track selected label filters
 
   useEffect(() => {
     let isMounted = true;
@@ -262,35 +264,124 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
     return acc;
   }, []);
 
+  // Filter rows based on selected labels
+  const filteredRows = quantRows.filter(row => {
+    if (selectedFilters.size === 0) {
+      return true; // Show all rows when no filters are selected
+    }
+    return selectedFilters.has(row.label_name);
+  });
+
+  // Handle filter toggle
+  const handleFilterToggle = (labelName) => {
+    setSelectedFilters(prev => {
+      const newFilters = new Set(prev);
+      if (newFilters.has(labelName)) {
+        newFilters.delete(labelName);
+      } else {
+        newFilters.add(labelName);
+      }
+      return newFilters;
+    });
+  };
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSelectedFilters(new Set());
+  };
+
+  // Select all filters
+  const selectAllFilters = () => {
+    const allLabels = uniqueLabelsWithIds.map(label => label.name);
+    setSelectedFilters(new Set(allLabels));
+  };
+
   return (
     <div>
-      {/* Color Legend */}
+      {/* Color Legend with Filter Controls */}
       {uniqueLabelsWithIds.length > 1 && (
-        <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: '#666', marginRight: 8 }}>Labels:</span>
-          {uniqueLabelsWithIds.map((labelInfo) => {
-            const colors = getTableRowColors(labelInfo.name, labelInfo.id);
-            const primaryColor = labelInfo.id ? getLabelColor(labelInfo.id) : getLabelColorByName(labelInfo.name);
-            return (
-              <div
-                key={labelInfo.name}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  backgroundColor: colors.backgroundColor,
-                  color: colors.color,
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  border: `1px solid ${primaryColor}40`
-                }}
-              >
-                {labelInfo.name}
-              </div>
-            );
-          })}
-        </div>
+        <Box sx={{ marginBottom: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            whiteSpace: 'nowrap',
+            paddingBottom: 1,
+            '&::-webkit-scrollbar': {
+              height: 4
+            },
+            '&::-webkit-scrollbar-track': {
+              backgroundColor: '#f1f1f1',
+              borderRadius: 2
+            },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: '#c1c1c1',
+              borderRadius: 2,
+              '&:hover': {
+                backgroundColor: '#a8a8a8'
+              }
+            }
+          }}>
+            <FilterListIcon sx={{ fontSize: 16, color: '#666', flexShrink: 0 }} />
+            <span style={{ fontSize: '12px', color: '#666', flexShrink: 0 }}>Filter by Labels:</span>
+            {uniqueLabelsWithIds.map((labelInfo) => {
+              const colors = getTableRowColors(labelInfo.name, labelInfo.id);
+              const primaryColor = labelInfo.id ? getLabelColor(labelInfo.id) : getLabelColorByName(labelInfo.name);
+              const isSelected = selectedFilters.size === 0 || selectedFilters.has(labelInfo.name);
+              const rowCount = quantRows.filter(row => row.label_name === labelInfo.name).length;
+              const filteredCount = filteredRows.filter(row => row.label_name === labelInfo.name).length;
+              
+              return (
+                <Chip
+                  key={labelInfo.name}
+                  label={`${labelInfo.name} (${filteredCount}/${rowCount})`}
+                  onClick={() => handleFilterToggle(labelInfo.name)}
+                  sx={{
+                    backgroundColor: isSelected ? colors.backgroundColor : '#f5f5f5',
+                    color: isSelected ? colors.color : '#666',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    border: `1px solid ${primaryColor}40`,
+                    cursor: 'pointer',
+                    opacity: isSelected ? 1 : 0.6,
+                    flexShrink: 0,
+                    '&:hover': {
+                      backgroundColor: isSelected ? colors.backgroundColor : '#e0e0e0',
+                      opacity: 1
+                    },
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                />
+              );
+            })}
+            {selectedFilters.size > 0 && (
+              <Chip 
+                label={`${filteredRows.length} of ${quantRows.length} items`}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: '10px', height: 20, flexShrink: 0 }}
+              />
+            )}
+            <Box sx={{ marginLeft: 'auto', display: 'flex', gap: 1, flexShrink: 0 }}>
+              <Chip 
+                label="All"
+                size="small"
+                variant="outlined"
+                onClick={selectAllFilters}
+                sx={{ fontSize: '10px', height: 20, cursor: 'pointer' }}
+              />
+              <Chip 
+                label="Clear"
+                size="small"
+                variant="outlined"
+                onClick={clearAllFilters}
+                sx={{ fontSize: '10px', height: 20, cursor: 'pointer' }}
+              />
+            </Box>
+          </Box>
+        </Box>
       )}
 
       <TableContainer 
@@ -311,7 +402,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
             </TableRow>
           </TableHead>
         <TableBody>
-          {quantRows.map((row, idx) => {
+          {filteredRows.map((row, idx) => {
             const labelColors = getTableRowColors(row.label_name, row.label);
             const isDeleting = deletingContours.has(row.contour_id);
             
