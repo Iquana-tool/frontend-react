@@ -1,17 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton, Chip, Box } from '@mui/material';
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, CircularProgress, IconButton, Chip, Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, List, ListItem, ListItemButton, ListItemText, ListItemIcon, Snackbar, Alert } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import * as api from '../../../api';
 import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
+import { useDataset } from '../../../contexts/DatasetContext';
 
-const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
+const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelUpdate }) => {
   const [quantRows, setQuantRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deletingContours, setDeletingContours] = useState(new Set());
   const [selectedContourId, setSelectedContourId] = useState(null);
   const [selectedFilters, setSelectedFilters] = useState(new Set()); // Track selected label filters
+  
+  // Label editing state
+  const [editingContourId, setEditingContourId] = useState(null);
+  const [showLabelDialog, setShowLabelDialog] = useState(false);
+  const [availableLabels, setAvailableLabels] = useState([]);
+  const [editingLabel, setEditingLabel] = useState(false);
+  
+  // Notification state
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: '',
+    severity: 'success' // 'success', 'error', 'warning', 'info'
+  });
+  
+  const { currentDataset } = useDataset();
+
+  // Helper function to show notifications
+  const showNotification = (message, severity = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  // Handle snackbar close
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -100,6 +134,26 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
     return () => { isMounted = false; };
   }, [masks]);
 
+  // Fetch available labels when component mounts or dataset changes
+  useEffect(() => {
+    const fetchLabels = async () => {
+      if (!currentDataset) {
+        setAvailableLabels([]);
+        return;
+      }
+
+      try {
+        const labels = await api.fetchLabels(currentDataset.id);
+        setAvailableLabels(labels || []);
+      } catch (err) {
+        console.error("Error fetching labels:", err);
+        setAvailableLabels([]);
+      }
+    };
+    
+    fetchLabels();
+  }, [currentDataset]);
+
   // Handle delete contour
   const handleDeleteContour = async (contourId, event) => {
     // Stop event propagation to prevent row click
@@ -176,11 +230,11 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
           }
         }
         
-        alert('This contour was already deleted. The table has been updated.');
+        showNotification('This contour was already deleted. The table has been updated.', 'info');
       } else {
         // Provide more specific error message
         const errorMessage = error.message || 'Unknown error occurred';
-        alert(`Failed to delete contour: ${errorMessage}`);
+        showNotification(`Failed to delete contour: ${errorMessage}`, 'error');
       }
       
     } finally {
@@ -190,6 +244,96 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
         return newSet;
       });
     }
+  };
+
+  // Handle edit contour label
+  const handleEditLabel = (contourId, event) => {
+    // Stop event propagation to prevent row click
+    event.stopPropagation();
+    
+    if (!contourId) {
+      console.error("No contour ID provided for label editing");
+      showNotification('Error: No contour ID provided', 'error');
+      return;
+    }
+    
+    setEditingContourId(contourId);
+    setShowLabelDialog(true);
+  };
+
+  // Get the current label of the contour being edited
+  const getCurrentContourLabel = () => {
+    if (!editingContourId) return null;
+    const currentRow = quantRows.find(row => row.contour_id === editingContourId);
+    return currentRow ? currentRow.label : null;
+  };
+
+  // Get filtered available labels (excluding the current label)
+  const getFilteredAvailableLabels = () => {
+    const currentLabel = getCurrentContourLabel();
+    if (currentLabel === null) return availableLabels;
+    
+    return availableLabels.filter(label => label.id !== currentLabel);
+  };
+
+  // Handle label selection and update
+  const handleLabelSelect = async (newLabelId) => {
+    if (!editingContourId || newLabelId === undefined) {
+      return;
+    }
+    
+    setEditingLabel(true);
+    
+    try {
+      const response = await api.editContourLabel(editingContourId, newLabelId);
+      
+      if (response && response.success !== false) {
+        // Update the local state to reflect the change
+        const updatedRow = {
+          ...quantRows.find(row => row.contour_id === editingContourId),
+          label: newLabelId,
+          label_name: availableLabels.find(label => label.id === newLabelId)?.name || `Label ${newLabelId}`
+        };
+        
+        setQuantRows(prevRows => 
+          prevRows.map(row => 
+            row.contour_id === editingContourId ? updatedRow : row
+          )
+        );
+        
+        // Call parent callback if provided
+        if (onLabelUpdate) {
+          try {
+            await onLabelUpdate(editingContourId, newLabelId, updatedRow);
+          } catch (callbackError) {
+            console.warn("Parent callback failed:", callbackError);
+            // Don't throw here since the label update was successful
+          }
+        }
+        
+        // Show success message
+        showNotification('Label updated successfully!', 'success');
+      } else {
+        throw new Error(response?.message || 'Failed to update label');
+      }
+    } catch (error) {
+      console.error('Error updating contour label:', error);
+      showNotification(`Failed to update label: ${error.message}`, 'error');
+    } finally {
+      setEditingLabel(false);
+      setShowLabelDialog(false);
+      setEditingContourId(null);
+    }
+  };
+
+  // Get label name from id
+  const getLabelName = (labelId) => {
+    if (!labelId) return 'Unlabeled';
+    
+    const label = availableLabels.find(label => label.id === labelId);
+    if (!label) return `Unknown (${labelId})`;
+    
+    return label.name;
   };
 
   // Format numeric values for display
@@ -453,24 +597,40 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
                   </TableCell>
                 ))}
                 <TableCell align="center">
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={(event) => handleDeleteContour(row.contour_id, event)}
-                    disabled={isDeleting}
-                    title="Delete contour"
-                    sx={{ 
-                      color: '#dc2626',
-                      '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
-                      '&:disabled': { color: '#9ca3af' }
-                    }}
-                  >
-                    {isDeleting ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <DeleteIcon fontSize="small" />
-                    )}
-                  </IconButton>
+                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                    <IconButton
+                      size="small"
+                      color="primary"
+                      onClick={(event) => handleEditLabel(row.contour_id, event)}
+                      disabled={isDeleting || editingLabel}
+                      title="Edit label"
+                      sx={{ 
+                        color: '#3b82f6',
+                        '&:hover': { backgroundColor: 'rgba(59, 130, 246, 0.1)' },
+                        '&:disabled': { color: '#9ca3af' }
+                      }}
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={(event) => handleDeleteContour(row.contour_id, event)}
+                      disabled={isDeleting || editingLabel}
+                      title="Delete contour"
+                      sx={{ 
+                        color: '#dc2626',
+                        '&:hover': { backgroundColor: 'rgba(220, 38, 38, 0.1)' },
+                        '&:disabled': { color: '#9ca3af' }
+                      }}
+                    >
+                      {isDeleting ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <DeleteIcon fontSize="small" />
+                      )}
+                    </IconButton>
+                  </Box>
                 </TableCell>
               </TableRow>
             );
@@ -478,6 +638,101 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete }) => {
         </TableBody>
       </Table>
     </TableContainer>
+
+    {/* Label Selection Dialog */}
+    <Dialog 
+      open={showLabelDialog} 
+      onClose={() => setShowLabelDialog(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle>
+        Select New Label for Contour
+        {getCurrentContourLabel() && (
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1, fontWeight: 'normal' }}>
+            Current label: {getLabelName(getCurrentContourLabel())}
+          </Typography>
+        )}
+      </DialogTitle>
+      <DialogContent>
+        {availableLabels.length === 0 ? (
+          <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
+            No labels available. Please create labels in the dataset settings first.
+          </Typography>
+        ) : getFilteredAvailableLabels().length === 0 ? (
+          <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
+            No other labels available to change to. The current label is the only option.
+          </Typography>
+        ) : (
+          <List sx={{ pt: 0 }}>
+            {getFilteredAvailableLabels().map((label) => (
+              <ListItem key={label.id} disablePadding>
+                <ListItemButton 
+                  onClick={() => handleLabelSelect(label.id)}
+                  disabled={editingLabel}
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'rgba(59, 130, 246, 0.1)'
+                    }
+                  }}
+                >
+                  <ListItemIcon>
+                    <Box
+                      sx={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: '50%',
+                        backgroundColor: getLabelColor(label.id),
+                        border: '2px solid #fff',
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
+                      }}
+                    />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={label.name}
+                    secondary={label.parent_id ? `Subclass of ${availableLabels.find(l => l.id === label.parent_id)?.name || 'Unknown'}` : 'Main class'}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button 
+          onClick={() => setShowLabelDialog(false)}
+          disabled={editingLabel}
+        >
+          Cancel
+        </Button>
+        {editingLabel && (
+          <CircularProgress size={20} sx={{ mr: 1 }} />
+        )}
+      </DialogActions>
+    </Dialog>
+
+    {/* Notification Snackbar */}
+    <Snackbar
+      open={snackbar.open}
+      autoHideDuration={3000}
+      onClose={handleSnackbarClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      <Alert 
+        onClose={handleSnackbarClose} 
+        severity={snackbar.severity}
+        variant="filled"
+        sx={{ 
+          width: '100%',
+          '& .MuiAlert-message': {
+            fontSize: '14px',
+            fontWeight: 500
+          }
+        }}
+      >
+        {snackbar.message}
+      </Alert>
+    </Snackbar>
     </div>
   );
 };
