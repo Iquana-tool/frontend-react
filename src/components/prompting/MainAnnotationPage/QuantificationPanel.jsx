@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography } from "@mui/material";
 import QuantificationTable from './QuantificationTable';
 
+//REFACTOR: This isnt used anywhere, can be deleted
 const QuantificationPanel = ({ segmentationMasks }) => {
   return (
     <div style={{ marginTop: 24 }}>
