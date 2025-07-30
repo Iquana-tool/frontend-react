@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Trash2, Play, Loader2, Brain } from "lucide-react";
+import { Trash2, Play, Loader2} from "lucide-react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
 import { useInstantSegmentation } from './hooks/useInstantSegmentation';
