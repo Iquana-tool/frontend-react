@@ -817,3 +817,45 @@ export const deleteMask = async (maskId) => {
         throw error;
     }
 };
+
+// Edit contour label
+export const editContourLabel = async (contourId, newLabelId) => {
+    try {
+        // Validate parameters
+        if (!contourId || typeof contourId !== "number") {
+            throw new Error("Invalid contour ID provided");
+        }
+        
+        if (newLabelId === undefined || newLabelId === null) {
+            throw new Error("New label ID is required");
+        }
+
+        // Send request to edit the contour label
+        const url = `${API_BASE_URL}/contours/edit_contour_label/${contourId}&new_label_id=${newLabelId}`;
+        
+        console.log("Edit contour label request:", {
+            url: url,
+            contourId,
+            newLabelId,
+            method: "POST"
+        });
+        
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        });
+        
+        console.log("Edit contour label response:", {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok
+        });
+        
+        return handleApiError(response);
+    } catch (error) {
+        console.error("Edit contour label error:", error);
+        throw error;
+    }
+};
