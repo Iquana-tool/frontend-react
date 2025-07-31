@@ -88,40 +88,45 @@ const AnnotationPage = () => {
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
         <div className="max-w-[98%] mx-auto px-2 py-2.5 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 lg:space-x-4">
             <button
               onClick={() => navigate(`/dataset/${datasetId}/gallery`)}
-              className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
+              className="flex items-center space-x-1 lg:space-x-2 hover:text-teal-200 transition-colors"
             >
-              <ArrowLeft size={20} />
-              <span>Back to Gallery</span>
+              <ArrowLeft size={18} className="lg:w-5 lg:h-5" />
+              <span className="hidden sm:inline text-sm lg:text-base">Back to Gallery</span>
             </button>
-            <div className="h-6 w-px bg-teal-400"></div>
-            <h1 className="text-2xl font-bold">AquaMorph</h1>
+            <div className="hidden sm:block h-6 w-px bg-teal-400"></div>
+            <h1 
+              className="text-lg lg:text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+              onClick={() => navigate('/')}
+            >
+              AquaMorph
+            </h1>
             {currentDataset && (
               <>
-                <div className="h-6 w-px bg-teal-400"></div>
-                <span className="text-lg font-medium">{currentDataset.name}</span>
+                <div className="hidden sm:block h-6 w-px bg-teal-400"></div>
+                <span className="text-sm lg:text-lg font-medium truncate max-w-[120px] lg:max-w-none">{currentDataset.name}</span>
               </>
             )}
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 lg:space-x-4">
             <button
               onClick={() => navigate("/docs")}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              className="flex items-center space-x-1 lg:space-x-2 bg-white/10 hover:bg-white/20 text-white py-1.5 lg:py-2 px-2 lg:px-4 rounded-lg transition-colors"
             >
               <BookOpen className="w-4 h-4" />
-              <span>Documentation</span>
+              <span className="hidden md:inline text-sm lg:text-base">Documentation</span>
             </button>
             <a 
               href="https://github.com/yapat-app/AquaMorph/issues" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              className="flex items-center gap-1 lg:gap-1.5 bg-white/10 hover:bg-white/20 text-white py-1.5 lg:py-2 px-2 lg:px-4 rounded-lg transition-colors"
             >
               <BugIcon size={16} />
-              <span>Report Bug</span>
+              <span className="hidden md:inline text-sm lg:text-base">Report Bug</span>
             </a>
           </div>
         </div>

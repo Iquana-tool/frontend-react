@@ -6,11 +6,11 @@ import {
   Edit3, 
   BarChart3, 
   Download, 
-  HelpCircle 
+  HelpCircle,
+  ArrowLeft,
 } from "lucide-react";
 
 import {
-  DocumentationHeader,
   DocumentationNavigation,
   SectionHeader,
   GettingStartedSection,
@@ -126,43 +126,75 @@ const DocumentationPage = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Application Navbar */}
       <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
-        <div className="max-w-[98%] mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+        <div className="max-w-[98%] mx-auto px-4 py-3">
+          {/* Mobile Layout */}
+          <div className="flex items-center justify-between lg:hidden">
             <button
               onClick={() => navigate("/datasets")}
               className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
             >
-              <BookOpen className="w-5 h-5" />
-              <span>Back to Datasets</span>
+              <ArrowLeft className="w-5 h-5" />
+              <span className="text-sm">Back</span>
             </button>
-            <div className="h-6 w-px bg-teal-400"></div>
-            <h1 className="text-2xl font-bold">AquaMorph</h1>
-            <div className="h-6 w-px bg-teal-400"></div>
-            <span className="text-lg font-medium">Documentation</span>
-          </div>
-          
-          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate("/")}
+              className="text-lg font-bold hover:text-teal-200 transition-colors cursor-pointer"
+            >
+              AquaMorph
+            </button>
             <button
               onClick={() => navigate("/datasets")}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-lg transition-colors text-sm"
             >
               <FileText className="w-4 h-4" />
-              <span>Datasets</span>
+              <span className="hidden sm:inline">Datasets</span>
             </button>
+          </div>
+
+          {/* Desktop Layout */}
+          <div className="hidden lg:flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate("/datasets")}
+                className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>Back to Datasets</span>
+              </button>
+              <div className="h-6 w-px bg-teal-400"></div>
+              <button
+                onClick={() => navigate("/")}
+                className="text-2xl font-bold hover:text-teal-200 transition-colors cursor-pointer"
+              >
+                AquaMorph
+              </button>
+              <div className="h-6 w-px bg-teal-400"></div>
+              <span className="text-lg font-medium">Documentation</span>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate("/datasets")}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Datasets</span>
+              </button>
+            </div>
           </div>
         </div>
       </nav>
 
       {/* Documentation Content */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[98%] mx-auto px-6 py-8">
+        <div className="max-w-[98%] mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <BookOpen className="w-8 h-8 text-teal-600" />
-              <h1 className="text-3xl font-bold text-gray-900">User Manual</h1>
+              <BookOpen className="w-6 h-6 sm:w-8 sm:h-8 text-teal-600" />
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Manual</h1>
             </div>
           </div>
-          <p className="text-gray-600 text-lg max-w-4xl">
+          <p className="text-gray-600 text-base sm:text-lg max-w-4xl">
           A complete guide to use the AquaMorph application for efficient dataset management, AI-driven image segmentation, and quantification analysis.
           </p>
         </div>
@@ -175,7 +207,7 @@ const DocumentationPage = () => {
         lastSelectedTab={lastSelectedTab}
       />
 
-      <div className="max-w-[98%] mx-auto px-6 py-8 scroll-mt-20">
+      <div className="max-w-[98%] mx-auto px-4 sm:px-6 py-6 sm:py-8 scroll-mt-20">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {sections.map(({ id, title, icon: Icon, component: Component }) => (
             <SectionHeader

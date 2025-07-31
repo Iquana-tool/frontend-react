@@ -6,28 +6,59 @@ async function handleInferImage(image) {
     //TODO: Implement the actual inference logic here. See InferenceInferenceCard.jsx for an example.
 }
 
-
 export default function InferImageButton({ image }) {
     const [isInfering, setIsInfering] = useState(false);
-    return (
-        <button
+    const [showTooltip, setShowTooltip] = useState(false);
 
-            disabled={isInfering}
-            className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-colors font-medium ${
-                isInfering ? "bg-gray-400 text-white cursor-not-allowed" : "bg-violet-600 text-white hover:bg-violet-700"
-            }`}
-        >
-            {isInfering ? (
-                <>
-                    <Loader2 className="w-8 h-8 animate-spin"/>
-                    <span>Inferring ...</span>
-                </>
-            ) : (
-                <>
-                    <Fullscreen className="w-6 h-6"/>
-                    <span>Infer Image</span>
-                </>
+    return (
+        <div className="relative inline-block">
+            <button
+                onClick={() => handleInferImage(image)}
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                disabled={isInfering}
+                className={`
+                    group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
+                    transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
+                    shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
+                    ${
+                        isInfering
+                            ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
+                            : "bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-violet-500/25 hover:shadow-violet-500/40"
+                    }
+                    min-w-[50px] 2xl:min-w-[110px] relative overflow-hidden
+                    before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
+                    hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
+                `}
+            >
+                {isInfering ? (
+                    <>
+                        <Loader2 className="w-4 h-4 animate-spin"/>
+                        <span className="animate-pulse hidden 2xl:inline">Inferring...</span>
+                    </>
+                ) : (
+                    <>
+                        <Fullscreen className="w-4 h-4 group-hover:scale-110 transition-transform duration-300"/>
+                        <span className="hidden 2xl:inline">Infer</span>
+                    </>
+                )}
+
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
+                             opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%]
+                             transition-all duration-700 ease-out"></div>
+            </button>
+
+            {/* Hover tooltip */}
+            {showTooltip && !isInfering && (
+                <div className="absolute bottom-[60px] left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
+                    <span className="text-xs">
+                        Run automatic inference on this image
+                    </span>
+                    {/* Arrow pointing down */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-gray-800"></div>
+                </div>
             )}
-        </button>
+        </div>
     );
 }

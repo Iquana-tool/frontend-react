@@ -189,7 +189,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
         <div className="max-w-[98%] mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold">AquaMorph</h1>
+              <h1 
+                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+                onClick={() => navigate('/')}
+              >
+                AquaMorph
+              </h1>
             </div>
             <div className="flex items-center space-x-4">
               <button

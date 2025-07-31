@@ -22,7 +22,13 @@ const Navbar = () => {
             <div className="w-8 h-8 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
               <Database className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">
+            <span 
+              className="text-xl font-bold text-gray-900 cursor-pointer hover:text-teal-600 transition-colors duration-200"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate('/');
+              }}
+            >
               Aqua<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Morph</span>
             </span>
           </div>

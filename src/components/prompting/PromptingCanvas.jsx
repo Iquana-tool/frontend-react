@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
-import { Trash2, Play, Loader2, Brain } from "lucide-react";
+import { Trash2, Play, Loader2} from "lucide-react";
 import { usePanZoom } from './hooks/usePanZoom';
 import { usePromptDrawing } from './hooks/usePromptDrawing';
 import { useInstantSegmentation } from './hooks/useInstantSegmentation';
@@ -41,6 +41,7 @@ const PromptingCanvas = forwardRef(({
   const [forceRender, setForceRender] = useState(0);
   const [isSequentialProcessing, setIsSequentialProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState("");
+  const [showSegmentTooltip, setShowSegmentTooltip] = useState(false);
 
   // Initialize pan/zoom hook
   const panZoom = usePanZoom(image, canvasSize, initialScale);
@@ -485,7 +486,7 @@ const PromptingCanvas = forwardRef(({
 
       {/* Finished Mask Overlay */}
       {isMaskFinished && (
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm mx-4 text-center border border-amber-100">
             <div className="w-12 h-12 bg-gradient-to-br from-amber-50 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
               <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -515,7 +516,7 @@ const PromptingCanvas = forwardRef(({
                 {prompts.length} prompt{prompts.length !== 1 ? 's' : ''} added
               </span>
             ) : (
-              <span className="text-sm text-gray-500 italic">
+              <span className="text-sm text-gray-500 italic hidden 2xl:inline">
                 Draw prompts on the image to segment objects
               </span>
             )}
@@ -530,41 +531,73 @@ const PromptingCanvas = forwardRef(({
 
 
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={clearPrompts}
               disabled={prompts.length === 0 || isSegmenting}
-              className={`flex items-center gap-1 px-3 py-1 text-sm transition-colors ${
-                prompts.length === 0 || isSegmenting
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
+              className={`
+                flex items-center gap-2 px-3 py-2 rounded-lg transition-colors border
+                ${
+                  prompts.length === 0 || isSegmenting
+                    ? 'text-gray-400 cursor-not-allowed border-gray-200 bg-gray-50'
+                    : 'text-gray-600 hover:text-gray-800 border-gray-300 bg-white hover:bg-gray-50'
+                }
+                font-medium text-sm
+              `}
             >
               <Trash2 className="w-4 h-4" />
               Clear
             </button>
             <InferImageButton image={image}/>
-            <button
-              onClick={handleComplete}
-              disabled={!currentLabel || isSegmenting || prompts.length === 0}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                !currentLabel || isSegmenting || prompts.length === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              {isSegmenting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  {isSequentialProcessing ? "Processing..." : "Segmenting..."}
-                </>
-              ) : (
-                <>
-                  <Play className="w-4 h-4" />
-                  Segment Object
-                </>
+            <div className="relative inline-block">
+              <button
+                onClick={handleComplete}
+                onMouseEnter={() => setShowSegmentTooltip(true)}
+                onMouseLeave={() => setShowSegmentTooltip(false)}
+                disabled={!currentLabel || isSegmenting || prompts.length === 0}
+                className={`
+                  group flex items-center gap-2 justify-center px-4 py-2 rounded-xl text-white font-semibold
+                  transition-all duration-300 ease-in-out transform hover:scale-[1.02] active:scale-[0.98]
+                  shadow-lg hover:shadow-xl backdrop-blur-sm border border-white/20
+                  ${
+                    !currentLabel || isSegmenting || prompts.length === 0
+                      ? "bg-gradient-to-r from-gray-400 to-gray-500 cursor-not-allowed shadow-none scale-100"
+                      : "bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 shadow-blue-500/25 hover:shadow-blue-500/40"
+                  }
+                  min-w-[50px] 2xl:min-w-[140px] relative overflow-hidden
+                  before:absolute before:inset-0 before:bg-white/10 before:translate-x-[-100%] 
+                  hover:before:translate-x-[100%] before:transition-transform before:duration-700 before:ease-out
+                `}
+              >
+                {isSegmenting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="animate-pulse hidden 2xl:inline">{isSequentialProcessing ? "Processing..." : "Segmenting..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
+                    <span className="hidden 2xl:inline">Segment</span>
+                  </>
+                )}
+
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent
+                             opacity-0 group-hover:opacity-100 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%]
+                             transition-all duration-700 ease-out"></div>
+              </button>
+
+              {/* Hover tooltip */}
+              {showSegmentTooltip && !isSegmenting && (
+                <div className="absolute bottom-[60px] right-0 bg-gray-800 text-white px-3 py-2 rounded-lg shadow-lg z-50 whitespace-nowrap">
+                  <span className="text-xs">
+                    Process prompts with AI to segment objects
+                  </span>
+                  {/* Arrow pointing down */}
+                  <div className="absolute top-full right-6 w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-gray-800"></div>
+                </div>
               )}
-            </button>
+            </div>
           </div>
         </div>
       )}
