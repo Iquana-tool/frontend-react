@@ -44,7 +44,7 @@ export default function InferenceModelSelect({
         }
         console.log("Selected Model Changed:", selectedModel);
         console.log("Selected Model ID:", selectedModelValue);
-    }, [selectedModel]);
+    }, [selectedModel, selectedModelValue]);
 
     // Fetch models when dataset changes
     useEffect(() => {
@@ -73,7 +73,7 @@ export default function InferenceModelSelect({
                   }
               }
             })
-      }, [dataset, selectedModel]);
+      }, [dataset, selectedModel, setSelectedModel]);
 
     return (
         <select
