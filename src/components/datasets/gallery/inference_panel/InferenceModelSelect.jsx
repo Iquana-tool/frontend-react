@@ -35,7 +35,7 @@ export default function InferenceModelSelect({
                                     }) {
     const [baseModels, setBaseModels] = useState([]);
     const [trainedModels, setTrainedModels] = useState([]);
-    const selectedModelValue = selectedModel ? selectedModel.model_identifier + (selectedModel.job_id ? "#trained#" + selectedModel.job_id : "#base") : "";
+    const selectedModelValue = selectedModel ? selectedModel.model_identifier + (selectedModel.job_id !== undefined ? "#trained#" + selectedModel.job_id : "#base") : "";
 
     useEffect(() => {
         if (!selectedModel) {
@@ -61,7 +61,6 @@ export default function InferenceModelSelect({
               setTrainedModels(trained);
               if (selectedModel){
                   console.log("Selected model exists:", selectedModel);
-
               } else {
                   // If no selectedModel, set default selection
                   // Set default selection preference: first trained model, else first base model
