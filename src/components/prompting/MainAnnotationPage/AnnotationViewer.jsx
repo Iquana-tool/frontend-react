@@ -27,6 +27,8 @@ const AnnotationViewer = ({
     setHighlightLabelWarning,
     showOverlay = true, // Control whether to show the overlay (now false by default for new layout)
     isMaskFinished = false,
+    image_id,
+    dataset_id
 }) => {
     const [activeTool, setActiveTool] = useState("point");
     const [manualContourCount, setManualContourCount] = useState(0);
@@ -143,6 +145,8 @@ const AnnotationViewer = ({
                     setError={setError}
                     setHighlightLabelWarning={setHighlightLabelWarning}
                     isMaskFinished={isMaskFinished}
+                    image_id={image_id}
+                    dataset_id={dataset_id}
                 />
             </div>
 

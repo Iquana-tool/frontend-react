@@ -57,6 +57,8 @@ const MainViewers = ({
   setHighlightLabelWarning,
   isMaskFinished,
   setIsMaskFinished,
+  image_id,
+  dataset_id
 }) => {
   // State for manual contour selection
   const [selectedManualContourIds, setSelectedManualContourIds] = React.useState([]);
@@ -262,6 +264,8 @@ const MainViewers = ({
             // Remove segmentation overlay since it's now in the left panel
             showOverlay={false}
             isMaskFinished={isMaskFinished}
+            image_id={image_id}
+            dataset_id={dataset_id}
           />
         </div>
 

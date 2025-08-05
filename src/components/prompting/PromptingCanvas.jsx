@@ -28,6 +28,8 @@ const PromptingCanvas = forwardRef(({
   setError,
   setHighlightLabelWarning,
   isMaskFinished = false,
+  image_id,
+  dataset_id
 }, ref) => {
   // Container and canvas refs
   const containerRef = useRef(null);
@@ -408,7 +410,7 @@ const PromptingCanvas = forwardRef(({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex relative flex-col h-full">
       <div 
         ref={containerRef}
         className="relative flex-1 overflow-hidden p-2"
@@ -486,7 +488,7 @@ const PromptingCanvas = forwardRef(({
 
       {/* Finished Mask Overlay */}
       {isMaskFinished && (
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
+        <div className="relative inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
           <div className="bg-white rounded-lg p-6 shadow-lg max-w-sm mx-4 text-center border border-amber-100">
             <div className="w-12 h-12 bg-gradient-to-br from-amber-50 to-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-200">
               <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -531,7 +533,7 @@ const PromptingCanvas = forwardRef(({
 
 
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex relative items-center gap-3">
             <button
               onClick={clearPrompts}
               disabled={prompts.length === 0 || isSegmenting}
@@ -548,7 +550,10 @@ const PromptingCanvas = forwardRef(({
               <Trash2 className="w-4 h-4" />
               Clear
             </button>
-            <InferImageButton image={image}/>
+            <InferImageButton
+              selectedImageId={image_id}
+              dataset_id={dataset_id}
+            />
             <div className="relative inline-block">
               <button
                 onClick={handleComplete}

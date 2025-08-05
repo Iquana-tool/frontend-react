@@ -360,6 +360,8 @@ const AnnotationPage = ({ initialImageId = null }) => {
             setHighlightLabelWarning={setHighlightLabelWarning}
             isMaskFinished={annotationState.isMaskFinished}
             setIsMaskFinished={annotationState.setIsMaskFinished}
+            image_id={imageManagement.selectedImageId}
+            dataset_id={currentDataset.id}
           />
 
           {/* Help Section */}
