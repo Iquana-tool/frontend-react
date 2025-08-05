@@ -226,7 +226,7 @@ const DatasetGallery = () => {
           </div>
 
           {/* Right Sidebar - Inference Panel */}
-          <div className="w-100 bg-white border-l border-gray-200 flex-shrink-0">
+          <div className="w-1/5 bg-white border-l border-gray-200 flex-shrink-0">
             <InferencePanel dataset={dataset} />
           </div>
         </div>
