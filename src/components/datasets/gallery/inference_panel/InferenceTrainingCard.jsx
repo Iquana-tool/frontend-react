@@ -42,6 +42,7 @@ export default function InferenceTrainingCard({
     const [trainError, setTrainError] = useState(null);
     const isTraining = model && model.training_status === "in progress";
     const isStarting = model && model.training_status === "starting";
+    const isFailed = model && model.training_status === "failed";
     const isTrained = model && model.job_id;
 
     // The unique job identifier is just the model_identifier!
@@ -279,8 +280,8 @@ export default function InferenceTrainingCard({
                         </div>
                     </div>
             }
-                {trainError && (
-                    <div className="text-red-700 text-sm">{trainError}</div>
+                {isFailed && (
+                    <div className="text-red-700 text-sm">Model Training Failed. Speak to an admin if this keeps happening.</div>
                 )}
             </div>
         </div>
