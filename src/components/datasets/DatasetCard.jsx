@@ -1,8 +1,9 @@
-import React from "react";
-import { Download } from "lucide-react";
+import React, {useState} from "react";
+import {Download, Loader2} from "lucide-react";
 import DeleteDatasetButton from "./DeleteDatasetButton";
 import PlaceholderImage from "../ui/PlaceholderImage";
 import DatasetAnnotationProgress from "./DatasetAnnotationProgress";
+import {DownloadQuantifications, DownloadImageDataset} from "../../api/downloads";
 
 const DatasetCard = ({
   dataset,
@@ -11,6 +12,93 @@ const DatasetCard = ({
   onDelete,
   onOpenDataset
 }) => {
+  const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+  const [isCreatingCSV, setIsCreatingCSV] = useState(false);
+
+  const handleCSVDownload = async () => {
+    setIsCreatingCSV(true);
+    try {
+      // Call the function that returns the streaming response
+      const response = await DownloadQuantifications(dataset.id);
+      // Check if the response is successful
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      // Extract the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'dataset.csv'; // Default filename if Content-Disposition is not present
+
+      // Create a blob from the response
+      const blob = await response.blob();
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create an anchor element and set the URL as its href
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Set the filename for the download
+      a.download = filename; // Set your desired filename here
+
+      // Append the anchor to the body (required for Firefox)
+      document.body.appendChild(a);
+
+      // Trigger a click event on the anchor to start the download
+      a.click();
+
+      // Clean up by removing the anchor and revoking the blob URL
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+    } finally {
+      setIsCreatingCSV(false);
+    }
+  };
+
+  const handleImagesDownload = async () => {
+    setIsCreatingDataset(true);
+    try {
+      // Call the function that returns the streaming response
+      const response = await DownloadImageDataset(dataset.id);
+      // Check if the response is successful
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      // Extract the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'dataset.zip'; // Default filename if Content-Disposition is not present
+
+      // Create a blob from the response
+      const blob = await response.blob();
+
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create an anchor element and set the URL as its href
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Set the filename for the download
+      a.download = filename; // Set your desired filename here
+
+      // Append the anchor to the body (required for Firefox)
+      document.body.appendChild(a);
+
+      // Trigger a click event on the anchor to start the download
+      a.click();
+
+      // Clean up by removing the anchor and revoking the blob URL
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+    } finally {
+      setIsCreatingDataset(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
       {/* Dataset Header */}
@@ -59,13 +147,28 @@ const DatasetCard = ({
 
         {/* Action Buttons */}
         <div className="flex space-x-2">
-          <button className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1">
-            <Download className="w-4 h-4" />
-            <span>Download quantifications</span>
+          <button
+              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1"
+              onClick={handleCSVDownload}
+          >
+            {isCreatingCSV ? (
+                <Loader2 className="w-4 h-4 animate-spin"/>
+            ) : (
+               <Download className="w-4 h-4" />
+            )
+            }
+            <span>{isCreatingCSV ? "Preparing download" : "Download analysis"}</span>
           </button>
-          <button className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1">
-            <Download className="w-4 h-4" />
-            <span>Download dataset</span>
+          <button className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1"
+            onClick={handleImagesDownload}
+          >
+            {isCreatingDataset ? (
+                <Loader2 className="w-4 h-4 animate-spin"/>
+            ) : (
+               <Download className="w-4 h-4" />
+            )
+            }
+            <span>{isCreatingDataset ? "Preparing download" : "Download dataset"}</span>
           </button>
           <button
             onClick={() => onOpenDataset(dataset)}
