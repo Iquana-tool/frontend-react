@@ -81,7 +81,7 @@ export default function InferenceModelCard({ model, setModel}) {
                     <InfoRow
                     icon="🧩"
                     label="Labels"
-                    value={model.num_classes}
+                    value={model.classes}
                     tooltip={tooltips.num_classes}
                 />
                 <InfoRow
