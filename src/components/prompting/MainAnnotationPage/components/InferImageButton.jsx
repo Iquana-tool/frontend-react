@@ -18,6 +18,7 @@ export default function InferImageButton({ dataset_id, selectedImageId }) {
     setIsInferring(true);
     try {
       await segmentBatchOfImages(selectedModel.job_id, [selectedImageId]);
+      window.location.reload();
     } catch (e) {
       console.error(e);
     } finally {
