@@ -19,7 +19,6 @@ const Sidebar = ({
              isSidebarCollapsed,
              setIsSidebarCollapsed
                          }) => {
-    console.log("Sidebar mounted with image id", selectedImageId)
         return (
         <div
             className={`bg-white rounded-lg shadow-sm border border-gray-100 transition-all duration-300 ${
