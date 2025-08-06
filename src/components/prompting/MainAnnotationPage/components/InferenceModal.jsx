@@ -3,7 +3,11 @@ import {getTrainedModels} from "../../../../api/automatic_segmentation";
 
 async function getAvailableModels(dataset_id){
     try {
-        return await getTrainedModels(dataset_id);
+        const response = await getTrainedModels(dataset_id);
+        let models = response.models;
+        //Sort the models based on their test dice (key: "best_test_dice")
+        models.sort((a, b) => b.best_test_dice - a.best_test_dice);
+        return models
     } catch (e) {
         console.error(e);
     }
@@ -16,7 +20,7 @@ const ModelSelectionModal = ({ dataset_id, isOpen, onClose, onSelectModel }) => 
     const fetchModels = async () => {
       const availableModels = await getAvailableModels(dataset_id);
       console.log(availableModels)
-      setModels(availableModels.models);
+      setModels(availableModels);
     };
 
     if (isOpen) {
@@ -59,8 +63,7 @@ const ModelEntry = ({ model, onSelect }) => {
       onClick={() => onSelect(model)}
       className="p-4 border rounded-lg cursor-pointer hover:bg-gray-100"
     >
-      <h3 className="font-bold">{model.Name}</h3>
-      <p>Training Dice: {formatDice(model["best_train_dice"])}</p>
+      <h3 className="font-bold">#{model.job_id} - {model.Name}</h3>
       <p>Test Dice: {formatDice(model["best_test_dice"])}</p>
     </div>
   );
