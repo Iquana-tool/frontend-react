@@ -8,6 +8,7 @@ export default function InferImageButton({ dataset_id, selectedImageId }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
+
   const handleInferImage = async () => {
     if (!selectedModel) {
       setIsModalOpen(true);
@@ -16,7 +17,7 @@ export default function InferImageButton({ dataset_id, selectedImageId }) {
 
     setIsInferring(true);
     try {
-      await segmentBatchOfImages(selectedModel.model_identifier, [selectedImageId]);
+      await segmentBatchOfImages(selectedModel.job_id, [selectedImageId]);
     } catch (e) {
       console.error(e);
     } finally {
