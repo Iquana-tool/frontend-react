@@ -1,33 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {getTrainedModels} from "../../../../api/automatic_segmentation";
 
-async function getAvailableModels(dataset_id){
-    try {
-        const response = await getTrainedModels(dataset_id);
-        let models = response.models;
-        //Sort the models based on their test dice (key: "best_test_dice")
-        models.sort((a, b) => b.best_test_dice - a.best_test_dice);
-        return models
-    } catch (e) {
-        console.error(e);
-    }
-}
-
-const ModelSelectionModal = ({ dataset_id, isOpen, onClose, onSelectModel }) => {
-  const [models, setModels] = useState([]);
-
-  useEffect(() => {
-    const fetchModels = async () => {
-      const availableModels = await getAvailableModels(dataset_id);
-      console.log(availableModels)
-      setModels(availableModels);
-    };
-
-    if (isOpen) {
-      fetchModels();
-    }
-  }, [isOpen, dataset_id]);
-
+const ModelSelectionModal = ({ models, isOpen, onClose, onSelectModel }) => {
   if (!isOpen) return null;
 
   return (
