@@ -26,6 +26,19 @@ export const getTrainedModels = async (dataset_id) => {
     }
 }
 
+/* Delete a model */
+export const deleteModel = async (model_id) => {
+    try {
+        return handleApiError(
+            await fetch(`${API_BASE_URL}/automatic_segmentation/delete_model/${model_id}`, {
+                method: 'DELETE',
+            })
+        );
+    } catch (error) {
+        throw error;
+    }
+}
+
 /* Get the model with the given job ID. */
 export const fetchModel = async (jobID) => {
     try {

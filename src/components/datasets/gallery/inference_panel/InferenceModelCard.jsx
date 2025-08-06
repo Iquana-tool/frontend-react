@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Info } from "lucide-react";
-import { fetchModel } from "../../../../api";
+import {Info, Loader2, Trash2} from "lucide-react";
+import { deleteModel } from "../../../../api";
 
 // Helper functions
 function getDiceColor(score) {
@@ -43,6 +43,7 @@ export default function InferenceModelCard({ model, setModel}) {
     const model_not_null = !(model === null || model === undefined)
     const isTrained = model_not_null && "job_id" in model
     const isTraining = model_not_null && (model.training_status === "in progress" || model.training_status === "starting");
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const tooltips = {
         num_classes: "Number of target categories the model predicts. More classes generally means increased complexity and may need more data.",
@@ -53,6 +54,20 @@ export default function InferenceModelCard({ model, setModel}) {
         "Automatically tuned": "Whether the model parameters were automatically optimized during training.",
         "Pre-trained": "Indicates if the model was initialized with weights from a pre-trained model, which can improve performance on small datasets.",
     };
+
+    const handleModelDelete = async () => {
+        setIsDeleting(true);
+        try{
+            const response = await deleteModel(model.job_id);
+            if (response.success){
+                setModel(null);
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsDeleting(false);
+        }
+    }
 
 
     if (!model) return null;
@@ -161,6 +176,21 @@ export default function InferenceModelCard({ model, setModel}) {
                         </div>
                     </div>
                 )}
+                {isTrained && (
+                    <button
+                    className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
+                    onClick={handleModelDelete}
+                >
+                    {isDeleting ? (
+                        <Loader2 className="w-4 h-4 animate-spin"/>
+                    ) : (
+                        <Trash2 className="w-4 h-4"/>
+                    )
+                    }
+                    <span>{isDeleting ? "Deleting" : "Delete model"}</span>
+                </button>
+                )
+                }
             </div>
         </div>
     );
