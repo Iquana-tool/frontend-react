@@ -29,3 +29,17 @@ export const deleteContour = async (contourId) => {
         throw error;
     }
 };
+
+export const deleteAllContours = async (maskId) =>{
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/contours/delete_all_contours_of_mask/${maskId}`,
+            {
+                method: "DELETE",
+            }
+        );
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}

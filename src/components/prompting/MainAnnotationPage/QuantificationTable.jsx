@@ -6,6 +6,8 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import * as api from '../../../api';
 import { getLabelColor, getLabelColorByName } from '../../../utils/labelColors';
 import { useDataset } from '../../../contexts/DatasetContext';
+import {deleteAllContours} from "../../../api";
+import {Loader2, Trash2} from "lucide-react";
 
 const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelUpdate }) => {
   const [quantRows, setQuantRows] = useState([]);
@@ -14,6 +16,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelU
   const [deletingContours, setDeletingContours] = useState(new Set());
   const [selectedContourId, setSelectedContourId] = useState(null);
   const [selectedFilters, setSelectedFilters] = useState(new Set()); // Track selected label filters
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Label editing state
   const [editingContourId, setEditingContourId] = useState(null);
@@ -46,6 +49,18 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelU
     }
     setSnackbar(prev => ({ ...prev, open: false }));
   };
+
+  const handleDeleteAll = async () => {
+    setIsDeleting(true);
+    try {
+      const response = await deleteAllContours(masks[0].id);
+      window.location.reload();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   useEffect(() => {
     let isMounted = true;
@@ -443,7 +458,7 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelU
   return (
     <div>
       {/* Color Legend with Filter Controls */}
-      {uniqueLabelsWithIds.length > 1 && (
+      {uniqueLabelsWithIds.length > 0 && (
         <Box sx={{ marginBottom: 2 }}>
           <Box sx={{ 
             display: 'flex', 
@@ -524,6 +539,18 @@ const QuantificationTable = ({ masks, onContourSelect, onContourDelete, onLabelU
                 sx={{ fontSize: '10px', height: 20, cursor: 'pointer' }}
               />
             </Box>
+            <button
+            className="w-auto flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
+            onClick={handleDeleteAll}
+        >
+            {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin"/>
+            ) : (
+                <Trash2 className="w-4 h-4"/>
+            )
+            }
+          <span>{isDeleting ? "Deleting" : "Delete all contours"}</span>
+      </button>
           </Box>
         </Box>
       )}
