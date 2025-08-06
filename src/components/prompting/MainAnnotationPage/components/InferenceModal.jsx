@@ -32,21 +32,14 @@ const ModelSelectionModal = ({ dataset_id, isOpen, onClose, onSelectModel }) => 
 
   return (
     <div
-        className="absolute top-[-400px] left-[-20px] w-[300px] h-[350px] overflow-y-scroll"
+        className="absolute top-[-350px] left-[-20px] w-[300px] h-[350px] overflow-y-scroll shadow-2xl bg-white p-6 rounded-lg "
     >
-      <div className="bg-white p-6 rounded-lg shadow-lg">
-        <h2 className="text-xl font-bold mb-4">Select a Model</h2>
+      <div>
         <div className="relative space-y-4 flex-col">
           {models.map((model) => (
             <ModelEntry key={model.job_id} model={model} onSelect={onSelectModel} />
           ))}
         </div>
-        <button
-          onClick={onClose}
-          className="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg"
-        >
-          Close
-        </button>
       </div>
     </div>
   );
