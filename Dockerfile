@@ -24,5 +24,7 @@ EXPOSE 3000
 # Install serve to run the application
 RUN npm install -g serve
 
+RUN npx update-browserslist-db@latest
+
 # Define the command to run the app in detached mode
 CMD ["npm", "start"]
