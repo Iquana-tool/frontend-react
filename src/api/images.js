@@ -194,7 +194,7 @@ export const uploadImage = async (file, datasetId) => {
 
             try {
                 const url = new URL(`${API_BASE_URL}/images/upload_image`);
-                url.searchParams.append("dataset_id", datasetId);
+                formData.append("dataset_id", datasetId);
 
                 const response = await fetch(url, {
                     method: "POST",
