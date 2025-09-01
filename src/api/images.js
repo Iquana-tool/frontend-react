@@ -186,7 +186,7 @@ export const uploadImage = async (file, datasetId) => {
         try {
             // Create a new FormData for each attempt
             const formData = new FormData();
-            url.searchParams.append("file", file);
+            formData.append("file", file);
 
             // Use a timeout to abort the request if it takes too long
             const controller = new AbortController();
@@ -194,7 +194,7 @@ export const uploadImage = async (file, datasetId) => {
 
             try {
                 const url = new URL(`${API_BASE_URL}/images/upload_image`);
-                formData.append("dataset_id", datasetId);
+                url.searchParams.append("dataset_id", datasetId);
 
                 const response = await fetch(url, {
                     method: "POST",
