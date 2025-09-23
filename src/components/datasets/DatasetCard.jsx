@@ -1,9 +1,10 @@
-import React, {useState} from "react";
+import React from "react";
 import {Download, Loader2} from "lucide-react";
 import DeleteDatasetButton from "./DeleteDatasetButton";
 import PlaceholderImage from "../ui/PlaceholderImage";
 import DatasetAnnotationProgress from "./DatasetAnnotationProgress";
 import {DownloadQuantifications, DownloadImageDataset} from "../../api/downloads";
+import { useIsCreatingDataset, useIsCreatingCSV, useDownloadActions } from "../../stores/selectors";
 
 const DatasetCard = ({
   dataset,
@@ -12,11 +13,13 @@ const DatasetCard = ({
   onDelete,
   onOpenDataset
 }) => {
-  const [isCreatingDataset, setIsCreatingDataset] = useState(false);
-  const [isCreatingCSV, setIsCreatingCSV] = useState(false);
+  // Replace local state with Zustand selectors
+  const isCreatingDataset = useIsCreatingDataset();
+  const isCreatingCSV = useIsCreatingCSV();
+  const { setCreatingDataset, setCreatingCSV } = useDownloadActions();
 
   const handleCSVDownload = async () => {
-    setIsCreatingCSV(true);
+    setCreatingCSV(true);
     try {
       // Call the function that returns the streaming response
       const response = await DownloadQuantifications(dataset.id);
@@ -53,12 +56,12 @@ const DatasetCard = ({
     } catch (error) {
       console.error('Download failed:', error);
     } finally {
-      setIsCreatingCSV(false);
+      setCreatingCSV(false);
     }
   };
 
   const handleImagesDownload = async () => {
-    setIsCreatingDataset(true);
+    setCreatingDataset(true);
     try {
       // Call the function that returns the streaming response
       const response = await DownloadImageDataset(dataset.id);
@@ -95,7 +98,7 @@ const DatasetCard = ({
     } catch (error) {
       console.error('Download failed:', error);
     } finally {
-      setIsCreatingDataset(false);
+      setCreatingDataset(false);
     }
   };
 
