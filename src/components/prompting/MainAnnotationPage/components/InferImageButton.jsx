@@ -6,12 +6,13 @@ import {Loader2, Fullscreen, ChevronDown, ChevronUp} from "lucide-react";
 async function getAvailableModels(dataset_id){
     try {
         const response = await getTrainedModels(dataset_id);
-        let models = response.models;
+        let models = response.models || [];
         //Sort the models based on their test dice (key: "best_test_dice")
         models.sort((a, b) => b.best_test_dice - a.best_test_dice);
         return models
     } catch (e) {
         console.error(e);
+        return []; // Return empty array on error
     }
 }
 
@@ -21,7 +22,7 @@ export default function InferImageButton({ dataset_id, selectedImageId }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
   const [models, setModels] = useState([]);
-  const modelsAvailable = models.length > 0;  // we have at least one trained model
+  const modelsAvailable = Array.isArray(models) && models.length > 0;  // we have at least one trained model
 
   const handleInferImage = async () => {
     if (!selectedModel) {
@@ -49,7 +50,7 @@ export default function InferImageButton({ dataset_id, selectedImageId }) {
     const fetchModels = async () => {
       const availableModels = await getAvailableModels(dataset_id);
       console.log(availableModels)
-      setModels(availableModels);
+      setModels(availableModels || []); // Ensure it's always an array
     };
     fetchModels();
   }, [dataset_id]);
