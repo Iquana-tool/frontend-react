@@ -40,7 +40,7 @@ const MainLayout = () => {
       <div className="h-[calc(100vh-120px)] flex gap-1 px-1 py-1">
         {/* Left Sidebar - Tools */}
         <div className="w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
             <ToolsSection />
             <StatusSection />
           </div>

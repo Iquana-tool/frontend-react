@@ -1,5 +1,5 @@
 import React from 'react';
-import { useImageList, useCurrentImageId, useSetCurrentImage } from '../../../stores/selectors/annotationSelectorsV2';
+import { useImageList, useCurrentImageId, useSetCurrentImage } from '../../../stores/selectors/annotationSelectors';
 
 const ImageGallery = () => {
   const imageList = useImageList();
