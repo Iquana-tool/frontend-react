@@ -23,7 +23,6 @@ const MainCanvas = () => {
       setImageLoading(true);
       setImageError(null);
       
-      console.log('Loading image:', image.id);
       
       // Fetch image data from API
       const imageResponse = await getImageById(image.id, false);
@@ -44,13 +43,6 @@ const MainCanvas = () => {
       });
 
       setImageObject(imgObject);
-      console.log('Image loaded successfully:', image.id);
-      console.log('Image dimensions:', {
-        naturalWidth: imgObject.naturalWidth,
-        naturalHeight: imgObject.naturalHeight,
-        displayWidth: imgObject.width,
-        displayHeight: imgObject.height
-      });
       
     } catch (error) {
       console.error('Error loading image:', error);
@@ -63,7 +55,7 @@ const MainCanvas = () => {
 
   // Load image when currentImage changes
   useEffect(() => {
-    if (currentImage) {
+    if (currentImage && currentImage.id) {
       loadImage(currentImage);
     } else {
       setImageObject(null);
