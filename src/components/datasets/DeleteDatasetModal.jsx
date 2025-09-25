@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Trash2 } from 'lucide-react';
+import { useDeleteConfirmText, useModalActions } from '../../stores/selectors';
 
 const DeleteDatasetModal = ({ 
   isOpen, 
@@ -8,7 +9,9 @@ const DeleteDatasetModal = ({
   onCancel, 
   isDeleting = false 
 }) => {
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+ 
+  const deleteConfirmText = useDeleteConfirmText();
+  const { setDeleteConfirmText, clearDeleteConfirmText } = useModalActions();
 
   if (!isOpen || !dataset) return null;
 
@@ -19,7 +22,7 @@ const DeleteDatasetModal = ({
   };
 
   const handleCancel = () => {
-    setDeleteConfirmText('');
+    clearDeleteConfirmText();
     onCancel();
   };
 
