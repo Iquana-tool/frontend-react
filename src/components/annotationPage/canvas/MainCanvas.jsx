@@ -65,7 +65,7 @@ const MainCanvas = () => {
   return (
     <div 
       ref={containerRef}
-      className="relative bg-gray-100 cursor-crosshair flex-1 flex items-center justify-center min-h-0 overflow-hidden"
+      className="absolute inset-0 cursor-crosshair py-2"
     >
       {imageLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
@@ -95,26 +95,20 @@ const MainCanvas = () => {
       )}
 
       {!imageLoading && !imageError && imageObject && (
-        <div className="relative w-full h-full p-2">
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              ref={canvasRef}
-              src={imageObject.src}
-              alt={currentImage?.name || 'Annotation Image'}
-              className="object-contain"
-              style={{
-                display: 'block',
-                maxWidth: '95%',
-                maxHeight: '95%',
-                width: 'auto',
-                height: 'auto',
-              }}
-            />
-            
-            {/* Overlays */}
-            <PromptOverlay canvasRef={canvasRef} />
-            <SegmentationOverlay canvasRef={canvasRef} />
-          </div>
+        <div className="relative w-full h-full">
+          <img
+            ref={canvasRef}
+            src={imageObject.src}
+            alt={currentImage?.name || 'Annotation Image'}
+            className="object-contain w-full h-full"
+            style={{
+              display: 'block',
+            }}
+          />
+          
+          {/* Overlays */}
+          <PromptOverlay canvasRef={canvasRef} />
+          <SegmentationOverlay canvasRef={canvasRef} />
         </div>
       )}
 

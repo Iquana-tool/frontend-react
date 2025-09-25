@@ -67,8 +67,20 @@ const ImageGallery = () => {
 
   return (
     <div className="h-full bg-gray-50">
-      <div className="h-full overflow-x-auto">
-        <div className="flex items-center h-full px-2 space-x-2">
+      <div 
+        className="h-full overflow-x-auto overflow-y-hidden"
+        style={{
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#d1d5db #f3f4f6'
+        }}
+      >
+        <div 
+          className="flex items-center h-full px-2 space-x-2" 
+          style={{ 
+            minWidth: 'max-content',
+            width: 'max-content'
+          }}
+        >
           {imageList.map((image) => (
             <ImageThumbnail
               key={image.id}

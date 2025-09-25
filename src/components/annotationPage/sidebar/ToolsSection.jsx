@@ -17,7 +17,7 @@ const ToolsSection = () => {
   return (
     <div className="flex-1 flex flex-col">
       {/* Tools Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-2 text-white flex-shrink-0">
+      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-4 text-white flex-shrink-0">
         <h2 className="text-lg font-semibold flex items-center">
           <PenTool className="w-4 h-4 mr-2" />
           Tools
@@ -25,7 +25,7 @@ const ToolsSection = () => {
       </div>
 
       {/* Tools List -*/}
-      <div className="p-2 space-y-1.5">
+      <div className="p-2 lg:p-3 space-y-1.5">
         {tools.map((tool) => {
           const Icon = tool.icon;
           const isActive = currentTool === tool.id;
