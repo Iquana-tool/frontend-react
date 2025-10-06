@@ -1,8 +1,8 @@
 import React from 'react';
-import { Eye, EyeOff, Edit3, Trash2, ChevronDown } from 'lucide-react';
+import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
 import { useSelectedObjects, useSelectObject, useDeselectObject, useRemoveObject } from '../../../stores/selectors/annotationSelectors';
 
-const ObjectItem = ({ object }) => {
+const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
@@ -28,10 +28,27 @@ const ObjectItem = ({ object }) => {
     removeObject(object.id);
   };
 
+  const handleAccept = () => {
+    // TODO: Implement accept functionality for temporary objects
+    console.log('Accept object:', object.id);
+  };
+
+  const handleReject = () => {
+    // TODO: Implement reject functionality for temporary objects
+    console.log('Reject object:', object.id);
+  };
+
+  // Variant-specific styling
+  const borderColor = isTemporary 
+    ? (isSelected ? 'border-purple-400' : 'border-purple-200')
+    : (isSelected ? 'border-teal-400' : 'border-gray-200');
+    
+  const bgColor = isTemporary
+    ? (isSelected ? 'bg-purple-50' : 'bg-purple-25 hover:bg-purple-50')
+    : (isSelected ? 'bg-teal-50' : 'bg-white hover:bg-gray-50');
+
   return (
-    <div className={`border rounded-lg p-3 transition-colors ${
-      isSelected ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-white hover:bg-gray-50'
-    }`}>
+    <div className={`border rounded-lg p-3 transition-colors ${borderColor} ${bgColor}`}>
       {/* Object Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
@@ -50,33 +67,57 @@ const ObjectItem = ({ object }) => {
         
         {/* Action Buttons */}
         <div className="flex items-center space-x-1">
-          <button
-            onClick={() => {/* TODO: Toggle visibility */}}
-            className="p-1 hover:bg-gray-200 rounded transition-colors"
-            title={isVisible ? 'Hide object' : 'Show object'}
-          >
-            {isVisible ? (
-              <Eye className="w-4 h-4 text-gray-600" />
-            ) : (
-              <EyeOff className="w-4 h-4 text-gray-400" />
-            )}
-          </button>
-          
-          <button
-            onClick={handleEdit}
-            className="p-1 hover:bg-gray-200 rounded transition-colors"
-            title="Edit object"
-          >
-            <Edit3 className="w-4 h-4 text-gray-600" />
-          </button>
-          
-          <button
-            onClick={handleDelete}
-            className="p-1 hover:bg-red-100 rounded transition-colors"
-            title="Delete object"
-          >
-            <Trash2 className="w-4 h-4 text-red-600" />
-          </button>
+          {isTemporary ? (
+            // Temporary object actions (Accept/Reject)
+            <>
+              <button
+                onClick={handleAccept}
+                className="p-1 hover:bg-green-100 rounded transition-colors"
+                title="Accept object"
+              >
+                <CheckCircle className="w-4 h-4 text-green-600" />
+              </button>
+              
+              <button
+                onClick={handleReject}
+                className="p-1 hover:bg-red-100 rounded transition-colors"
+                title="Reject object"
+              >
+                <XCircle className="w-4 h-4 text-red-600" />
+              </button>
+            </>
+          ) : (
+            // Permanent object actions (Visibility/Edit/Delete)
+            <>
+              <button
+                onClick={() => {/* TODO: Toggle visibility */}}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                title={isVisible ? 'Hide object' : 'Show object'}
+              >
+                {isVisible ? (
+                  <Eye className="w-4 h-4 text-gray-600" />
+                ) : (
+                  <EyeOff className="w-4 h-4 text-gray-400" />
+                )}
+              </button>
+              
+              <button
+                onClick={handleEdit}
+                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                title="Edit object"
+              >
+                <Edit3 className="w-4 h-4 text-gray-600" />
+              </button>
+              
+              <button
+                onClick={handleDelete}
+                className="p-1 hover:bg-red-100 rounded transition-colors"
+                title="Delete object"
+              >
+                <Trash2 className="w-4 h-4 text-red-600" />
+              </button>
+            </>
+          )}
         </div>
       </div>
       
