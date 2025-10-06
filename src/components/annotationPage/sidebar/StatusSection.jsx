@@ -22,7 +22,7 @@ const StatusSection = () => {
   };
 
   return (
-    <div className="border-t border-gray-200 p-3 flex-shrink-0">
+    <div className="border-t border-gray-200 p-3 flex-shrink-0 mt-auto">
       <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
         <CheckCircle2 className="w-4 h-4 mr-2 text-gray-600" />
         Status

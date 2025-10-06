@@ -11,3 +11,22 @@ services:
     restart: unless-stopped
     labels:
       - "authors=prathmesh"
+
+  # Development service - run with: docker-compose up dev
+  dev:
+    container_name: react-frontend-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    labels:
+      - "authors=prathmesh"

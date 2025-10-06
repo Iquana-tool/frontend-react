@@ -35,6 +35,8 @@ export default function InferenceModelSelect({
                                     }) {
     const [baseModels, setBaseModels] = useState([]);
     const [trainedModels, setTrainedModels] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const selectedModelValue = selectedModel ? selectedModel.model_identifier + (selectedModel.job_id !== undefined ? "#trained#" + selectedModel.job_id : "#base") : "";
 
     useEffect(() => {
@@ -50,6 +52,9 @@ export default function InferenceModelSelect({
     useEffect(() => {
         if (!dataset) return;
 
+        setLoading(true);
+        setError(null);
+
         Promise.all([
           getBaseModels(),
           getTrainedModels(dataset.id)
@@ -59,6 +64,8 @@ export default function InferenceModelSelect({
               const trained = trainedRes?.models || [];
               setBaseModels(base);
               setTrainedModels(trained);
+              setError(null);
+              
               if (selectedModel){
                   console.log("Selected model exists:", selectedModel);
               } else {
@@ -72,7 +79,33 @@ export default function InferenceModelSelect({
                   }
               }
             })
+            .catch((error) => {
+              console.error("Failed to fetch models:", error);
+              setError("Failed to load models. Please check your connection.");
+              // Set empty arrays on error to prevent crashes
+              setBaseModels([]);
+              setTrainedModels([]);
+            })
+            .finally(() => {
+              setLoading(false);
+            });
       }, [dataset, selectedModel, setSelectedModel]);
+
+    if (loading) {
+        return (
+            <div className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 bg-gray-50">
+                <span className="text-gray-500">Loading models...</span>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg mb-3 bg-red-50">
+                <span className="text-red-600 text-xs">{error}</span>
+            </div>
+        );
+    }
 
     return (
         <select
@@ -84,6 +117,9 @@ export default function InferenceModelSelect({
             }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
         >
+            {trainedModels.length === 0 && baseModels.length === 0 && (
+                <option value="">No models available</option>
+            )}
             {trainedModels.length > 0 && (
                 <optgroup label="Trained Models">
                     {trainedModels.map(model => (

@@ -4,7 +4,6 @@ import ToolsSection from '../sidebar/ToolsSection';
 import StatusSection from '../sidebar/StatusSection';
 import RightSidebar from '../sidebar/RightSidebar';
 import MainCanvas from '../canvas/MainCanvas';
-import ImageGallery from '../gallery/ImageGallery';
 
 const MainLayout = () => {
 
@@ -28,11 +27,6 @@ const MainLayout = () => {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
             <div className="flex-1 relative">
               <MainCanvas />
-            </div>
-            
-            {/* Bottom Image Gallery */}
-            <div className="flex-shrink-0 h-16 flex items-center justify-center">
-              <ImageGallery />
             </div>
           </div>
         </div>
