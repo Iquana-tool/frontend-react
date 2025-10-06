@@ -19,6 +19,15 @@ export const useCurrentImageId = () => useAnnotationStore(state => state.images.
 export const useImageList = () => useAnnotationStore(state => state.images.imageList);
 export const useAnnotationStatus = () => useAnnotationStore(state => state.images.annotationStatus);
 
+// Image loading and display selectors
+export const useImageObject = () => useAnnotationStore(state => state.images.imageObject);
+export const useImageLoading = () => useAnnotationStore(state => state.images.imageLoading);
+export const useImageError = () => useAnnotationStore(state => state.images.imageError);
+
+// Zoom and pan selectors
+export const useZoomLevel = () => useAnnotationStore(state => state.images.zoomLevel);
+export const usePanOffset = () => useAnnotationStore(state => state.images.panOffset);
+
 export const useSelectedModel = () => useAnnotationStore(state => state.models.selectedModel);
 export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
 
@@ -59,6 +68,16 @@ export const useToggleVisibility = () => useAnnotationStore(state => state.toggl
 export const useSetCurrentImage = () => useAnnotationStore(state => state.setCurrentImage);
 export const useSetImageList = () => useAnnotationStore(state => state.setImageList);
 export const useSetAnnotationStatus = () => useAnnotationStore(state => state.setAnnotationStatus);
+
+// Image loading and display actions
+export const useSetImageObject = () => useAnnotationStore(state => state.setImageObject);
+export const useSetImageLoading = () => useAnnotationStore(state => state.setImageLoading);
+export const useSetImageError = () => useAnnotationStore(state => state.setImageError);
+
+// Zoom and pan actions
+export const useSetZoomLevel = () => useAnnotationStore(state => state.setZoomLevel);
+export const useSetPanOffset = () => useAnnotationStore(state => state.setPanOffset);
+export const useResetImageState = () => useAnnotationStore(state => state.resetImageState);
 
 // Sidebar actions
 export const useSetLeftSidebarCollapsed = () => useAnnotationStore(state => state.setLeftSidebarCollapsed);

@@ -1,12 +1,13 @@
 import React from 'react';
 import { useCurrentMask, useObjectsList, useAddObject } from '../../../stores/selectors/annotationSelectors';
+import { screenToImageCoords, imageToScreenCoords } from '../../../utils/transformUtils';
 
-const SegmentationOverlay = ({ canvasRef }) => {
+const SegmentationOverlay = ({ canvasRef, transformRef }) => {
   const currentMask = useCurrentMask();
   const objectsList = useObjectsList();
   const addObject = useAddObject();
 
-  const handleMaskClick = () => {
+  const handleMaskClick = (e) => {
     if (currentMask) {
       // Add the current mask to final objects
       addObject({

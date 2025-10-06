@@ -1,142 +1,90 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import PromptOverlay from './PromptOverlay';
-import SegmentationOverlay from './SegmentationOverlay';
-import { useCurrentImage } from '../../../stores/selectors/annotationSelectors';
-import { getImageById } from '../../../api/images';
+import React, { useRef, forwardRef, useImperativeHandle } from 'react';
+import { useCurrentImage, useZoomLevel, usePanOffset, useSetZoomLevel, useSetPanOffset } from '../../../stores/selectors/annotationSelectors';
+import { useImageLoader } from '../../../hooks/useImageLoader';
+import { useCanvasInteractions } from '../../../hooks/useCanvasInteractions';
+import CanvasContainer from './CanvasContainer';
+import LoadingState from './LoadingState';
+import ErrorState from './ErrorState';
+import EmptyState from './EmptyState';
 
-const MainCanvas = () => {
-  const canvasRef = useRef(null);
+const MainCanvas = forwardRef((props, ref) => {
   const containerRef = useRef(null);
+  
+  // Zustand store state
   const currentImage = useCurrentImage();
-  const [imageObject, setImageObject] = useState(null);
-  const [imageLoading, setImageLoading] = useState(false);
-  const [imageError, setImageError] = useState(null);
+  const zoomLevel = useZoomLevel();
+  const panOffset = usePanOffset();
+  
+  // Zustand store actions
+  const setZoomLevel = useSetZoomLevel();
+  const setPanOffset = useSetPanOffset();
 
-  // Load image when currentImage changes
-  const loadImage = useCallback(async (image) => {
-    if (!image || !image.id) {
-      setImageObject(null);
-      return;
-    }
+  // Custom hooks
+  const { imageObject, imageLoading, imageError, loadImage } = useImageLoader(currentImage);
+  const { isDragging } = useCanvasInteractions(containerRef);
 
-    try {
-      setImageLoading(true);
-      setImageError(null);
-      
-      
-      // Fetch image data from API
-      const imageResponse = await getImageById(image.id, false);
-      
-      if (!imageResponse || !imageResponse[image.id]) {
-        throw new Error(`Failed to load image data for ID: ${image.id}`);
-      }
+  // Expose methods to parent components
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => {
+      setZoomLevel(prev => Math.min(prev * 1.2, 10));
+    },
+    zoomOut: () => {
+      setZoomLevel(prev => Math.max(prev / 1.2, 0.1));
+    },
+    resetView: () => {
+      setZoomLevel(1);
+      setPanOffset({ x: 0, y: 0 });
+    },
+    setZoom: (level) => {
+      setZoomLevel(level);
+    },
+    getZoomLevel: () => zoomLevel,
+    getPanOffset: () => panOffset
+  }));
 
-      const base64Data = imageResponse[image.id];
-      const imageUrl = `data:image/jpeg;base64,${base64Data}`;
-      const imgObject = new Image();
 
-      // Wait for image to load
-      await new Promise((resolve, reject) => {
-        imgObject.onload = () => resolve();
-        imgObject.onerror = () => reject(new Error("Failed to load image data"));
-        imgObject.src = imageUrl;
-      });
-
-      setImageObject(imgObject);
-      
-    } catch (error) {
-      console.error('Error loading image:', error);
-      setImageError(error.message);
-      setImageObject(null);
-    } finally {
-      setImageLoading(false);
-    }
-  }, []);
-
-  // Load image when currentImage changes
-  useEffect(() => {
-    if (currentImage && currentImage.id) {
-      loadImage(currentImage);
-    } else {
-      setImageObject(null);
-    }
-  }, [currentImage, loadImage]);
 
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0 cursor-crosshair"
+      className={`absolute inset-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
     >
-      {imageLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading image...</p>
-          </div>
-        </div>
-      )}
+      {imageLoading && <LoadingState />}
 
       {imageError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-red-600 text-2xl">⚠️</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Image</h3>
-            <p className="text-gray-600 mb-4">{imageError}</p>
-            <button
-              onClick={() => currentImage && loadImage(currentImage)}
-              className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
+        <ErrorState 
+          error={imageError} 
+          onRetry={() => currentImage && loadImage(currentImage)} 
+        />
       )}
 
       {!imageLoading && !imageError && imageObject && (
-        <div className="relative w-full h-full">
-          <img
-            ref={canvasRef}
-            src={imageObject.src}
-            alt={currentImage?.name || 'Annotation Image'}
-            className="object-contain w-full h-full"
-            style={{
-              display: 'block',
-            }}
-          />
-          
-          {/* Overlays */}
-          <PromptOverlay canvasRef={canvasRef} />
-          <SegmentationOverlay canvasRef={canvasRef} />
-        </div>
+        <CanvasContainer
+          imageObject={imageObject}
+          currentImage={currentImage}
+          zoomLevel={zoomLevel}
+          panOffset={panOffset}
+          isDragging={isDragging}
+        />
       )}
 
       {!imageLoading && !imageError && !imageObject && currentImage && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-gray-400 text-2xl">📷</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Image Selected</h3>
-            <p className="text-gray-600">Select an image from the gallery to start annotating</p>
-          </div>
-        </div>
+        <EmptyState
+          title="No Image Selected"
+          message="Select an image from the gallery to start annotating"
+        />
       )}
 
       {!currentImage && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-gray-400 text-2xl">📷</span>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Image Available</h3>
-            <p className="text-gray-600">No images found in this dataset</p>
-          </div>
-        </div>
+        <EmptyState
+          title="No Image Available"
+          message="No images found in this dataset"
+        />
       )}
     </div>
   );
-};
+});
+
+MainCanvas.displayName = 'MainCanvas';
 
 export default MainCanvas;

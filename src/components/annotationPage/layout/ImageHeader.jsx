@@ -7,6 +7,7 @@ import {
   useCurrentImageId,
   useSetCurrentImage 
 } from '../../../stores/selectors/annotationSelectors';
+import ZoomControls from '../canvas/ZoomControls';
 
 const ImageHeader = () => {
   // Use ONLY simple, direct selectors - no computed ones
@@ -54,29 +55,35 @@ const ImageHeader = () => {
               </span>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={handlePreviousImage}
-              disabled={!canGoPrev}
-              className={`p-2 rounded-lg transition-colors ${
-                canGoPrev 
-                  ? 'hover:bg-gray-100 text-gray-600' 
-                  : 'opacity-50 cursor-not-allowed text-gray-400'
-              }`}
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleNextImage}
-              disabled={!canGoNext}
-              className={`p-2 rounded-lg transition-colors ${
-                canGoNext 
-                  ? 'hover:bg-gray-100 text-gray-600' 
-                  : 'opacity-50 cursor-not-allowed text-gray-400'
-              }`}
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
+          <div className="flex items-center space-x-4">
+            {/* Zoom Controls */}
+            <ZoomControls />
+            
+            {/* Image Navigation */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePreviousImage}
+                disabled={!canGoPrev}
+                className={`p-2 rounded-lg transition-colors ${
+                  canGoPrev 
+                    ? 'hover:bg-gray-100 text-gray-600' 
+                    : 'opacity-50 cursor-not-allowed text-gray-400'
+                }`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={handleNextImage}
+                disabled={!canGoNext}
+                className={`p-2 rounded-lg transition-colors ${
+                  canGoNext 
+                    ? 'hover:bg-gray-100 text-gray-600' 
+                    : 'opacity-50 cursor-not-allowed text-gray-400'
+                }`}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

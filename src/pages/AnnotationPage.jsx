@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useDataset } from "../contexts/DatasetContext";
-import ImageViewerWithPrompting from "../components/prompting";
+import MainLayout from "../components/annotationPage/layout/MainLayout";
 import { BugIcon, ArrowLeft, BookOpen } from "lucide-react";
 
 const AnnotationPage = () => {
@@ -133,7 +133,7 @@ const AnnotationPage = () => {
       </nav>
 
       <main className="max-w-[98%] mx-auto py-4 px-2">
-        <ImageViewerWithPrompting initialImageId={imageId ? parseInt(imageId) : null} />
+        <MainLayout />
       </main>
     </div>
   );

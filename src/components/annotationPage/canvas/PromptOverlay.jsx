@@ -16,7 +16,7 @@ const PromptOverlay = ({ canvasRef }) => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Set prompt point
+    // Set prompt point in screen coordinates (no transform needed for simple case)
     const promptPoint = { x, y, type: 'point' };
     setPrompt(promptPoint);
     setIsPrompting(true);
@@ -29,8 +29,8 @@ const PromptOverlay = ({ canvasRef }) => {
       setTimeout(() => {
         const mockMask = {
           id: Date.now(),
-          path: `M ${x-50} ${y-30} L ${x+50} ${y-30} L ${x+50} ${y+30} L ${x-50} ${y+30} Z`,
-          points: [[x-50, y-30], [x+50, y-30], [x+50, y+30], [x-50, y+30]],
+          path: `M ${prompt.x-50} ${prompt.y-30} L ${prompt.x+50} ${prompt.y-30} L ${prompt.x+50} ${prompt.y+30} L ${prompt.x-50} ${prompt.y+30} Z`,
+          points: [[prompt.x-50, prompt.y-30], [prompt.x+50, prompt.y-30], [prompt.x+50, prompt.y+30], [prompt.x-50, prompt.y+30]],
           pixelCount: 2400
         };
         setCurrentMask(mockMask);
