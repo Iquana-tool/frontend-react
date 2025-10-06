@@ -25,6 +25,7 @@ const useAnnotationStore = create()(
           currentTool: 'selection',
           leftSidebarCollapsed: false,
           rightSidebarCollapsed: false,
+          visibilityControlsExpanded: true,
         },
         
         // Canvas State (needed for canvas components)
@@ -182,6 +183,15 @@ const useAnnotationStore = create()(
         
         toggleRightSidebar: () => set((state) => {
           state.ui.rightSidebarCollapsed = !state.ui.rightSidebarCollapsed;
+        }),
+        
+        // Visibility controls actions
+        setVisibilityControlsExpanded: (expanded) => set((state) => {
+          state.ui.visibilityControlsExpanded = expanded;
+        }),
+        
+        toggleVisibilityControls: () => set((state) => {
+          state.ui.visibilityControlsExpanded = !state.ui.visibilityControlsExpanded;
         }),
       }))
     ),

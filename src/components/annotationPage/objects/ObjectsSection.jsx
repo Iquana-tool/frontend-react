@@ -43,7 +43,7 @@ const ObjectsSection = () => {
         >
           <div className="flex items-center space-x-1.5 md:space-x-2">
             <span className="text-xs md:text-sm font-semibold text-purple-900">
-              AI Generated <span className="hidden md:inline">(Temporary)</span>
+            Reviewable Objects
             </span>
             <span className="text-[10px] md:text-xs bg-purple-200 text-purple-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
               {temporaryObjects.length}
@@ -73,7 +73,7 @@ const ObjectsSection = () => {
         >
           <div className="flex items-center space-x-1.5 md:space-x-2">
             <span className="text-xs md:text-sm font-semibold text-teal-900">
-              Objects <span className="hidden md:inline">(Saved)</span>
+            Reviewed Objects
             </span>
             <span className="text-[10px] md:text-xs bg-teal-200 text-teal-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
               {permanentObjects.length}
@@ -92,24 +92,6 @@ const ObjectsSection = () => {
             <PermanentObjectsList objects={permanentObjects} />
           </div>
         )}
-      </div>
-
-      {/* Summary Stats */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-2 md:p-3">
-        <div className="flex items-center justify-between text-[10px] md:text-xs">
-          <span className="text-gray-600 font-medium">Total Objects:</span>
-          <span className="text-gray-900 font-bold text-xs md:text-sm">
-            {temporaryObjects.length + permanentObjects.length}
-          </span>
-        </div>
-        <div className="mt-1.5 md:mt-2 pt-1.5 md:pt-2 border-t border-gray-200 flex items-center justify-between text-[10px] md:text-xs">
-          <span className="text-purple-600">Pending Review:</span>
-          <span className="font-semibold text-purple-700">{temporaryObjects.length}</span>
-        </div>
-        <div className="mt-1 flex items-center justify-between text-[10px] md:text-xs">
-          <span className="text-teal-600">Confirmed:</span>
-          <span className="font-semibold text-teal-700">{permanentObjects.length}</span>
-        </div>
       </div>
     </div>
   );
