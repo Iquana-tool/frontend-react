@@ -1,11 +1,12 @@
 import React from 'react';
 import { Trash2, Eye, CheckCircle2 } from 'lucide-react';
-import { useAnnotationStatus, useSetAnnotationStatus, useClearSelection } from '../../../stores/selectors/annotationSelectors';
+import { useAnnotationStatus, useSetAnnotationStatus, useClearSelection, useLeftSidebarCollapsed } from '../../../stores/selectors/annotationSelectors';
 
 const StatusSection = () => {
   const status = useAnnotationStatus();
   const setAnnotationStatus = useSetAnnotationStatus();
   const clearSelection = useClearSelection();
+  const leftSidebarCollapsed = useLeftSidebarCollapsed();
 
   const handleRemoveAnnotations = () => {
     // Clear all annotations and reset to not started
@@ -20,6 +21,34 @@ const StatusSection = () => {
   const handleMarkAsFinished = () => {
     setAnnotationStatus('completed');
   };
+
+  if (leftSidebarCollapsed) {
+    return (
+      <div className="space-y-3 p-1">
+        <button
+          onClick={handleRemoveAnnotations}
+          className="w-full p-2 hover:bg-red-50 rounded transition-colors flex items-center justify-center"
+          title="Remove Annotations"
+        >
+          <Trash2 className="w-5 h-5 text-red-600" />
+        </button>
+        <button
+          onClick={handleMarkAsReviewable}
+          className="w-full p-2 hover:bg-yellow-50 rounded transition-colors flex items-center justify-center"
+          title="Mark as Reviewable"
+        >
+          <Eye className="w-5 h-5 text-yellow-600" />
+        </button>
+        <button
+          onClick={handleMarkAsFinished}
+          className="w-full p-2 hover:bg-teal-50 rounded transition-colors flex items-center justify-center"
+          title="Mark as Finished"
+        >
+          <CheckCircle2 className="w-5 h-5 text-teal-600" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t border-gray-200 p-3 flex-shrink-0 mt-auto">

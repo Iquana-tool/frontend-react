@@ -14,16 +14,6 @@ const PermanentObjectsList = ({ objects = [] }) => {
 
   return (
     <div className="space-y-3">
-      {/* Add Manual Button */}
-      <button
-        onClick={handleAddManual}
-        className="w-full flex items-center justify-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 text-[10px] md:text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors"
-      >
-        <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-        <span className="hidden sm:inline">Add Manual Object</span>
-        <span className="sm:hidden">Add Object</span>
-      </button>
-
       {/* Objects List */}
       <div className="space-y-2 max-h-48 md:max-h-64 lg:max-h-96 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-teal-300 scrollbar-track-teal-50">
         {objects.length > 0 ? (

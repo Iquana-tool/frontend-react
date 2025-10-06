@@ -23,6 +23,8 @@ const useAnnotationStore = create()(
         // UI State
         ui: {
           currentTool: 'selection',
+          leftSidebarCollapsed: false,
+          rightSidebarCollapsed: false,
         },
         
         // Canvas State (needed for canvas components)
@@ -163,6 +165,23 @@ const useAnnotationStore = create()(
         
         setAnnotationStatus: (status) => set((state) => {
           state.images.annotationStatus = status;
+        }),
+        
+        // Sidebar actions
+        setLeftSidebarCollapsed: (collapsed) => set((state) => {
+          state.ui.leftSidebarCollapsed = collapsed;
+        }),
+        
+        setRightSidebarCollapsed: (collapsed) => set((state) => {
+          state.ui.rightSidebarCollapsed = collapsed;
+        }),
+        
+        toggleLeftSidebar: () => set((state) => {
+          state.ui.leftSidebarCollapsed = !state.ui.leftSidebarCollapsed;
+        }),
+        
+        toggleRightSidebar: () => set((state) => {
+          state.ui.rightSidebarCollapsed = !state.ui.rightSidebarCollapsed;
         }),
       }))
     ),

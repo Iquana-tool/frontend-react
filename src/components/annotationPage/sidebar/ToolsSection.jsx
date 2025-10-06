@@ -1,30 +1,52 @@
 import React from 'react';
-import { MousePointer, PenTool, Sparkles, CheckCircle } from 'lucide-react';
-import { useCurrentTool, useSetCurrentTool } from '../../../stores/selectors/annotationSelectors';
+import { MousePointer, Pencil, Sparkles, CheckCircle } from 'lucide-react';
+import { useCurrentTool, useSetCurrentTool, useLeftSidebarCollapsed } from '../../../stores/selectors/annotationSelectors';
 import ModelSelectors from './ModelSelectors';
 
 const ToolsSection = () => {
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
+  const leftSidebarCollapsed = useLeftSidebarCollapsed();
 
   const tools = [
     { id: 'selection', name: 'Selection', icon: MousePointer, description: 'Select and manipulate objects' },
-    { id: 'manual_drawing', name: 'Manual Drawing', icon: PenTool, description: 'Draw annotations manually' },
+    { id: 'manual_drawing', name: 'Manual Drawing', icon: Pencil, description: 'Draw annotations manually' },
     { id: 'ai_annotation', name: 'AI assisted Annotation', icon: Sparkles, description: 'Use AI models for automatic segmentation' },
     { id: 'completion', name: 'Annotation Completion', icon: CheckCircle, description: 'Complete and refine annotations' },
   ];
 
+  if (leftSidebarCollapsed) {
+    return (
+      <div className="flex-1 flex flex-col p-1">
+        {/* Collapsed Tools Icons */}
+        <div className="space-y-3">
+          {tools.map((tool) => {
+            const Icon = tool.icon;
+            const isActive = currentTool === tool.id;
+            
+            return (
+              <button
+                key={tool.id}
+                onClick={() => setCurrentTool(tool.id)}
+                className={`w-full p-2 rounded transition-colors flex items-center justify-center ${
+                  isActive 
+                    ? 'bg-teal-50 text-teal-600' 
+                    : 'hover:bg-gray-100 text-gray-600'
+                }`}
+                title={tool.name}
+              >
+                <Icon className="w-5 h-5" />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col">
-      {/* Tools Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-4 text-white flex-shrink-0">
-        <h2 className="text-lg font-semibold flex items-center">
-          <PenTool className="w-4 h-4 mr-2" />
-          Tools
-        </h2>
-      </div>
-
-      {/* Tools List -*/}
+      {/* Tools List */}
       <div className="p-2 lg:p-3 space-y-1.5">
         {tools.map((tool) => {
           const Icon = tool.icon;

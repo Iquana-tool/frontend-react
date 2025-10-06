@@ -65,7 +65,7 @@ const MainCanvas = () => {
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0 cursor-crosshair py-2"
+      className="absolute inset-0 cursor-crosshair"
     >
       {imageLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">

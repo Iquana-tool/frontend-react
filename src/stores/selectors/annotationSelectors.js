@@ -3,6 +3,8 @@ import { shallow } from 'zustand/shallow';
 
 // Simple state selectors 
 export const useCurrentTool = () => useAnnotationStore(state => state.ui.currentTool);
+export const useLeftSidebarCollapsed = () => useAnnotationStore(state => state.ui.leftSidebarCollapsed);
+export const useRightSidebarCollapsed = () => useAnnotationStore(state => state.ui.rightSidebarCollapsed);
 
 // Canvas selectors
 export const useCanvasPrompt = () => useAnnotationStore(state => state.canvas.prompt);
@@ -56,4 +58,10 @@ export const useToggleVisibility = () => useAnnotationStore(state => state.toggl
 export const useSetCurrentImage = () => useAnnotationStore(state => state.setCurrentImage);
 export const useSetImageList = () => useAnnotationStore(state => state.setImageList);
 export const useSetAnnotationStatus = () => useAnnotationStore(state => state.setAnnotationStatus);
+
+// Sidebar actions
+export const useSetLeftSidebarCollapsed = () => useAnnotationStore(state => state.setLeftSidebarCollapsed);
+export const useSetRightSidebarCollapsed = () => useAnnotationStore(state => state.setRightSidebarCollapsed);
+export const useToggleLeftSidebar = () => useAnnotationStore(state => state.toggleLeftSidebar);
+export const useToggleRightSidebar = () => useAnnotationStore(state => state.toggleRightSidebar);
 
