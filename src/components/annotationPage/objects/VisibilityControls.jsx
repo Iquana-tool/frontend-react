@@ -36,45 +36,46 @@ const VisibilityControls = () => {
       {/* Collapsible Header */}
       <button
         onClick={toggleVisibilityControls}
-        className="w-full flex items-center justify-between p-2 md:p-3 bg-blue-50 hover:bg-blue-100 transition-colors"
+        className="w-full flex items-center justify-between p-2 lg:p-3 bg-blue-50 hover:bg-blue-100 transition-colors"
       >
-        <div className="flex items-center space-x-1.5 md:space-x-2">
-          <span className="text-xs md:text-sm font-semibold text-blue-900">
+        <div className="flex items-center space-x-1.5 lg:space-x-2 min-w-0 flex-1">
+          <span className="text-xs lg:text-sm font-semibold text-blue-900 truncate">
             Visibility of annotations
           </span>
         </div>
         {isExpanded ? (
-          <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-700" />
+          <ChevronUp className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-700 flex-shrink-0" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-700" />
+          <ChevronDown className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-blue-700 flex-shrink-0" />
         )}
       </button>
 
       {/* Content */}
       {isExpanded && (
-        <div className="p-2 md:p-3 border-t border-blue-100 space-y-4">
+        <div className="p-2 lg:p-3 border-t border-blue-100 space-y-3 lg:space-y-4">
           {/* Visibility options section */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2">
+          <div className="space-y-2 lg:space-y-3">
+            <div className="flex flex-wrap gap-1 lg:gap-1.5">
               {visibilityOptions.map((option) => (
                 <button
                   key={option.id}
                   onClick={() => setVisibilityMode(option.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 ${
                     option.active
                       ? 'bg-green-100 text-green-800 border border-green-300'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
                   }`}
+                  title={option.label}
                 >
-                  {option.label}
+                  <span className="truncate">{option.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
           {/* Label filters section */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-2 lg:space-y-3">
+            <div className="flex flex-wrap gap-1 lg:gap-1.5">
               {labels.map((label) => {
                 const isActive = visibility.labels[label.key];
                 
@@ -82,13 +83,14 @@ const VisibilityControls = () => {
                   <button
                     key={label.key}
                     onClick={() => toggleVisibility(label.key)}
-                    className={`px-2 py-1.5 text-xs font-medium rounded transition-colors ${
+                    className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 ${
                       isActive
                         ? 'bg-green-100 text-green-800 border border-green-300'
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200'
                     }`}
+                    title={label.name}
                   >
-                    {label.name}
+                    <span className="truncate">{label.name}</span>
                   </button>
                 );
               })}
