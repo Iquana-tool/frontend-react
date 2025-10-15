@@ -1,5 +1,5 @@
 import React from 'react';
-import { useZoomLevel, useSetZoomLevel } from '../../../stores/selectors/annotationSelectors';
+import { useZoomLevel, useSetZoomLevel, useSetPanOffset } from '../../../stores/selectors/annotationSelectors';
 
 /**
  * Zoom controls component that works directly with the Zustand store
@@ -7,6 +7,7 @@ import { useZoomLevel, useSetZoomLevel } from '../../../stores/selectors/annotat
 const ZoomControls = () => {
   const zoomLevel = useZoomLevel();
   const setZoomLevel = useSetZoomLevel();
+  const setPanOffset = useSetPanOffset();
 
   const handleZoomIn = () => {
     const newLevel = Math.min(zoomLevel * 1.2, 10);
@@ -20,6 +21,7 @@ const ZoomControls = () => {
 
   const handleReset = () => {
     setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
   };
 
   return (

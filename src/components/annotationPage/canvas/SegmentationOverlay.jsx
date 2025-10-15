@@ -1,8 +1,7 @@
 import React from 'react';
 import { useCurrentMask, useObjectsList, useAddObject } from '../../../stores/selectors/annotationSelectors';
-import { screenToImageCoords, imageToScreenCoords } from '../../../utils/transformUtils';
 
-const SegmentationOverlay = ({ canvasRef, transformRef }) => {
+const SegmentationOverlay = ({ canvasRef }) => {
   const currentMask = useCurrentMask();
   const objectsList = useObjectsList();
   const addObject = useAddObject();

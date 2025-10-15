@@ -39,6 +39,11 @@ const PromptOverlay = ({ canvasRef }) => {
     }, 100);
   };
 
+  // Only render for AI annotation tool
+  if (currentTool !== 'ai_annotation') {
+    return null;
+  }
+
   return (
     <div 
       className="absolute inset-0 pointer-events-auto cursor-crosshair"
