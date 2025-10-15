@@ -3,15 +3,20 @@ import {
   useZoomLevel, 
   usePanOffset,
   useSetZoomLevel,
-  useSetPanOffset
+  useSetPanOffset,
+  useCurrentTool
 } from '../stores/selectors/annotationSelectors';
 
 export const useCanvasInteractions = (containerRef) => {
   const zoomLevel = useZoomLevel();
   const panOffset = usePanOffset();
+  const currentTool = useCurrentTool();
   
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
+
+  // Pan mode state (controlled by spacebar)
+  const [isPanMode, setIsPanMode] = useState(false);
 
   // Mouse wheel zoom handler
   const handleWheel = useCallback((e) => {
@@ -26,12 +31,16 @@ export const useCanvasInteractions = (containerRef) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const handleMouseDown = useCallback((e) => {
-    if (e.button === 0) { // Left mouse button
+    // Don't pan when using AI annotation tool - it has its own pan controls
+    if (currentTool === 'ai_annotation') return;
+    
+    // Only pan with middle mouse button or left mouse + spacebar (pan mode)
+    if (e.button === 1 || (e.button === 0 && isPanMode)) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
       e.preventDefault();
     }
-  }, [panOffset]);
+  }, [currentTool, isPanMode, panOffset]);
 
   const handleMouseMove = useCallback((e) => {
     if (isDragging) {
@@ -48,15 +57,19 @@ export const useCanvasInteractions = (containerRef) => {
     setIsDragging(false);
   }, []);
 
-  // Touch support for mobile
+  // Touch support for mobile (always enabled for touch)
   const handleTouchStart = useCallback((e) => {
+    // Don't pan when using AI annotation tool - it has its own pan controls
+    if (currentTool === 'ai_annotation') return;
+    
+    // For touch, allow panning without spacebar (mobile UX)
     if (e.touches.length === 1) { // Single finger
       const touch = e.touches[0];
       setIsDragging(true);
       setDragStart({ x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y });
       e.preventDefault();
     }
-  }, [panOffset]);
+  }, [currentTool, panOffset]);
 
   const handleTouchMove = useCallback((e) => {
     if (isDragging && e.touches.length === 1) {
@@ -73,6 +86,59 @@ export const useCanvasInteractions = (containerRef) => {
   const handleTouchEnd = useCallback(() => {
     setIsDragging(false);
   }, []);
+
+  // Keyboard handler for spacebar pan mode
+  useEffect(() => {
+    // Skip keyboard pan mode for AI annotation tool (it has its own)
+    if (currentTool === 'ai_annotation') return;
+
+    let spacebarPressed = false;
+
+    const handleKeyDown = (e) => {
+      // Only handle spacebar if not already pressed
+      if (e.code === 'Space' && !spacebarPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        spacebarPressed = true;
+        setIsPanMode(true);
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      // Only handle spacebar if it was pressed
+      if (e.code === 'Space' && spacebarPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        spacebarPressed = false;
+        setIsPanMode(false);
+      }
+    };
+
+    // Reset pan mode when focus is lost
+    const handleBlur = () => {
+      spacebarPressed = false;
+      setIsPanMode(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        spacebarPressed = false;
+        setIsPanMode(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentTool]);
 
   // Add event listeners
   useEffect(() => {
@@ -108,6 +174,7 @@ export const useCanvasInteractions = (containerRef) => {
 
   return {
     isDragging,
+    isPanMode,
     zoomLevel,
     panOffset
   };

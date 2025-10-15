@@ -89,3 +89,19 @@ export const useToggleRightSidebar = () => useAnnotationStore(state => state.tog
 export const useSetVisibilityControlsExpanded = () => useAnnotationStore(state => state.setVisibilityControlsExpanded);
 export const useToggleVisibilityControls = () => useAnnotationStore(state => state.toggleVisibilityControls);
 
+// AI Annotation selectors
+export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
+export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
+export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
+
+// AI Annotation actions
+export const useAddPointPrompt = () => useAnnotationStore(state => state.addPointPrompt);
+export const useAddBoxPrompt = () => useAnnotationStore(state => state.addBoxPrompt);
+export const useRemoveLastPrompt = () => useAnnotationStore(state => state.removeLastPrompt);
+export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
+export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
+export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
+export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
+export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
+
+
