@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, BugIcon } from 'lucide-react';
 import { useDataset } from '../../../contexts/DatasetContext';
+import WebSocketStatus from '../WebSocketStatus';
 
 const DatasetNavigation = () => {
   const navigate = useNavigate();
@@ -39,6 +40,9 @@ const DatasetNavigation = () => {
           </div>
           
           <div className="flex items-center space-x-2 lg:space-x-4">
+            {/* WebSocket Status Indicator */}
+            <WebSocketStatus />
+            
             <button
               onClick={() => navigate("/docs")}
               className="flex items-center space-x-1 lg:space-x-2 bg-white/10 hover:bg-white/20 text-white py-1.5 lg:py-2 px-2 lg:px-4 rounded-lg transition-colors"

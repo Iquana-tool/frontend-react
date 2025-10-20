@@ -89,6 +89,17 @@ const useAnnotationStore = create()(
           colors: {},
         },
         
+        // WebSocket State
+        websocket: {
+          connectionState: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
+          sessionState: 'uninitialized',   // 'uninitialized' | 'initializing' | 'ready' | 'error'
+          currentImageId: null,
+          runningServices: [],
+          failedServices: [],
+          lastError: null,
+          isReconnecting: false,
+        },
+        
         
         // Actions 
         setCurrentTool: (tool) => set((state) => {
@@ -344,6 +355,48 @@ const useAnnotationStore = create()(
             const nextState = state.aiAnnotation.redoStack.pop();
             state.aiAnnotation.prompts = nextState;
           }
+        }),
+        
+        // WebSocket actions
+        setWebSocketConnectionState: (connectionState) => set((state) => {
+          state.websocket.connectionState = connectionState;
+        }),
+        
+        setWebSocketSessionState: (sessionState) => set((state) => {
+          state.websocket.sessionState = sessionState;
+        }),
+        
+        setWebSocketSessionData: (data) => set((state) => {
+          state.websocket.runningServices = data.running || [];
+          state.websocket.failedServices = data.failed || [];
+          state.websocket.sessionState = 'ready';
+        }),
+        
+        setWebSocketError: (error) => set((state) => {
+          state.websocket.lastError = error;
+          state.websocket.sessionState = 'error';
+        }),
+        
+        clearWebSocketError: () => set((state) => {
+          state.websocket.lastError = null;
+        }),
+        
+        setWebSocketImageId: (imageId) => set((state) => {
+          state.websocket.currentImageId = imageId;
+        }),
+        
+        setWebSocketReconnecting: (isReconnecting) => set((state) => {
+          state.websocket.isReconnecting = isReconnecting;
+        }),
+        
+        resetWebSocketState: () => set((state) => {
+          state.websocket.connectionState = 'disconnected';
+          state.websocket.sessionState = 'uninitialized';
+          state.websocket.currentImageId = null;
+          state.websocket.runningServices = [];
+          state.websocket.failedServices = [];
+          state.websocket.lastError = null;
+          state.websocket.isReconnecting = false;
         }),
       }))
     ),

@@ -104,4 +104,30 @@ export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setI
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
 
+// WebSocket selectors
+export const useWebSocketConnectionState = () => useAnnotationStore(state => state.websocket.connectionState);
+export const useWebSocketSessionState = () => useAnnotationStore(state => state.websocket.sessionState);
+export const useWebSocketImageId = () => useAnnotationStore(state => state.websocket.currentImageId);
+export const useWebSocketRunningServices = () => useAnnotationStore(state => state.websocket.runningServices);
+export const useWebSocketFailedServices = () => useAnnotationStore(state => state.websocket.failedServices);
+export const useWebSocketLastError = () => useAnnotationStore(state => state.websocket.lastError);
+export const useWebSocketIsReconnecting = () => useAnnotationStore(state => state.websocket.isReconnecting);
+
+// WebSocket derived selectors
+export const useWebSocketIsConnected = () => useAnnotationStore(
+  state => state.websocket.connectionState === 'connected'
+);
+export const useWebSocketIsReady = () => useAnnotationStore(
+  state => state.websocket.sessionState === 'ready' && state.websocket.connectionState === 'connected'
+);
+
+// WebSocket actions
+export const useSetWebSocketConnectionState = () => useAnnotationStore(state => state.setWebSocketConnectionState);
+export const useSetWebSocketSessionState = () => useAnnotationStore(state => state.setWebSocketSessionState);
+export const useSetWebSocketSessionData = () => useAnnotationStore(state => state.setWebSocketSessionData);
+export const useSetWebSocketError = () => useAnnotationStore(state => state.setWebSocketError);
+export const useClearWebSocketError = () => useAnnotationStore(state => state.clearWebSocketError);
+export const useSetWebSocketImageId = () => useAnnotationStore(state => state.setWebSocketImageId);
+export const useSetWebSocketReconnecting = () => useAnnotationStore(state => state.setWebSocketReconnecting);
+export const useResetWebSocketState = () => useAnnotationStore(state => state.resetWebSocketState);
 

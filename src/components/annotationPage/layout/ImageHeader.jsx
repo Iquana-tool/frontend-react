@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   useCurrentImage, 
   useAnnotationStatus, 
@@ -10,6 +11,8 @@ import {
 import ZoomControls from '../canvas/ZoomControls';
 
 const ImageHeader = () => {
+  const navigate = useNavigate();
+  const { datasetId } = useParams();
   // Use ONLY simple, direct selectors - no computed ones
   const currentImage = useCurrentImage();
   const annotationStatus = useAnnotationStatus();
@@ -30,6 +33,9 @@ const ImageHeader = () => {
     if (canGoNext) {
       const nextImage = imageList[currentIndex + 1];
       setCurrentImage(nextImage);
+      if (nextImage?.id && datasetId) {
+        navigate(`/dataset/${datasetId}/annotate/${nextImage.id}`);
+      }
     }
   };
   
@@ -37,6 +43,9 @@ const ImageHeader = () => {
     if (canGoPrev) {
       const prevImage = imageList[currentIndex - 1];
       setCurrentImage(prevImage);
+      if (prevImage?.id && datasetId) {
+        navigate(`/dataset/${datasetId}/annotate/${prevImage.id}`);
+      }
     }
   };
 

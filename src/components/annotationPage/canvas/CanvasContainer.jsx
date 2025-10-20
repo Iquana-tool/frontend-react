@@ -29,38 +29,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
     }
   };
 
-  // For AI annotation tool, use Konva canvas
-  if (currentTool === 'ai_annotation') {
-    return (
-      <div ref={containerRef} className="relative w-full h-full overflow-hidden">
-        {/* Konva-based AI Prompt Canvas */}
-        <AIPromptCanvas 
-          width={containerRef.current?.offsetWidth || 800}
-          height={containerRef.current?.offsetHeight || 600}
-        />
-        
-        {/* Model Selection Hint */}
-        <ModelSelectionHint />
-        
-        {/* Run AI Button */}
-        <RunAIButton onRunAI={handleRunAI} />
-        
-        {/* Segmentation overlay (show results) */}
-        <SegmentationOverlay canvasRef={canvasRef} />
-        
-        {/* Error display */}
-        {error && (
-          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-red-50 border-2 border-red-300 rounded-lg px-4 py-2 shadow-lg">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // For other tools, using the traditional canvas setup
+  // Cursor for non-AI tools (base image remains mounted for all tools)
   const getCanvasCursor = () => {
     switch (currentTool) {
       case 'selection':
@@ -76,6 +45,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
   return (
     <div 
+      ref={containerRef}
       className={`relative w-full h-full ${getCanvasCursor()} overflow-hidden`}
       onDragStart={(e) => e.preventDefault()}
       onDragOver={(e) => e.preventDefault()}
@@ -99,11 +69,35 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
           }}
           draggable={false}
         />
-        
-        {/* Overlays */}
-        <PromptOverlay canvasRef={canvasRef} />
+
+        {/* Overlays for traditional tools */}
+        {currentTool !== 'ai_annotation' && (
+          <PromptOverlay canvasRef={canvasRef} />
+        )}
+
+        {/* Segmentation results overlay (applies to all tools) */}
         <SegmentationOverlay canvasRef={canvasRef} />
       </div>
+
+      {/* AI tool overlays (keeps base image mounted to avoid reloading) */}
+      {currentTool === 'ai_annotation' && (
+        <>
+          <AIPromptCanvas 
+            width={containerRef.current?.offsetWidth || 800}
+            height={containerRef.current?.offsetHeight || 600}
+            renderBackground={false}
+          />
+          <ModelSelectionHint />
+          <RunAIButton onRunAI={handleRunAI} />
+          {error && (
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50">
+              <div className="bg-red-50 border-2 border-red-300 rounded-lg px-4 py-2 shadow-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

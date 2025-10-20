@@ -26,7 +26,7 @@ import LiveBoxPreview from './prompts/LiveBoxPreview';
  * Handles interactive prompt creation (points and boxes) using Konva
  * Only active when currentTool is 'ai_annotation'
  */
-const AIPromptCanvas = ({ width, height }) => {
+const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const stageRef = useRef(null);
   const containerRef = useRef(null);
   const [dragStart, setDragStart] = useState(null);
@@ -465,14 +465,16 @@ const AIPromptCanvas = ({ width, height }) => {
         onContextMenu={handleContextMenu}
       >
         <Layer>
-          {/* Background Image */}
-          <KonvaImage
-            image={imageObject}
-            x={imageDimensions.x}
-            y={imageDimensions.y}
-            width={imageDimensions.width}
-            height={imageDimensions.height}
-          />
+          {/* Background Image (optional when overlaying native <img>) */}
+          {renderBackground && (
+            <KonvaImage
+              image={imageObject}
+              x={imageDimensions.x}
+              y={imageDimensions.y}
+              width={imageDimensions.width}
+              height={imageDimensions.height}
+            />
+          )}
 
           {/* Box Prompts (render first, lower z-index) */}
           {prompts

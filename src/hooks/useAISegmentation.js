@@ -1,5 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { segmentImage } from '../api/segmentation';
+import annotationSession from '../services/annotationSession';
+import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
+import { pixelToNormalized, normalizedToPixel } from '../utils/coordinateUtils';
 import {
   useAIPrompts,
   useSelectedModel,
@@ -7,19 +10,25 @@ import {
   useSetCurrentMask,
   useClearAllPrompts,
   useSetIsSubmittingAI,
+  useWebSocketIsReady,
+  useImageObject,
 } from '../stores/selectors/annotationSelectors';
 
 /**
- * Custom hook to handle AI segmentation API calls
+ * Custom hook to handle AI segmentation via WebSocket
+ * Falls back to REST API if WebSocket is not available
  * Converts prompts to API format and processes the response
  */
 const useAISegmentation = () => {
   const [error, setError] = useState(null);
+  const [useWebSocket, setUseWebSocket] = useState(true);
 
   // Store state
   const prompts = useAIPrompts();
   const selectedModel = useSelectedModel();
   const currentImage = useCurrentImage();
+  const imageObject = useImageObject();
+  const isWebSocketReady = useWebSocketIsReady();
 
   // Store actions
   const setCurrentMask = useSetCurrentMask();
@@ -57,9 +66,119 @@ const useAISegmentation = () => {
   }, []);
 
   /**
-   * Run AI segmentation with current prompts
+   * Run AI segmentation via WebSocket
    */
-  const runSegmentation = useCallback(async () => {
+  const runWebSocketSegmentation = useCallback(async () => {
+    if (!currentImage || !selectedModel || prompts.length === 0) {
+      setError('Missing required data: image, model, or prompts');
+      return { success: false, error: 'Missing required data' };
+    }
+
+    if (!imageObject) {
+      setError('Image not loaded');
+      return { success: false, error: 'Image not loaded' };
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      
+
+      // Convert prompts to WebSocket format (convert pixel coordinates to normalized)
+      const wsPrompts = {
+        points: [],
+        boxes: [],
+        masks: [],
+      };
+
+      prompts.forEach((prompt) => {
+        if (prompt.type === 'point') {
+          // Convert pixel coordinates to normalized
+          const normalized = pixelToNormalized(
+            prompt.coords.x, 
+            prompt.coords.y, 
+            imageObject.width, 
+            imageObject.height
+          );
+          
+          wsPrompts.points.push({
+            x: normalized.x,
+            y: normalized.y,
+            label: prompt.label === 'positive', // Convert to boolean
+          });
+        } else if (prompt.type === 'box') {
+          // Convert pixel coordinates to normalized
+          const minNormalized = pixelToNormalized(
+            prompt.coords.x1, 
+            prompt.coords.y1, 
+            imageObject.width, 
+            imageObject.height
+          );
+          const maxNormalized = pixelToNormalized(
+            prompt.coords.x2, 
+            prompt.coords.y2, 
+            imageObject.width, 
+            imageObject.height
+          );
+          
+          wsPrompts.boxes.push({
+            min_x: minNormalized.x,
+            min_y: minNormalized.y,
+            max_x: maxNormalized.x,
+            max_y: maxNormalized.y,
+          });
+        }
+      });
+
+      // Map model names to backend identifiers
+      const modelMap = {
+        'SAM2': 'sam2_tiny',
+        'SAM2Tiny': 'sam2_tiny',
+        'SAM2Small': 'sam2_small',
+        'SAM2Base': 'sam2_base',
+        'SAM2Large': 'sam2_large',
+      };
+      const modelIdentifier = modelMap[selectedModel] || 'sam2_tiny';
+
+      // Send segmentation request via WebSocket
+      const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts);
+
+      
+
+      // Transform response to mask format
+      const mask = transformResponseToMask(response.data || response);
+
+      if (mask) {
+        setCurrentMask(mask);
+        clearAllPrompts();
+        return { success: true, mask };
+      } else {
+        throw new Error('No valid mask returned from server');
+      }
+    } catch (err) {
+      const errorMessage = err.message || 'Segmentation failed';
+      setError(errorMessage);
+      console.error('[useAISegmentation] WebSocket segmentation error:', err);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    currentImage,
+    selectedModel,
+    prompts,
+    imageObject,
+    setIsSubmitting,
+    transformResponseToMask,
+    setCurrentMask,
+    clearAllPrompts,
+  ]);
+
+  /**
+   * Run AI segmentation via REST API (fallback)
+   */
+  const runRestSegmentation = useCallback(async () => {
     if (!currentImage || !selectedModel || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
@@ -69,6 +188,8 @@ const useAISegmentation = () => {
     setError(null);
 
     try {
+      
+
       // Convert prompts to API format
       const apiPrompts = prompts.map((prompt) => {
         if (prompt.type === 'point') {
@@ -118,7 +239,7 @@ const useAISegmentation = () => {
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
-      console.error('AI Segmentation error:', err);
+      console.error('[useAISegmentation] REST segmentation error:', err);
       return { success: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
@@ -133,12 +254,27 @@ const useAISegmentation = () => {
     clearAllPrompts,
   ]);
 
+  /**
+   * Run AI segmentation - automatically chooses WebSocket or REST
+   */
+  const runSegmentation = useCallback(async () => {
+    // Use WebSocket if available and enabled
+    if (useWebSocket && isWebSocketReady) {
+      return runWebSocketSegmentation();
+    } else {
+      // Fallback to REST API
+      
+      return runRestSegmentation();
+    }
+  }, [useWebSocket, isWebSocketReady, runWebSocketSegmentation, runRestSegmentation]);
+
   return {
     runSegmentation,
     error,
     isReady: currentImage && selectedModel && prompts.length > 0,
+    isWebSocketMode: useWebSocket && isWebSocketReady,
+    setUseWebSocket, // Allow manual override
   };
 };
 
 export default useAISegmentation;
-
