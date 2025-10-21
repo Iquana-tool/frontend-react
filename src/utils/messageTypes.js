@@ -74,6 +74,8 @@ const createMessage = (type, data) => ({
   id: generateMessageId(),
   type,
   data,
+  success: true,
+  message: "",
 });
 
 /**
@@ -114,16 +116,15 @@ export const MessageBuilders = {
    * @param {Array} prompts.points - Array of point prompts {x: float, y: float, label: boolean}
    * @param {Array} prompts.boxes - Array of box prompts {min_x, min_y, max_x, max_y}
    * @param {Array} prompts.masks - Array of mask prompts
-   */
-  runSegmentation: (modelIdentifier, prompts) => createMessage(
+   */  
+  runSegmentation: (modelIdentifier, prompts,) => createMessage(
     CLIENT_MESSAGE_TYPES.PROMPTED_SEGMENTATION,
     {
       model_identifier: modelIdentifier,
       prompts: {
-        points: prompts.points || [],
-        boxes: prompts.boxes || [],
-        masks: prompts.masks || [],
-      }
+        point_prompts: prompts.points || [],
+        // box_prompt: prompts.boxes || [],
+      },
     }
   ),
 
