@@ -202,14 +202,33 @@ export const MessageBuilders = {
  * @returns {boolean} True if valid
  */
 export const isValidMessage = (message) => {
-  return (
+  const isValid = (
     message &&
     typeof message === 'object' &&
     typeof message.id === 'string' &&
     typeof message.type === 'string' &&
     typeof message.success === 'boolean' &&
-    message.hasOwnProperty('data')
+    message.hasOwnProperty('data') &&
+    // Allow optional message field
+    (message.message === undefined || typeof message.message === 'string')
   );
+  
+  if (!isValid) {
+    console.log('[MessageValidation] Invalid message:', {
+      message,
+      checks: {
+        exists: !!message,
+        isObject: typeof message === 'object',
+        hasId: typeof message?.id === 'string',
+        hasType: typeof message?.type === 'string',
+        hasSuccess: typeof message?.success === 'boolean',
+        hasData: message?.hasOwnProperty('data'),
+        messageFieldValid: message?.message === undefined || typeof message?.message === 'string'
+      }
+    });
+  }
+  
+  return isValid;
 };
 
 /**

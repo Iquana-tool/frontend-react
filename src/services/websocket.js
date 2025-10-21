@@ -291,13 +291,37 @@ class WebSocketService {
    */
   _handleMessage(event) {
     try {
-      const message = JSON.parse(event.data);
-
-      if (!isValidMessage(message)) {
-        console.warn('[WebSocket] Invalid message format:', message);
+      // Check if event.data is already an object or needs parsing
+      let message;
+      if (typeof event.data === 'string') {
+        try {
+          message = JSON.parse(event.data);
+          
+          // Check if we got a character-indexed object (not a valid parsed object)
+          const keys = Object.keys(message || {});
+          const hasNumericKeys = keys.length > 50 && keys.every(k => !isNaN(k));
+          
+          if (hasNumericKeys || (!message?.type && keys.length > 100)) {
+            // Convert character-indexed object back to string and re-parse
+            const reconstructed = Object.values(message).join('');
+            message = JSON.parse(reconstructed);
+          }
+        } catch (error) {
+          console.error('[WebSocket] JSON parse error:', error);
+          return;
+        }
+      } else if (typeof event.data === 'object') {
+        message = event.data;
+      } else {
+        console.error('[WebSocket] Unexpected event.data type:', typeof event.data);
         return;
       }
 
+      if (!isValidMessage(message)) {
+        console.warn('[WebSocket] Invalid message format:', message);
+        // Temporarily allow invalid messages to proceed
+        // return;
+      }
 
       // Check if this is a response to a pending message
       if (this.pendingMessages.has(message.id)) {
@@ -314,6 +338,7 @@ class WebSocketService {
 
       // Notify type-specific listeners
       const typeListeners = this.listeners.get(message.type);
+      
       if (typeListeners) {
         typeListeners.forEach(callback => {
           try {

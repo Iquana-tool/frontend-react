@@ -8,6 +8,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import annotationSession from '../services/annotationSession';
+import websocketService from '../services/websocket';
 import {
   useSetWebSocketConnectionState,
   useSetWebSocketSessionState,
@@ -134,7 +135,7 @@ const useAnnotationSession = (imageId, options = {}) => {
 
   // Subscribe to connection state changes
   useEffect(() => {
-    const unsubscribe = annotationSession.onConnectionStateChange((state) => {
+    const unsubscribe = websocketService.onConnectionStateChange((state) => {
       setConnectionState(state);
     });
 

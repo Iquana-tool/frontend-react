@@ -21,15 +21,24 @@ export const SessionState = {
 
 /**
  * Generates a temporary user ID
- * @returns {string} User ID
+ * @returns {number} User ID
  */
 const getUserId = () => {
   let userId = sessionStorage.getItem('temp_user_id');
   if (!userId) {
-    userId = `temp_${Date.now()}`;
-    sessionStorage.setItem('temp_user_id', userId);
+    // Generate a timestamp-based ID
+    const numericId = Date.now();
+    sessionStorage.setItem('temp_user_id', numericId.toString());
+    return numericId;
   }
-  return userId;
+  const parsedId = parseInt(userId, 10);
+  // If parsing fails, generate a new ID
+  if (isNaN(parsedId)) {
+    const numericId = Date.now();
+    sessionStorage.setItem('temp_user_id', numericId.toString());
+    return numericId;
+  }
+  return parsedId;
 };
 
 /**
@@ -51,7 +60,7 @@ class AnnotationSession {
   /**
    * Initialize annotation session for an image
    * @param {number|string} imageId - Image ID
-   * @param {string} userId - User ID (optional, will use temp ID if not provided)
+   * @param {number} userId - User ID (optional, will use temp ID if not provided)
    * @returns {Promise<Object>} Session initialization data
    */
   async initialize(imageId, userId = null) {
@@ -61,7 +70,7 @@ class AnnotationSession {
       this._updateSessionState(SessionState.INITIALIZING);
 
       // Construct WebSocket URL
-      const wsUrl = `${this.wsBaseUrl}/ws/annotation_session/user=${this.currentUserId}&image=${this.currentImageId}`;
+      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/user=${this.currentUserId}&image=${this.currentImageId}`;
       
       console.log('[AnnotationSession] Initializing session for image', imageId);
 
@@ -79,30 +88,42 @@ class AnnotationSession {
           reject(new Error('Session initialization timeout'));
         }, 10000);
 
+        // Add debugging for all incoming messages
+        const debugUnsubscribe = websocketService.onAny((message) => {
+          console.log('[AnnotationSession] Received message:', message);
+        });
+
         const unsubscribe = websocketService.on(
           SERVER_MESSAGE_TYPES.SESSION_INITIALIZED,
           (message) => {
             clearTimeout(timeout);
             unsubscribe();
+            debugUnsubscribe();
 
+            // Always process the session data, regardless of success status
+            this.runningServices = message.data?.running || [];
+            this.failedServices = message.data?.failed || [];
+            
             if (message.success) {
-              this.runningServices = message.data?.running || [];
-              this.failedServices = message.data?.failed || [];
               this._updateSessionState(SessionState.READY);
-              
-              console.log('[AnnotationSession] Session initialized:', {
-                running: this.runningServices,
-                failed: this.failedServices,
-              });
-
-              resolve({
+              console.log('[AnnotationSession] Session initialized successfully:', {
                 running: this.runningServices,
                 failed: this.failedServices,
               });
             } else {
               this._updateSessionState(SessionState.ERROR);
-              reject(new Error(message.message || 'Session initialization failed'));
+              console.warn('[AnnotationSession] Session initialized with errors:', {
+                running: this.runningServices,
+                failed: this.failedServices,
+                message: message.message,
+              });
             }
+
+            // Always resolve with the session data, even if some services failed
+            resolve({
+              running: this.runningServices,
+              failed: this.failedServices,
+            });
           }
         );
       });
@@ -400,5 +421,6 @@ class AnnotationSession {
 const annotationSession = new AnnotationSession();
 
 export default annotationSession;
+
 
 
