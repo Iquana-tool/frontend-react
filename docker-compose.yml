@@ -13,9 +13,7 @@ services:
     restart: unless-stopped
     labels:
       - "authors=dev-team"
-    # Optional: Can use env_file to load from .env
-    # env_file:
-    #   - .env
+   
 
   # Development service - run with: docker-compose up dev
   dev:
@@ -36,7 +34,4 @@ services:
       - /app/node_modules
     restart: unless-stopped
     labels:
-      - "authors=prathmesh"
-    # Optional: Can use env_file to load from .env
-    # env_file:
-    #   - .env
+      - "authors=dev-team"
