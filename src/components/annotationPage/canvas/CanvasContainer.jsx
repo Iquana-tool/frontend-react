@@ -74,10 +74,10 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
         {currentTool !== 'ai_annotation' && (
           <PromptOverlay canvasRef={canvasRef} />
         )}
-
-        {/* Segmentation results overlay (applies to all tools) */}
-        <SegmentationOverlay canvasRef={canvasRef} />
       </div>
+
+      {/* Segmentation results overlay (for all tools) - outside transform for correct positioning */}
+      <SegmentationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
 
       {/* AI tool overlays (keeps base image mounted to avoid reloading) */}
       {currentTool === 'ai_annotation' && (
