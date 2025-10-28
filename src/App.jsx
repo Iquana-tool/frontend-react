@@ -4,7 +4,6 @@ import { DatasetProvider } from "./contexts/DatasetContext";
 import LandingPage from "./pages/LandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
-import AnnotationPage from "./pages/AnnotationPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
 import DocumentationPage from "./pages/DocumentationPage";
 

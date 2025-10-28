@@ -112,18 +112,17 @@ export const MessageBuilders = {
   /**
    * Request AI segmentation with prompts
    * @param {string} modelIdentifier - Model to use for segmentation
-   * @param {Object} prompts - Prompts object containing points, boxes, and masks
-   * @param {Array} prompts.points - Array of point prompts {x: float, y: float, label: boolean}
-   * @param {Array} prompts.boxes - Array of box prompts {min_x, min_y, max_x, max_y}
-   * @param {Array} prompts.masks - Array of mask prompts
+   * @param {Object} prompts - Prompts object containing points and box
+   * @param {Array} prompts.point_prompts - Array of point prompts {x: float, y: float, label: boolean}
+   * @param {Object} prompts.box_prompt - Single box prompt {min_x, min_y, max_x, max_y} or null
    */  
-  runSegmentation: (modelIdentifier, prompts,) => createMessage(
+  runSegmentation: (modelIdentifier, prompts) => createMessage(
     CLIENT_MESSAGE_TYPES.PROMPTED_SEGMENTATION,
     {
       model_identifier: modelIdentifier,
       prompts: {
-        point_prompts: prompts.points || [],
-        // box_prompt: prompts.boxes || [],
+        point_prompts: prompts.point_prompts || [],
+        box_prompt: prompts.box_prompt || null,
       },
     }
   ),

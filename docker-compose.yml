@@ -8,9 +8,14 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
     restart: unless-stopped
     labels:
-      - "authors=prathmesh"
+      - "authors=dev-team"
+    # Optional: Can use env_file to load from .env
+    # env_file:
+    #   - .env
 
   # Development service - run with: docker-compose up dev
   dev:
@@ -19,9 +24,11 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NODE_ENV=development
+      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     volumes:
@@ -30,3 +37,6 @@ services:
     restart: unless-stopped
     labels:
       - "authors=prathmesh"
+    # Optional: Can use env_file to load from .env
+    # env_file:
+    #   - .env

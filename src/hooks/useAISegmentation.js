@@ -1,7 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { segmentImage } from '../api/segmentation';
+import { useState, useCallback } from 'react';
 import annotationSession from '../services/annotationSession';
-import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import { pixelToNormalized, normalizedToPixel } from '../utils/coordinateUtils';
 import {
   useAIPrompts,
@@ -10,25 +8,21 @@ import {
   useSetCurrentMask,
   useClearAllPrompts,
   useSetIsSubmittingAI,
-  useWebSocketIsReady,
   useImageObject,
 } from '../stores/selectors/annotationSelectors';
 
 /**
  * Custom hook to handle AI segmentation via WebSocket
- * Falls back to REST API if WebSocket is not available
  * Converts prompts to API format and processes the response
  */
 const useAISegmentation = () => {
   const [error, setError] = useState(null);
-  const [useWebSocket, setUseWebSocket] = useState(true);
 
   // Store state
   const prompts = useAIPrompts();
   const selectedModel = useSelectedModel();
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
-  const isWebSocketReady = useWebSocketIsReady();
 
   // Store actions
   const setCurrentMask = useSetCurrentMask();
@@ -37,38 +31,80 @@ const useAISegmentation = () => {
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
+   * Handles object_added message format with contour data
    */
   const transformResponseToMask = useCallback((response) => {
-    if (!response || !response.contours || response.contours.length === 0) {
+    let contour = null;
+    
+    // Handle backend format: object_added message with contour data
+    if (response && response.type === 'object_added' && response.data) {
+      contour = response.data;
+    }
+    // Handle direct contour data
+    else if (response && response.points) {
+      contour = response;
+    }
+    
+    // Check if we have valid contour data - handle both 'points' array and 'x,y' arrays
+    const hasPoints = contour && contour.points && contour.points.length > 0;
+    const hasXYArrays = contour && contour.x && contour.y && contour.x.length > 0 && contour.y.length > 0;
+    
+    if (!hasPoints && !hasXYArrays) {
+      console.warn('No valid contour data found in response:', response);
       return null;
     }
 
-    // Get the first contour (as SAM typically returns one mask per prompt)
-    const contour = response.contours[0];
+    // Check if we have image dimensions for coordinate conversion
+    if (!imageObject) {
+      console.error('Image object not available for coordinate conversion');
+      return null;
+    }
 
     // Convert contour points to SVG path
     let pathData = '';
-    if (contour.points && contour.points.length > 0) {
+    let points = [];
+    
+    if (hasPoints) {
+      // Old format with 'points' array (assumed to be in pixel coordinates)
+      points = contour.points;
       pathData = `M ${contour.points[0][0]} ${contour.points[0][1]}`;
       for (let i = 1; i < contour.points.length; i++) {
         pathData += ` L ${contour.points[i][0]} ${contour.points[i][1]}`;
       }
       pathData += ' Z'; // Close path
+    } else if (hasXYArrays) {
+      // New format with 'x' and 'y' arrays (normalized coordinates 0-1, need to convert to pixels)
+      points = contour.x.map((x, i) => {
+        const pixel = normalizedToPixel(x, contour.y[i], imageObject.width, imageObject.height);
+        return [pixel.x, pixel.y];
+      });
+      
+      // Build SVG path from pixel coordinates
+      const firstPoint = normalizedToPixel(contour.x[0], contour.y[0], imageObject.width, imageObject.height);
+      pathData = `M ${firstPoint.x} ${firstPoint.y}`;
+      for (let i = 1; i < contour.x.length; i++) {
+        const pixel = normalizedToPixel(contour.x[i], contour.y[i], imageObject.width, imageObject.height);
+        pathData += ` L ${pixel.x} ${pixel.y}`;
+      }
+      pathData += ' Z'; // Close path
     }
 
-    return {
+    const mask = {
       id: contour.id || Date.now(),
       path: pathData,
-      points: contour.points || [],
-      pixelCount: contour.pixel_count || 0,
+      points: points,
+      pixelCount: contour.quantification?.area || contour.pixel_count || 0,
       label: contour.label || 'AI Generated',
+      confidence: contour.confidence,
     };
-  }, []);
+    
+    return mask;
+  }, [imageObject]);
 
   /**
    * Run AI segmentation via WebSocket
    */
-  const runWebSocketSegmentation = useCallback(async () => {
+  const runSegmentation = useCallback(async () => {
     if (!currentImage || !selectedModel || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
@@ -83,13 +119,20 @@ const useAISegmentation = () => {
     setError(null);
 
     try {
-      
+      // Verify session is ready
+      if (!annotationSession.isReady()) {
+        throw new Error('WebSocket session is not ready. Please wait for the connection to be established or try refreshing the page.');
+      }
+
+      // Check if prompted_segmentation service is available
+      if (!annotationSession.isServiceAvailable('prompted_segmentation')) {
+        throw new Error('AI segmentation service is not available. Please check your connection and try again.');
+      }
 
       // Convert prompts to WebSocket format (convert pixel coordinates to normalized)
       const wsPrompts = {
-        points: [],
-        boxes: [],
-        masks: [],
+        point_prompts: [],
+        box_prompt: null,
       };
 
       prompts.forEach((prompt) => {
@@ -102,7 +145,7 @@ const useAISegmentation = () => {
             imageObject.height
           );
           
-          wsPrompts.points.push({
+          wsPrompts.point_prompts.push({
             x: normalized.x,
             y: normalized.y,
             label: prompt.label === 'positive', // Convert to boolean
@@ -122,12 +165,14 @@ const useAISegmentation = () => {
             imageObject.height
           );
           
-          wsPrompts.boxes.push({
+          // Backend expects a SINGLE box_prompt object, not an array of boxes
+          // If we have multiple boxes, only use the last one
+          wsPrompts.box_prompt = {
             min_x: minNormalized.x,
             min_y: minNormalized.y,
             max_x: maxNormalized.x,
             max_y: maxNormalized.y,
-          });
+          };
         }
       });
 
@@ -144,10 +189,8 @@ const useAISegmentation = () => {
       // Send segmentation request via WebSocket
       const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts);
 
-      
-
       // Transform response to mask format
-      const mask = transformResponseToMask(response.data || response);
+      const mask = transformResponseToMask(response);
 
       if (mask) {
         setCurrentMask(mask);
@@ -175,105 +218,10 @@ const useAISegmentation = () => {
     clearAllPrompts,
   ]);
 
-  /**
-   * Run AI segmentation via REST API (fallback)
-   */
-  const runRestSegmentation = useCallback(async () => {
-    if (!currentImage || !selectedModel || prompts.length === 0) {
-      setError('Missing required data: image, model, or prompts');
-      return { success: false, error: 'Missing required data' };
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      
-
-      // Convert prompts to API format
-      const apiPrompts = prompts.map((prompt) => {
-        if (prompt.type === 'point') {
-          return {
-            type: 'point',
-            coordinates: {
-              x: prompt.coords.x,
-              y: prompt.coords.y,
-            },
-            label: prompt.label === 'positive', // Convert to boolean for API
-          };
-        } else if (prompt.type === 'box') {
-          return {
-            type: 'box',
-            coordinates: {
-              startX: prompt.coords.x1,
-              startY: prompt.coords.y1,
-              endX: prompt.coords.x2,
-              endY: prompt.coords.y2,
-            },
-          };
-        }
-        return null;
-      }).filter(Boolean);
-
-      // Call segmentation API
-      const response = await segmentImage(
-        currentImage.id,
-        selectedModel,
-        apiPrompts,
-        { min_x: 0, min_y: 0, max_x: 1, max_y: 1 }, // Full image crop
-        'temporary_label', // Will be assigned later by user
-        null, // No mask_id
-        null  // No parent_contour_id
-      );
-
-      // Transform response to mask format
-      const mask = transformResponseToMask(response);
-
-      if (mask) {
-        setCurrentMask(mask);
-        clearAllPrompts(); // Clear prompts after successful segmentation
-        return { success: true, mask };
-      } else {
-        throw new Error('No valid mask returned from API');
-      }
-    } catch (err) {
-      const errorMessage = err.message || 'Segmentation failed';
-      setError(errorMessage);
-      console.error('[useAISegmentation] REST segmentation error:', err);
-      return { success: false, error: errorMessage };
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [
-    currentImage,
-    selectedModel,
-    prompts,
-    setIsSubmitting,
-    transformResponseToMask,
-    setCurrentMask,
-    clearAllPrompts,
-  ]);
-
-  /**
-   * Run AI segmentation - automatically chooses WebSocket or REST
-   */
-  const runSegmentation = useCallback(async () => {
-    // Use WebSocket if available and enabled
-    if (useWebSocket && isWebSocketReady) {
-      return runWebSocketSegmentation();
-    } else {
-      // Fallback to REST API
-      
-      return runRestSegmentation();
-    }
-  }, [useWebSocket, isWebSocketReady, runWebSocketSegmentation, runRestSegmentation]);
-
   return {
     runSegmentation,
     error,
     isReady: currentImage && selectedModel && prompts.length > 0,
-    isWebSocketMode: useWebSocket && isWebSocketReady,
-    setUseWebSocket, // Allow manual override
   };
 };
 

@@ -8,7 +8,6 @@ export const segmentImage = async (
     imageId,
     model = "SAM2Tiny",
     prompts = null,
-    cropCoords = { min_x: 0, min_y: 0, max_x: 1, max_y: 1 },
     label = null,
     maskId = null,
     parentContourId = null
@@ -19,16 +18,40 @@ export const segmentImage = async (
             throw new Error("A label must be selected before segmentation");
         }
 
+        // Prepare prompts object according to backend schema
+        const promptsData = {
+            point_prompts: [],
+            box_prompt: null,
+        };
+
+        // Add prompts to the prompts object
+        if (prompts && prompts.length > 0) {
+            prompts.forEach((prompt) => {
+                if (prompt.type === "point") {
+                    promptsData.point_prompts.push({
+                        x: prompt.coordinates.x,
+                        y: prompt.coordinates.y,
+                        label: prompt.label ? 1 : 0, // Convert boolean to 1/0
+                    });
+                } else if (prompt.type === "box") {
+                    // Only take the first box prompt (backend allows only one)
+                    if (!promptsData.box_prompt) {
+                        promptsData.box_prompt = {
+                            min_x: prompt.coordinates.startX,
+                            min_y: prompt.coordinates.startY,
+                            max_x: prompt.coordinates.endX,
+                            max_y: prompt.coordinates.endY,
+                        };
+                    }
+                } 
+            });
+        }
+
         const requestData = {
             image_id: imageId,
             model: model,
-            use_prompts: !!prompts && prompts.length > 0,
-            point_prompts: [],
-            min_x: cropCoords.min_x,
-            min_y: cropCoords.min_y,
-            max_x: cropCoords.max_x,
-            max_y: cropCoords.max_y,
-            label: label,
+            prompts: promptsData,
+            label: label ? parseInt(label) : 0,
         };
 
         // Add mask_id if provided
@@ -39,41 +62,6 @@ export const segmentImage = async (
         // Add parent_contour_id if provided
         if (parentContourId) {
             requestData.parent_contour_id = parentContourId;
-        }
-
-        if (prompts && prompts.length > 0) {
-            // Convert prompts to the format expected by the API
-            // Note: Backend only supports one prompt of each type (except points)
-            prompts.forEach((prompt) => {
-                if (prompt.type === "point") {
-                    requestData.point_prompts.push({
-                        x: prompt.coordinates.x,
-                        y: prompt.coordinates.y,
-                        label: prompt.label ? 1 : 0, // Convert boolean to 1/0
-                    });
-                } else if (prompt.type === "box") {
-                    // Only take the first box prompt (backend schema allows only one)
-                    if (!requestData.hasOwnProperty("box_prompt")) {
-                        requestData.box_prompt = {
-                            min_x: prompt.coordinates.startX,
-                            min_y: prompt.coordinates.startY,
-                            max_x: prompt.coordinates.endX,
-                            max_y: prompt.coordinates.endY,
-                        };
-                    }
-                } else if (prompt.type === "polygon") {
-                    // Only take the first polygon prompt (backend schema allows only one)
-                    if (!requestData.hasOwnProperty("polygon_prompt")) {
-                        const vertices = prompt.coordinates.map((point) => [
-                            point.x,
-                            point.y,
-                        ]);
-                        requestData.polygon_prompt = {
-                            vertices: vertices,
-                        };
-                    }
-                }
-            });
         }
 
         const response = await fetch(`${API_BASE_URL}/prompted_segmentation/segment_image`, {
