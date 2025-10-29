@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import TemporaryObjectsList from './TemporaryObjectsList';
 import PermanentObjectsList from './PermanentObjectsList';
+import { useObjectsList } from '../../../stores/selectors/annotationSelectors';
 
 /**
  * ObjectsSection - Container component that manages both temporary and permanent objects
@@ -13,17 +14,19 @@ const ObjectsSection = () => {
     permanent: true,
   });
 
-  // TODO: Replace with actual data from store
-  // Mock data for UI demonstration
-  const temporaryObjects = [
-    // { id: 'temp-1', label: 'Coral', pixelCount: 1234, color: '#FF6B6B', labelIndex: 1 },
-    // { id: 'temp-2', label: 'Sand', pixelCount: 5678, color: '#FFD93D', labelIndex: 2 },
-  ];
+  // Get all objects from store
+  const allObjects = useObjectsList();
 
-  const permanentObjects = [
-    // { id: 'perm-1', label: 'Coral', pixelCount: 2345, color: '#6BCF7F', labelIndex: 1 },
-    // { id: 'perm-2', label: 'Rock', pixelCount: 3456, color: '#95E1D3', labelIndex: 3 },
-  ];
+  // Filter objects by temporary status
+  const { temporaryObjects, permanentObjects } = useMemo(() => {
+    const temporary = allObjects.filter(obj => obj.temporary === true);
+    const permanent = allObjects.filter(obj => obj.temporary === false || obj.temporary === undefined);
+    
+    return {
+      temporaryObjects: temporary,
+      permanentObjects: permanent
+    };
+  }, [allObjects]);
 
   const toggleSection = (section) => {
     setExpandedSections(prev => ({

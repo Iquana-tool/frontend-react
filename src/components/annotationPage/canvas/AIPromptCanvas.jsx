@@ -16,7 +16,10 @@ import {
   usePanOffset,
   useSetZoomLevel,
   useSetPanOffset,
+  useFocusModeActive,
+  useFocusModeObjectMask,
 } from '../../../stores/selectors/annotationSelectors';
+import { isPointInPolygon, isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
 import PointPromptMarker from './prompts/PointPromptMarker';
 import BoxPromptMarker from './prompts/BoxPromptMarker';
 import LiveBoxPreview from './prompts/LiveBoxPreview';
@@ -35,6 +38,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const [panStart, setPanStart] = useState(null);
   const [isPanMode, setIsPanMode] = useState(false);
   const [containerSize, setContainerSize] = useState({ width, height });
+  const [focusModeWarning, setFocusModeWarning] = useState(null);
 
   // Store state
   const currentTool = useCurrentTool();
@@ -47,6 +51,14 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const imageError = useImageError();
   const zoomLevel = useZoomLevel();
   const panOffset = usePanOffset();
+  const focusModeActive = useFocusModeActive();
+  const focusedObjectMask = useFocusModeObjectMask();
+
+  // Show focus mode warning
+  const showFocusModeWarning = useCallback((message) => {
+    setFocusModeWarning(message);
+    setTimeout(() => setFocusModeWarning(null), 3000); // Clear after 3 seconds
+  }, []);
 
   // Store actions
   const addPointPrompt = useAddPointPrompt();
@@ -155,9 +167,16 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return; // Click outside image
 
+    // Validate prompt is within focused object if in focus mode
+    if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
+      // Show visual feedback to user
+      showFocusModeWarning('Point annotation is outside the focused object boundary');
+      return;
+    }
+
     // Add negative point
     addPointPrompt(coords.imageX, coords.imageY, 'negative');
-  }, [currentTool, selectedModel, isDragging, stageToImageCoords, addPointPrompt]);
+  }, [currentTool, selectedModel, isDragging, stageToImageCoords, addPointPrompt, focusModeActive, focusedObjectMask]);
 
   // Handle pan start
   const handlePanStart = useCallback((e) => {
@@ -284,12 +303,17 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
         // Only create box if minimum size met (3px in image space)
         if (width >= 3 && height >= 3) {
-          addBoxPrompt(
-            dragStart.imageX,
-            dragStart.imageY,
-            coords.imageX,
-            coords.imageY
-          );
+          // Validate box is within focused object if in focus mode
+          if (!isBoxInFocusedObject(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY, focusedObjectMask)) {
+            showFocusModeWarning('Box annotation is outside the focused object boundary');
+          } else {
+            addBoxPrompt(
+              dragStart.imageX,
+              dragStart.imageY,
+              coords.imageX,
+              coords.imageY
+            );
+          }
         }
       }
 
@@ -304,6 +328,16 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       
       const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
       if (!coords) return; // Click outside image
+
+      // Validate prompt is within focused object if in focus mode
+      if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
+        showFocusModeWarning('Point annotation is outside the focused object boundary');
+        // Clear drag state
+        setDragStart(null);
+        setIsDragging(false);
+        setActivePreview(null);
+        return;
+      }
 
       // Add positive point
       addPointPrompt(coords.imageX, coords.imageY, 'positive');
@@ -443,7 +477,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0"
+      className="absolute inset-0 z-10"
       style={{ cursor }}
     >
       {/* Pan mode indicator */}
@@ -512,6 +546,18 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
             })}
         </Layer>
       </Stage>
+      
+      {/* Focus Mode Warning */}
+      {focusModeWarning && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium">{focusModeWarning}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

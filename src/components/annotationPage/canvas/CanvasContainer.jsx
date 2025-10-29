@@ -4,8 +4,11 @@ import SegmentationOverlay from './SegmentationOverlay';
 import AIPromptCanvas from './AIPromptCanvas';
 import ModelSelectionHint from './ModelSelectionHint';
 import RunAIButton from './RunAIButton';
+import ObjectContextMenu from './ObjectContextMenu';
+import FocusOverlay from './FocusOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useAISegmentation from '../../../hooks/useAISegmentation';
+import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
 import { useCurrentTool } from '../../../stores/selectors/annotationSelectors';
 
 const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDragging }) => {
@@ -18,6 +21,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   
   // Enable keyboard shortcuts for AI annotation
   useAIAnnotationShortcuts();
+  
+  // Enable Escape key to exit focus mode
+  useFocusModeEscape();
 
   const handleRunAI = async () => {
     const result = await runSegmentation();
@@ -78,6 +84,12 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
       {/* Segmentation results overlay (for all tools) - outside transform for correct positioning */}
       <SegmentationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+
+      {/* Focus mode overlay (shows dimmed area and focused object) */}
+      <FocusOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+
+      {/* Context menu for object labeling */}
+      <ObjectContextMenu />
 
       {/* AI tool overlays (keeps base image mounted to avoid reloading) */}
       {currentTool === 'ai_annotation' && (

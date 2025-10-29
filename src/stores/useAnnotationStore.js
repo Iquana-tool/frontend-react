@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import { calculateBoundingBox, calculateFocusTransformSimple } from '../utils/geometryUtils';
 
 const generateObjectColor = (index) => {
   const colors = [
@@ -46,6 +47,21 @@ const useAnnotationStore = create()(
         // Segmentation State (needed for canvas components)
         segmentation: {
           currentMask: null,
+        },
+        
+        // Context Menu State (for object labeling)
+        contextMenu: {
+          visible: false,
+          x: 0,
+          y: 0,
+          targetObjectId: null,
+        },
+        
+        // Focus Mode State (for focused annotation)
+        focusMode: {
+          active: false,
+          objectId: null,
+          objectMask: null, // Store mask for boundary checking
         },
         
         // Image State
@@ -135,8 +151,11 @@ const useAnnotationStore = create()(
         
         // Object actions
         addObject: (object) => set((state) => {
+          // Use contour_id from backend if available, otherwise generate a timestamp ID
+          const objectId = object.contour_id || object.mask?.id || Date.now();
           const newObject = {
-            id: Date.now(),
+            id: objectId, // Store ID (can be contour_id or timestamp)
+            contour_id: object.contour_id || object.mask?.id || null, // Backend contour ID for API calls
             pixelCount: object.pixelCount || 0,
             label: object.label || 'Object',
             mask: object.mask,
@@ -151,6 +170,24 @@ const useAnnotationStore = create()(
           state.objects.list = state.objects.list.filter(obj => obj.id !== id);
           delete state.objects.colors[id];
           state.objects.selected = state.objects.selected.filter(objId => objId !== id);
+          
+          // Clear focus mode if the focused object is removed
+          if (state.focusMode.objectId === id) {
+            state.focusMode.active = false;
+            state.focusMode.objectId = null;
+            state.focusMode.objectMask = null;
+          }
+        }),
+        
+        updateObject: (id, updates) => set((state) => {
+          const objectIndex = state.objects.list.findIndex(obj => obj.id === id);
+          if (objectIndex !== -1) {
+            // Merge updates into the existing object
+            state.objects.list[objectIndex] = {
+              ...state.objects.list[objectIndex],
+              ...updates
+            };
+          }
         }),
         
         selectObject: (id) => set((state) => {
@@ -185,6 +222,11 @@ const useAnnotationStore = create()(
         setCurrentImage: (image) => set((state) => {
           state.images.currentImage = image;
           state.images.currentImageId = image?.id || null;
+          
+          // Clear focus mode when switching images
+          state.focusMode.active = false;
+          state.focusMode.objectId = null;
+          state.focusMode.objectMask = null;
         }),
         
         setImageList: (images) => set((state) => {
@@ -223,6 +265,11 @@ const useAnnotationStore = create()(
           state.images.imageError = null;
           state.images.zoomLevel = 1;
           state.images.panOffset = { x: 0, y: 0 };
+          
+          // Clear focus mode when resetting image state
+          state.focusMode.active = false;
+          state.focusMode.objectId = null;
+          state.focusMode.objectMask = null;
         }),
         
         // Sidebar actions
@@ -397,6 +444,52 @@ const useAnnotationStore = create()(
           state.websocket.failedServices = [];
           state.websocket.lastError = null;
           state.websocket.isReconnecting = false;
+        }),
+        
+        // Context Menu actions
+        showContextMenu: (x, y, targetObjectId) => set((state) => {
+          state.contextMenu.visible = true;
+          state.contextMenu.x = x;
+          state.contextMenu.y = y;
+          state.contextMenu.targetObjectId = targetObjectId;
+        }),
+        
+        hideContextMenu: () => set((state) => {
+          state.contextMenu.visible = false;
+          state.contextMenu.targetObjectId = null;
+        }),
+        
+        // Focus Mode actions
+        enterFocusMode: (objectId, objectMask) => set((state) => {
+          state.focusMode.active = true;
+          state.focusMode.objectId = objectId;
+          state.focusMode.objectMask = objectMask;
+        }),
+        
+        enterFocusModeWithZoom: (objectId, objectMask, imageDimensions, containerDimensions, renderedImageDimensions) => set((state) => {
+          state.focusMode.active = true;
+          state.focusMode.objectId = objectId;
+          state.focusMode.objectMask = objectMask;
+          
+          // Calculate and apply zoom/pan for focus
+          if (objectMask && objectMask.points) {
+            const boundingBox = calculateBoundingBox(objectMask.points);
+            const focusTransform = calculateFocusTransformSimple(
+              boundingBox, 
+              imageDimensions, 
+              containerDimensions, 
+              renderedImageDimensions
+            );
+            
+            // Zoom only: do not change pan when entering focus mode
+            state.images.zoomLevel = focusTransform.zoomLevel;
+          }
+        }),
+        
+        exitFocusMode: () => set((state) => {
+          state.focusMode.active = false;
+          state.focusMode.objectId = null;
+          state.focusMode.objectMask = null;
         }),
       }))
     ),

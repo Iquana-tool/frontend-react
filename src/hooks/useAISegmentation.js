@@ -5,10 +5,11 @@ import {
   useAIPrompts,
   useSelectedModel,
   useCurrentImage,
-  useSetCurrentMask,
   useClearAllPrompts,
   useSetIsSubmittingAI,
   useImageObject,
+  useAddObject,
+  useObjectsList,
 } from '../stores/selectors/annotationSelectors';
 
 /**
@@ -23,11 +24,12 @@ const useAISegmentation = () => {
   const selectedModel = useSelectedModel();
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
+  const objectsList = useObjectsList();
 
   // Store actions
-  const setCurrentMask = useSetCurrentMask();
   const clearAllPrompts = useClearAllPrompts();
   const setIsSubmitting = useSetIsSubmittingAI();
+  const addObject = useAddObject();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -193,8 +195,21 @@ const useAISegmentation = () => {
       const mask = transformResponseToMask(response);
 
       if (mask) {
-        setCurrentMask(mask);
+        // Extract contour_id from the mask (it comes from backend as mask.id)
+        const contourId = mask.id;
+        
+        // Add as a temporary object (will appear in Reviewable Objects)
+        // User can assign a label via context menu or click Accept to move it to Reviewed Objects
+        addObject({
+          mask: mask,
+          contour_id: contourId, // Store the backend contour_id for API calls
+          pixelCount: mask.pixelCount || 0,
+          label: mask.label || `Object #${objectsList.length + 1}`,
+          temporary: true // Mark as temporary so it appears in Reviewable Objects
+        });
+        
         clearAllPrompts();
+        console.log('[useAISegmentation] Object created directly from segmentation. Immediately interactive.');
         return { success: true, mask };
       } else {
         throw new Error('No valid mask returned from server');
@@ -212,10 +227,11 @@ const useAISegmentation = () => {
     selectedModel,
     prompts,
     imageObject,
+    objectsList,
     setIsSubmitting,
     transformResponseToMask,
-    setCurrentMask,
     clearAllPrompts,
+    addObject,
   ]);
 
   return {

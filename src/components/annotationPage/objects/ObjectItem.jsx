@@ -1,12 +1,30 @@
-import React from 'react';
-import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
-import { useSelectedObjects, useSelectObject, useDeselectObject, useRemoveObject } from '../../../stores/selectors/annotationSelectors';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle, X } from 'lucide-react';
+import { 
+  useSelectedObjects, 
+  useSelectObject, 
+  useDeselectObject, 
+  useRemoveObject,
+  useUpdateObject,
+  useObjectsList,
+} from '../../../stores/selectors/annotationSelectors';
+import annotationSession from '../../../services/annotationSession';
+import { useDataset } from '../../../contexts/DatasetContext';
+import { fetchLabels } from '../../../api/labels';
+import { editContourLabel } from '../../../api/masks';
 
 const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
   const removeObject = useRemoveObject();
+  const updateObject = useUpdateObject();
+  const objectsList = useObjectsList();
+  const { currentDataset } = useDataset();
+  
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
   
   const isSelected = selectedObjects.includes(object.id);
   const isVisible = true; // For now, assume all objects are visible
@@ -28,14 +46,96 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     removeObject(object.id);
   };
 
+  // Fetch labels when modal opens
+  useEffect(() => {
+    if (!showLabelModal || !currentDataset) return;
+
+    const loadLabels = async () => {
+      setLabelsLoading(true);
+      try {
+        const labelsData = await fetchLabels(currentDataset.id);
+        // Handle both array response and object response
+        const labelsArray = Array.isArray(labelsData) 
+          ? labelsData 
+          : labelsData?.labels || [];
+        
+        // Filter only root-level labels (no parent_id) for selection
+        const rootLabels = labelsArray.filter(label => !label.parent_id);
+        setLabels(rootLabels);
+      } catch (error) {
+        console.error('Failed to fetch labels:', error);
+        setLabels([]);
+      } finally {
+        setLabelsLoading(false);
+      }
+    };
+
+    loadLabels();
+  }, [showLabelModal, currentDataset]);
+
   const handleAccept = () => {
-    // TODO: Implement accept functionality for temporary objects
-    console.log('Accept object:', object.id);
+    // Show label selection modal instead of directly accepting
+    if (!currentDataset) {
+      alert('Please select a dataset first');
+      return;
+    }
+    setShowLabelModal(true);
   };
 
-  const handleReject = () => {
-    // TODO: Implement reject functionality for temporary objects
-    console.log('Reject object:', object.id);
+  const handleLabelSelect = async (label) => {
+    if (!label) return;
+
+    // Use contour_id for backend calls if available, otherwise fall back to store ID
+    const contourId = object.contour_id || object.id;
+    
+    // label is now an object with { id, name }, extract the ID
+    const labelId = typeof label === 'object' ? label.id : label;
+    const labelName = typeof label === 'object' ? label.name : label;
+
+    try {
+      // Update label using REST API endpoint
+      await editContourLabel(contourId, labelId);
+      
+      // Update temporary flag to mark as reviewed (move from Reviewable to Reviewed Objects)
+      await annotationSession.modifyObject(contourId, {
+        temporary: false,
+      });
+      
+      // Update the object in the store to mark it as reviewed (temporary: false)
+      updateObject(object.id, {
+        label: labelName, // Store label name for display
+        labelId: labelId, // Store label ID for future reference
+        temporary: false,
+      });
+      
+      console.log(`Applied label "${labelName}" (ID: ${labelId}) to object ${object.id} (contour_id: ${contourId}) and moved to Reviewed Objects`);
+      setShowLabelModal(false);
+    } catch (error) {
+      console.error('Failed to accept object with label:', error);
+      alert(`Failed to accept object: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowLabelModal(false);
+  };
+
+  const handleReject = async () => {
+    // Reject temporary object: delete it
+    const contourId = object.contour_id || object.id;
+    
+    try {
+      // Delete from backend
+      await annotationSession.deleteObject(contourId);
+      
+      // Remove from store
+      removeObject(object.id);
+      
+      console.log(`Rejected and deleted object ${object.id} (contour_id: ${contourId})`);
+    } catch (error) {
+      console.error('Failed to reject object:', error);
+      alert(`Failed to reject object: ${error.message || 'Unknown error'}`);
+    }
   };
 
   // Variant-specific styling
@@ -137,6 +237,67 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
               {object.label}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Label Selection Modal */}
+      {showLabelModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={handleCloseModal}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Select Label</h3>
+              <button
+                onClick={handleCloseModal}
+                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Please select a label for this object before accepting it.
+            </p>
+
+            {labelsLoading ? (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-sm">Loading labels...</div>
+              </div>
+            ) : labels.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-sm font-medium mb-2">No labels available</div>
+                <div className="text-xs">Please create labels for this dataset first.</div>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {labels.map((label) => (
+                  <button
+                    key={label.id}
+                    onClick={() => handleLabelSelect(label)}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center border border-gray-200 rounded-lg"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-gray-300 mr-3 flex-shrink-0"></div>
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={handleCloseModal}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

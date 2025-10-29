@@ -831,7 +831,7 @@ export const editContourLabel = async (contourId, newLabelId) => {
         }
 
         // Send request to edit the contour label
-        const url = `${API_BASE_URL}/contours/edit_contour_label/${contourId}&new_label_id=${newLabelId}`;
+        const url = `${API_BASE_URL}/contours/change_contour_label/${contourId}&new_label_id=${newLabelId}`;
         
         console.log("Edit contour label request:", {
             url: url,

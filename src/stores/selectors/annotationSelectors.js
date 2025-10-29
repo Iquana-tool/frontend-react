@@ -1,5 +1,4 @@
 import useAnnotationStore from '../useAnnotationStore';
-import { shallow } from 'zustand/shallow';
 
 // Simple state selectors 
 export const useCurrentTool = () => useAnnotationStore(state => state.ui.currentTool);
@@ -33,14 +32,7 @@ export const useCompletionModel = () => useAnnotationStore(state => state.models
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
-export const useObjectsVisibility = () => useAnnotationStore(
-  state => state.objects.visibility,
-  (a, b) => 
-    a.showAll === b.showAll && 
-    a.rootLevelOnly === b.rootLevelOnly && 
-    a.selectedLevelOnly === b.selectedLevelOnly &&
-    JSON.stringify(a.labels) === JSON.stringify(b.labels)
-);
+export const useObjectsVisibility = () => useAnnotationStore(state => state.objects.visibility);
 export const useObjectColors = () => useAnnotationStore(state => state.objects.colors);
 
 // Action selectors
@@ -57,6 +49,7 @@ export const useSetCurrentMask = () => useAnnotationStore(state => state.setCurr
 // Object actions
 export const useAddObject = () => useAnnotationStore(state => state.addObject);
 export const useRemoveObject = () => useAnnotationStore(state => state.removeObject);
+export const useUpdateObject = () => useAnnotationStore(state => state.updateObject);
 export const useSelectObject = () => useAnnotationStore(state => state.selectObject);
 export const useDeselectObject = () => useAnnotationStore(state => state.deselectObject);
 export const useClearSelection = () => useAnnotationStore(state => state.clearSelection);
@@ -130,4 +123,24 @@ export const useClearWebSocketError = () => useAnnotationStore(state => state.cl
 export const useSetWebSocketImageId = () => useAnnotationStore(state => state.setWebSocketImageId);
 export const useSetWebSocketReconnecting = () => useAnnotationStore(state => state.setWebSocketReconnecting);
 export const useResetWebSocketState = () => useAnnotationStore(state => state.resetWebSocketState);
+
+// Context Menu selectors
+export const useContextMenuVisible = () => useAnnotationStore(state => state.contextMenu.visible);
+export const useContextMenuX = () => useAnnotationStore(state => state.contextMenu.x);
+export const useContextMenuY = () => useAnnotationStore(state => state.contextMenu.y);
+export const useContextMenuTargetObjectId = () => useAnnotationStore(state => state.contextMenu.targetObjectId);
+
+// Context Menu actions
+export const useShowContextMenu = () => useAnnotationStore(state => state.showContextMenu);
+export const useHideContextMenu = () => useAnnotationStore(state => state.hideContextMenu);
+
+// Focus Mode selectors
+export const useFocusModeActive = () => useAnnotationStore(state => state.focusMode.active);
+export const useFocusModeObjectId = () => useAnnotationStore(state => state.focusMode.objectId);
+export const useFocusModeObjectMask = () => useAnnotationStore(state => state.focusMode.objectMask);
+
+// Focus Mode actions
+export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFocusMode);
+export const useEnterFocusModeWithZoom = () => useAnnotationStore(state => state.enterFocusModeWithZoom);
+export const useExitFocusMode = () => useAnnotationStore(state => state.exitFocusMode);
 
