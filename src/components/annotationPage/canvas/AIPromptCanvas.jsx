@@ -19,7 +19,7 @@ import {
   useFocusModeActive,
   useFocusModeObjectMask,
 } from '../../../stores/selectors/annotationSelectors';
-import { isPointInPolygon, isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
+import { isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
 import PointPromptMarker from './prompts/PointPromptMarker';
 import BoxPromptMarker from './prompts/BoxPromptMarker';
 import LiveBoxPreview from './prompts/LiveBoxPreview';
