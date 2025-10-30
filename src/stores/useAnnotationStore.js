@@ -166,6 +166,45 @@ const useAnnotationStore = create()(
           state.objects.colors[newObject.id] = newObject.color;
         }),
         
+        // Replace all objects from a backend ContourHierarchy
+        setObjectsFromHierarchy: (hierarchy) => set((state) => {
+          const list = [];
+          const colors = {};
+          if (hierarchy && Array.isArray(hierarchy.root_contours)) {
+            const queue = [...hierarchy.root_contours];
+            while (queue.length > 0) {
+              const c = queue.shift();
+              const id = c.id ?? Date.now() + Math.random();
+              const obj = {
+                id,
+                contour_id: c.id ?? null,
+                label: c.label ?? null,
+                x: c.x || [],
+                y: c.y || [],
+                added_by: c.added_by || null,
+                temporary: !!c.temporary,
+                parent_id: c.parent_id ?? null,
+                quantification: c.quantification || null,
+                color: generateObjectColor(list.length),
+              };
+              list.push(obj);
+              colors[obj.id] = obj.color;
+              if (Array.isArray(c.children) && c.children.length > 0) {
+                queue.push(...c.children);
+              }
+            }
+          }
+          state.objects.list = list;
+          state.objects.selected = [];
+          state.objects.colors = colors;
+        }),
+        
+        clearObjects: () => set((state) => {
+          state.objects.list = [];
+          state.objects.selected = [];
+          state.objects.colors = {};
+        }),
+        
         removeObject: (id) => set((state) => {
           state.objects.list = state.objects.list.filter(obj => obj.id !== id);
           delete state.objects.colors[id];

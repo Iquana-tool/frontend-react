@@ -230,19 +230,16 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         return (
           <svg 
             key={object.id} 
-            className="absolute pointer-events-auto transition-all duration-200"
+            className="absolute transition-all duration-200"
             viewBox={viewBox}
             preserveAspectRatio="none"
-            onClick={(e) => handleObjectLeftClick(e, object)}
-            onContextMenu={(e) => handleObjectRightClick(e, object)}
-            onMouseEnter={() => setHoveredObjectId(object.id)}
-            onMouseLeave={() => setHoveredObjectId(null)}
             style={{
               left: `${imageDimensions.x}px`,
               top: `${imageDimensions.y}px`,
               width: `${imageDimensions.width}px`,
               height: `${imageDimensions.height}px`,
-              cursor: 'pointer'
+              // Let clicks pass through by default; path will capture clicks
+              pointerEvents: 'none'
             }}
           >
             <defs>
@@ -278,9 +275,14 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               strokeLinecap="round"
               filter={isHovered ? `url(#glow-${object.id})` : `url(#shadow-${object.id})`}
               style={{ 
-                pointerEvents: 'none', 
+                // Only the path should capture pointer events
+                pointerEvents: 'auto', 
                 transition: 'all 0.2s ease-in-out'
               }}
+              onClick={(e) => handleObjectLeftClick(e, object)}
+              onContextMenu={(e) => handleObjectRightClick(e, object)}
+              onMouseEnter={() => setHoveredObjectId(object.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
             />
           </svg>
         );

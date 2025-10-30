@@ -53,6 +53,8 @@ export const useUpdateObject = () => useAnnotationStore(state => state.updateObj
 export const useSelectObject = () => useAnnotationStore(state => state.selectObject);
 export const useDeselectObject = () => useAnnotationStore(state => state.deselectObject);
 export const useClearSelection = () => useAnnotationStore(state => state.clearSelection);
+export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => state.setObjectsFromHierarchy);
+export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
 
 export const useSetSelectedModel = () => useAnnotationStore(state => state.setSelectedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);

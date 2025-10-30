@@ -5,6 +5,7 @@ import ResponsiveWrapper from '../components/annotationPage/layout/ResponsiveWra
 import DatasetLoader from '../components/annotationPage/layout/DatasetLoader';
 import DatasetNavigation from '../components/annotationPage/layout/DatasetNavigation';
 import useAnnotationSession from '../hooks/useAnnotationSession';
+import { useSetObjectsFromHierarchy, useClearObjects } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 
 const AnnotationPageV2 = () => {
@@ -15,6 +16,9 @@ const AnnotationPageV2 = () => {
   // Use URL imageId if available, otherwise use store imageId
   const imageId = urlImageId ? parseInt(urlImageId) : storeImageId;
 
+  const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
+  const clearObjects = useClearObjects();
+
   // Initialize WebSocket session for the current image
   const { isReady, sessionState, runningServices, failedServices } = useAnnotationSession(
     imageId,
@@ -22,9 +26,17 @@ const AnnotationPageV2 = () => {
       autoConnect: true,
       onSessionReady: (data) => {
         console.log('[AnnotationPageV2] WebSocket session ready:', data);
+        // Populate objects from backend-provided hierarchy when available
+        if (data && data.objects) {
+          setObjectsFromHierarchy(data.objects);
+        } else {
+          // Clear if backend didn't return objects (just in case)
+          clearObjects();
+        }
       },
       onSessionError: (error) => {
         console.error('[AnnotationPageV2] WebSocket session error:', error);
+        clearObjects();
       },
     }
   );

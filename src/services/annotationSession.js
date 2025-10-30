@@ -123,6 +123,7 @@ class AnnotationSession {
             resolve({
               running: this.runningServices,
               failed: this.failedServices,
+              objects: message.data?.objects || null,
             });
           }
         );

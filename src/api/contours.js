@@ -15,6 +15,18 @@ export const getContoursForMask = async (maskId) => {
     }
 };
 
+// Get full ContourHierarchy for a mask 
+export const getContourHierarchy = async (maskId) => {
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`
+        );
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+};
+
 // Delete a contour from a mask
 export const deleteContour = async (contourId) => {
     try {
