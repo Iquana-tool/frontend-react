@@ -5,6 +5,7 @@ import {
   useImageObject,
   useShowContextMenu,
   useEnterFocusMode,
+  useCurrentTool,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { findObjectAtPoint } from '../../../utils/geometryUtils';
@@ -15,6 +16,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const imageObject = useImageObject();
   const showContextMenu = useShowContextMenu();
   const enterFocusMode = useEnterFocusMode();
+  const currentTool = useCurrentTool();
   const containerRef = useRef(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [hoveredObjectId, setHoveredObjectId] = useState(null);
@@ -100,8 +102,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const handleObjectLeftClick = (e, object) => {
     e.stopPropagation();
     
+    // Get the SVG element (parent of the path)
+    const svgElement = e.currentTarget.parentElement;
+    
     // Convert click coordinates to image pixel coordinates
-    const imageCoords = screenToImageCoords(e.clientX, e.clientY, e.currentTarget);
+    const imageCoords = screenToImageCoords(e.clientX, e.clientY, svgElement);
     if (!imageCoords) return;
     
     // Check if click is actually inside the object boundary
@@ -117,8 +122,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     e.preventDefault();
     e.stopPropagation();
     
+    // Get the SVG element (parent of the path)
+    const svgElement = e.currentTarget.parentElement;
+    
     // Convert click coordinates to image pixel coordinates
-    const imageCoords = screenToImageCoords(e.clientX, e.clientY, e.currentTarget);
+    const imageCoords = screenToImageCoords(e.clientX, e.clientY, svgElement);
     if (!imageCoords) return;
     
     // Check if click is actually inside the object boundary
@@ -136,12 +144,6 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     const containerX = e.clientX - containerRect.left;
     const containerY = e.clientY - containerRect.top;
     
-    console.log('[SegmentationOverlay] Context menu positioning:', {
-      viewport: { x: e.clientX, y: e.clientY },
-      container: { x: containerX, y: containerY },
-      containerRect: { left: containerRect.left, top: containerRect.top }
-    });
-    
     // Show context menu at the container-relative position
     showContextMenu(containerX, containerY, object.id);
   };
@@ -151,28 +153,34 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     ? `0 0 ${imageObject.width} ${imageObject.height}`
     : '0 0 800 600'; // Fallback dimensions
 
+  // use high z-index to ensure object interactions work
+  // Object paths will only capture events on painted areas, allowing empty areas to pass through
+  const overlayZIndex = 30;
+  
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0"
       style={{
         transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
         transformOrigin: 'center center',
         transition: 'transform 0.2s ease-out',
-        zIndex: 30 // Higher than AIPromptCanvas (z-10) to ensure clicks work
+        zIndex: overlayZIndex,
+        pointerEvents: 'none' // Container doesn't block - let children control their events
       }}
     >
       {/* Current Segmentation Mask - Visual preview only (auto-converted to object) */}
       {currentMask && imageDimensions.width > 0 && (
         <svg 
-          className="absolute pointer-events-none"
+          className="absolute"
           viewBox={viewBox}
           preserveAspectRatio="none"
           style={{ 
             left: `${imageDimensions.x}px`,
             top: `${imageDimensions.y}px`,
             width: `${imageDimensions.width}px`,
-            height: `${imageDimensions.height}px`
+            height: `${imageDimensions.height}px`,
+            pointerEvents: 'none' // Preview mask is not interactive
           }}
         >
           <defs>
@@ -238,7 +246,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               top: `${imageDimensions.y}px`,
               width: `${imageDimensions.width}px`,
               height: `${imageDimensions.height}px`,
-              // Let clicks pass through by default; path will capture clicks
+              // SVG container has no pointer events - let it pass through
               pointerEvents: 'none'
             }}
           >
@@ -275,9 +283,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               strokeLinecap="round"
               filter={isHovered ? `url(#glow-${object.id})` : `url(#shadow-${object.id})`}
               style={{ 
-                // Only the path should capture pointer events
-                pointerEvents: 'auto', 
-                transition: 'all 0.2s ease-in-out'
+                transition: 'all 0.2s ease-in-out',
+                cursor: 'pointer',
+                // Path captures pointer events - this is the interactive element
+                pointerEvents: 'auto'
               }}
               onClick={(e) => handleObjectLeftClick(e, object)}
               onContextMenu={(e) => handleObjectRightClick(e, object)}

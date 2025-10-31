@@ -27,9 +27,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
   const handleRunAI = async () => {
     const result = await runSegmentation();
-    if (result.success) {
-      console.log('Segmentation successful:', result.mask);
-    } else {
+    if (!result.success) {
       console.error('Segmentation failed:', result.error);
       // TODO: toast notification here
     }

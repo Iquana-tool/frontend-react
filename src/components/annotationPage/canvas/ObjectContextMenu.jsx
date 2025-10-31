@@ -66,13 +66,6 @@ const ObjectContextMenu = () => {
     // Keep within vertical bounds
     adjustedY = Math.max(10, Math.min(adjustedY, containerHeight - menuRect.height - 10));
 
-    console.log('[ObjectContextMenu] Positioning menu at:', { 
-      original: { x, y }, 
-      adjusted: { adjustedX, adjustedY }, 
-      menuSize: { width: menuRect.width, height: menuRect.height },
-      containerSize: { width: containerWidth, height: containerHeight }
-    });
-
     setAdjustedPosition({ x: adjustedX, y: adjustedY });
   }, [visible, x, y]);
 
@@ -162,7 +155,6 @@ const ObjectContextMenu = () => {
         temporary: false,
       });
       
-      console.log(`Applied label "${labelName}" (ID: ${labelId}) to object ${targetObjectId} (contour_id: ${contourId}) and marked as reviewed`);
       hideContextMenu();
     } catch (error) {
       console.error('Failed to apply label:', error);
