@@ -209,7 +209,6 @@ const useAISegmentation = () => {
         });
         
         clearAllPrompts();
-        console.log('[useAISegmentation] Object created directly from segmentation. Immediately interactive.');
         return { success: true, mask };
       } else {
         throw new Error('No valid mask returned from server');

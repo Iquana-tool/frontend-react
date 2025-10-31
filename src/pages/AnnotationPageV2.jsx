@@ -25,7 +25,6 @@ const AnnotationPageV2 = () => {
     {
       autoConnect: true,
       onSessionReady: (data) => {
-        console.log('[AnnotationPageV2] WebSocket session ready:', data);
         // Populate objects from backend-provided hierarchy when available
         if (data && data.objects) {
           setObjectsFromHierarchy(data.objects);

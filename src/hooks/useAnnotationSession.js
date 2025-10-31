@@ -61,13 +61,11 @@ const useAnnotationSession = (imageId, options = {}) => {
 
     // Prevent duplicate initialization for the same image
     if (annotationSession.getCurrentImageId() === imageId && annotationSession.isReady()) {
-      console.log('[useAnnotationSession] Session already ready for image:', imageId);
       return;
     }
 
     try {
       isInitializing.current = true;
-      console.log('[useAnnotationSession] Initializing session for image:', imageId);
 
       setSessionState(SessionState.INITIALIZING);
       setImageId(imageId);
@@ -75,7 +73,6 @@ const useAnnotationSession = (imageId, options = {}) => {
       const sessionData = await annotationSession.initialize(imageId);
 
       setSessionData(sessionData);
-      console.log('[useAnnotationSession] Session initialized successfully');
 
       if (onSessionReady) {
         onSessionReady(sessionData);
@@ -97,7 +94,6 @@ const useAnnotationSession = (imageId, options = {}) => {
    */
   const closeSession = useCallback(async (sendFinish = true) => {
     try {
-      console.log('[useAnnotationSession] Closing session');
       await annotationSession.close(sendFinish);
       resetState();
     } catch (error) {
@@ -113,7 +109,6 @@ const useAnnotationSession = (imageId, options = {}) => {
     if (!newImageId) return;
 
     try {
-      console.log('[useAnnotationSession] Switching to image:', newImageId);
       setSessionState(SessionState.INITIALIZING);
       setImageId(newImageId);
 
@@ -177,7 +172,6 @@ const useAnnotationSession = (imageId, options = {}) => {
     
     return () => {
       isMounted.current = false;
-      console.log('[useAnnotationSession] Cleaning up on unmount');
       
       // Small delay to avoid closing during React StrictMode double-mount
       setTimeout(() => {

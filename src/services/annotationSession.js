@@ -71,8 +71,6 @@ class AnnotationSession {
 
       // Construct WebSocket URL
       const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/user=${this.currentUserId}&image=${this.currentImageId}`;
-      
-      console.log('[AnnotationSession] Initializing session for image', imageId);
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
@@ -88,17 +86,11 @@ class AnnotationSession {
           reject(new Error('Session initialization timeout'));
         }, 10000);
 
-        // Add debugging for all incoming messages
-        const debugUnsubscribe = websocketService.onAny((message) => {
-          console.log('[AnnotationSession] Received message:', message);
-        });
-
         const unsubscribe = websocketService.on(
           SERVER_MESSAGE_TYPES.SESSION_INITIALIZED,
           (message) => {
             clearTimeout(timeout);
             unsubscribe();
-            debugUnsubscribe();
 
             // Always process the session data, regardless of success status
             this.runningServices = message.data?.running || [];
@@ -106,17 +98,8 @@ class AnnotationSession {
             
             if (message.success) {
               this._updateSessionState(SessionState.READY);
-              console.log('[AnnotationSession] Session initialized successfully:', {
-                running: this.runningServices,
-                failed: this.failedServices,
-              });
             } else {
               this._updateSessionState(SessionState.ERROR);
-              console.warn('[AnnotationSession] Session initialized with errors:', {
-                running: this.runningServices,
-                failed: this.failedServices,
-                message: message.message,
-              });
             }
 
             // Always resolve with the session data, even if some services failed
@@ -142,8 +125,6 @@ class AnnotationSession {
    */
   async close(sendFinishMessage = true) {
     try {
-      console.log('[AnnotationSession] Closing session for image', this.currentImageId);
-
       if (sendFinishMessage && websocketService.isConnected()) {
         const message = MessageBuilders.finishAnnotation();
         await websocketService.send(message);
@@ -168,7 +149,6 @@ class AnnotationSession {
    */
   async switchImage(newImageId) {
     if (this.currentImageId === newImageId) {
-      console.log('[AnnotationSession] Already on image', newImageId);
       return {
         running: this.runningServices,
         failed: this.failedServices,
@@ -404,7 +384,6 @@ class AnnotationSession {
    */
   _updateSessionState(newState) {
     if (this.sessionState !== newState) {
-      console.log(`[AnnotationSession] State: ${this.sessionState} -> ${newState}`);
       this.sessionState = newState;
       
       this.sessionListeners.forEach(callback => {
