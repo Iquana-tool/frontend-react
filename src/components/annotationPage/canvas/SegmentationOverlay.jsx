@@ -139,7 +139,6 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       style={{
         transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
         transformOrigin: 'center center',
-        transition: 'transform 0.2s ease-out',
         zIndex: overlayZIndex,
         pointerEvents: 'none' // Container doesn't block - let children control their events
       }}

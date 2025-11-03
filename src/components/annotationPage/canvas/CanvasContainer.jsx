@@ -59,8 +59,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
         className="relative w-full h-full"
         style={{
           transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-          transformOrigin: 'center center',
-          transition: 'transform 0.2s ease-out'
+          transformOrigin: 'center center'
         }}
       >
         <img

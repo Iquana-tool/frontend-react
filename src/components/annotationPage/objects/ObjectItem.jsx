@@ -118,18 +118,13 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       return;
     }
     
-    // Toggle selection
+    // Toggle selection only - no panning or zooming
     if (isSelected) {
       // If already selected, deselect it
       deselectObject(object.id);
-      // If this was the only selected object, reset view
-      if (selectedObjects.length === 1) {
-        resetView();
-      }
     } else {
-      // If not selected, select it and pan/zoom
+      // If not selected, select it (without pan/zoom)
       selectObject(object.id);
-      performPanZoom();
     }
   };
 
@@ -281,7 +276,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
           </button>
           <span 
             className="font-medium text-sm text-gray-800"
-            title="Click to select and pan/zoom to object"
+            title="Click to select object"
           >
             Object #{object.id}
           </span>

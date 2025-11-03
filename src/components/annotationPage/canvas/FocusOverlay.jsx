@@ -145,8 +145,7 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
       style={{ 
         zIndex: 40, // Higher than SegmentationOverlay (z-30)
         transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-        transformOrigin: 'center center',
-        transition: 'transform 0.2s ease-out'
+        transformOrigin: 'center center'
       }}
     >
       {imageDimensions.width > 0 && (
