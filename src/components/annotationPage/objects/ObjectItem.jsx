@@ -139,9 +139,21 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     console.log('Edit object:', object.id);
   };
 
-  const handleDelete = (e) => {
+  const handleDelete = async (e) => {
     e?.stopPropagation();
-    removeObject(object.id);
+    // Delete from backend first
+    const contourId = object.contour_id || object.id;
+    
+    try {
+      // Delete from backend
+      await annotationSession.deleteObject(contourId);
+      
+      // Remove from store
+      removeObject(object.id);
+      
+    } catch (error) {
+      alert(`Failed to delete object: ${error.message || 'Unknown error'}`);
+    }
   };
 
   // Fetch labels when modal opens
