@@ -176,16 +176,8 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
             <rect
               width="100%"
               height="100%"
-              fill="rgba(0, 0, 0, 0.6)"
+              fill="rgba(0, 0, 0, 0.7)"
               mask="url(#focus-mask)"
-            />
-            {/* Highlighted border around focused object */}
-            <path
-              d={focusedObjectMask.path}
-              fill="none"
-              stroke="#3B82F6"
-              strokeWidth="3"
-              strokeDasharray="8,4"
             />
           </svg>
 
