@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { devtools, subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { calculateBoundingBox, calculateFocusTransformSimple } from '../utils/geometryUtils';
+import { getLabelColor, getLabelColorByName } from '../utils/labelColors';
 
 const generateObjectColor = (index) => {
   const colors = [
@@ -15,6 +16,25 @@ const generateObjectColor = (index) => {
     '#84CC16', // lime
   ];
   return colors[index % colors.length];
+};
+
+/**
+ * Get color for an object based on its label, or fallback to index-based color
+ * @param {Object} object - Object with labelId, label, or labelName
+ * @param {number} index - Fallback index for unlabeled objects
+ * @returns {string} Hex color code
+ */
+const getObjectColor = (object, index) => {
+  // If object has a labelId, use label-based color
+  if (object.labelId) {
+    return getLabelColor(object.labelId);
+  }
+  // If object has a label name (but no ID), use name-based color
+  if (object.label && object.label !== 'Object') {
+    return getLabelColorByName(object.label);
+  }
+  // Fallback to index-based color for unlabeled objects
+  return generateObjectColor(index);
 };
 
 const useAnnotationStore = create()(
@@ -161,7 +181,8 @@ const useAnnotationStore = create()(
             path: object.path || object.mask?.path || null, // Preserve path from backend
             mask: object.mask,
             ...object,
-            color: generateObjectColor(state.objects.list.length)
+            // Use label-based color if labeled, otherwise use index-based
+            color: getObjectColor({ labelId: object.labelId, label: object.label }, state.objects.list.length)
           };
           state.objects.list.push(newObject);
           state.objects.colors[newObject.id] = newObject.color;
@@ -180,6 +201,7 @@ const useAnnotationStore = create()(
                 id,
                 contour_id: c.id ?? null,
                 label: c.label ?? null,
+                labelId: c.label_id ?? c.labelId ?? null, // Support both label_id and labelId from backend
                 x: c.x || [],
                 y: c.y || [],
                 path: c.path || null, // SVG path from backend
@@ -187,7 +209,8 @@ const useAnnotationStore = create()(
                 temporary: !!c.temporary,
                 parent_id: c.parent_id ?? null,
                 quantification: c.quantification || null,
-                color: generateObjectColor(list.length),
+                // Use label-based color if labeled, otherwise use index-based
+                color: getObjectColor({ labelId: c.label_id ?? c.labelId, label: c.label }, list.length),
               };
               list.push(obj);
               colors[obj.id] = obj.color;
@@ -223,11 +246,27 @@ const useAnnotationStore = create()(
         updateObject: (id, updates) => set((state) => {
           const objectIndex = state.objects.list.findIndex(obj => obj.id === id);
           if (objectIndex !== -1) {
+            const existingObject = state.objects.list[objectIndex];
             // Merge updates into the existing object
-            state.objects.list[objectIndex] = {
-              ...state.objects.list[objectIndex],
+            const updatedObject = {
+              ...existingObject,
               ...updates
             };
+            
+            // If label or labelId is being updated, recalculate color based on label
+            if (updates.labelId !== undefined || updates.label !== undefined) {
+              updatedObject.color = getObjectColor(
+                { 
+                  labelId: updatedObject.labelId, 
+                  label: updatedObject.label 
+                }, 
+                objectIndex
+              );
+              // Also update the colors map
+              state.objects.colors[updatedObject.id] = updatedObject.color;
+            }
+            
+            state.objects.list[objectIndex] = updatedObject;
           }
         }),
         
