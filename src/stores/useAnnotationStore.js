@@ -158,6 +158,7 @@ const useAnnotationStore = create()(
             contour_id: object.contour_id || object.mask?.id || null, // Backend contour ID for API calls
             pixelCount: object.pixelCount || 0,
             label: object.label || 'Object',
+            path: object.path || object.mask?.path || null, // Preserve path from backend
             mask: object.mask,
             ...object,
             color: generateObjectColor(state.objects.list.length)
@@ -181,6 +182,7 @@ const useAnnotationStore = create()(
                 label: c.label ?? null,
                 x: c.x || [],
                 y: c.y || [],
+                path: c.path || null, // SVG path from backend
                 added_by: c.added_by || null,
                 temporary: !!c.temporary,
                 parent_id: c.parent_id ?? null,
@@ -520,8 +522,24 @@ const useAnnotationStore = create()(
               renderedImageDimensions
             );
             
-            // Zoom only: do not change pan when entering focus mode
+            // Set both zoom and pan
             state.images.zoomLevel = focusTransform.zoomLevel;
+            state.images.panOffset = focusTransform.panOffset;
+          }
+        }),
+        
+        panZoomToObject: (objectMask, imageDimensions, containerDimensions, renderedImageDimensions) => set((state) => {
+          if (objectMask && objectMask.points) {
+            const boundingBox = calculateBoundingBox(objectMask.points);
+            const focusTransform = calculateFocusTransformSimple(
+              boundingBox, 
+              imageDimensions, 
+              containerDimensions, 
+              renderedImageDimensions
+            );
+            
+            state.images.zoomLevel = focusTransform.zoomLevel;
+            state.images.panOffset = focusTransform.panOffset;
           }
         }),
         

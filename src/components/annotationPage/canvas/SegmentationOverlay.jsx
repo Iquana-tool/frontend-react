@@ -6,9 +6,9 @@ import {
   useShowContextMenu,
   useEnterFocusMode,
   useCurrentTool,
+  useSelectedObjects,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
-import { findObjectAtPoint } from '../../../utils/geometryUtils';
 
 const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const currentMask = useCurrentMask();
@@ -20,6 +20,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const containerRef = useRef(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [hoveredObjectId, setHoveredObjectId] = useState(null);
+  const selectedObjects = useSelectedObjects();
 
   // Calculate the actual rendered dimensions of the image after object-contain is applied
   useEffect(() => {
@@ -81,40 +82,18 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  // Convert screen coordinates to image pixel coordinates
-  const screenToImageCoords = (screenX, screenY, svgElement) => {
-    if (!imageObject || !imageDimensions.width || !svgElement) return null;
-
-    const svgRect = svgElement.getBoundingClientRect();
-    const svgX = screenX - svgRect.left;
-    const svgY = screenY - svgRect.top;
-    
-    const scaleX = imageObject.width / imageDimensions.width;
-    const scaleY = imageObject.height / imageDimensions.height;
-    
-    return { 
-      x: svgX * scaleX, 
-      y: svgY * scaleY 
-    };
-  };
-
   // Handle left-click on objects (enter focus mode)
   const handleObjectLeftClick = (e, object) => {
     e.stopPropagation();
     
-    // Get the SVG element (parent of the path)
-    const svgElement = e.currentTarget.parentElement;
+    // Click is already on the SVG path element, so it's inside the object
+    // (browser SVG hit-testing handles this)
     
-    // Convert click coordinates to image pixel coordinates
-    const imageCoords = screenToImageCoords(e.clientX, e.clientY, svgElement);
-    if (!imageCoords) return;
-    
-    // Check if click is actually inside the object boundary
-    const clickedObject = findObjectAtPoint(imageCoords.x, imageCoords.y, [object]);
-    if (!clickedObject) return;
+    // Get mask for focus mode
+    const mask = object.mask || (object.path ? { path: object.path } : null);
     
     // Enter focus mode for this object
-    enterFocusMode(object.id, object.mask);
+    enterFocusMode(object.id, mask);
   };
 
   // Handle right-click on objects (show context menu)
@@ -122,16 +101,8 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     e.preventDefault();
     e.stopPropagation();
     
-    // Get the SVG element (parent of the path)
-    const svgElement = e.currentTarget.parentElement;
-    
-    // Convert click coordinates to image pixel coordinates
-    const imageCoords = screenToImageCoords(e.clientX, e.clientY, svgElement);
-    if (!imageCoords) return;
-    
-    // Check if click is actually inside the object boundary
-    const clickedObject = findObjectAtPoint(imageCoords.x, imageCoords.y, [object]);
-    if (!clickedObject) return;
+    // Click is already on the SVG path element, so it's inside the object
+    // (browser SVG hit-testing handles this)
     
     // Get the canvas container to calculate relative coordinates
     // The containerRef points to the outer div with position: relative
@@ -231,9 +202,18 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       {/* Final Objects Masks */}
       {imageDimensions.width > 0 && objectsList.map((object) => {
         const isHovered = hoveredObjectId === object.id;
-        const fillOpacity = isHovered ? 0.3 : 0.2;
-        const strokeWidth = isHovered ? 3 : 2.5;
-        const glowIntensity = isHovered ? 8 : 4;
+        const isSelected = selectedObjects.includes(object.id);
+        const fillOpacity = isHovered ? 0.3 : (isSelected ? 0.35 : 0.2);
+        const strokeWidth = isHovered ? 3 : (isSelected ? 4 : 2.5);
+        const glowIntensity = isHovered ? 8 : (isSelected ? 6 : 4);
+        
+        // Get mask path from backend (precomputed) or fallback to mask.path
+        const maskPath = object.path || object.mask?.path;
+        
+        // Skip if no path available
+        if (!maskPath) {
+          return null;
+        }
         
         return (
           <svg 
@@ -272,16 +252,31 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                   <feMergeNode in="SourceGraphic"/>
                 </feMerge>
               </filter>
+              
+              {/* Selected object glow */}
+              <filter id={`selected-glow-${object.id}`}>
+                <feGaussianBlur stdDeviation={glowIntensity} result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
             </defs>
             
             <path
-              d={object.mask?.path}
+              d={maskPath}
               fill={hexToRgba(object.color, fillOpacity)}
               stroke={object.color}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
               strokeLinecap="round"
-              filter={isHovered ? `url(#glow-${object.id})` : `url(#shadow-${object.id})`}
+              filter={
+                isHovered 
+                  ? `url(#glow-${object.id})` 
+                  : isSelected 
+                    ? `url(#selected-glow-${object.id})` 
+                    : `url(#shadow-${object.id})`
+              }
               style={{ 
                 transition: 'all 0.2s ease-in-out',
                 cursor: 'pointer',

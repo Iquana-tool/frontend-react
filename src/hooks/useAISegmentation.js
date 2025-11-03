@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import annotationSession from '../services/annotationSession';
-import { pixelToNormalized, normalizedToPixel } from '../utils/coordinateUtils';
+import { pixelToNormalized } from '../utils/coordinateUtils';
 import {
   useAIPrompts,
   useSelectedModel,
@@ -43,65 +43,26 @@ const useAISegmentation = () => {
       contour = response.data;
     }
     // Handle direct contour data
-    else if (response && response.points) {
+    else if (response && response.path) {
       contour = response;
     }
     
-    // Check if we have valid contour data - handle both 'points' array and 'x,y' arrays
-    const hasPoints = contour && contour.points && contour.points.length > 0;
-    const hasXYArrays = contour && contour.x && contour.y && contour.x.length > 0 && contour.y.length > 0;
-    
-    if (!hasPoints && !hasXYArrays) {
-      console.warn('No valid contour data found in response:', response);
+    // Backend should always provide path - if missing, it's an error
+    if (!contour || !contour.path) {
+      console.warn('No valid contour with path found in response:', response);
       return null;
-    }
-
-    // Check if we have image dimensions for coordinate conversion
-    if (!imageObject) {
-      console.error('Image object not available for coordinate conversion');
-      return null;
-    }
-
-    // Convert contour points to SVG path
-    let pathData = '';
-    let points = [];
-    
-    if (hasPoints) {
-      // Old format with 'points' array (assumed to be in pixel coordinates)
-      points = contour.points;
-      pathData = `M ${contour.points[0][0]} ${contour.points[0][1]}`;
-      for (let i = 1; i < contour.points.length; i++) {
-        pathData += ` L ${contour.points[i][0]} ${contour.points[i][1]}`;
-      }
-      pathData += ' Z'; // Close path
-    } else if (hasXYArrays) {
-      // New format with 'x' and 'y' arrays (normalized coordinates 0-1, need to convert to pixels)
-      points = contour.x.map((x, i) => {
-        const pixel = normalizedToPixel(x, contour.y[i], imageObject.width, imageObject.height);
-        return [pixel.x, pixel.y];
-      });
-      
-      // Build SVG path from pixel coordinates
-      const firstPoint = normalizedToPixel(contour.x[0], contour.y[0], imageObject.width, imageObject.height);
-      pathData = `M ${firstPoint.x} ${firstPoint.y}`;
-      for (let i = 1; i < contour.x.length; i++) {
-        const pixel = normalizedToPixel(contour.x[i], contour.y[i], imageObject.width, imageObject.height);
-        pathData += ` L ${pixel.x} ${pixel.y}`;
-      }
-      pathData += ' Z'; // Close path
     }
 
     const mask = {
       id: contour.id || Date.now(),
-      path: pathData,
-      points: points,
+      path: contour.path, // Backend-computed SVG path
       pixelCount: contour.quantification?.area || contour.pixel_count || 0,
       label: contour.label || 'AI Generated',
       confidence: contour.confidence,
     };
     
     return mask;
-  }, [imageObject]);
+  }, []);
 
   /**
    * Run AI segmentation via WebSocket

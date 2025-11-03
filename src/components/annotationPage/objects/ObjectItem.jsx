@@ -7,6 +7,10 @@ import {
   useRemoveObject,
   useUpdateObject,
   useObjectsList,
+  usePanZoomToObject,
+  useImageObject,
+  useSetZoomLevel,
+  useSetPanOffset,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
@@ -21,6 +25,10 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const updateObject = useUpdateObject();
   const objectsList = useObjectsList();
   const { currentDataset } = useDataset();
+  const panZoomToObject = usePanZoomToObject();
+  const imageObject = useImageObject();
+  const setZoomLevel = useSetZoomLevel();
+  const setPanOffset = useSetPanOffset();
   
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [labels, setLabels] = useState([]);
@@ -37,12 +45,102 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     }
   };
 
-  const handleEdit = () => {
+  const performPanZoom = () => {
+    if (!imageObject || !object.x || !object.y || object.x.length === 0) {
+      console.warn('Cannot pan/zoom: missing image or object coordinates');
+      return;
+    }
+    
+    // Convert normalized x/y arrays (0-1) to pixel coordinates
+    const points = object.x.map((x, i) => {
+      return [x * imageObject.width, object.y[i] * imageObject.height];
+    });
+
+    // Construct mask with points for panZoomToObject
+    const mask = { points };
+
+    // Get image dimensions
+    const imageDimensions = {
+      width: imageObject.width,
+      height: imageObject.height
+    };
+
+    // Find the canvas container
+    const container = document.querySelector('.relative.overflow-hidden');
+    if (!container) {
+      console.warn('Canvas container not found');
+      return;
+    }
+
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+    
+    if (!containerWidth || !containerHeight) {
+      console.warn('Container dimensions not available');
+      return;
+    }
+
+    // Calculate rendered image dimensions (object-contain sizing)
+    const imageAspect = imageObject.width / imageObject.height;
+    const containerAspect = containerWidth / containerHeight;
+
+    let renderedWidth, renderedHeight, renderedX, renderedY;
+
+    if (imageAspect > containerAspect) {
+      renderedWidth = containerWidth;
+      renderedHeight = containerWidth / imageAspect;
+      renderedX = 0;
+      renderedY = (containerHeight - renderedHeight) / 2;
+    } else {
+      renderedWidth = containerHeight * imageAspect;
+      renderedHeight = containerHeight;
+      renderedX = (containerWidth - renderedWidth) / 2;
+      renderedY = 0;
+    }
+
+    panZoomToObject(
+      mask,
+      imageDimensions,
+      { width: containerWidth, height: containerHeight },
+      { width: renderedWidth, height: renderedHeight, x: renderedX, y: renderedY }
+    );
+  };
+
+  const resetView = () => {
+    // Reset zoom and pan to default view (show entire image)
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  };
+
+  const handleItemClick = (e) => {
+    // Don't trigger if clicking action buttons or chevron
+    if (e.target.closest('button')) {
+      return;
+    }
+    
+    // Toggle selection
+    if (isSelected) {
+      // If already selected, deselect it
+      deselectObject(object.id);
+      // If this was the only selected object, reset view
+      if (selectedObjects.length === 1) {
+        resetView();
+      }
+    } else {
+      // If not selected, select it and pan/zoom
+      selectObject(object.id);
+      performPanZoom();
+    }
+  };
+
+  const handleEdit = (e) => {
+    e?.stopPropagation();
     // TODO: Implement edit functionality
     console.log('Edit object:', object.id);
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e) => {
+    e?.stopPropagation();
     removeObject(object.id);
   };
 
@@ -73,7 +171,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     loadLabels();
   }, [showLabelModal, currentDataset]);
 
-  const handleAccept = () => {
+  const handleAccept = (e) => {
+    e?.stopPropagation();
     // Show label selection modal instead of directly accepting
     if (!currentDataset) {
       alert('Please select a dataset first');
@@ -120,7 +219,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     setShowLabelModal(false);
   };
 
-  const handleReject = async () => {
+  const handleReject = async (e) => {
+    e?.stopPropagation();
     // Reject temporary object: delete it
     const contourId = object.contour_id || object.id;
     
@@ -148,19 +248,29 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     : (isSelected ? 'bg-teal-50' : 'bg-white hover:bg-gray-50');
 
   return (
-    <div className={`border rounded-lg p-3 transition-colors ${borderColor} ${bgColor}`}>
+    <div 
+      className={`border rounded-lg p-3 transition-colors cursor-pointer ${borderColor} ${bgColor}`}
+      onClick={handleItemClick}
+    >
       {/* Object Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-2">
           <button
-            onClick={handleToggleSelection}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleSelection();
+              // Don't pan/zoom when clicking chevron - only expand/collapse
+            }}
             className="p-1 hover:bg-gray-200 rounded transition-colors"
           >
             <ChevronDown className={`w-4 h-4 transition-transform ${
               isSelected ? 'rotate-0' : '-rotate-90'
             }`} />
           </button>
-          <span className="font-medium text-sm text-gray-800">
+          <span 
+            className="font-medium text-sm text-gray-800"
+            title="Click to select and pan/zoom to object"
+          >
             Object #{object.id}
           </span>
         </div>

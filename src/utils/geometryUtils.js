@@ -32,31 +32,6 @@ export const isPointInPolygon = (x, y, points) => {
 };
 
 /**
- * Find which object a point is inside
- * @param {number} x - Point x coordinate (pixel space)
- * @param {number} y - Point y coordinate (pixel space)
- * @param {Array} objects - Array of objects with mask.points property
- * @returns {Object|null} The object the point is inside, or null
- */
-export const findObjectAtPoint = (x, y, objects) => {
-  if (!objects || objects.length === 0) {
-    return null;
-  }
-
-  // Check from last to first (render order - top to bottom)
-  for (let i = objects.length - 1; i >= 0; i--) {
-    const obj = objects[i];
-    if (obj.mask && obj.mask.points) {
-      if (isPointInPolygon(x, y, obj.mask.points)) {
-        return obj;
-      }
-    }
-  }
-  
-  return null;
-};
-
-/**
  * Calculate bounding box for a polygon
  * @param {Array<Array<number>>} points - Polygon points as [[x1, y1], [x2, y2], ...]
  * @returns {Object} Bounding box with {minX, minY, maxX, maxY, width, height, centerX, centerY}

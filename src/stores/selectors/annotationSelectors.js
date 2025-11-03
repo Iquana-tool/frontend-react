@@ -144,5 +144,6 @@ export const useFocusModeObjectMask = () => useAnnotationStore(state => state.fo
 // Focus Mode actions
 export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFocusMode);
 export const useEnterFocusModeWithZoom = () => useAnnotationStore(state => state.enterFocusModeWithZoom);
+export const usePanZoomToObject = () => useAnnotationStore(state => state.panZoomToObject);
 export const useExitFocusMode = () => useAnnotationStore(state => state.exitFocusMode);
 
