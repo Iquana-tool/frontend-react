@@ -185,16 +185,16 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
           <div
             className="absolute top-4 right-4 pointer-events-auto z-50"
             style={{
-              left: `${imageDimensions.x + imageDimensions.width - 150}px`,
+              left: `${imageDimensions.x + imageDimensions.width - 180}px`,
               top: `${imageDimensions.y + 16}px`,
             }}
           >
             <button
               onClick={exitFocusMode}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl hover:bg-white border border-gray-200/50 transition-all duration-200 hover:shadow-2xl"
             >
               <svg
-                className="w-4 h-4"
+                className="w-4 h-4 text-gray-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -206,22 +206,29 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
                   d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              <span className="text-sm font-medium">Exit Focus</span>
-              <span className="text-xs opacity-75">(ESC)</span>
+              <span className="text-sm font-semibold">Exit Focus</span>
+              <span className="text-xs text-gray-500 font-normal">(ESC)</span>
             </button>
           </div>
 
           {/* Focus mode indicator */}
           <div
-            className="absolute top-4 left-4 px-3 py-2 bg-blue-600 text-white rounded-lg shadow-lg text-sm font-medium"
+            className="absolute top-4 left-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl border border-gray-200/50 text-sm font-medium"
             style={{
               left: `${imageDimensions.x + 16}px`,
               top: `${imageDimensions.y + 16}px`,
             }}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-300 rounded-full animate-pulse"></div>
-              <span>Focus Mode: {focusedObject.label || `Object #${focusedObject.id}`}</span>
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-700">Focus Mode</span>
+                <span className="text-gray-400">·</span>
+                <span className="text-gray-600 font-medium">{focusedObject.label || `Object #${focusedObject.id}`}</span>
+              </div>
             </div>
           </div>
         </>
