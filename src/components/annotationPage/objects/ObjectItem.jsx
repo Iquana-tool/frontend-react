@@ -6,12 +6,11 @@ import {
   useDeselectObject, 
   useRemoveObject,
   useUpdateObject,
-  useObjectsList,
-  usePanZoomToObject,
   useImageObject,
   useSetZoomLevel,
   useSetPanOffset,
 } from '../../../stores/selectors/annotationSelectors';
+import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
@@ -23,12 +22,17 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const deselectObject = useDeselectObject();
   const removeObject = useRemoveObject();
   const updateObject = useUpdateObject();
-  const objectsList = useObjectsList();
   const { currentDataset } = useDataset();
-  const panZoomToObject = usePanZoomToObject();
   const imageObject = useImageObject();
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
+  
+  // Use the modular zoom hook
+  const { zoomToObject: zoomToObjectFn } = useZoomToObject({
+    marginPct: 0.2,
+    maxZoom: 4, // Cap at 400% (max zoom)
+    minZoom: 1
+  });
   
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [labels, setLabels] = useState([]);
@@ -50,14 +54,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       console.warn('Cannot pan/zoom: missing image or object coordinates');
       return;
     }
-    
-    // Convert normalized x/y arrays (0-1) to pixel coordinates
-    const points = object.x.map((x, i) => {
-      return [x * imageObject.width, object.y[i] * imageObject.height];
-    });
-
-    // Construct mask with points for panZoomToObject
-    const mask = { points };
 
     // Get image dimensions
     const imageDimensions = {
@@ -98,11 +94,16 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       renderedY = 0;
     }
 
-    panZoomToObject(
-      mask,
+    // Use the modular zoom hook
+    zoomToObjectFn(
+      object, // Object with x, y arrays
       imageDimensions,
       { width: containerWidth, height: containerHeight },
-      { width: renderedWidth, height: renderedHeight, x: renderedX, y: renderedY }
+      { width: renderedWidth, height: renderedHeight, x: renderedX, y: renderedY },
+      {
+        animateMs: 320, // Smooth animation
+        immediate: false
+      }
     );
   };
 
@@ -118,13 +119,18 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       return;
     }
     
-    // Toggle selection only - no panning or zooming
+    // Toggle selection and zoom/pan to object
     if (isSelected) {
       // If already selected, deselect it
       deselectObject(object.id);
+      // If this was the only selected object, reset view
+      if (selectedObjects.length === 1) {
+        resetView();
+      }
     } else {
-      // If not selected, select it (without pan/zoom)
+      // If not selected, select it and pan/zoom
       selectObject(object.id);
+      performPanZoom();
     }
   };
 
@@ -276,7 +282,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
           </button>
           <span 
             className="font-medium text-sm text-gray-800"
-            title="Click to select object"
+            title="Click to select and zoom to object"
           >
             Object #{object.id}
           </span>
