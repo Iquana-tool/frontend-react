@@ -209,9 +209,14 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         const isSelected = selectedObjects.includes(object.id);
         const isFocused = focusModeActive && focusedObjectId === object.id;
         
-        // In focus mode, hide all color overlays on the focused object to show the original image clearly
-        const fillOpacity = isFocused ? 0 : (isHovered ? 0.3 : (isSelected ? 0.35 : 0.2));
-        const strokeWidth = isFocused ? 0 : (isHovered ? 3 : (isSelected ? 4 : 2.5));
+        // In focus mode, completely skip rendering the focused object's overlay
+        // This ensures no color overlay appears on the focused object
+        if (isFocused) {
+          return null;
+        }
+        
+        const fillOpacity = isHovered ? 0.3 : (isSelected ? 0.35 : 0.2);
+        const strokeWidth = isHovered ? 3 : (isSelected ? 4 : 2.5);
         const glowIntensity = isHovered ? 8 : (isSelected ? 6 : 4);
         
         // Get mask path from backend (precomputed) or fallback to mask.path
@@ -272,19 +277,17 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             
             <path
               d={maskPath}
-              fill={isFocused ? 'none' : hexToRgba(object.color, fillOpacity)}
-              stroke={isFocused ? 'none' : object.color}
+              fill={hexToRgba(object.color, fillOpacity)}
+              stroke={object.color}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
               strokeLinecap="round"
               filter={
-                isFocused 
-                  ? undefined
-                  : (isHovered 
-                    ? `url(#glow-${object.id})` 
-                    : isSelected 
-                      ? `url(#selected-glow-${object.id})` 
-                      : `url(#shadow-${object.id})`)
+                isHovered 
+                  ? `url(#glow-${object.id})` 
+                  : isSelected 
+                    ? `url(#selected-glow-${object.id})` 
+                    : `url(#shadow-${object.id})`
               }
               style={{ 
                 transition: 'all 0.2s ease-in-out',
