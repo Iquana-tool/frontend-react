@@ -14,6 +14,7 @@ import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
 import { editContourLabel } from '../../../api/masks';
+import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 
 const ObjectContextMenu = () => {
   const visible = useContextMenuVisible();
@@ -77,15 +78,8 @@ const ObjectContextMenu = () => {
       setLabelsLoading(true);
       try {
         const labelsData = await fetchLabels(currentDataset.id);
-        // Handle both array response and object response
-        const labelsArray = Array.isArray(labelsData) 
-          ? labelsData 
-          : labelsData?.labels || [];
-        
-        // Filter only root-level labels (no parent_id) for the context menu
-        // Sublabels can be added later if needed
-        const rootLabels = labelsArray.filter(label => !label.parent_id);
-        setLabels(rootLabels);
+        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
+        setLabels(labelsArray);
       } catch (error) {
         console.error('Failed to fetch labels:', error);
         setLabels([]);
@@ -148,7 +142,7 @@ const ObjectContextMenu = () => {
       });
       
       // Update the object in the store to mark it as reviewed (temporary: false)
-      // This will automatically move it from Reviewable Objects to Reviewed Objects
+      // The store will automatically assign labelAssignmentOrder when label is assigned
       updateObject(targetObjectId, {
         label: labelName, // Store label name for display
         labelId: labelId, // Store label ID for future reference

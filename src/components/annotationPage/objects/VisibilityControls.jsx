@@ -32,11 +32,12 @@ const VisibilityControls = () => {
 
 
   return (
-    <div className="border border-blue-200 rounded-lg overflow-hidden bg-white">
+    <div className="border border-blue-200 rounded-lg overflow-hidden bg-white opacity-50 pointer-events-none">
       {/* Collapsible Header */}
       <button
         onClick={toggleVisibilityControls}
-        className="w-full flex items-center justify-between p-2 lg:p-3 bg-blue-50 hover:bg-blue-100 transition-colors"
+        disabled
+        className="w-full flex items-center justify-between p-2 lg:p-3 bg-blue-50 transition-colors cursor-not-allowed"
       >
         <div className="flex items-center space-x-1.5 lg:space-x-2 min-w-0 flex-1">
           <span className="text-xs lg:text-sm font-semibold text-blue-900 truncate">
@@ -60,10 +61,11 @@ const VisibilityControls = () => {
                 <button
                   key={option.id}
                   onClick={() => setVisibilityMode(option.id)}
-                  className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 ${
+                  disabled
+                  className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 cursor-not-allowed ${
                     option.active
                       ? 'bg-green-100 text-green-800 border border-green-300'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                      : 'bg-gray-100 text-gray-700 border border-gray-200'
                   }`}
                   title={option.label}
                 >
@@ -83,10 +85,11 @@ const VisibilityControls = () => {
                   <button
                     key={label.key}
                     onClick={() => toggleVisibility(label.key)}
-                    className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 ${
+                    disabled
+                    className={`px-1.5 lg:px-2 py-1 text-xs font-medium rounded transition-colors flex-shrink-0 min-w-0 cursor-not-allowed ${
                       isActive
                         ? 'bg-green-100 text-green-800 border border-green-300'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200 border border-gray-200'
+                        : 'bg-gray-100 text-gray-500 border border-gray-200'
                     }`}
                     title={label.name}
                   >

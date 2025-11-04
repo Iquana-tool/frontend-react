@@ -15,6 +15,7 @@ import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
 import { editContourLabel } from '../../../api/masks';
+import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 
 const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
@@ -40,6 +41,28 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   
   const isSelected = selectedObjects.includes(object.id);
   const isVisible = true; // For now, assume all objects are visible
+
+  // Helper function to check if an object has a valid label
+  const hasValidLabel = (obj) => {
+    if (!obj.label) return false;
+    // Convert to string and trim
+    const labelStr = String(obj.label || '').trim();
+    if (!labelStr || labelStr === 'Object') return false;
+    // Check if label is just a number (like "2") - these are not valid labels
+    if (/^\d+$/.test(labelStr)) return false;
+    return true;
+  };
+
+  // Compute display name: if labeled, show "{label} #{id}", otherwise "Object #{id}"
+  const displayName = React.useMemo(() => {
+    // Only compute label-based name for permanent/reviewed objects with valid labels
+    if (!isTemporary && hasValidLabel(object)) {
+      return `${object.label} #${object.id}`;
+    }
+    
+    // For unlabeled objects or temporary objects, show default format
+    return `Object #${object.id}`;
+  }, [object.id, object.label, isTemporary]);
 
   const handleToggleSelection = () => {
     if (isSelected) {
@@ -165,14 +188,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       setLabelsLoading(true);
       try {
         const labelsData = await fetchLabels(currentDataset.id);
-        // Handle both array response and object response
-        const labelsArray = Array.isArray(labelsData) 
-          ? labelsData 
-          : labelsData?.labels || [];
-        
-        // Filter only root-level labels (no parent_id) for selection
-        const rootLabels = labelsArray.filter(label => !label.parent_id);
-        setLabels(rootLabels);
+        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
+        setLabels(labelsArray);
       } catch (error) {
         console.error('Failed to fetch labels:', error);
         setLabels([]);
@@ -214,6 +231,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       });
       
       // Update the object in the store to mark it as reviewed (temporary: false)
+      // The store will automatically assign labelAssignmentOrder when label is assigned
       updateObject(object.id, {
         label: labelName, // Store label name for display
         labelId: labelId, // Store label ID for future reference
@@ -284,7 +302,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
             className="font-medium text-sm text-gray-800"
             title="Click to select and zoom to object"
           >
-            Object #{object.id}
+            {displayName}
           </span>
         </div>
         

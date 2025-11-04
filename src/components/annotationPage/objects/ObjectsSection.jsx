@@ -17,14 +17,40 @@ const ObjectsSection = () => {
   // Get all objects from store
   const allObjects = useObjectsList();
 
+  // Helper function to check if an object has a valid label
+  const hasValidLabel = (obj) => {
+    if (!obj.label) return false;
+    // Convert to string and trim
+    const labelStr = String(obj.label || '').trim();
+    if (!labelStr || labelStr === 'Object') return false;
+    // Check if label is just a number (like "2") - these are not valid labels
+    if (/^\d+$/.test(labelStr)) return false;
+    return true;
+  };
+
   // Filter objects by temporary status
   const { temporaryObjects, permanentObjects } = useMemo(() => {
     const temporary = allObjects.filter(obj => obj.temporary === true);
     const permanent = allObjects.filter(obj => obj.temporary === false || obj.temporary === undefined);
     
+    // Sort permanent objects: labeled first (by ID), then unlabeled (by ID)
+    const sortedPermanent = [...permanent].sort((a, b) => {
+      const aHasLabel = hasValidLabel(a);
+      const bHasLabel = hasValidLabel(b);
+      
+      // If one has label and other doesn't, labeled comes first
+      if (aHasLabel && !bHasLabel) return -1;
+      if (!aHasLabel && bHasLabel) return 1;
+      
+      // Both have same label status - sort by ID
+      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id) || 0;
+      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id) || 0;
+      return idA - idB;
+    });
+    
     return {
       temporaryObjects: temporary,
-      permanentObjects: permanent
+      permanentObjects: sortedPermanent
     };
   }, [allObjects]);
 
