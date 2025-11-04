@@ -128,7 +128,7 @@ export const saveMask = async (imageId, label, contours) => {
                 body: JSON.stringify({
                     x: contour.x,
                     y: contour.y,
-                    label: contour.label || 0,
+                    label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
                 }),
             });
 
@@ -327,7 +327,7 @@ export const getMaskWithContours = async (maskId) => {
                     id: contour.id,
                     x: coords.x || [],
                     y: coords.y || [],
-                    label: contour.label || 0,
+                    label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
                     parent_id: contour.parent_id,
                 };
             });
@@ -597,7 +597,7 @@ export async function addContourToFinalMask(imageId, contour) {
         const contourData = {
             x: contour.x || [],
             y: contour.y || [],
-            label: contour.label || 0,
+            label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
         };
 
         // Add parent_contour_id if provided
@@ -719,7 +719,7 @@ export async function addContoursToFinalMask(imageId, contours) {
         const formattedContours = contours.map((contour) => ({
             x: contour.x,
             y: contour.y,
-            label: contour.label,
+            label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
         }));
 
         const response = await fetch(url, {
