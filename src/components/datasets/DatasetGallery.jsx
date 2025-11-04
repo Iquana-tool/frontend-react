@@ -6,6 +6,7 @@ import DatasetInfo from "./gallery/DatasetInfo";
 import ImageGallery from "./gallery/ImageGallery";
 import InferencePanel from "./gallery/InferencePanel";
 import * as api from "../../api";
+import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 
 const DatasetGallery = () => {
   const { datasetId } = useParams();
@@ -63,7 +64,8 @@ const DatasetGallery = () => {
           setImages(imageList.map(img => ({ ...img, thumbnail: null })));
         }
 
-        setLabels(Array.isArray(labelsResponse) ? labelsResponse : labelsResponse?.labels || []);
+        const labelsArray = extractLabelsFromResponse(labelsResponse);
+        setLabels(labelsArray);
         setStats(statsResponse);
       } catch (err) {
         console.error("Error fetching dataset data:", err);
