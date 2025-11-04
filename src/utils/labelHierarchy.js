@@ -191,4 +191,49 @@ export const flattenHierarchy = (hierarchy) => {
 
   flatten(hierarchy);
   return flatLabels;
+};
+
+/**
+ * Extract labels array from API response
+ * Handles various response formats from the backend:
+ * - { labels: LabelHierarchy } where LabelHierarchy has id_to_label_object, root_level_labels, etc.
+ * - Direct LabelHierarchy object
+ * - Direct array of labels
+ * 
+ * @param {Object|Array} labelsData - API response data
+ * @param {boolean} rootOnly - If true, only return root-level labels (no parent_id)
+ * @returns {Array} - Flat array of label objects
+ */
+export const extractLabelsFromResponse = (labelsData, rootOnly = false) => {
+  if (!labelsData) {
+    return [];
+  }
+
+  // Backend returns { success, message, labels: LabelHierarchy }
+  // LabelHierarchy has: root_level_labels, id_to_label_object, value_to_label_object
+  const labelHierarchy = labelsData?.labels || labelsData;
+  let labelsArray = [];
+  
+  if (labelHierarchy?.id_to_label_object) {
+    // Extract all labels as flat array from id_to_label_object
+    labelsArray = Object.values(labelHierarchy.id_to_label_object);
+  } else if (labelHierarchy?.root_level_labels && Array.isArray(labelHierarchy.root_level_labels)) {
+    // Fallback: use root_level_labels
+    labelsArray = labelHierarchy.root_level_labels;
+  } else if (Array.isArray(labelsData)) {
+    // Fallback: handle direct array response (if any)
+    labelsArray = labelsData;
+  } else if (Array.isArray(labelHierarchy)) {
+    // Fallback: handle array in labels field
+    labelsArray = labelHierarchy;
+  }
+  
+  // Filter for root labels only if requested
+  if (rootOnly && labelsArray.length > 0) {
+    labelsArray = labelsArray.filter(
+      label => !label.parent_id || label.parent_id === null
+    );
+  }
+  
+  return labelsArray;
 }; 

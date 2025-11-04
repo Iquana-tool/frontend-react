@@ -3,7 +3,8 @@ import { Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
 import * as api from "../../../api";
 import { 
   buildLabelHierarchy, 
-  hasChildren 
+  hasChildren,
+  extractLabelsFromResponse
 } from "../../../utils/labelHierarchy";
 
 const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
@@ -34,11 +35,13 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
   // Refresh labels from backend
   const refreshLabels = async () => {
     try {
-      const updatedLabels = await api.fetchLabels(dataset.id);
-      const hierarchy = buildLabelHierarchy(updatedLabels || []);
+      const labelsData = await api.fetchLabels(dataset.id);
+      const labelsArray = extractLabelsFromResponse(labelsData);
+      
+      const hierarchy = buildLabelHierarchy(labelsArray);
       setLabelHierarchy(hierarchy);
       if (onLabelsUpdated) {
-        onLabelsUpdated(updatedLabels || []);
+        onLabelsUpdated(labelsArray);
       }
     } catch (err) {
       console.error('Error refreshing labels:', err);

@@ -9,6 +9,7 @@ import DeleteDatasetModal from "./DeleteDatasetModal";
 import DatasetCard from "./DatasetCard";
 import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
+import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
@@ -102,18 +103,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     try {
       // Check if the dataset has any labels
       const labelsResponse = await api.fetchLabels(dataset.id);
-      
-      // Handle different response formats
-      let labels = [];
-      
-      if (Array.isArray(labelsResponse)) {
-        labels = labelsResponse;
-      } else if (labelsResponse && Array.isArray(labelsResponse.labels)) {
-        labels = labelsResponse.labels;
-      } else if (labelsResponse && typeof labelsResponse === 'object') {
-        // Handle case where response might be an object with no labels property
-        labels = [];
-      }
+      const labels = extractLabelsFromResponse(labelsResponse);
       
       // Filter out any invalid labels and orphaned sublabels
       const validLabels = labels.filter(label => {

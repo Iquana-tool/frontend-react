@@ -77,7 +77,7 @@ export const useContourOperations = () => {
         return {
           x: contour.x,
           y: contour.y,
-          label: contour.label || 0,
+          label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
         };
       });
 
