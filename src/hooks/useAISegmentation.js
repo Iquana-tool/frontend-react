@@ -59,6 +59,9 @@ const useAISegmentation = () => {
       pixelCount: contour.quantification?.area || contour.pixel_count || 0,
       label: contour.label || 'AI Generated',
       confidence: contour.confidence,
+      // Extract x and y coordinate arrays if available from backend
+      x: contour.x || [],
+      y: contour.y || [],
     };
     
     return mask;
@@ -157,16 +160,23 @@ const useAISegmentation = () => {
 
       if (mask) {
         // Extract contour_id from the mask (it comes from backend as mask.id)
+        // Ensure consistent ID format (convert to number if it's a string number)
         const contourId = mask.id;
+        const normalizedId = typeof contourId === 'string' && !isNaN(contourId) 
+          ? Number(contourId) 
+          : (typeof contourId === 'number' ? contourId : contourId);
         
         // Add as a temporary object (will appear in Reviewable Objects)
         // User can assign a label via context menu or click Accept to move it to Reviewed Objects
         addObject({
           mask: mask,
-          contour_id: contourId, // Store the backend contour_id for API calls
+          contour_id: normalizedId, // Store the backend contour_id for API calls (consistent format)
           pixelCount: mask.pixelCount || 0,
           label: mask.label || `Object #${objectsList.length + 1}`,
-          temporary: true // Mark as temporary so it appears in Reviewable Objects
+          temporary: true, // Mark as temporary so it appears in Reviewable Objects
+          // Include x and y coordinate arrays if available from backend response
+          x: mask.x || [],
+          y: mask.y || [],
         });
         
         clearAllPrompts();
