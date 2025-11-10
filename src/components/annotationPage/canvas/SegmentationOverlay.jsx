@@ -10,6 +10,7 @@ import {
   useFocusModeActive,
   useFocusModeObjectId,
 } from '../../../stores/selectors/annotationSelectors';
+import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 
 const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
@@ -25,6 +26,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const selectedObjects = useSelectedObjects();
   const focusModeActive = useFocusModeActive();
   const focusedObjectId = useFocusModeObjectId();
+  
+  const { zoomToObject } = useZoomToObject({
+    marginPct: 0.25,
+    maxZoom: 4,
+    minZoom: 1,
+    animationDuration: 300
+  });
 
   // Calculate the actual rendered dimensions of the image after object-contain is applied
   useEffect(() => {
@@ -90,14 +98,45 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const handleObjectLeftClick = (e, object) => {
     e.stopPropagation();
     
-    // Click is already on the SVG path element, so it's inside the object
-    // (browser SVG hit-testing handles this)
-    
-    // Get mask for focus mode
+    if (!imageObject || !object.x || !object.y || object.x.length === 0) {
+      return;
+    }
+
     const mask = object.mask || (object.path ? { path: object.path } : null);
-    
-    // Enter focus mode for this object
     enterFocusMode(object.id, mask);
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+
+    if (!containerWidth || !containerHeight) return;
+
+    const imageDims = {
+      width: imageObject.width,
+      height: imageObject.height
+    };
+
+    const containerDims = {
+      width: containerWidth,
+      height: containerHeight
+    };
+
+    const renderedImageDims = {
+      width: imageDimensions.width,
+      height: imageDimensions.height,
+      x: imageDimensions.x,
+      y: imageDimensions.y
+    };
+
+    zoomToObject(
+      object,
+      imageDims,
+      containerDims,
+      renderedImageDims,
+      { animateMs: 300, immediate: false }
+    );
   };
 
   // Handle right-click on objects (show context menu)

@@ -139,18 +139,18 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
     : '0 0 800 600';
 
   return (
-    <div 
-      ref={containerRef}
-      className="absolute inset-0 pointer-events-none"
-      style={{ 
-        zIndex: 40, // Higher than SegmentationOverlay (z-30)
-        transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-        transformOrigin: 'center center'
-      }}
-    >
-      {imageDimensions.width > 0 && (
-        <>
-          {/* Dimmed overlay with cutout for focused object */}
+    <>
+      {/* Dimmed overlay with cutout for focused object - inside transform */}
+      <div 
+        ref={containerRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{ 
+          zIndex: 40,
+          transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+          transformOrigin: 'center center'
+        }}
+      >
+        {imageDimensions.width > 0 && (
           <svg 
             className="absolute"
             viewBox={viewBox}
@@ -171,7 +171,6 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
                 />
               </mask>
             </defs>
-            {/* Dark overlay everywhere except focused object */}
             <rect
               width="100%"
               height="100%"
@@ -179,60 +178,54 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
               mask="url(#focus-mask)"
             />
           </svg>
+        )}
+      </div>
 
-          {/* Exit focus mode button */}
-          <div
-            className="absolute top-4 right-4 pointer-events-auto z-50"
-            style={{
-              left: `${imageDimensions.x + imageDimensions.width - 180}px`,
-              top: `${imageDimensions.y + 16}px`,
-            }}
+      {/* Text overlays - outside transform, fixed to viewport */}
+      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 50 }}>
+        {/* Exit focus mode button - fixed to viewport top-right */}
+        <div className="absolute top-4 right-4 pointer-events-auto">
+          <button
+            onClick={exitFocusMode}
+            className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl hover:bg-white border border-gray-200/50 transition-all duration-200 hover:shadow-2xl"
           >
-            <button
-              onClick={exitFocusMode}
-              className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl hover:bg-white border border-gray-200/50 transition-all duration-200 hover:shadow-2xl"
+            <svg
+              className="w-4 h-4 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <svg
-                className="w-4 h-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-              <span className="text-sm font-semibold">Exit Focus</span>
-              <span className="text-xs text-gray-500 font-normal">(ESC)</span>
-            </button>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+            <span className="text-sm font-semibold">Exit Focus</span>
+            <span className="text-xs text-gray-500 font-normal">(ESC)</span>
+          </button>
+        </div>
 
-          {/* Focus mode indicator */}
-          <div
-            className="absolute top-4 left-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl border border-gray-200/50 text-sm font-medium"
-            style={{
-              left: `${imageDimensions.x + 16}px`,
-              top: `${imageDimensions.y + 16}px`,
-            }}
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                <div className="absolute inset-0 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
-              </div>
+        {/* Focus mode indicator - fixed to viewport top-left */}
+        <div className="absolute top-4 left-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl border border-gray-200/50 text-sm font-medium pointer-events-auto">
+          <div className="flex items-center gap-2.5">
+            <div className="relative">
+              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
+              <div className="absolute inset-0 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
+            </div>
+            <div className="flex flex-col gap-0.5">
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-gray-700">Focus Mode</span>
                 <span className="text-gray-400">·</span>
                 <span className="text-gray-600 font-medium">{focusedObject.label || `Object #${focusedObject.id}`}</span>
               </div>
+              <span className="text-xs text-gray-500">Press ESC to exit focus mode</span>
             </div>
           </div>
-        </>
-      )}
-    </div>
+        </div>
+      </div>
+    </>
   );
 };
 
