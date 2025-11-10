@@ -102,14 +102,18 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         y = 0;
       }
 
+      // Apply zoom and pan 
+      // CSS transform applies translate in the SCALED coordinate system
+      // we need to multiply panOffset by zoomLevel to get the actual pixel offset
       const zoomedWidth = imageWidth * zoomLevel;
       const zoomedHeight = imageHeight * zoomLevel;
       const baseCenterX = x + imageWidth / 2;
       const baseCenterY = y + imageHeight / 2;
       const zoomedX = baseCenterX - zoomedWidth / 2;
       const zoomedY = baseCenterY - zoomedHeight / 2;
-      const finalX = zoomedX + panOffset.x;
-      const finalY = zoomedY + panOffset.y;
+      // Apply panOffset in scaled coordinate system (matching CSS transform behavior)
+      const finalX = zoomedX + (panOffset.x * zoomLevel);
+      const finalY = zoomedY + (panOffset.y * zoomLevel);
 
       setImageDimensions({ 
         width: imageWidth, 
