@@ -7,15 +7,32 @@ import { hasValidLabel } from '../utils/labelValidation';
 export const createObjectsSlice = (set) => ({
   addObject: (object) => set((state) => {
     // Use contour_id from backend if available, otherwise generate a timestamp ID
-    const objectId = object.contour_id || object.mask?.id || Date.now();
+    // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)
+    const rawId = object.contour_id || object.mask?.id || Date.now();
+    const objectId = typeof rawId === 'string' && !isNaN(rawId) 
+      ? Number(rawId) 
+      : (typeof rawId === 'number' ? rawId : rawId);
+    
+    // Normalize contour_id as well for consistency
+    const rawContourId = object.contour_id || object.mask?.id || null;
+    const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
+      ? Number(rawContourId)
+      : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
+    
     const newObject = {
-      id: objectId, // Store ID (can be contour_id or timestamp)
-      contour_id: object.contour_id || object.mask?.id || null, // Backend contour ID for API calls
+      id: objectId, // Store ID (normalized format for consistent color calculation)
+      contour_id: contourId, // Backend contour ID for API calls (normalized format)
       pixelCount: object.pixelCount || 0,
       label: object.label || 'Object',
       path: object.path || object.mask?.path || null, // Preserve path from backend
       mask: object.mask,
+      // Include x and y coordinate arrays if provided
+      x: object.x || [],
+      y: object.y || [],
       ...object,
+      // Override id and contour_id with normalized versions
+      id: objectId,
+      contour_id: contourId,
       // Use label-based color if labeled, otherwise use ID-based color for stability
       color: getObjectColor({ labelId: object.labelId, label: object.label }, objectId)
     };
@@ -38,7 +55,18 @@ export const createObjectsSlice = (set) => ({
       
       while (queue.length > 0) {
         const c = queue.shift();
-        const id = c.id ?? Date.now() + Math.random();
+        const rawId = c.id ?? Date.now() + Math.random();
+        
+        // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)
+        const id = typeof rawId === 'string' && !isNaN(rawId) 
+          ? Number(rawId) 
+          : (typeof rawId === 'number' ? rawId : rawId);
+        
+        // Normalize contour_id as well
+        const rawContourId = c.id ?? null;
+        const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
+          ? Number(rawContourId)
+          : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
         
         // Backend returns label_id
         const labelId = c.label_id ?? null;
@@ -59,8 +87,8 @@ export const createObjectsSlice = (set) => ({
         }
         
         const obj = {
-          id,
-          contour_id: c.id ?? null,
+          id, // Normalized ID format
+          contour_id: contourId, // Normalized contour_id format
           label: labelName, // Use label name if available, otherwise null
           labelId: labelId, // Store label ID for future reference
           labelAssignmentOrder,

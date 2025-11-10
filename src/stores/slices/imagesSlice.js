@@ -3,8 +3,17 @@
  */
 export const createImagesSlice = (set) => ({
   setCurrentImage: (image) => set((state) => {
+    // Check if image is actually changing
+    const isImageChanging = state.images.currentImageId !== (image?.id || null);
+    
     state.images.currentImage = image;
     state.images.currentImageId = image?.id || null;
+    
+    // Reset zoom and pan when switching to a different image
+    if (isImageChanging) {
+      state.images.zoomLevel = 1;
+      state.images.panOffset = { x: 0, y: 0 };
+    }
     
     // Clear focus mode when switching images
     state.focusMode.active = false;
