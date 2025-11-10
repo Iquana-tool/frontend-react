@@ -110,5 +110,28 @@ export const createAIAnnotationSlice = (set) => ({
       state.aiAnnotation.prompts = nextState;
     }
   }),
+  
+  // Refinement mode actions
+  enterRefinementMode: (objectId, contourId) => set((state) => {
+    state.aiAnnotation.refinementMode.active = true;
+    state.aiAnnotation.refinementMode.objectId = objectId;
+    state.aiAnnotation.refinementMode.contourId = contourId;
+    // Clear existing prompts when entering refinement mode
+    state.aiAnnotation.prompts = [];
+    state.aiAnnotation.activePreview = null;
+    state.aiAnnotation.undoStack = [];
+    state.aiAnnotation.redoStack = [];
+  }),
+  
+  exitRefinementMode: () => set((state) => {
+    state.aiAnnotation.refinementMode.active = false;
+    state.aiAnnotation.refinementMode.objectId = null;
+    state.aiAnnotation.refinementMode.contourId = null;
+    // Clear prompts when exiting refinement mode
+    state.aiAnnotation.prompts = [];
+    state.aiAnnotation.activePreview = null;
+    state.aiAnnotation.undoStack = [];
+    state.aiAnnotation.redoStack = [];
+  }),
 });
 

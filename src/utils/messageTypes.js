@@ -16,6 +16,10 @@ export const CLIENT_MESSAGE_TYPES = {
   FOCUS_IMAGE: 'focus_image',
   UNFOCUS_IMAGE: 'unfocus_image',
   
+  // Refinement Mode
+  SELECT_REFINEMENT_OBJECT: 'refine_object',
+  UNSELECT_REFINEMENT_OBJECT: 'unselect_refinement_object',
+  
   // AI Segmentation
   PROMPTED_SELECT_MODEL: 'prompted_select_model',
   PROMPTED_SEGMENTATION: 'prompted_segmentation',
@@ -97,6 +101,23 @@ export const MessageBuilders = {
    */
   unfocusImage: () => createMessage(
     CLIENT_MESSAGE_TYPES.UNFOCUS_IMAGE,
+    {}
+  ),
+
+  /**
+   * Select object for refinement mode
+   * @param {number} contourId - ID of the contour to refine
+   */
+  selectRefinementObject: (contourId) => createMessage(
+    CLIENT_MESSAGE_TYPES.SELECT_REFINEMENT_OBJECT,
+    { contour_id: contourId }
+  ),
+
+  /**
+   * Exit refinement mode
+   */
+  unselectRefinementObject: () => createMessage(
+    CLIENT_MESSAGE_TYPES.UNSELECT_REFINEMENT_OBJECT,
     {}
   ),
 

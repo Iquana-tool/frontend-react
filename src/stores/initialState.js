@@ -24,6 +24,12 @@ export const initialState = {
     instantSegmentation: false, // Auto-trigger segmentation when prompt is added
     undoStack: [],
     redoStack: [],
+    // Refinement mode
+    refinementMode: {
+      active: false,
+      objectId: null, // Store ID for UI selection
+      contourId: null, // Backend contour ID for refinement
+    },
   },
   
   // Segmentation State (needed for canvas components)

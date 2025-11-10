@@ -10,6 +10,8 @@ import {
   useImageObject,
   useAddObject,
   useObjectsList,
+  useRefinementModeActive,
+  useExitRefinementMode,
 } from '../stores/selectors/annotationSelectors';
 
 /**
@@ -30,6 +32,8 @@ const useAISegmentation = () => {
   const clearAllPrompts = useClearAllPrompts();
   const setIsSubmitting = useSetIsSubmittingAI();
   const addObject = useAddObject();
+  const refinementModeActive = useRefinementModeActive();
+  const exitRefinementMode = useExitRefinementMode();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -177,7 +181,21 @@ const useAISegmentation = () => {
           // Include x and y coordinate arrays if available from backend response
           x: mask.x || [],
           y: mask.y || [],
+          // Ensure path is available for rendering
+          path: mask.path || mask.mask?.path,
         });
+        
+        // Exit refinement mode after successful segmentation so the new object is clickable
+        if (refinementModeActive) {
+          try {
+            await annotationSession.unselectRefinementObject();
+            exitRefinementMode();
+            console.log('Exited refinement mode after successful segmentation');
+          } catch (error) {
+            console.error('Failed to exit refinement mode:', error);
+            // Continue anyway - the object was added successfully
+          }
+        }
         
         clearAllPrompts();
         return { success: true, mask };
@@ -202,6 +220,8 @@ const useAISegmentation = () => {
     transformResponseToMask,
     clearAllPrompts,
     addObject,
+    refinementModeActive,
+    exitRefinementMode,
   ]);
 
   return {

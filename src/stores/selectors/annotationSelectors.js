@@ -90,6 +90,11 @@ export const useActivePreview = () => useAnnotationStore(state => state.aiAnnota
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
 export const useInstantSegmentation = () => useAnnotationStore(state => state.aiAnnotation.instantSegmentation);
 
+// Refinement mode selectors
+export const useRefinementModeActive = () => useAnnotationStore(state => state.aiAnnotation.refinementMode.active);
+export const useRefinementModeObjectId = () => useAnnotationStore(state => state.aiAnnotation.refinementMode.objectId);
+export const useRefinementModeContourId = () => useAnnotationStore(state => state.aiAnnotation.refinementMode.contourId);
+
 // AI Annotation actions
 export const useAddPointPrompt = () => useAnnotationStore(state => state.addPointPrompt);
 export const useAddBoxPrompt = () => useAnnotationStore(state => state.addBoxPrompt);
@@ -100,6 +105,10 @@ export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setI
 export const useToggleInstantSegmentation = () => useAnnotationStore(state => state.toggleInstantSegmentation);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
+
+// Refinement mode actions
+export const useEnterRefinementMode = () => useAnnotationStore(state => state.enterRefinementMode);
+export const useExitRefinementMode = () => useAnnotationStore(state => state.exitRefinementMode);
 
 // WebSocket selectors
 export const useWebSocketConnectionState = () => useAnnotationStore(state => state.websocket.connectionState);

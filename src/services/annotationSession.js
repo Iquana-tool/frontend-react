@@ -261,6 +261,29 @@ class AnnotationSession {
     return websocketService.send(message);
   }
 
+  // ==================== REFINEMENT MODE ====================
+
+  /**
+   * Select an object for refinement
+   * @param {number} contourId - Contour ID to refine
+   * @returns {Promise<void>}
+   */
+  async selectRefinementObject(contourId) {
+    this._ensureReady();
+    const message = MessageBuilders.selectRefinementObject(contourId);
+    return websocketService.send(message, true);
+  }
+
+  /**
+   * Exit refinement mode
+   * @returns {Promise<void>}
+   */
+  async unselectRefinementObject() {
+    this._ensureReady();
+    const message = MessageBuilders.unselectRefinementObject();
+    return websocketService.send(message, true);
+  }
+
   // ==================== SESSION MANAGEMENT ====================
 
   /**
