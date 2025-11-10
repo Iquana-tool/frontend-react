@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import PromptOverlay from './PromptOverlay';
 import SegmentationOverlay from './SegmentationOverlay';
 import AIPromptCanvas from './AIPromptCanvas';
@@ -9,12 +9,23 @@ import FocusOverlay from './FocusOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
-import { useCurrentTool } from '../../../stores/selectors/annotationSelectors';
+import { 
+  useCurrentTool,
+  useInstantSegmentation,
+  useAIPrompts,
+  useSelectedModel,
+  useIsSubmitting,
+} from '../../../stores/selectors/annotationSelectors';
 
 const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDragging }) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const currentTool = useCurrentTool();
+  const instantSegmentation = useInstantSegmentation();
+  const prompts = useAIPrompts();
+  const selectedModel = useSelectedModel();
+  const isSubmitting = useIsSubmitting();
+  const previousPromptsLengthRef = useRef(0);
   
   // AI Segmentation hook
   const { runSegmentation, error } = useAISegmentation();
@@ -25,13 +36,42 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   // Enable Escape key to exit focus mode
   useFocusModeEscape();
 
-  const handleRunAI = async () => {
+  const handleRunAI = useCallback(async () => {
     const result = await runSegmentation();
     if (!result.success) {
       console.error('Segmentation failed:', result.error);
       // TODO: toast notification here
     }
-  };
+  }, [runSegmentation]);
+
+  // Auto-trigger segmentation when instant segmentation is enabled and a prompt is added
+  useEffect(() => {
+    // Only trigger if:
+    // 1. Instant segmentation is enabled
+    // 2. Current tool is AI annotation
+    // 3. A model is selected
+    // 4. Not already submitting
+    // 5. Prompts exist
+    // 6. A new prompt was just added (prompts.length increased)
+    if (
+      instantSegmentation &&
+      currentTool === 'ai_annotation' &&
+      selectedModel &&
+      !isSubmitting &&
+      prompts.length > 0 &&
+      prompts.length > previousPromptsLengthRef.current
+    ) {
+      // Small delay to ensure state is fully updated
+      const timeoutId = setTimeout(() => {
+        handleRunAI();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+    
+    // Update the previous prompts length
+    previousPromptsLengthRef.current = prompts.length;
+  }, [instantSegmentation, currentTool, selectedModel, isSubmitting, prompts.length, handleRunAI]);
 
   // Cursor for non-AI tools (base image remains mounted for all tools)
   const getCanvasCursor = () => {

@@ -79,6 +79,10 @@ export const createAIAnnotationSlice = (set) => ({
     state.aiAnnotation.isSubmitting = isSubmitting;
   }),
   
+  toggleInstantSegmentation: () => set((state) => {
+    state.aiAnnotation.instantSegmentation = !state.aiAnnotation.instantSegmentation;
+  }),
+  
   // Custom undo action
   undoLastAction: () => set((state) => {
     if (state.aiAnnotation.undoStack && state.aiAnnotation.undoStack.length > 0) {

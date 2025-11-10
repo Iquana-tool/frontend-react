@@ -21,6 +21,7 @@ export const initialState = {
     prompts: [],
     activePreview: null,
     isSubmitting: false,
+    instantSegmentation: false, // Auto-trigger segmentation when prompt is added
     undoStack: [],
     redoStack: [],
   },

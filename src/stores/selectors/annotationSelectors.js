@@ -88,6 +88,7 @@ export const useToggleVisibilityControls = () => useAnnotationStore(state => sta
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
+export const useInstantSegmentation = () => useAnnotationStore(state => state.aiAnnotation.instantSegmentation);
 
 // AI Annotation actions
 export const useAddPointPrompt = () => useAnnotationStore(state => state.addPointPrompt);
@@ -96,6 +97,7 @@ export const useRemoveLastPrompt = () => useAnnotationStore(state => state.remov
 export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
+export const useToggleInstantSegmentation = () => useAnnotationStore(state => state.toggleInstantSegmentation);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
 

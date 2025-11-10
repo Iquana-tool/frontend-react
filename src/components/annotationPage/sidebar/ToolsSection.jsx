@@ -1,12 +1,20 @@
 import React from 'react';
 import { MousePointer, Pencil, Sparkles, CheckCircle } from 'lucide-react';
-import { useCurrentTool, useSetCurrentTool, useLeftSidebarCollapsed } from '../../../stores/selectors/annotationSelectors';
+import { 
+  useCurrentTool, 
+  useSetCurrentTool, 
+  useLeftSidebarCollapsed,
+  useInstantSegmentation,
+  useToggleInstantSegmentation,
+} from '../../../stores/selectors/annotationSelectors';
 import ModelSelectors from './ModelSelectors';
 
 const ToolsSection = () => {
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
   const leftSidebarCollapsed = useLeftSidebarCollapsed();
+  const instantSegmentation = useInstantSegmentation();
+  const toggleInstantSegmentation = useToggleInstantSegmentation();
 
   const tools = [
     { id: 'selection', name: 'Selection', icon: MousePointer, description: 'Select and manipulate objects', disabled: false },
@@ -88,6 +96,50 @@ const ToolsSection = () => {
       <div className="border-t border-gray-200 p-2">
         <ModelSelectors />
       </div>
+      
+      {/* Instant Segmentation Toggle - Only show when AI annotation tool is active */}
+      {currentTool === 'ai_annotation' && (
+        <div className="border-t border-gray-200 p-3">
+          <label className="flex items-start justify-between cursor-pointer group hover:bg-gray-50 rounded-lg -m-1 p-1 transition-colors focus-within:bg-teal-50/50">
+            <div className="flex-1 pr-3">
+              <div className="text-xs font-semibold text-gray-900 group-hover:text-teal-700 transition-colors">
+                Instant Prompted Segmentation
+              </div>
+              <div className="text-xs text-gray-500 mt-1 leading-relaxed">
+                Auto-trigger segmentation when prompt is added
+              </div>
+            </div>
+            <div className="ml-2 relative flex-shrink-0 pt-0.5">
+              <input
+                type="checkbox"
+                checked={instantSegmentation}
+                onChange={toggleInstantSegmentation}
+                className="sr-only peer"
+              />
+              <div
+                className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ring-0 ${
+                  instantSegmentation 
+                    ? 'bg-gradient-to-r from-teal-500 to-teal-600 shadow-lg shadow-teal-500/30 ring-2 ring-teal-500/20' 
+                    : 'bg-gray-300 group-hover:bg-gray-400'
+                } peer-focus:ring-2 peer-focus:ring-teal-500/50 peer-focus:ring-offset-2`}
+              >
+                <div
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transform transition-all duration-300 ease-in-out ${
+                    instantSegmentation 
+                      ? 'translate-x-6' 
+                      : 'translate-x-0.5'
+                  }`}
+                  style={{
+                    boxShadow: instantSegmentation 
+                      ? '0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9)' 
+                      : '0 2px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.9)'
+                  }}
+                />
+              </div>
+            </div>
+          </label>
+        </div>
+      )}
     </div>
   );
 };
