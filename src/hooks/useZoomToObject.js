@@ -5,24 +5,26 @@ import {
   useZoomLevel,
   usePanOffset
 } from '../stores/selectors/annotationSelectors';
-import { bboxOf, centroidOf, objectToPolygonPoints } from '../utils/polygonUtils';
+import { bboxOf, objectToPolygonPoints } from '../utils/polygonUtils';
 
 /**
- * Modular hook for zooming and panning to objects
- * Provides smooth animated zoom-to-polygon functionality
+ * hook for zooming and panning to objects
+ * Provides smooth animated zoom-to-object functionality with predictable behavior
  * 
  * @param {Object} options - Configuration options
- * @param {number} options.marginPct - Padding around object (default: 0.18 = 18%)
- * @param {number} options.maxZoom - Maximum zoom level multiplier (default: 3.0)
- * @param {number} options.minZoom - Minimum zoom level (default: 1)
+ * @param {number} options.marginPct - Padding around object (default: 0.25 = 25%)
+ * @param {number} options.maxZoom - Maximum zoom level multiplier (default: 4.0)
+ * @param {number} options.minZoom - Minimum zoom level (default: 1.0)
+ * @param {number} options.animationDuration - Animation duration in ms (default: 300)
  * @param {Function} options.onComplete - Callback when animation completes
- * @returns {Object} {zoomToPolygon, zoomToObject, animateTo}
+ * @returns {Object} {zoomToObject, zoomToPolygon}
  */
 export const useZoomToObject = (options = {}) => {
   const {
-    marginPct = 0.18,
-    maxZoom = 3.0,
-    minZoom = 1,
+    marginPct = 0.25,
+    maxZoom = 4.0,
+    minZoom = 1.0,
+    animationDuration = 300,
     onComplete
   } = options;
 
@@ -33,246 +35,148 @@ export const useZoomToObject = (options = {}) => {
 
   const animationRef = useRef(null);
 
-  const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
-
   /**
    * Calculate zoom and pan to fit polygon in viewport
    * 
    * @param {Array} polygonPoints - Array of {x, y} points in image pixel coordinates
    * @param {Object} imageDimensions - {width, height} of image
-   * @param {Object} containerDimensions - {width, height} of container
+   * @param {Object} containerDimensions - {width, height} of viewport container
    * @param {Object} renderedImageDimensions - {width, height, x, y} of rendered image
-   * @param {Object} currentTransform - {zoomLevel, panOffset: {x, y}} current view state
    * @returns {Object} {zoomLevel, panOffset: {x, y}}
    */
   const calculateZoomPanToPolygon = useCallback((
     polygonPoints,
     imageDimensions,
     containerDimensions,
-    renderedImageDimensions,
-    currentTransform
+    renderedImageDimensions
   ) => {
-    const { width: IW, height: IH } = imageDimensions;
-    const { width: VW, height: VH } = containerDimensions;
-    const { width: RW, height: RH, x: RX, y: RY } = renderedImageDimensions;
-    const { zoomLevel: currentZoom, panOffset: currentPan } = currentTransform;
+    const { width: imgW, height: imgH } = imageDimensions;
+    const { width: viewW, height: viewH } = containerDimensions;
+    const { width: rendW, height: rendH, x: rendX, y: rendY } = renderedImageDimensions;
 
-    if (!IW || !IH || !VW || !VH || !polygonPoints || polygonPoints.length === 0) {
-      return { zoomLevel: currentZoom, panOffset: currentPan };
+    if (!imgW || !imgH || !viewW || !viewH || !polygonPoints || polygonPoints.length === 0) {
+      return { zoomLevel: currentZoomLevel, panOffset: currentPanOffset };
     }
 
     // Calculate bounding box with margin
     const bbox = bboxOf(polygonPoints);
     const marginW = bbox.w * marginPct;
     const marginH = bbox.h * marginPct;
-    const paddedWidth = bbox.w + 2 * marginW;
-    const paddedHeight = bbox.h + 2 * marginH;
+    const targetWidth = bbox.w + 2 * marginW;
+    const targetHeight = bbox.h + 2 * marginH;
 
-    // Convert to rendered space (at zoom = 1)
-    const scaleX = RW / IW;
-    const scaleY = RH / IH;
-    const renderedObjW = paddedWidth * scaleX;
-    const renderedObjH = paddedHeight * scaleY;
-
-    // Use centroid for accurate centering
-    const centroid = centroidOf(polygonPoints);
+    // Calculate zoom level to fit object + margin in viewport
+    const scaleToRendered = rendW / imgW;
+    const rendTargetW = targetWidth * scaleToRendered;
+    const rendTargetH = targetHeight * scaleToRendered;
+    const zoomW = viewW / rendTargetW;
+    const zoomH = viewH / rendTargetH;
+    let zoom = Math.min(zoomW, zoomH);
     
-    // Convert centroid from image coords to rendered coords (at zoom = 1)
-    const centroidRendered = {
-      x: RX + (centroid.x / IW) * RW,
-      y: RY + (centroid.y / IH) * RH
-    };
+    // Clamp zoom (max 3x for stability)
+    zoom = Math.max(minZoom, Math.min(Math.min(maxZoom, 3.0), zoom));
 
-    // Detect edge objects
-    const relCentroidX = centroid.x / IW;
-    const relCentroidY = centroid.y / IH;
-    const isNearEdgeX = relCentroidX < 0.25 || relCentroidX > 0.75;
-    const isNearEdgeY = relCentroidY < 0.25 || relCentroidY > 0.75;
-    const isNearAnyEdge = isNearEdgeX || isNearEdgeY;
-
-    // Calculate zoom to fit object
-    // More conservative for edge objects
-    const targetFraction = isNearAnyEdge ? 0.30 : 0.35;
-    const targetSize = Math.min(VW, VH) * targetFraction;
+    // Calculate pan to center the object
+    const objCenterX = bbox.centerX;
+    const objCenterY = bbox.centerY;
+    const rendObjX = rendX + (objCenterX / imgW) * rendW;
+    const rendObjY = rendY + (objCenterY / imgH) * rendH;
+    const viewCenterX = viewW / 2;
+    const viewCenterY = viewH / 2;
     
-    const zoomX = renderedObjW > 0 ? targetSize / renderedObjW : 1;
-    const zoomY = renderedObjH > 0 ? targetSize / renderedObjH : 1;
-    const zoomToFit = Math.min(zoomX, zoomY);
-
-    // Additional zoom constraints
-    const objectArea = renderedObjW * renderedObjH;
-    const viewportArea = VW * VH;
-    const relativeSize = objectArea / viewportArea;
-
-    let effectiveMaxZoom = maxZoom;
-    if (isNearAnyEdge) {
-      effectiveMaxZoom = Math.min(maxZoom, 2.5);
-    } else if (relativeSize < 0.01) {
-      effectiveMaxZoom = Math.min(maxZoom, 2.2);
-    } else if (relativeSize < 0.05) {
-      effectiveMaxZoom = Math.min(maxZoom, 2.8);
-    }
-
-    // Final zoom level
-    const zoom = clamp(zoomToFit, minZoom, effectiveMaxZoom);
-
-    // Container center
-    const containerCenter = { x: VW / 2, y: VH / 2 };
-
-    // SIMPLIFIED APPROACH: Just center the object
-    // Formula: pan = -zoom * (objectCenter - containerCenter)
-    // This positions the object at the center of the viewport
-    const panX = -zoom * (centroidRendered.x - containerCenter.x);
-    const panY = -zoom * (centroidRendered.y - containerCenter.y);
-
-    // Calculate where the image edges will be after this transform
-    // After transform: point' = containerCenter + zoom * (point - containerCenter) + pan
-    const scaledW = RW * zoom;
-    const scaledH = RH * zoom;
-
-    // Image corners in rendered space (before transform)
-    const topLeft = { x: RX, y: RY };
-    const bottomRight = { x: RX + RW, y: RY + RH };
-
-    // After transform (where corners end up in viewport)
-    const topLeftFinal = {
-      x: containerCenter.x + zoom * (topLeft.x - containerCenter.x) + panX,
-      y: containerCenter.y + zoom * (topLeft.y - containerCenter.y) + panY
-    };
+    // With transform-origin: center, pan formula is: pan = viewCenter - objectPosition
+    let panX = viewCenterX - rendObjX;
+    let panY = viewCenterY - rendObjY;
     
-    const bottomRightFinal = {
-      x: containerCenter.x + zoom * (bottomRight.x - containerCenter.x) + panX,
-      y: containerCenter.y + zoom * (bottomRight.y - containerCenter.y) + panY
-    };
-
-    // Calculate blank space that would appear
-    const blankLeft = Math.max(0, topLeftFinal.x);
-    const blankRight = Math.max(0, VW - bottomRightFinal.x);
-    const blankTop = Math.max(0, topLeftFinal.y);
-    const blankBottom = Math.max(0, VH - bottomRightFinal.y);
-
-    // Determine if we need to constrain pan
-    // For edge objects: allow more blank space (20%)
-    // For center objects: allow minimal blank space (8%)
-    const maxAllowedBlankPct = isNearAnyEdge ? 0.20 : 0.08;
-    const maxAllowedBlank = Math.max(VW, VH) * maxAllowedBlankPct;
-
-    const totalBlank = blankLeft + blankRight + blankTop + blankBottom;
-    const hasExcessiveBlank = totalBlank > maxAllowedBlank;
-
-    let finalPanX = panX;
-    let finalPanY = panY;
-
-    // Only apply constraints if:
-    // 1. There's excessive blank space
-    // 2. The scaled image is actually larger than viewport
-    if (hasExcessiveBlank && (scaledW > VW || scaledH > VH)) {
-      // Constrain pan to minimize blank space while keeping object visible
-      
-      // X-axis constraints
-      if (scaledW > VW) {
-        // Image wider than viewport - ensure it covers viewport horizontally
-        // Left edge should be at or left of viewport: topLeftFinal.x <= 0
-        // containerCenter.x + zoom * (RX - containerCenter.x) + panX <= 0
-        // panX <= -containerCenter.x - zoom * (RX - containerCenter.x)
-        const maxPanX = -containerCenter.x - zoom * (RX - containerCenter.x);
-        
-        // Right edge should be at or right of viewport: bottomRightFinal.x >= VW
-        // containerCenter.x + zoom * (RX + RW - containerCenter.x) + panX >= VW
-        // panX >= VW - containerCenter.x - zoom * (RX + RW - containerCenter.x)
-        const minPanX = VW - containerCenter.x - zoom * (RX + RW - containerCenter.x);
-        
-        // Apply constraints but allow some flexibility for edge objects
-        if (isNearEdgeX) {
-          // For edge objects, allow pan to go slightly beyond strict bounds
-          const flexPct = 0.10; // 10% flexibility
-          const flex = VW * flexPct;
-          finalPanX = clamp(panX, minPanX - flex, maxPanX + flex);
-        } else {
-          finalPanX = clamp(panX, minPanX, maxPanX);
-        }
+    // Apply boundary constraints to keep image in viewport
+    const imgLeftInViewport = (rendX - viewCenterX) * zoom + viewCenterX + panX * zoom;
+    const imgRightInViewport = (rendX + rendW - viewCenterX) * zoom + viewCenterX + panX * zoom;
+    
+    if (rendW * zoom > viewW) {
+      // Image wider than viewport - ensure it fills viewport
+      if (imgLeftInViewport > 0) {
+        panX = -(rendX - viewCenterX) - viewCenterX / zoom;
       }
-      
-      // Y-axis constraints
-      if (scaledH > VH) {
-        // Image taller than viewport - ensure it covers viewport vertically
-        const maxPanY = -containerCenter.y - zoom * (RY - containerCenter.y);
-        const minPanY = VH - containerCenter.y - zoom * (RY + RH - containerCenter.y);
-        
-        if (isNearEdgeY) {
-          const flex = VH * 0.10;
-          finalPanY = clamp(panY, minPanY - flex, maxPanY + flex);
-        } else {
-          finalPanY = clamp(panY, minPanY, maxPanY);
-        }
+      if (imgRightInViewport < viewW) {
+        panX = (viewW - viewCenterX) / zoom - (rendX + rendW - viewCenterX);
       }
+    } else {
+      // Image narrower than viewport - keep fully visible
+      const minPanX = -(rendX - viewCenterX) - viewCenterX / zoom;
+      const maxPanX = (viewW - viewCenterX) / zoom - (rendX + rendW - viewCenterX);
+      panX = Math.max(minPanX, Math.min(maxPanX, panX));
     }
-
-    // Final safety check: if constrained pan moves object too far off-center, reduce zoom
-    const panOffsetDist = Math.sqrt(
-      Math.pow(finalPanX - panX, 2) + 
-      Math.pow(finalPanY - panY, 2)
-    );
     
-    const maxAcceptableOffset = Math.max(VW, VH) * 0.15;
+    // Vertical boundary constraints
+    const imgTopInViewport = (rendY - viewCenterY) * zoom + viewCenterY + panY * zoom;
+    const imgBottomInViewport = (rendY + rendH - viewCenterY) * zoom + viewCenterY + panY * zoom;
     
-    if (panOffsetDist > maxAcceptableOffset && zoom > 1.3) {
-      // Reduce zoom and try again
-      const reducedZoom = Math.max(1.2, zoom * 0.7);
-      
-      const newPanX = -reducedZoom * (centroidRendered.x - containerCenter.x);
-      const newPanY = -reducedZoom * (centroidRendered.y - containerCenter.y);
-      
-      return {
-        zoomLevel: reducedZoom,
-        panOffset: { x: newPanX, y: newPanY }
-      };
+    if (rendH * zoom > viewH) {
+      // Image taller than viewport - ensure it fills viewport
+      if (imgTopInViewport > 0) {
+        panY = -(rendY - viewCenterY) - viewCenterY / zoom;
+      }
+      if (imgBottomInViewport < viewH) {
+        panY = (viewH - viewCenterY) / zoom - (rendY + rendH - viewCenterY);
+      }
+    } else {
+      // Image shorter than viewport - keep fully visible
+      const minPanY = -(rendY - viewCenterY) - viewCenterY / zoom;
+      const maxPanY = (viewH - viewCenterY) / zoom - (rendY + rendH - viewCenterY);
+      panY = Math.max(minPanY, Math.min(maxPanY, panY));
     }
 
     return {
       zoomLevel: zoom,
-      panOffset: { x: finalPanX, y: finalPanY }
+      panOffset: { x: panX, y: panY }
     };
-  }, [marginPct, maxZoom, minZoom]);
+  }, [marginPct, maxZoom, minZoom, currentZoomLevel, currentPanOffset]);
 
   /**
-   * Smoothly animate to target transform
+   * Smoothly animate to target transform using easeInOutQuad
    */
-  const animateTo = useCallback((target, durationMs = 320) => {
+  const animateTo = useCallback((target, durationMs) => {
+    // Cancel any existing animation
     if (animationRef.current) {
       cancelAnimationFrame(animationRef.current);
     }
 
-    const start = performance.now();
+    const startTime = performance.now();
     const startZoom = currentZoomLevel;
     const startPan = { ...currentPanOffset };
 
-    const dZoom = target.zoomLevel - startZoom;
-    const dPanX = target.panOffset.x - startPan.x;
-    const dPanY = target.panOffset.y - startPan.y;
+    const deltaZoom = target.zoomLevel - startZoom;
+    const deltaPanX = target.panOffset.x - startPan.x;
+    const deltaPanY = target.panOffset.y - startPan.y;
 
-    const ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    // Simple easeInOutQuad easing function
+    const easeInOutQuad = (t) => {
+      return t < 0.5 
+        ? 2 * t * t 
+        : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    };
 
-    const step = (now) => {
-      const elapsed = now - start;
-      const t = Math.min(1, elapsed / durationMs);
-      const e = ease(t);
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const easedProgress = easeInOutQuad(progress);
 
-      setZoomLevel(startZoom + dZoom * e);
-      setPanOffset({ 
-        x: startPan.x + dPanX * e, 
-        y: startPan.y + dPanY * e 
+      // Apply eased values
+      setZoomLevel(startZoom + deltaZoom * easedProgress);
+      setPanOffset({
+        x: startPan.x + deltaPanX * easedProgress,
+        y: startPan.y + deltaPanY * easedProgress
       });
 
-      if (t < 1) {
-        animationRef.current = requestAnimationFrame(step);
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animate);
       } else {
         animationRef.current = null;
         onComplete?.();
       }
     };
 
-    animationRef.current = requestAnimationFrame(step);
+    animationRef.current = requestAnimationFrame(animate);
   }, [currentZoomLevel, currentPanOffset, setZoomLevel, setPanOffset, onComplete]);
 
   /**
@@ -283,17 +187,15 @@ export const useZoomToObject = (options = {}) => {
     imageDimensions,
     containerDimensions,
     renderedImageDimensions,
-    currentTransform,
     options = {}
   ) => {
-    const { animateMs = 320, immediate = false } = options;
+    const { animateMs = animationDuration, immediate = false } = options;
 
     const target = calculateZoomPanToPolygon(
       polygonPoints,
       imageDimensions,
       containerDimensions,
-      renderedImageDimensions,
-      currentTransform
+      renderedImageDimensions
     );
 
     if (immediate || animateMs === 0) {
@@ -303,10 +205,10 @@ export const useZoomToObject = (options = {}) => {
     } else {
       animateTo(target, animateMs);
     }
-  }, [calculateZoomPanToPolygon, animateTo, setZoomLevel, setPanOffset, onComplete]);
+  }, [calculateZoomPanToPolygon, animateTo, animationDuration, setZoomLevel, setPanOffset, onComplete]);
 
   /**
-   * Convenience method to zoom to an object
+   * Zoom to an object by converting its coordinates to polygon points
    */
   const zoomToObject = useCallback((
     object,
@@ -318,24 +220,17 @@ export const useZoomToObject = (options = {}) => {
     const points = objectToPolygonPoints(object, imageDimensions);
     
     if (points.length === 0) {
-      console.warn('No valid points found in object');
       return;
     }
-
-    const currentTransform = {
-      zoomLevel: currentZoomLevel,
-      panOffset: currentPanOffset
-    };
     
     zoomToPolygon(
       points,
       imageDimensions,
       containerDimensions,
       renderedImageDimensions,
-      currentTransform,
       options
     );
-  }, [zoomToPolygon, currentZoomLevel, currentPanOffset]);
+  }, [zoomToPolygon]);
 
   return {
     zoomToPolygon,
