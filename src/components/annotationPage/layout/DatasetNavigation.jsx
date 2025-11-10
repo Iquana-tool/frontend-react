@@ -41,7 +41,7 @@ const DatasetNavigation = () => {
           
           <div className="flex items-center space-x-2 lg:space-x-4">
             {/* WebSocket Status Indicator */}
-            <WebSocketStatus />
+            {/* <WebSocketStatus /> */}
             
             <button
               onClick={() => navigate("/docs")}
