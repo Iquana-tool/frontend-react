@@ -14,7 +14,7 @@ import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
 import { editContourLabel } from '../../../api/masks';
-import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
+import { extractLabelsFromResponse, buildLabelHierarchy } from '../../../utils/labelHierarchy';
 
 const ObjectContextMenu = () => {
   const visible = useContextMenuVisible();
@@ -29,8 +29,9 @@ const ObjectContextMenu = () => {
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
-  const [labels, setLabels] = useState([]);
+  const [labelHierarchy, setLabelHierarchy] = useState([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
+  const [labelMap, setLabelMap] = useState(new Map()); // Map to store all labels for parent lookup
 
   // Adjust position to keep menu within container bounds and place it intuitively next to the object
   useEffect(() => {
@@ -78,11 +79,22 @@ const ObjectContextMenu = () => {
       setLabelsLoading(true);
       try {
         const labelsData = await fetchLabels(currentDataset.id);
-        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
-        setLabels(labelsArray);
+        const labelsArray = extractLabelsFromResponse(labelsData, false); // Include all labels (parent and sub-labels)
+        
+        // Build hierarchical structure
+        const hierarchy = buildLabelHierarchy(labelsArray);
+        setLabelHierarchy(hierarchy);
+        
+        // Create a map for quick lookup
+        const map = new Map();
+        labelsArray.forEach(label => {
+          map.set(label.id, label);
+        });
+        setLabelMap(map);
       } catch (error) {
         console.error('Failed to fetch labels:', error);
-        setLabels([]);
+        setLabelHierarchy([]);
+        setLabelMap(new Map());
       } finally {
         setLabelsLoading(false);
       }
@@ -233,7 +245,7 @@ const ObjectContextMenu = () => {
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[120px] max-w-[140px]"
+      className="absolute z-50 bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[120px] max-w-[220px]"
       style={{
         left: `${adjustedPosition.x}px`,
         top: `${adjustedPosition.y}px`,
@@ -260,21 +272,36 @@ const ObjectContextMenu = () => {
         <div className="px-3 py-2 text-xs text-gray-500 text-center">
           Loading labels...
         </div>
-      ) : labels.length === 0 ? (
+      ) : labelHierarchy.length === 0 ? (
         <div className="px-3 py-2 text-xs text-gray-500 text-center">
           No labels available
         </div>
       ) : (
-        labels.map((label) => (
-          <button
-            key={label.id}
-            onClick={() => handleLabelSelect(label)}
-            className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center"
-          >
-            <div className="w-2 h-2 rounded-full bg-gray-300 mr-2 flex-shrink-0"></div>
-            {label.name}
-          </button>
-        ))
+        (() => {
+          // Flatten hierarchy with proper indentation for display
+          const renderLabel = (label, depth = 0) => {
+            const indent = depth * 16; // 16px indent per level
+            
+            return (
+              <React.Fragment key={label.id}>
+                <button
+                  onClick={() => handleLabelSelect(label)}
+                  className="w-full text-left py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center"
+                  style={{ paddingLeft: `${12 + indent}px`, paddingRight: '12px' }}
+                >
+                  <div className="w-2 h-2 rounded-full bg-gray-300 mr-2 flex-shrink-0"></div>
+                  <span className="truncate">{label.name}</span>
+                </button>
+                {/* Render children if any */}
+                {label.children && label.children.length > 0 && 
+                  label.children.map(child => renderLabel(child, depth + 1))
+                }
+              </React.Fragment>
+            );
+          };
+          
+          return labelHierarchy.map(label => renderLabel(label));
+        })()
       )}
     </div>
   );

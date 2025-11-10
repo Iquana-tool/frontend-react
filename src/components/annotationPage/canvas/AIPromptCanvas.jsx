@@ -67,8 +67,17 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
 
-  // Calculate fitted image dimensions
-  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0, scale: 1 });
+  const [imageDimensions, setImageDimensions] = useState({ 
+    width: 0, 
+    height: 0, 
+    x: 0, 
+    y: 0, 
+    baseScale: 1,
+    displayWidth: 0,
+    displayHeight: 0,
+    displayX: 0,
+    displayY: 0
+  });
 
   useEffect(() => {
     if (imageObject && containerSize.width && containerSize.height) {
@@ -93,22 +102,29 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         y = 0;
       }
 
-      // Apply zoom and pan transforms
-      const finalScale = baseScale * zoomLevel;
-      const finalX = x + panOffset.x;
-      const finalY = y + panOffset.y;
+      const zoomedWidth = imageWidth * zoomLevel;
+      const zoomedHeight = imageHeight * zoomLevel;
+      const baseCenterX = x + imageWidth / 2;
+      const baseCenterY = y + imageHeight / 2;
+      const zoomedX = baseCenterX - zoomedWidth / 2;
+      const zoomedY = baseCenterY - zoomedHeight / 2;
+      const finalX = zoomedX + panOffset.x;
+      const finalY = zoomedY + panOffset.y;
 
       setImageDimensions({ 
-        width: imageWidth * zoomLevel, 
-        height: imageHeight * zoomLevel, 
-        x: finalX, 
-        y: finalY, 
-        scale: finalScale 
+        width: imageWidth, 
+        height: imageHeight, 
+        x: x, 
+        y: y,
+        baseScale: baseScale,
+        displayWidth: zoomedWidth, 
+        displayHeight: zoomedHeight, 
+        displayX: finalX, 
+        displayY: finalY
       });
     }
   }, [imageObject, containerSize, zoomLevel, panOffset]);
 
-  // Handle container resize
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -123,74 +139,61 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Convert stage coordinates to image pixel coordinates
   const stageToImageCoords = useCallback((stageX, stageY) => {
-    if (!imageObject || !imageDimensions.scale) return null;
+    if (!imageObject || !imageDimensions.baseScale) return null;
 
-    // Adjust for image position in container
-    const relativeX = stageX - imageDimensions.x;
-    const relativeY = stageY - imageDimensions.y;
+    const relativeX = stageX - imageDimensions.displayX;
+    const relativeY = stageY - imageDimensions.displayY;
 
-    // Check if click is within image bounds
     if (
       relativeX < 0 ||
       relativeY < 0 ||
-      relativeX > imageDimensions.width ||
-      relativeY > imageDimensions.height
+      relativeX > imageDimensions.displayWidth ||
+      relativeY > imageDimensions.displayHeight
     ) {
-      return null; // Outside image bounds
+      return null;
     }
 
-    // Convert to image pixel space
-    const imageX = Math.round(relativeX / imageDimensions.scale);
-    const imageY = Math.round(relativeY / imageDimensions.scale);
+    const finalScale = imageDimensions.baseScale * zoomLevel;
+    const imageX = Math.round(relativeX / finalScale);
+    const imageY = Math.round(relativeY / finalScale);
+    
+    // Clamp to image bounds
+    const clampedImageX = Math.max(0, Math.min(imageObject.width - 1, imageX));
+    const clampedImageY = Math.max(0, Math.min(imageObject.height - 1, imageY));
 
     return { 
-      imageX, 
-      imageY, 
-      stageX: relativeX + imageDimensions.x, 
-      stageY: relativeY + imageDimensions.y 
+      imageX: clampedImageX, 
+      imageY: clampedImageY, 
+      stageX: relativeX + imageDimensions.displayX, 
+      stageY: relativeY + imageDimensions.displayY 
     };
-  }, [imageObject, imageDimensions]);
+  }, [imageObject, imageDimensions, zoomLevel, panOffset]);
 
-  // Handle point prompt (click) - for right-click only
   const handleStageClick = useCallback((e) => {
-    // Only handle if AI annotation tool is active and model is selected
     if (currentTool !== 'ai_annotation' || !selectedModel || isDragging) return;
-
-    // Only handle right-click for points
     if (e.evt.button !== 2) return;
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
-    
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
-    if (!coords) return; // Click outside image
+    if (!coords) return;
 
-    // Validate prompt is within focused object if in focus mode
     if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
-      // Show visual feedback to user
       showFocusModeWarning('Point annotation is outside the focused object boundary');
       return;
     }
 
-    // Add negative point
     addPointPrompt(coords.imageX, coords.imageY, 'negative');
-  }, [currentTool, selectedModel, isDragging, stageToImageCoords, addPointPrompt, focusModeActive, focusedObjectMask]);
+  }, [currentTool, selectedModel, isDragging, stageToImageCoords, addPointPrompt, focusedObjectMask, showFocusModeWarning]);
 
-  // Handle pan start
   const handlePanStart = useCallback((e) => {
-    // Only pan with middle mouse button or when explicitly in pan mode
-    if (e.evt.button === 1) {
-      setIsPanning(true);
-      setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
-    } else if (e.evt.button === 0 && isPanMode) {
+    if (e.evt.button === 1 || (e.evt.button === 0 && isPanMode)) {
       setIsPanning(true);
       setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
     }
   }, [isPanMode]);
 
-  // Handle pan move
   const handlePanMove = useCallback((e) => {
     if (!isPanning || !panStart) return;
     
@@ -205,34 +208,20 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
   }, [isPanning, panStart, panOffset, setPanOffset]);
 
-  // Handle pan end
   const handlePanEnd = useCallback(() => {
     setIsPanning(false);
     setPanStart(null);
   }, []);
 
-  // Handle box drag start and pan start
   const handleMouseDown = useCallback((e) => {
     if (currentTool !== 'ai_annotation' || !selectedModel) return;
 
-    // Handle pan start (middle mouse button only, or left click when explicitly in pan mode)
-    if (e.evt.button === 1) {
-      // Middle mouse button - always pan
-      handlePanStart(e);
-      return;
-    }
-    
-    if (e.evt.button === 0 && isPanMode) {
-      // Left click in pan mode - pan
+    if (e.evt.button === 1 || (e.evt.button === 0 && isPanMode)) {
       handlePanStart(e);
       return;
     }
 
-    // Handle box creation (left click when NOT in pan mode)
-    if (e.evt.button !== 0) return;
-    
-    // If we're in pan mode, don't create boxes
-    if (isPanMode) return;
+    if (e.evt.button !== 0 || isPanMode) return;
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
@@ -240,20 +229,15 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return;
 
-    // Start drag for box creation
     setDragStart({ imageX: coords.imageX, imageY: coords.imageY, stageX: coords.stageX, stageY: coords.stageY });
-    // Don't set isDragging immediately - wait for actual movement
   }, [currentTool, selectedModel, isPanMode, stageToImageCoords, handlePanStart]);
 
-  // Handle box drag move and pan move
   const handleMouseMove = useCallback((e) => {
-    // Handle panning
     if (isPanning) {
       handlePanMove(e);
       return;
     }
 
-    // Handle box dragging
     if (!dragStart) return;
 
     const stage = e.target.getStage();
@@ -262,18 +246,16 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return;
 
-    // Start dragging if we've moved enough (to distinguish from clicks)
     if (!isDragging) {
       const distance = Math.sqrt(
         Math.pow(pointerPosition.x - dragStart.stageX, 2) + 
         Math.pow(pointerPosition.y - dragStart.stageY, 2)
       );
-      if (distance > 5) { // 5px threshold
+      if (distance > 5) {
         setIsDragging(true);
       }
     }
 
-    // Update preview in stage coordinates for visual feedback
     setActivePreview({
       x1: dragStart.stageX,
       y1: dragStart.stageY,
@@ -282,16 +264,13 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     });
   }, [isPanning, handlePanMove, isDragging, dragStart, stageToImageCoords, setActivePreview]);
 
-  // Handle box drag end, left-click for positive points, and pan end
   const handleMouseUp = useCallback((e) => {
-    // Handle pan end
     if (isPanning) {
       handlePanEnd();
       return;
     }
 
     if (isDragging && dragStart) {
-      // Handle box completion
       const stage = e.target.getStage();
       const pointerPosition = stage.getPointerPosition();
       
@@ -301,9 +280,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         const width = Math.abs(coords.imageX - dragStart.imageX);
         const height = Math.abs(coords.imageY - dragStart.imageY);
 
-        // Only create box if minimum size met (3px in image space)
         if (width >= 3 && height >= 3) {
-          // Validate box is within focused object if in focus mode
           if (!isBoxInFocusedObject(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY, focusedObjectMask)) {
             showFocusModeWarning('Box annotation is outside the focused object boundary');
           } else {
@@ -317,71 +294,87 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         }
       }
 
-      // Clear drag state
       setDragStart(null);
       setIsDragging(false);
       setActivePreview(null);
     } else if (dragStart && currentTool === 'ai_annotation' && selectedModel && e.evt.button === 0) {
-      // Handle left-click for positive points (when we have dragStart but didn't actually drag)
       const stage = e.target.getStage();
       const pointerPosition = stage.getPointerPosition();
-      
       const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
-      if (!coords) return; // Click outside image
+      if (!coords) return;
 
-      // Validate prompt is within focused object if in focus mode
       if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
         showFocusModeWarning('Point annotation is outside the focused object boundary');
-        // Clear drag state
         setDragStart(null);
         setIsDragging(false);
         setActivePreview(null);
         return;
       }
 
-      // Add positive point
       addPointPrompt(coords.imageX, coords.imageY, 'positive');
-      
-      // Clear drag state
       setDragStart(null);
       setIsDragging(false);
       setActivePreview(null);
     }
-  }, [isPanning, handlePanEnd, isDragging, dragStart, currentTool, selectedModel, stageToImageCoords, addBoxPrompt, addPointPrompt, setActivePreview]);
+  }, [isPanning, handlePanEnd, isDragging, dragStart, currentTool, selectedModel, stageToImageCoords, addBoxPrompt, addPointPrompt, setActivePreview, focusedObjectMask, showFocusModeWarning]);
 
-  // Handle wheel zoom
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault();
     
+    if (!imageObject || !containerSize.width || !containerSize.height) return;
+    
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
-    
-    // Calculate zoom factor
     const scaleBy = 1.1;
     const newScale = e.evt.deltaY > 0 ? zoomLevel / scaleBy : zoomLevel * scaleBy;
-    
-    // Clamp zoom level
     const clampedScale = Math.max(0.1, Math.min(10, newScale));
+    const imageAspect = imageObject.width / imageObject.height;
+    const containerAspect = containerSize.width / containerSize.height;
     
-    // Calculate new pan offset to zoom towards mouse position
-    const mouseX = pointerPosition.x;
-    const mouseY = pointerPosition.y;
+    let baseScale, imageWidth, imageHeight, x, y;
     
-    const newPanX = panOffset.x - (mouseX - panOffset.x) * (clampedScale / zoomLevel - 1);
-    const newPanY = panOffset.y - (mouseY - panOffset.y) * (clampedScale / zoomLevel - 1);
+    if (imageAspect > containerAspect) {
+      baseScale = containerSize.width / imageObject.width;
+      imageWidth = containerSize.width;
+      imageHeight = imageObject.height * baseScale;
+      x = 0;
+      y = (containerSize.height - imageHeight) / 2;
+    } else {
+      baseScale = containerSize.height / imageObject.height;
+      imageWidth = imageObject.width * baseScale;
+      imageHeight = containerSize.height;
+      x = (containerSize.width - imageWidth) / 2;
+      y = 0;
+    }
+    
+    const baseCenterX = x + imageWidth / 2;
+    const baseCenterY = y + imageHeight / 2;
+    const currentZoomedWidth = imageWidth * zoomLevel;
+    const currentZoomedHeight = imageHeight * zoomLevel;
+    const currentZoomedX = baseCenterX - currentZoomedWidth / 2;
+    const currentZoomedY = baseCenterY - currentZoomedHeight / 2;
+    const currentImageX = currentZoomedX + panOffset.x;
+    const currentImageY = currentZoomedY + panOffset.y;
+    const relativeX = pointerPosition.x - currentImageX;
+    const relativeY = pointerPosition.y - currentImageY;
+    const imagePixelX = relativeX / (baseScale * zoomLevel);
+    const imagePixelY = relativeY / (baseScale * zoomLevel);
+    const newZoomedWidth = imageWidth * clampedScale;
+    const newZoomedHeight = imageHeight * clampedScale;
+    const newZoomedX = baseCenterX - newZoomedWidth / 2;
+    const newZoomedY = baseCenterY - newZoomedHeight / 2;
+    const newPanX = pointerPosition.x - newZoomedX - (imagePixelX * baseScale * clampedScale);
+    const newPanY = pointerPosition.y - newZoomedY - (imagePixelY * baseScale * clampedScale);
     
     setZoomLevel(clampedScale);
     setPanOffset({ x: newPanX, y: newPanY });
-  }, [zoomLevel, panOffset, setZoomLevel, setPanOffset]);
+  }, [zoomLevel, panOffset, setZoomLevel, setPanOffset, imageObject, containerSize]);
 
-  // Handle keyboard shortcuts
   useEffect(() => {
     let spacebarPressed = false;
     
     const handleKeyDown = (e) => {
       if (currentTool !== 'ai_annotation') return;
-      
-      // Only handle spacebar if not already pressed
       if (e.code === 'Space' && !spacebarPressed) {
         e.preventDefault();
         e.stopPropagation();
@@ -392,8 +385,6 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
     const handleKeyUp = (e) => {
       if (currentTool !== 'ai_annotation') return;
-      
-      // Only handle spacebar if it was pressed
       if (e.code === 'Space' && spacebarPressed) {
         e.preventDefault();
         e.stopPropagation();
@@ -402,13 +393,11 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       }
     };
 
-    // Also handle when focus is lost to reset pan mode
     const handleBlur = () => {
       spacebarPressed = false;
       setIsPanMode(false);
     };
 
-    // Handle when window loses focus
     const handleVisibilityChange = () => {
       if (document.hidden) {
         spacebarPressed = false;
@@ -429,15 +418,12 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     };
   }, [currentTool]);
 
-  // Prevent context menu
   const handleContextMenu = useCallback((e) => {
     e.evt.preventDefault();
   }, []);
 
-  // Don't render if not AI annotation tool
   if (currentTool !== 'ai_annotation') return null;
 
-  // Show loading state
   if (imageLoading) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -449,10 +435,8 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     );
   }
 
-  // Don't render if no image
   if (!imageObject) return null;
 
-  // Show error state if image failed to load
   if (imageError) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -494,52 +478,48 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp} // End drag if mouse leaves
+        onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
       >
         <Layer>
-          {/* Background Image (optional when overlaying native <img>) */}
           {renderBackground && (
             <KonvaImage
               image={imageObject}
-              x={imageDimensions.x}
-              y={imageDimensions.y}
-              width={imageDimensions.width}
-              height={imageDimensions.height}
+              x={imageDimensions.displayX}
+              y={imageDimensions.displayY}
+              width={imageDimensions.displayWidth}
+              height={imageDimensions.displayHeight}
             />
           )}
 
-          {/* Box Prompts (render first, lower z-index) */}
           {prompts
             .filter((p) => p.type === 'box')
             .map((prompt) => {
-              // Convert image coords to stage coords for rendering
+              const finalScale = imageDimensions.baseScale * zoomLevel;
               const stagePrompt = {
                 ...prompt,
                 coords: {
-                  x1: prompt.coords.x1 * imageDimensions.scale + imageDimensions.x,
-                  y1: prompt.coords.y1 * imageDimensions.scale + imageDimensions.y,
-                  x2: prompt.coords.x2 * imageDimensions.scale + imageDimensions.x,
-                  y2: prompt.coords.y2 * imageDimensions.scale + imageDimensions.y,
+                  x1: prompt.coords.x1 * finalScale + imageDimensions.displayX,
+                  y1: prompt.coords.y1 * finalScale + imageDimensions.displayY,
+                  x2: prompt.coords.x2 * finalScale + imageDimensions.displayX,
+                  y2: prompt.coords.y2 * finalScale + imageDimensions.displayY,
                 },
               };
               return <BoxPromptMarker key={prompt.id} prompt={stagePrompt} />;
             })}
 
-          {/* Live Box Preview */}
           <LiveBoxPreview preview={activePreview} />
 
-          {/* Point Prompts (render last, higher z-index) */}
           {prompts
             .filter((p) => p.type === 'point')
             .map((prompt) => {
-              // Convert image coords to stage coords for rendering
+              const finalScale = imageDimensions.baseScale * zoomLevel;
               const stagePrompt = {
                 ...prompt,
                 coords: {
-                  x: prompt.coords.x * imageDimensions.scale + imageDimensions.x,
-                  y: prompt.coords.y * imageDimensions.scale + imageDimensions.y,
+                  x: prompt.coords.x * finalScale + imageDimensions.displayX,
+                  y: prompt.coords.y * finalScale + imageDimensions.displayY,
                 },
               };
               return <PointPromptMarker key={prompt.id} prompt={stagePrompt} />;
@@ -547,7 +527,6 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         </Layer>
       </Stage>
       
-      {/* Focus Mode Warning */}
       {focusModeWarning && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">

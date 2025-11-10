@@ -8,7 +8,7 @@ import {
 import { bboxOf, objectToPolygonPoints } from '../utils/polygonUtils';
 
 /**
- * hook for zooming and panning to objects
+ *  hook for zooming and panning to objects
  * Provides smooth animated zoom-to-object functionality with predictable behavior
  * 
  * @param {Object} options - Configuration options
