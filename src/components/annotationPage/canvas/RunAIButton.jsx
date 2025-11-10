@@ -5,6 +5,7 @@ import {
   useSelectedModel,
   useAIPrompts,
   useIsSubmitting,
+  useInstantSegmentation,
 } from '../../../stores/selectors/annotationSelectors';
 
 /**
@@ -16,9 +17,15 @@ const RunAIButton = ({ onRunAI }) => {
   const selectedModel = useSelectedModel();
   const prompts = useAIPrompts();
   const isSubmitting = useIsSubmitting();
+  const instantSegmentation = useInstantSegmentation();
 
   // Only show when AI annotation tool is active
   if (currentTool !== 'ai_annotation') {
+    return null;
+  }
+
+  // Hide button completely when instant segmentation is enabled (segmentation happens automatically)
+  if (instantSegmentation) {
     return null;
   }
 
