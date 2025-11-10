@@ -9,6 +9,7 @@ import {
   useObjectsList,
   useImageObject,
   useUpdateObject,
+  useRemoveObject,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { useDataset } from '../../../contexts/DatasetContext';
@@ -26,6 +27,7 @@ const ObjectContextMenu = () => {
   const objectsList = useObjectsList();
   const imageObject = useImageObject();
   const updateObject = useUpdateObject();
+  const removeObject = useRemoveObject();
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
@@ -92,7 +94,6 @@ const ObjectContextMenu = () => {
         });
         setLabelMap(map);
       } catch (error) {
-        console.error('Failed to fetch labels:', error);
         setLabelHierarchy([]);
         setLabelMap(new Map());
       } finally {
@@ -131,7 +132,6 @@ const ObjectContextMenu = () => {
     // Find the target object to get its contour_id
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
     if (!targetObject) {
-      console.error('Target object not found');
       hideContextMenu();
       return;
     }
@@ -163,7 +163,6 @@ const ObjectContextMenu = () => {
       
       hideContextMenu();
     } catch (error) {
-      console.error('Failed to apply label:', error);
       // Show user-friendly error message
       alert(`Failed to apply label: ${error.message || 'Unknown error'}`);
       hideContextMenu();
@@ -176,7 +175,6 @@ const ObjectContextMenu = () => {
     // Find the target object
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
     if (!targetObject || !targetObject.mask) {
-      console.error('Target object not found or has no mask');
       hideContextMenu();
       return;
     }
@@ -184,7 +182,6 @@ const ObjectContextMenu = () => {
     // Get the container element (the canvas container)
     const container = menuRef.current?.parentElement;
     if (!container) {
-      console.error('Container element not found');
       hideContextMenu();
       return;
     }
@@ -240,6 +237,33 @@ const ObjectContextMenu = () => {
     hideContextMenu();
   };
 
+  const handleReject = async () => {
+    if (!targetObjectId) return;
+
+    // Find the target object to get its contour_id
+    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
+    if (!targetObject) {
+      hideContextMenu();
+      return;
+    }
+
+    // Use contour_id for backend calls if available, otherwise fall back to store ID
+    const contourId = targetObject.contour_id || targetObjectId;
+
+    try {
+      // Delete from backend
+      await annotationSession.deleteObject(contourId);
+      
+      // Remove from store
+      removeObject(targetObjectId);
+      
+      hideContextMenu();
+    } catch (error) {
+      alert(`Failed to reject object: ${error.message || 'Unknown error'}`);
+      hideContextMenu();
+    }
+  };
+
   if (!visible) return null;
 
   return (
@@ -251,6 +275,17 @@ const ObjectContextMenu = () => {
         top: `${adjustedPosition.y}px`,
       }}
     >
+      {/* Reject Object Option */}
+      <button
+        onClick={handleReject}
+        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-150 flex items-center border-b border-gray-100"
+      >
+        <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        Reject object
+      </button>
+
       {/* Focus Mode Option */}
       <button
         onClick={handleFocusMode}
