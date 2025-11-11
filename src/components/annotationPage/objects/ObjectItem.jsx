@@ -23,6 +23,7 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
 import { editContourLabel } from '../../../api/masks';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
+import { hexToRgba } from '../../../utils/labelColors';
 
 const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
@@ -408,18 +409,32 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     }
   };
 
-  // Variant-specific styling
-  const borderColor = isTemporary 
-    ? (isSelected ? 'border-purple-400' : 'border-purple-200')
-    : (isSelected ? 'border-teal-400' : 'border-gray-200');
-    
-  const bgColor = isTemporary
-    ? (isSelected ? 'bg-purple-50' : 'bg-purple-25 hover:bg-purple-50')
-    : (isSelected ? 'bg-teal-50' : 'bg-white hover:bg-gray-50');
+  // Use object's color for styling
+  const objectColor = object.color || '#3b82f6'; // Default to blue if no color
+  const borderColorStyle = isSelected 
+    ? objectColor 
+    : hexToRgba(objectColor, 0.3); // Lighter border when not selected
+  const bgColorStyle = isSelected
+    ? hexToRgba(objectColor, 0.15) // More visible when selected
+    : hexToRgba(objectColor, 0.08); // Subtle background
 
   return (
     <div 
-      className={`border rounded-lg p-3 transition-colors cursor-pointer ${borderColor} ${bgColor}`}
+      className="border rounded-lg p-3 transition-all cursor-pointer hover:shadow-sm"
+      style={{
+        borderColor: borderColorStyle,
+        backgroundColor: bgColorStyle,
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = hexToRgba(objectColor, 0.12);
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = hexToRgba(objectColor, 0.08);
+        }
+      }}
       onClick={handleItemClick}
     >
       {/* Object Header */}
