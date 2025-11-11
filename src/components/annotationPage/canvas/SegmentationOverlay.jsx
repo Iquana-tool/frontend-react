@@ -340,16 +340,20 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     // Click is already on the SVG path element, so it's inside the object
     // (browser SVG hit-testing handles this)
     
-    // Get the canvas container to calculate relative coordinates
-    // The containerRef points to the outer div with position: relative
-    const canvasContainer = containerRef.current;
-    if (!canvasContainer) return;
+    // Get the parent canvas container (not the transformed overlay container)
+    // The containerRef points to the transformed overlay, we need its parent
+    const transformedContainer = containerRef.current;
+    if (!transformedContainer) return;
     
-    const containerRect = canvasContainer.getBoundingClientRect();
+    const parentContainer = transformedContainer.parentElement;
+    if (!parentContainer) return;
     
-    // Convert viewport coordinates to container-relative coordinates
-    const containerX = e.clientX - containerRect.left;
-    const containerY = e.clientY - containerRect.top;
+    const parentRect = parentContainer.getBoundingClientRect();
+    
+    // Convert viewport coordinates to parent container-relative coordinates
+    // This ensures the context menu appears at the correct position regardless of zoom/pan
+    const containerX = e.clientX - parentRect.left;
+    const containerY = e.clientY - parentRect.top;
     
     // Show context menu at the container-relative position
     showContextMenu(containerX, containerY, object.id);
