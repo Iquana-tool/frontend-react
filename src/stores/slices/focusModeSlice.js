@@ -8,12 +8,16 @@ export const createFocusModeSlice = (set) => ({
     state.focusMode.active = true;
     state.focusMode.objectId = objectId;
     state.focusMode.objectMask = objectMask;
+    // Switch to AI assisted annotation tool when entering focus mode
+    state.ui.currentTool = 'ai_annotation';
   }),
   
   enterFocusModeWithZoom: (objectId, objectMask, imageDimensions, containerDimensions, renderedImageDimensions) => set((state) => {
     state.focusMode.active = true;
     state.focusMode.objectId = objectId;
     state.focusMode.objectMask = objectMask;
+    // Switch to AI assisted annotation tool when entering focus mode
+    state.ui.currentTool = 'ai_annotation';
     
     // Calculate and apply zoom/pan for focus
     if (objectMask && objectMask.points) {

@@ -180,6 +180,9 @@ const ObjectContextMenu = () => {
         temporary: false,
       });
       
+      // Switch to AI assisted annotation tool
+      setCurrentTool('ai_annotation');
+      
       hideContextMenu();
     } catch (error) {
       // Show user-friendly error message
@@ -280,6 +283,9 @@ const ObjectContextMenu = () => {
       
       // Remove from store
       removeObject(targetObjectId);
+      
+      // Switch to AI assisted annotation tool
+      setCurrentTool('ai_annotation');
       
       hideContextMenu();
     } catch (error) {
