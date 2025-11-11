@@ -16,6 +16,7 @@ import {
   useAIPrompts,
   useSelectedModel,
   useIsSubmitting,
+  useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 
 const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDragging }) => {
@@ -26,7 +27,10 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   const prompts = useAIPrompts();
   const selectedModel = useSelectedModel();
   const isSubmitting = useIsSubmitting();
+  const refinementModeActive = useRefinementModeActive();
   const previousPromptsLengthRef = useRef(0);
+  const previousRefinementModeRef = useRef(false);
+  const refinementModeEnteredTimeRef = useRef(0);
   
   // AI Segmentation hook
   const { runSegmentation, error } = useAISegmentation();
@@ -45,6 +49,20 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
     }
   }, [runSegmentation]);
 
+  // Reset previousPromptsLengthRef when entering/exiting refinement mode
+  useEffect(() => {
+    // If refinement mode state changed, reset the previous prompts length
+    if (previousRefinementModeRef.current !== refinementModeActive) {
+      previousPromptsLengthRef.current = 0;
+      previousRefinementModeRef.current = refinementModeActive;
+      
+      // Track when refinement mode was entered to ensure backend is ready
+      if (refinementModeActive) {
+        refinementModeEnteredTimeRef.current = Date.now();
+      }
+    }
+  }, [refinementModeActive]);
+
   // Auto-trigger segmentation when instant segmentation is enabled and a prompt is added
   useEffect(() => {
     // Only trigger if:
@@ -62,17 +80,32 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
       prompts.length > 0 &&
       prompts.length > previousPromptsLengthRef.current
     ) {
-      // Small delay to ensure state is fully updated
+      // Calculate appropriate delay
+      let delay = 100; // Default delay for normal segmentation
+      
+      // In refinement mode, ensure minimum time has passed since entering refinement mode
+      if (refinementModeActive) {
+        const timeSinceRefinementEntered = Date.now() - refinementModeEnteredTimeRef.current;
+        const minReadyTime = 200; // Minimum time for backend to be ready
+        
+        // If we just entered refinement mode, wait longer
+        if (timeSinceRefinementEntered < minReadyTime) {
+          delay = minReadyTime - timeSinceRefinementEntered + 150; // Extra buffer
+        } else {
+          delay = 150; // Backend should be ready, but still use slightly longer delay
+        }
+      }
+      
       const timeoutId = setTimeout(() => {
         handleRunAI();
-      }, 100);
+      }, delay);
       
       return () => clearTimeout(timeoutId);
     }
     
     // Update the previous prompts length
     previousPromptsLengthRef.current = prompts.length;
-  }, [instantSegmentation, currentTool, selectedModel, isSubmitting, prompts.length, handleRunAI]);
+  }, [instantSegmentation, currentTool, selectedModel, isSubmitting, prompts.length, refinementModeActive, handleRunAI]);
 
   // Cursor for non-AI tools (base image remains mounted for all tools)
   const getCanvasCursor = () => {

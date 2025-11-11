@@ -81,14 +81,9 @@ export const initialState = {
       showAll: true,
       rootLevelOnly: false,
       selectedLevelOnly: false,
-      labels: {
-        label1: true, 
-        label2: true, 
-        label3: true,
-        label4: true, 
-        label5: true, 
-        label6: true,
-      }
+      showRootLabels: true, // Toggle for root level labels visibility
+      labels: {}, // Map of labelId -> boolean (dynamically populated from actual labels)
+      rootLabelIds: [], // Array of root-level label IDs for filtering
     },
     colors: {},
     labelAssignmentCounter: 0, // Global counter to track label assignment order

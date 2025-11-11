@@ -60,6 +60,7 @@ export const useSetSelectedModel = () => useAnnotationStore(state => state.setSe
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
+export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);
 export const useSetCurrentImage = () => useAnnotationStore(state => state.setCurrentImage);
 export const useSetImageList = () => useAnnotationStore(state => state.setImageList);
 export const useSetAnnotationStatus = () => useAnnotationStore(state => state.setAnnotationStatus);

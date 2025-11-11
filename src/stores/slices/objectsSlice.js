@@ -204,12 +204,51 @@ export const createObjectsSlice = (set) => ({
     state.objects.selected = [];
   }),
   
-  toggleVisibility: (filter) => set((state) => {
-    if (filter in state.objects.visibility) {
-      state.objects.visibility[filter] = !state.objects.visibility[filter];
-    } else if (filter.startsWith('label') && state.objects.visibility.labels[filter]) {
-      state.objects.visibility.labels[filter] = !state.objects.visibility.labels[filter];
+  toggleVisibility: (labelId) => set((state) => {
+    // Handle special visibility modes
+    if (labelId === 'showRootLabels') {
+      state.objects.visibility.showRootLabels = !state.objects.visibility.showRootLabels;
+      return;
     }
+    
+    // Handle label ID toggling (labelId can be a number or string representation)
+    const labelIdKey = typeof labelId === 'number' ? labelId : String(labelId);
+    
+    // If label visibility doesn't exist, initialize it to true (default visible)
+    if (!(labelIdKey in state.objects.visibility.labels)) {
+      state.objects.visibility.labels[labelIdKey] = true;
+    }
+    
+    // Toggle the visibility
+    state.objects.visibility.labels[labelIdKey] = !state.objects.visibility.labels[labelIdKey];
+  }),
+  
+  // Initialize label visibility from actual labels
+  initializeLabelVisibility: (labels) => set((state) => {
+    if (!labels || !Array.isArray(labels)) return;
+    
+    // Build array of root-level label IDs (store both number and string versions)
+    const rootLabelIds = [];
+    
+    // Initialize all labels as visible by default and track root labels
+    labels.forEach(label => {
+      if (label && label.id !== undefined) {
+        const labelIdKey = String(label.id);
+        // Only initialize if not already set (preserve user's manual changes)
+        if (!(labelIdKey in state.objects.visibility.labels)) {
+          state.objects.visibility.labels[labelIdKey] = true;
+        }
+        
+        // Track root-level labels (labels with no parent_id)
+        if (!label.parent_id || label.parent_id === null) {
+          rootLabelIds.push(label.id);
+          rootLabelIds.push(String(label.id)); // Also add string version for lookup
+        }
+      }
+    });
+    
+    // Update root label IDs array
+    state.objects.visibility.rootLabelIds = rootLabelIds;
   }),
   
   setVisibilityMode: (mode) => set((state) => {

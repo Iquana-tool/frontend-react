@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   useCurrentMask, 
   useObjectsList, 
@@ -16,6 +16,7 @@ import {
   useEnterRefinementMode,
   useSetCurrentTool,
   useExitFocusMode,
+  useObjectsVisibility,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
@@ -67,6 +68,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const enterRefinementMode = useEnterRefinementMode();
   const setCurrentTool = useSetCurrentTool();
   const exitFocusMode = useExitFocusMode();
+  const visibility = useObjectsVisibility();
   
   const { zoomToObject } = useZoomToObject({
     marginPct: 0.25,
@@ -74,6 +76,52 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     minZoom: 1,
     animationDuration: 300
   });
+
+  // Filter objects based on visibility settings
+  const visibleObjects = useMemo(() => {
+    if (visibility.showAll) {
+      return objectsList;
+    }
+
+    return objectsList.filter(obj => {
+      const isRootLevel = !obj.parent_id || obj.parent_id === null;
+
+      // Filter by root level only - show only objects with root-level labels
+      if (visibility.rootLevelOnly) {
+        // Check if object has a root-level label
+        if (obj.labelId !== undefined && obj.labelId !== null) {
+          const labelIdKey = String(obj.labelId);
+          const rootLabelIds = visibility.rootLabelIds || [];
+          const isRootLabel = rootLabelIds.includes(obj.labelId) || rootLabelIds.includes(labelIdKey);
+          if (!isRootLabel) return false;
+        } else {
+          // If object has no label, don't show it in root level only mode
+          return false;
+        }
+      }
+
+      // Filter by root level labels visibility
+      if (visibility.showRootLabels === false) {
+        if (isRootLevel) return false;
+      }
+
+      // Filter by label visibility - applies to all modes except showAll
+      // In selectedLevelOnly mode, only selected labels are shown
+      if (obj.labelId !== undefined && obj.labelId !== null) {
+        const labelIdKey = String(obj.labelId);
+        const isLabelVisible = visibility.labels[labelIdKey] !== false; // Default to true if not set
+        if (!isLabelVisible) return false;
+      } else {
+        // If object has no labelId, hide it when labels are configured
+        // Only show unlabeled objects when no labels are configured yet
+        if (Object.keys(visibility.labels).length > 0) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [objectsList, visibility, selectedObjects]);
 
   // Track last click times for double-click detection using ref to avoid closure issues
   const lastClickTimesRef = useRef({});
@@ -387,7 +435,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       )}
 
       {/* Final Objects Masks */}
-      {imageDimensions.width > 0 && objectsList.map((object) => {
+      {imageDimensions.width > 0 && visibleObjects.map((object) => {
         // Disable hover effects when in refinement mode
         const isHovered = refinementModeActive ? false : (hoveredObjectId === object.id);
         const isSelected = selectedObjects.includes(object.id);

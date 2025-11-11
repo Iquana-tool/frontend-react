@@ -17,11 +17,40 @@ const ObjectsList = () => {
     if (visibility.showAll) return objectsList;
     
     return objectsList.filter(obj => {
-      if (visibility.rootLevelOnly && obj.level !== 'root') return false;
-      if (visibility.selectedLevelOnly && !selectedObjects.includes(obj.id)) return false;
-      
-      const labelKey = `label${obj.labelIndex || 1}`;
-      if (!visibility.labels[labelKey]) return false;
+      const isRootLevel = !obj.parent_id || obj.parent_id === null;
+
+      // Filter by root level only - show only objects with root-level labels
+      if (visibility.rootLevelOnly) {
+        // Check if object has a root-level label
+        if (obj.labelId !== undefined && obj.labelId !== null) {
+          const labelIdKey = String(obj.labelId);
+          const rootLabelIds = visibility.rootLabelIds || [];
+          const isRootLabel = rootLabelIds.includes(obj.labelId) || rootLabelIds.includes(labelIdKey);
+          if (!isRootLabel) return false;
+        } else {
+          // If object has no label, don't show it in root level only mode
+          return false;
+        }
+      }
+
+      // Filter by root level labels visibility
+      if (visibility.showRootLabels === false) {
+        if (isRootLevel) return false;
+      }
+
+      // Filter by label visibility - applies to all modes except showAll
+      // In selectedLevelOnly mode, only selected labels are shown
+      if (obj.labelId !== undefined && obj.labelId !== null) {
+        const labelIdKey = String(obj.labelId);
+        const isLabelVisible = visibility.labels[labelIdKey] !== false; // Default to true if not set
+        if (!isLabelVisible) return false;
+      } else {
+        // If object has no labelId, hide it when labels are configured
+        // Only show unlabeled objects when no labels are configured yet
+        if (Object.keys(visibility.labels).length > 0) {
+          return false;
+        }
+      }
       
       return true;
     });
