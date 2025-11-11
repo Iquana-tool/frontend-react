@@ -6,13 +6,14 @@ const API_BASE_URL =
 // Get available prompted segmentation models from backend
 export const getPromptedModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/models/get_prompted_models`);
+        const response = await fetch(`${API_BASE_URL}/prompted_segmentation/models`);
         const data = await handleApiError(response);
 
-        if (data.success && data.models) {
+        // The backend returns: { success, message, response: { success, message, available_models } }
+        if (data.success && data.response && data.response.available_models) {
             return {
                 success: true,
-                models: data.models,
+                models: data.response.available_models,
             };
         }
 
