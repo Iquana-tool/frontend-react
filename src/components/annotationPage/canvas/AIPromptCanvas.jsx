@@ -18,7 +18,10 @@ import {
   useSetPanOffset,
   useFocusModeActive,
   useFocusModeObjectMask,
+  useRefinementModeActive,
+  useExitRefinementMode,
 } from '../../../stores/selectors/annotationSelectors';
+import annotationSession from '../../../services/annotationSession';
 import { isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
 import PointPromptMarker from './prompts/PointPromptMarker';
 import BoxPromptMarker from './prompts/BoxPromptMarker';
@@ -53,6 +56,8 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const panOffset = usePanOffset();
   const focusModeActive = useFocusModeActive();
   const focusedObjectMask = useFocusModeObjectMask();
+  const refinementModeActive = useRefinementModeActive();
+  const exitRefinementMode = useExitRefinementMode();
 
   // Show focus mode warning
   const showFocusModeWarning = useCallback((message) => {
@@ -377,8 +382,32 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   useEffect(() => {
     let spacebarPressed = false;
     
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
       if (currentTool !== 'ai_annotation') return;
+      
+      // Handle ESC key for exiting refinement mode
+      if (e.code === 'Escape' && refinementModeActive) {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          // Send unselect message to backend
+          await annotationSession.unselectRefinementObject();
+          
+          // Reset zoom and pan before exiting
+          setZoomLevel(1);
+          setPanOffset({ x: 0, y: 0 });
+          
+          // Exit refinement mode in store
+          exitRefinementMode();
+          
+          console.log('Exited refinement mode via ESC key');
+        } catch (error) {
+          console.error('Failed to exit refinement mode:', error);
+        }
+        return;
+      }
+      
+      // Handle Space key for pan mode
       if (e.code === 'Space' && !spacebarPressed) {
         e.preventDefault();
         e.stopPropagation();
@@ -420,7 +449,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentTool]);
+  }, [currentTool, refinementModeActive, exitRefinementMode, setZoomLevel, setPanOffset]);
 
   const handleContextMenu = useCallback((e) => {
     e.evt.preventDefault();

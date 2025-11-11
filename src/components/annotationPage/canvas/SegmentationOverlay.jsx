@@ -7,11 +7,45 @@ import {
   useEnterFocusMode,
   useCurrentTool,
   useSelectedObjects,
+  useSelectObject,
+  useDeselectObject,
   useFocusModeActive,
   useFocusModeObjectId,
+  useRefinementModeActive,
+  useRefinementModeObjectId,
+  useEnterRefinementMode,
+  useSetCurrentTool,
+  useExitFocusMode,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
+
+/**
+ * Helper function to generate SVG path from x, y coordinate arrays
+ * Coordinates should be normalized (0-1) and will be scaled to image dimensions
+ */
+const generatePathFromCoordinates = (xArray, yArray, imageWidth, imageHeight) => {
+  if (!xArray || !yArray || xArray.length === 0 || yArray.length === 0 || !imageWidth || !imageHeight) {
+    return null;
+  }
+  
+  // Scale first point to pixel coordinates
+  const x0 = xArray[0] * imageWidth;
+  const y0 = yArray[0] * imageHeight;
+  let path = `M ${x0} ${y0}`;
+  
+  // Add line segments for remaining points (scaled to pixel coordinates)
+  for (let i = 1; i < Math.min(xArray.length, yArray.length); i++) {
+    const x = xArray[i] * imageWidth;
+    const y = yArray[i] * imageHeight;
+    path += ` L ${x} ${y}`;
+  }
+  
+  // Close path
+  path += ' Z';
+  
+  return path;
+};
 
 const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const currentMask = useCurrentMask();
@@ -24,8 +58,15 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [hoveredObjectId, setHoveredObjectId] = useState(null);
   const selectedObjects = useSelectedObjects();
+  const selectObject = useSelectObject();
+  const deselectObject = useDeselectObject();
   const focusModeActive = useFocusModeActive();
   const focusedObjectId = useFocusModeObjectId();
+  const refinementModeActive = useRefinementModeActive();
+  const refinementModeObjectId = useRefinementModeObjectId();
+  const enterRefinementMode = useEnterRefinementMode();
+  const setCurrentTool = useSetCurrentTool();
+  const exitFocusMode = useExitFocusMode();
   
   const { zoomToObject } = useZoomToObject({
     marginPct: 0.25,
@@ -33,6 +74,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     minZoom: 1,
     animationDuration: 300
   });
+
+  // Track last click times for double-click detection using ref to avoid closure issues
+  const lastClickTimesRef = useRef({});
 
   // Calculate the actual rendered dimensions of the image after object-contain is applied
   useEffect(() => {
@@ -94,49 +138,150 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  // Handle left-click on objects (enter focus mode)
+  // Handle double-click on objects (enter refinement mode)
+  const handleObjectDoubleClick = async (object) => {
+    const contourId = object.contour_id || object.id;
+    
+    try {
+      // Exit focus mode if active (refinement mode replaces focus mode)
+      if (focusModeActive) {
+        exitFocusMode();
+      }
+      
+      // Send refinement selection to backend
+      await annotationSession.selectRefinementObject(contourId);
+      
+      // Enter refinement mode in the store
+      enterRefinementMode(object.id, contourId);
+      
+      // Switch to AI annotation tool
+      setCurrentTool('ai_annotation');
+      
+      // Zoom and pan to the object
+      if (imageObject && object.x && object.y && object.x.length > 0) {
+        const container = containerRef.current;
+        if (container) {
+          const containerWidth = container.offsetWidth;
+          const containerHeight = container.offsetHeight;
+          
+          if (containerWidth && containerHeight) {
+            const imageDims = {
+              width: imageObject.width,
+              height: imageObject.height
+            };
+            
+            const containerDims = {
+              width: containerWidth,
+              height: containerHeight
+            };
+            
+            const renderedImageDims = {
+              width: imageDimensions.width,
+              height: imageDimensions.height,
+              x: imageDimensions.x,
+              y: imageDimensions.y
+            };
+            
+            zoomToObject(
+              object,
+              imageDims,
+              containerDims,
+              renderedImageDims,
+              { animateMs: 300, immediate: false }
+            );
+          }
+        }
+      }
+      
+      console.log(`Entered refinement mode for object ${object.id} (contour_id: ${contourId})`);
+    } catch (error) {
+      console.error('Failed to enter refinement mode:', error);
+    }
+  };
+
+  // Handle left-click on objects (enter focus mode only in selection tool, or detect double-click)
   const handleObjectLeftClick = (e, object) => {
     e.stopPropagation();
     
-    if (!imageObject || !object.x || !object.y || object.x.length === 0) {
+    // Detect double-click
+    const currentTime = Date.now();
+    const lastClickTime = lastClickTimesRef.current[object.id] || 0;
+    const timeDiff = currentTime - lastClickTime;
+    
+    if (timeDiff < 300 && lastClickTime > 0) {
+      // Double-click detected - enter refinement mode
+      lastClickTimesRef.current[object.id] = 0; // Reset to prevent triple-clicks
+      handleObjectDoubleClick(object);
       return;
     }
+    
+    // Update last click time
+    lastClickTimesRef.current[object.id] = currentTime;
+    
+    // Capture the click time for the closure to avoid ref mutation issues
+    const clickTime = currentTime;
+    
+    // Single-click behavior (delayed to allow double-click detection)
+    setTimeout(() => {
+      const storedTime = lastClickTimesRef.current[object.id] || 0;
+      
+      // Only proceed if no second click came (this click time matches stored time)
+      // If a double-click occurred, storedTime would be 0 (reset) or a different time
+      if (storedTime === clickTime) {
+        handleSingleClick(object);
+      }
+    }, 250);
+  };
 
-    const mask = object.mask || (object.path ? { path: object.path } : null);
-    enterFocusMode(object.id, mask);
+  // Handle single-click on objects (enter focus mode in both selection and AI annotation tools)
+  const handleSingleClick = (object) => {
+    // Disable focus mode when in refinement mode
+    if (refinementModeActive) {
+      return;
+    }
+    
+    // Enter focus mode for both selection and AI annotation tools
+    if (currentTool === 'selection' || currentTool === 'ai_annotation') {
+      if (!imageObject || !object.x || !object.y || object.x.length === 0) {
+        return;
+      }
 
-    const container = containerRef.current;
-    if (!container) return;
+      const mask = object.mask || (object.path ? { path: object.path } : null);
+      enterFocusMode(object.id, mask);
 
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+      const container = containerRef.current;
+      if (!container) return;
 
-    if (!containerWidth || !containerHeight) return;
+      const containerWidth = container.offsetWidth;
+      const containerHeight = container.offsetHeight;
 
-    const imageDims = {
-      width: imageObject.width,
-      height: imageObject.height
-    };
+      if (!containerWidth || !containerHeight) return;
 
-    const containerDims = {
-      width: containerWidth,
-      height: containerHeight
-    };
+      const imageDims = {
+        width: imageObject.width,
+        height: imageObject.height
+      };
 
-    const renderedImageDims = {
-      width: imageDimensions.width,
-      height: imageDimensions.height,
-      x: imageDimensions.x,
-      y: imageDimensions.y
-    };
+      const containerDims = {
+        width: containerWidth,
+        height: containerHeight
+      };
 
-    zoomToObject(
-      object,
-      imageDims,
-      containerDims,
-      renderedImageDims,
-      { animateMs: 300, immediate: false }
-    );
+      const renderedImageDims = {
+        width: imageDimensions.width,
+        height: imageDimensions.height,
+        x: imageDimensions.x,
+        y: imageDimensions.y
+      };
+
+      zoomToObject(
+        object,
+        imageDims,
+        containerDims,
+        renderedImageDims,
+        { animateMs: 300, immediate: false }
+      );
+    }
   };
 
   // Handle right-click on objects (show context menu)
@@ -243,9 +388,23 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
       {/* Final Objects Masks */}
       {imageDimensions.width > 0 && objectsList.map((object) => {
-        const isHovered = hoveredObjectId === object.id;
+        // Disable hover effects when in refinement mode
+        const isHovered = refinementModeActive ? false : (hoveredObjectId === object.id);
         const isSelected = selectedObjects.includes(object.id);
         const isFocused = focusModeActive && focusedObjectId === object.id;
+        const isRefinementObject = refinementModeActive && refinementModeObjectId === object.id;
+        
+        // Debug logging for refinement object
+        if (isRefinementObject) {
+          console.log('Rendering refinement object:', {
+            id: object.id,
+            hasPath: !!object.path,
+            hasMaskPath: !!object.mask?.path,
+            hasXY: !!(object.x && object.y),
+            xLength: object.x?.length,
+            yLength: object.y?.length,
+          });
+        }
         
         // In focus mode, completely skip rendering the focused object's overlay
         // This ensures no color overlay appears on the focused object
@@ -253,15 +412,48 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           return null;
         }
         
-        const fillOpacity = isHovered ? 0.3 : (isSelected ? 0.35 : 0.2);
-        const strokeWidth = isHovered ? 3 : (isSelected ? 4 : 2.5);
-        const glowIntensity = isHovered ? 8 : (isSelected ? 6 : 4);
+        // In refinement mode, highlight the refinement object prominently
+        // Keep other objects visible but less prominent for context
+        let fillOpacity, strokeWidth, glowIntensity, strokeColor;
+        
+        if (refinementModeActive) {
+          if (isRefinementObject) {
+            // Highlight refinement object with high visibility
+            fillOpacity = 0.45;
+            strokeWidth = 5;
+            glowIntensity = 12;
+            strokeColor = object.color; // Use object's color but make it more prominent
+          } else {
+            // Other objects: keep visible for context but less prominent
+            fillOpacity = 0.15;
+            strokeWidth = 2;
+            glowIntensity = 2;
+            strokeColor = object.color;
+          }
+        } else {
+          // Normal mode styling
+          fillOpacity = isHovered ? 0.3 : (isSelected ? 0.35 : 0.2);
+          strokeWidth = isHovered ? 3 : (isSelected ? 4 : 2.5);
+          glowIntensity = isHovered ? 8 : (isSelected ? 6 : 4);
+          strokeColor = object.color;
+        }
         
         // Get mask path from backend (precomputed) or fallback to mask.path
-        const maskPath = object.path || object.mask?.path;
+        let maskPath = object.path || object.mask?.path;
         
-        // Skip if no path available
+        // If no path available, try to generate from x, y coordinates
+        if (!maskPath && object.x && object.y && object.x.length > 0 && imageObject) {
+          maskPath = generatePathFromCoordinates(object.x, object.y, imageObject.width, imageObject.height);
+          console.log(`Generated path from coordinates for object ${object.id}:`, {
+            numPoints: object.x.length,
+            imageSize: { width: imageObject.width, height: imageObject.height },
+            firstPoint: { x: object.x[0], y: object.y[0] }
+          });
+        }
+        
+        // Skip if still no path available
         if (!maskPath) {
+          console.warn(`No path or coordinates available for object ${object.id}`);
           return null;
         }
         
@@ -316,27 +508,38 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             <path
               d={maskPath}
               fill={hexToRgba(object.color, fillOpacity)}
-              stroke={object.color}
+              stroke={strokeColor}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
               strokeLinecap="round"
               filter={
-                isHovered 
-                  ? `url(#glow-${object.id})` 
-                  : isSelected 
-                    ? `url(#selected-glow-${object.id})` 
-                    : `url(#shadow-${object.id})`
+                isRefinementObject
+                  ? `url(#selected-glow-${object.id})` // Use selected glow for refinement object
+                  : isHovered 
+                    ? `url(#glow-${object.id})` 
+                    : isSelected 
+                      ? `url(#selected-glow-${object.id})` 
+                      : `url(#shadow-${object.id})`
               }
               style={{ 
                 transition: 'all 0.2s ease-in-out',
-                cursor: 'pointer',
-                // Path captures pointer events - this is the interactive element
-                pointerEvents: 'auto'
+                cursor: refinementModeActive ? 'default' : 'pointer',
+                // In refinement mode, disable pointer events so clicks pass through to canvas
+                pointerEvents: refinementModeActive ? 'none' : 'auto'
               }}
               onClick={(e) => handleObjectLeftClick(e, object)}
               onContextMenu={(e) => handleObjectRightClick(e, object)}
-              onMouseEnter={() => setHoveredObjectId(object.id)}
-              onMouseLeave={() => setHoveredObjectId(null)}
+              onMouseEnter={() => {
+                // Disable hover highlighting in refinement mode
+                if (!refinementModeActive) {
+                  setHoveredObjectId(object.id);
+                }
+              }}
+              onMouseLeave={() => {
+                if (!refinementModeActive) {
+                  setHoveredObjectId(null);
+                }
+              }}
             />
           </svg>
         );

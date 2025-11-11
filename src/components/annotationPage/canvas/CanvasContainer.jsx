@@ -6,6 +6,7 @@ import ModelSelectionHint from './ModelSelectionHint';
 import RunAIButton from './RunAIButton';
 import ObjectContextMenu from './ObjectContextMenu';
 import FocusOverlay from './FocusOverlay';
+import RefinementOverlay from './RefinementOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
@@ -124,6 +125,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
       {/* Focus mode overlay (shows dimmed area and focused object) */}
       <FocusOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+
+      {/* Refinement mode overlay (shows indicator and exit button) */}
+      <RefinementOverlay />
 
       {/* Context menu for object labeling */}
       <ObjectContextMenu />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle, X } from 'lucide-react';
 import { 
   useSelectedObjects, 
@@ -9,6 +9,13 @@ import {
   useImageObject,
   useSetZoomLevel,
   useSetPanOffset,
+  useEnterRefinementMode,
+  useSetCurrentTool,
+  useFocusModeActive,
+  useExitFocusMode,
+  useCurrentTool,
+  useEnterFocusMode,
+  useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
@@ -23,6 +30,13 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const deselectObject = useDeselectObject();
   const removeObject = useRemoveObject();
   const updateObject = useUpdateObject();
+  const enterRefinementMode = useEnterRefinementMode();
+  const setCurrentTool = useSetCurrentTool();
+  const focusModeActive = useFocusModeActive();
+  const exitFocusMode = useExitFocusMode();
+  const currentTool = useCurrentTool();
+  const enterFocusMode = useEnterFocusMode();
+  const refinementModeActive = useRefinementModeActive();
   const { currentDataset } = useDataset();
   const imageObject = useImageObject();
   const setZoomLevel = useSetZoomLevel();
@@ -38,6 +52,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [labels, setLabels] = useState([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
+  const [lastClickTime, setLastClickTime] = useState(0);
+  const singleClickTimeoutRef = useRef(null);
   
   const isSelected = selectedObjects.includes(object.id);
   const isVisible = true; // For now, assume all objects are visible
@@ -74,7 +90,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
   const performPanZoom = () => {
     if (!imageObject || !object.x || !object.y || object.x.length === 0) {
-      console.warn('Cannot pan/zoom: missing image or object coordinates');
       return;
     }
 
@@ -87,7 +102,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     // Find the canvas container
     const container = document.querySelector('.relative.overflow-hidden');
     if (!container) {
-      console.warn('Canvas container not found');
       return;
     }
 
@@ -95,7 +109,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     const containerHeight = container.offsetHeight;
     
     if (!containerWidth || !containerHeight) {
-      console.warn('Container dimensions not available');
       return;
     }
 
@@ -136,31 +149,154 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     setPanOffset({ x: 0, y: 0 });
   };
 
+  const handleDoubleClick = async () => {
+    // Double-click enters refinement mode
+    const contourId = object.contour_id || object.id;
+    
+    try {
+      // Exit focus mode if active (refinement mode replaces focus mode)
+      if (focusModeActive) {
+        exitFocusMode();
+      }
+      
+      // Send refinement selection to backend
+      await annotationSession.selectRefinementObject(contourId);
+      
+      // Enter refinement mode in the store
+      enterRefinementMode(object.id, contourId);
+      
+      // Switch to AI annotation tool
+      setCurrentTool('ai_annotation');
+      
+      // Zoom and pan to the object (similar to focus mode)
+      if (imageObject && object.x && object.y && object.x.length > 0) {
+        // Find the canvas container
+        const container = document.querySelector('.relative.overflow-hidden');
+        if (container) {
+          const containerWidth = container.offsetWidth;
+          const containerHeight = container.offsetHeight;
+          
+          if (containerWidth && containerHeight) {
+            const imageDimensionsForCalc = {
+              width: imageObject.width,
+              height: imageObject.height
+            };
+            
+            const containerDimensions = {
+              width: containerWidth,
+              height: containerHeight
+            };
+            
+            // Calculate rendered image dimensions (object-contain sizing)
+            const imageAspect = imageObject.width / imageObject.height;
+            const containerAspect = containerWidth / containerHeight;
+            
+            let renderedWidth, renderedHeight, renderedX, renderedY;
+            
+            if (imageAspect > containerAspect) {
+              renderedWidth = containerWidth;
+              renderedHeight = containerWidth / imageAspect;
+              renderedX = 0;
+              renderedY = (containerHeight - renderedHeight) / 2;
+            } else {
+              renderedWidth = containerHeight * imageAspect;
+              renderedHeight = containerHeight;
+              renderedX = (containerWidth - renderedWidth) / 2;
+              renderedY = 0;
+            }
+            
+            const renderedImageDimensions = {
+              width: renderedWidth,
+              height: renderedHeight,
+              x: renderedX,
+              y: renderedY
+            };
+            
+            // Use the zoom hook to zoom/pan to the object
+            zoomToObjectFn(
+              object, // Object with x, y arrays
+              imageDimensionsForCalc,
+              containerDimensions,
+              renderedImageDimensions,
+              { animateMs: 300, immediate: false }
+            );
+          }
+        }
+      }
+    } catch (error) {
+      alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const handleItemClick = (e) => {
     // Don't trigger if clicking action buttons or chevron
     if (e.target.closest('button')) {
       return;
     }
     
-    // Toggle selection and zoom/pan to object
-    if (isSelected) {
-      // If already selected, deselect it
-      deselectObject(object.id);
-      // If this was the only selected object, reset view
-      if (selectedObjects.length === 1) {
-        resetView();
+    // Detect double-click
+    const currentTime = Date.now();
+    const timeDiff = currentTime - lastClickTime;
+    
+    if (timeDiff < 300 && lastClickTime > 0) {
+      // Double-click detected - cancel pending single-click action
+      if (singleClickTimeoutRef.current) {
+        clearTimeout(singleClickTimeoutRef.current);
+        singleClickTimeoutRef.current = null;
       }
-    } else {
-      // If not selected, select it and pan/zoom
-      selectObject(object.id);
-      performPanZoom();
+      handleDoubleClick();
+      setLastClickTime(0); // Reset to prevent triple-clicks
+      return;
     }
+    
+    setLastClickTime(currentTime);
+    
+    // Clear any existing timeout
+    if (singleClickTimeoutRef.current) {
+      clearTimeout(singleClickTimeoutRef.current);
+    }
+    
+    // Delay single-click action to allow double-click detection
+    singleClickTimeoutRef.current = setTimeout(() => {
+      singleClickTimeoutRef.current = null;
+      
+      // Single click: Toggle selection, enter focus mode (if appropriate), and zoom/pan to object
+      if (isSelected) {
+        // If already selected, deselect it
+        deselectObject(object.id);
+        // Exit focus mode if active
+        if (focusModeActive) {
+          exitFocusMode();
+        }
+        // If this was the only selected object, reset view
+        if (selectedObjects.length === 1) {
+          resetView();
+        }
+      } else {
+        // If not selected, select it
+        selectObject(object.id);
+        
+        // Enter focus mode if:
+        // 1. Not in refinement mode
+        // 2. Using selection tool (not AI annotation tool)
+        // 3. Object has valid coordinates
+        if (!refinementModeActive && currentTool === 'selection' && 
+            imageObject && object.x && object.y && object.x.length > 0) {
+          const mask = object.mask || (object.path ? { path: object.path } : null);
+          if (mask) {
+            enterFocusMode(object.id, mask);
+          }
+        }
+        
+        // Pan/zoom to the object
+        performPanZoom();
+      }
+    }, 200); // Wait 200ms to see if a second click comes
   };
 
   const handleEdit = (e) => {
     e?.stopPropagation();
     // TODO: Implement edit functionality
-    console.log('Edit object:', object.id);
   };
 
   const handleDelete = async (e) => {
@@ -191,7 +327,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
         setLabels(labelsArray);
       } catch (error) {
-        console.error('Failed to fetch labels:', error);
         setLabels([]);
       } finally {
         setLabelsLoading(false);
@@ -200,6 +335,15 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
     loadLabels();
   }, [showLabelModal, currentDataset]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (singleClickTimeoutRef.current) {
+        clearTimeout(singleClickTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleAccept = (e) => {
     e?.stopPropagation();
@@ -238,10 +382,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         temporary: false,
       });
       
-      console.log(`Applied label "${labelName}" (ID: ${labelId}) to object ${object.id} (contour_id: ${contourId}) and moved to Reviewed Objects`);
       setShowLabelModal(false);
     } catch (error) {
-      console.error('Failed to accept object with label:', error);
       alert(`Failed to accept object: ${error.message || 'Unknown error'}`);
     }
   };
@@ -261,10 +403,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       
       // Remove from store
       removeObject(object.id);
-      
-      console.log(`Rejected and deleted object ${object.id} (contour_id: ${contourId})`);
     } catch (error) {
-      console.error('Failed to reject object:', error);
       alert(`Failed to reject object: ${error.message || 'Unknown error'}`);
     }
   };

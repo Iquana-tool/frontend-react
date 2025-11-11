@@ -8,6 +8,8 @@ import {
   useImageObject,
   useEnterFocusModeWithZoom,
   useSetPanOffset,
+  useRefinementModeActive,
+  useSetZoomLevel,
 } from '../../../stores/selectors/annotationSelectors';
 import { calculateBoundingBox, calculateFocusTransformSimple } from '../../../utils/geometryUtils';
 
@@ -20,9 +22,19 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   const imageObject = useImageObject();
   const enterFocusModeWithZoom = useEnterFocusModeWithZoom();
   const setPanOffset = useSetPanOffset();
+  const setZoomLevel = useSetZoomLevel();
+  const refinementModeActive = useRefinementModeActive();
   const containerRef = canvasRef; // Use the same container reference as SegmentationOverlay
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [hasAppliedFocusZoom, setHasAppliedFocusZoom] = useState(false);
+
+  const handleExitFocusMode = () => {
+    // Reset zoom and pan before exiting
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+    // Exit focus mode
+    exitFocusMode();
+  };
 
 
   // Calculate the actual rendered dimensions of the image
@@ -117,6 +129,11 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   // Note: Pan calculation is now handled by the improved calculateFocusTransformSimple function
   // No additional pan adjustment needed here
 
+  // Hide focus overlay when refinement mode is active
+  if (refinementModeActive) {
+    return null;
+  }
+
   if (!focusModeActive || !focusedObjectId || !focusedObjectMask) {
     return null;
   }
@@ -186,7 +203,7 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
         {/* Exit focus mode button - fixed to viewport top-right */}
         <div className="absolute top-4 right-4 pointer-events-auto">
           <button
-            onClick={exitFocusMode}
+            onClick={handleExitFocusMode}
             className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl hover:bg-white border border-gray-200/50 transition-all duration-200 hover:shadow-2xl"
           >
             <svg

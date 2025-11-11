@@ -1,17 +1,12 @@
 import React from 'react';
-import { MousePointer, Pencil, Sparkles, CheckCircle, X } from 'lucide-react';
+import { MousePointer, Pencil, Sparkles, CheckCircle } from 'lucide-react';
 import { 
   useCurrentTool, 
   useSetCurrentTool, 
   useLeftSidebarCollapsed,
   useInstantSegmentation,
   useToggleInstantSegmentation,
-  useRefinementModeActive,
-  useRefinementModeObjectId,
-  useExitRefinementMode,
-  useObjectsList,
 } from '../../../stores/selectors/annotationSelectors';
-import annotationSession from '../../../services/annotationSession';
 import ModelSelectors from './ModelSelectors';
 
 const ToolsSection = () => {
@@ -20,30 +15,6 @@ const ToolsSection = () => {
   const leftSidebarCollapsed = useLeftSidebarCollapsed();
   const instantSegmentation = useInstantSegmentation();
   const toggleInstantSegmentation = useToggleInstantSegmentation();
-  const refinementModeActive = useRefinementModeActive();
-  const refinementModeObjectId = useRefinementModeObjectId();
-  const exitRefinementMode = useExitRefinementMode();
-  const objectsList = useObjectsList();
-  
-  // Get the object being refined
-  const refinementObject = refinementModeActive 
-    ? objectsList.find(obj => obj.id === refinementModeObjectId) 
-    : null;
-
-  const handleExitRefinementMode = async () => {
-    try {
-      // Send unselect message to backend
-      await annotationSession.unselectRefinementObject();
-      
-      // Exit refinement mode in store
-      exitRefinementMode();
-      
-      console.log('Exited refinement mode');
-    } catch (error) {
-      console.error('Failed to exit refinement mode:', error);
-      alert(`Failed to exit refinement mode: ${error.message || 'Unknown error'}`);
-    }
-  };
 
   const tools = [
     { id: 'selection', name: 'Selection', icon: MousePointer, description: 'Select and manipulate objects', disabled: false },
@@ -170,36 +141,6 @@ const ToolsSection = () => {
         </div>
       )}
       
-      {/* Refinement Mode Indicator - Show when refinement mode is active */}
-      {refinementModeActive && refinementObject && (
-        <div className="border-t border-gray-200 p-3">
-          <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-3">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-                  <div className="text-xs font-bold text-purple-900">
-                    Refinement Mode
-                  </div>
-                </div>
-                <div className="text-xs text-purple-700 mt-1">
-                  Refining: {refinementObject.label || `Object #${refinementObject.id}`}
-                </div>
-              </div>
-              <button
-                onClick={handleExitRefinementMode}
-                className="p-1 hover:bg-purple-200 rounded transition-colors flex-shrink-0"
-                title="Exit refinement mode (ESC)"
-              >
-                <X className="w-4 h-4 text-purple-700" />
-              </button>
-            </div>
-            <div className="text-xs text-purple-600 mt-2 leading-relaxed">
-              Add prompts to refine this object. Press ESC to exit.
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

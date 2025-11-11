@@ -12,6 +12,7 @@ import {
   useObjectsList,
   useRefinementModeActive,
   useExitRefinementMode,
+  useSetCurrentTool,
 } from '../stores/selectors/annotationSelectors';
 
 /**
@@ -34,6 +35,7 @@ const useAISegmentation = () => {
   const addObject = useAddObject();
   const refinementModeActive = useRefinementModeActive();
   const exitRefinementMode = useExitRefinementMode();
+  const setCurrentTool = useSetCurrentTool();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -190,11 +192,16 @@ const useAISegmentation = () => {
           try {
             await annotationSession.unselectRefinementObject();
             exitRefinementMode();
-            console.log('Exited refinement mode after successful segmentation');
+            // Switch back to selection tool so clicking the new object can enter focus mode
+            setCurrentTool('selection');
           } catch (error) {
-            console.error('Failed to exit refinement mode:', error);
+           
             // Continue anyway - the object was added successfully
           }
+        } else {
+          // If not in refinement mode, switch to selection tool after segmentation
+          // so the newly created object can be clicked to enter focus mode
+          setCurrentTool('selection');
         }
         
         clearAllPrompts();
@@ -205,7 +212,6 @@ const useAISegmentation = () => {
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
-      console.error('[useAISegmentation] WebSocket segmentation error:', err);
       return { success: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
@@ -222,6 +228,7 @@ const useAISegmentation = () => {
     addObject,
     refinementModeActive,
     exitRefinementMode,
+    setCurrentTool,
   ]);
 
   return {
