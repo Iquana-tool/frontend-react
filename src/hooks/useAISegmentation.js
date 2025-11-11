@@ -9,8 +9,10 @@ import {
   useSetIsSubmittingAI,
   useImageObject,
   useAddObject,
+  useUpdateObject,
   useObjectsList,
   useRefinementModeActive,
+  useRefinementModeObjectId,
   useExitRefinementMode,
   useSetCurrentTool,
 } from '../stores/selectors/annotationSelectors';
@@ -33,19 +35,21 @@ const useAISegmentation = () => {
   const clearAllPrompts = useClearAllPrompts();
   const setIsSubmitting = useSetIsSubmittingAI();
   const addObject = useAddObject();
+  const updateObject = useUpdateObject();
   const refinementModeActive = useRefinementModeActive();
+  const refinementModeObjectId = useRefinementModeObjectId();
   const exitRefinementMode = useExitRefinementMode();
   const setCurrentTool = useSetCurrentTool();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
-   * Handles object_added message format with contour data
+   * Handles object_added and object_modified message formats with contour data
    */
   const transformResponseToMask = useCallback((response) => {
     let contour = null;
     
-    // Handle backend format: object_added message with contour data
-    if (response && response.type === 'object_added' && response.data) {
+    // Handle: object_added or object_modified message with contour data
+    if (response && (response.type === 'object_added' || response.type === 'object_modified') && response.data) {
       contour = response.data;
     }
     // Handle direct contour data
@@ -172,31 +176,75 @@ const useAISegmentation = () => {
           ? Number(contourId) 
           : (typeof contourId === 'number' ? contourId : contourId);
         
-        // Add as a temporary object (will appear in Reviewable Objects)
-        // User can assign a label via context menu or click Accept to move it to Reviewed Objects
-        addObject({
-          mask: mask,
-          contour_id: normalizedId, // Store the backend contour_id for API calls (consistent format)
-          pixelCount: mask.pixelCount || 0,
-          label: mask.label || `Object #${objectsList.length + 1}`,
-          temporary: true, // Mark as temporary so it appears in Reviewable Objects
-          // Include x and y coordinate arrays if available from backend response
-          x: mask.x || [],
-          y: mask.y || [],
-          // Ensure path is available for rendering
-          path: mask.path || mask.mask?.path,
-        });
+        // Handle message types generically: object_modified updates existing, object_added creates new
+        const isModified = response && response.type === 'object_modified';
         
-        // Exit refinement mode after successful segmentation so the new object is clickable
+        if (isModified) {
+          // When in refinement mode, we know which object to update from refinementModeObjectId
+          const objectToUpdate = refinementModeActive && refinementModeObjectId
+            ? objectsList.find(obj => obj.id === refinementModeObjectId)
+            : objectsList.find(obj => {
+                const objContourId = obj.contour_id || obj.id;
+                const normalizedObjContourId = typeof objContourId === 'string' && !isNaN(objContourId)
+                  ? Number(objContourId)
+                  : (typeof objContourId === 'number' ? objContourId : objContourId);
+                return normalizedObjContourId === normalizedId;
+              });
+          
+          if (objectToUpdate) {
+            // Update the existing object - completely replace mask and path to show only the refined version
+            updateObject(objectToUpdate.id, {
+              mask: mask,
+              contour_id: normalizedId, // Update with the NEW contour_id from backend
+              pixelCount: mask.pixelCount || 0,
+              // Preserve existing label if it exists, otherwise use the one from backend
+              label: mask.label || objectToUpdate.label || `Object #${objectToUpdate.id}`,
+              // Include x and y coordinate arrays if available from backend response
+              x: mask.x || [],
+              y: mask.y || [],
+              // Ensure path is available for rendering - explicitly set from new refined object
+              path: mask.path || null,
+            });
+          } else {
+            console.warn(`Object not found for object_modified. Adding as new object.`);
+            // Fallback: if object not found, add as new
+            addObject({
+              mask: mask,
+              contour_id: normalizedId,
+              pixelCount: mask.pixelCount || 0,
+              label: mask.label || `Object #${objectsList.length + 1}`,
+              temporary: true,
+              x: mask.x || [],
+              y: mask.y || [],
+              path: mask.path || mask.mask?.path,
+            });
+          }
+        } else {
+          // object_added: Add as a temporary object
+          addObject({
+            mask: mask,
+            contour_id: normalizedId, // Store the backend contour_id for API calls (consistent format)
+            pixelCount: mask.pixelCount || 0,
+            label: mask.label || `Object #${objectsList.length + 1}`,
+            temporary: true, // Mark as temporary so it appears in Reviewable Objects
+            // Include x and y coordinate arrays if available from backend response
+            x: mask.x || [],
+            y: mask.y || [],
+            // Ensure path is available for rendering
+            path: mask.path || mask.mask?.path,
+          });
+        }
+        
+        // Exit refinement mode after successful segmentation so the object is clickable
         if (refinementModeActive) {
           try {
             await annotationSession.unselectRefinementObject();
             exitRefinementMode();
-            // Switch back to selection tool so clicking the new object can enter focus mode
+            // Switch back to selection tool so clicking the object can enter focus mode
             setCurrentTool('selection');
           } catch (error) {
            
-            // Continue anyway - the object was added successfully
+            // Continue anyway - the object was updated/added successfully
           }
         } else {
           // If not in refinement mode, switch to selection tool after segmentation
@@ -226,7 +274,9 @@ const useAISegmentation = () => {
     transformResponseToMask,
     clearAllPrompts,
     addObject,
+    updateObject,
     refinementModeActive,
+    refinementModeObjectId,
     exitRefinementMode,
     setCurrentTool,
   ]);
