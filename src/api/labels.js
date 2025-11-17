@@ -53,6 +53,37 @@ export const createLabel = async (labelData, datasetId) => {
     }
 };
 
+// Update a label
+// labelData: { name: string }
+export const updateLabel = async (labelId, labelData, datasetId) => {
+    try {
+        if (!labelId) {
+            throw new Error("Label ID is required");
+        }
+
+        if (!labelData || !labelData.name) {
+            throw new Error("Label name is required");
+        }
+
+        if (!datasetId) {
+            throw new Error("Dataset ID is required");
+        }
+
+        const url = new URL(`${API_BASE_URL}/labels/update_label`);
+        url.searchParams.append("label_id", labelId);
+        url.searchParams.append("label_name", labelData.name);
+        url.searchParams.append("dataset_id", datasetId);
+
+        const response = await fetch(url, {
+            method: "PUT",
+        });
+
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+};
+
 // Delete a label
 export const deleteLabel = async (labelId, datasetId) => {
     try {

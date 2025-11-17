@@ -1,30 +1,37 @@
 import React, { useState, useEffect } from "react";
-import { Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Trash2, Edit2 } from "lucide-react";
 import * as api from "../../../api";
 import { 
   buildLabelHierarchy, 
-  hasChildren,
   extractLabelsFromResponse
 } from "../../../utils/labelHierarchy";
+import { useLabelHierarchy } from "../../../hooks/useLabelHierarchy";
+import LabelHierarchyRenderer from "../shared/LabelHierarchyRenderer";
 
 const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
-  const [labelHierarchy, setLabelHierarchy] = useState([]);
-  const [expandedLabels, setExpandedLabels] = useState(new Set());
+  const {
+    labelHierarchy,
+    expandedLabels,
+    setLabelHierarchy,
+    toggleExpanded,
+  } = useLabelHierarchy([]);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [labelToDelete, setLabelToDelete] = useState(null);
+  const [labelToEdit, setLabelToEdit] = useState(null);
   
   // Add label form
   const [newLabelName, setNewLabelName] = useState('');
   const [targetParentLabel, setTargetParentLabel] = useState(null);
 
-  // Edit label states - temporarily disabled until API is available
-  // const [editingLabel, setEditingLabel] = useState(null);
-  // const [editLabelName, setEditLabelName] = useState('');
+  // Edit label states
+  const [editLabelName, setEditLabelName] = useState('');
 
   // Update local labels when props change
   useEffect(() => {
@@ -100,36 +107,27 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
     }
   };
 
-  // Handle editing a label name - temporarily disabled until updateLabel API is available
-  // const handleEditLabel = async (labelId) => {
-  //   if (!editLabelName.trim()) return;
-  //   
-  //   setLoading(true);
-  //   setError(null);
-  //   
-  //   try {
-  //     await api.updateLabel(labelId, { name: editLabelName.trim() }, dataset.id);
-  //     await refreshLabels();
-  //     setEditingLabel(null);
-  //     setEditLabelName('');
-  //   } catch (err) {
-  //     console.error('Error updating label:', err);
-  //     setError('Failed to update label');
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-  // Toggle expanded state for a label
-  const toggleExpanded = (labelId) => {
-    const newExpanded = new Set(expandedLabels);
-    if (newExpanded.has(labelId)) {
-      newExpanded.delete(labelId);
-    } else {
-      newExpanded.add(labelId);
+  // Handle editing a label name
+  const handleEditLabel = async () => {
+    if (!labelToEdit || !editLabelName.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await api.updateLabel(labelToEdit.id, { name: editLabelName.trim() }, dataset.id);
+      await refreshLabels();
+      setShowEditModal(false);
+      setLabelToEdit(null);
+      setEditLabelName('');
+    } catch (err) {
+      console.error('Error updating label:', err);
+      setError('Failed to update label');
+    } finally {
+      setLoading(false);
     }
-    setExpandedLabels(newExpanded);
   };
+
 
   // Open add modal
   const openAddModal = (parentLabel = null) => {
@@ -144,93 +142,18 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
     setShowDeleteModal(true);
   };
 
-  // Recursive component to render label hierarchy
-  const renderLabelHierarchy = (labels, depth = 0) => {
-    return labels.map((label) => {
-      const hasChildLabels = hasChildren(label);
-      const isExpanded = expandedLabels.has(label.id);
-      const marginLeft = depth * 20; // Indent based on depth
-      
-      return (
-        <div key={label.id} className="mb-2">
-          {/* Parent label */}
-          <div 
-            className="border border-gray-200 rounded-lg p-3 bg-white"
-            style={{ marginLeft: `${marginLeft}px` }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center flex-1">
-                {hasChildLabels && (
-                  <button
-                    onClick={() => toggleExpanded(label.id)}
-                    className="p-1 mr-2 text-gray-600 hover:bg-gray-100 rounded"
-                    title={isExpanded ? "Collapse" : "Expand"}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown size={16} />
-                    ) : (
-                      <ChevronRight size={16} />
-                    )}
-                  </button>
-                )}
-                
-                <div
-                  className="w-4 h-4 rounded-full mr-3"
-                  style={{
-                    backgroundColor: `hsl(${(label.id * 137.508) % 360}, 70%, 50%)`
-                  }}
-                ></div>
-                
-                <span className="font-medium text-gray-900">{label.name}</span>
-                
-                {hasChildLabels && (
-                  <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
-                    {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={() => openAddModal(label)}
-                  className="p-1 text-teal-600 hover:bg-teal-100 rounded"
-                  title="Add sublabel"
-                >
-                  <Plus size={14} />
-                </button>
-                <button
-                  onClick={() => openDeleteModal(label)}
-                  className="p-1 text-red-600 hover:bg-red-100 rounded"
-                  title="Delete label"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Children labels */}
-          {hasChildLabels && isExpanded && label.children && (
-            <div className="mt-2">
-              {renderLabelHierarchy(label.children, depth + 1)}
-            </div>
-          )}
-        </div>
-      );
-    });
+  // Open edit modal
+  const openEditModal = (label) => {
+    setLabelToEdit(label);
+    setEditLabelName(label.name);
+    setShowEditModal(true);
   };
 
-  // Start editing a label - temporarily disabled
-  // const startEditing = (label) => {
-  //   setEditingLabel(label.id);
-  //   setEditLabelName(label.name);
-  // };
+  // Get label color
+  const getLabelColor = (label) => {
+    return `hsl(${(label.id * 137.508) % 360}, 70%, 50%)`;
+  };
 
-  // Cancel editing - temporarily disabled
-  // const cancelEditing = () => {
-  //   setEditingLabel(null);
-  //   setEditLabelName('');
-  // };
 
   return (
     <div>
@@ -255,7 +178,16 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
         </div>
       ) : (
         <div className="space-y-2">
-          {renderLabelHierarchy(labelHierarchy)}
+          <LabelHierarchyRenderer
+            labels={labelHierarchy}
+            expandedLabels={expandedLabels}
+            onToggleExpanded={toggleExpanded}
+            onAddLabel={openAddModal}
+            onEditLabel={openEditModal}
+            onDeleteLabel={openDeleteModal}
+            mode="editable"
+            getLabelColor={getLabelColor}
+          />
           
           {/* Add new label button */}
           <button
@@ -312,6 +244,59 @@ const EditableLabels = ({ dataset, labels, onLabelsUpdated }) => {
                     className="px-4 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {loading ? 'Creating...' : 'Create'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Label Modal */}
+      {showEditModal && labelToEdit && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" onClick={() => setShowEditModal(false)}>
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-6 pt-6 pb-4">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">
+                  Edit Label
+                </h3>
+                
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={editLabelName}
+                    onChange={(e) => setEditLabelName(e.target.value)}
+                    placeholder="Enter label name..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    autoFocus
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') handleEditLabel();
+                    }}
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setLabelToEdit(null);
+                      setEditLabelName('');
+                    }}
+                    className="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleEditLabel}
+                    disabled={!editLabelName.trim() || loading}
+                    className="px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {loading ? 'Updating...' : 'Update'}
                   </button>
                 </div>
               </div>

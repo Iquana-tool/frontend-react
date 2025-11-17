@@ -1,7 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
-import { useSelectedModel, useCompletionModel, useSetSelectedModel, useSetCompletionModel, useCurrentTool } from '../../../stores/selectors/annotationSelectors';
-import { getPromptedModels } from '../../../api/models';
+import { 
+  useSelectedModel, 
+  useCompletionModel, 
+  useSetSelectedModel, 
+  useSetCompletionModel, 
+  useCurrentTool,
+  useAvailableModels,
+  useIsLoadingModels,
+  useFetchAvailableModels
+} from '../../../stores/selectors/annotationSelectors';
 import ModelDescription from './ModelDescription';
 
 const ModelSelectors = () => {
@@ -10,9 +18,9 @@ const ModelSelectors = () => {
   const completionModel = useCompletionModel();
   const setSelectedModel = useSetSelectedModel();
   const setCompletionModel = useSetCompletionModel();
-
-  const [aiModels, setAiModels] = useState([]);
-  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const availableModels = useAvailableModels();
+  const isLoadingModels = useIsLoadingModels();
+  const fetchAvailableModels = useFetchAvailableModels();
 
   const showAIAnnotationSelector = currentTool === 'ai_annotation';
   const showCompletionSelector = currentTool === 'completion';
@@ -22,61 +30,12 @@ const ModelSelectors = () => {
     { id: 'DINOv2', name: 'DINOv2' }
   ];
 
-  // Fetch AI models from backend
+  // Fetch AI models from backend when AI annotation tool is selected
   useEffect(() => {
-    const fetchModels = async () => {
-      setIsLoadingModels(true);
-      try {
-        const result = await getPromptedModels();
-        if (result.success && result.models && result.models.length > 0) {
-          // Transform backend models to frontend format
-          // Backend returns models with identifier_str and name fields
-          const transformedModels = result.models.map(model => ({
-            id: model.identifier_str || model.id,
-            name: model.name || model.identifier_str || model.id,
-            description: model.description,
-            tags: model.tags,
-            supported_prompt_types: model.supported_prompt_types,
-            supports_refinement: model.supports_refinement
-          }));
-          setAiModels(transformedModels);
-          
-          // Set default model if none is selected and models are available
-          if (!selectedModel && transformedModels.length > 0) {
-            setSelectedModel(transformedModels[0].id);
-          }
-        } else {
-          // Fallback to hardcoded models if backend doesn't return any
-          const fallbackModels = [
-            { id: 'SAM2', name: 'SAM2' },
-            { id: 'SAM', name: 'SAM' }
-          ];
-          setAiModels(fallbackModels);
-          if (!selectedModel && fallbackModels.length > 0) {
-            setSelectedModel(fallbackModels[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching AI models:', error);
-        // Fallback to hardcoded models on error
-        const fallbackModels = [
-          { id: 'SAM2', name: 'SAM2' },
-          { id: 'SAM', name: 'SAM' }
-        ];
-        setAiModels(fallbackModels);
-        if (!selectedModel && fallbackModels.length > 0) {
-          setSelectedModel(fallbackModels[0].id);
-        }
-      } finally {
-        setIsLoadingModels(false);
-      }
-    };
-
-    if (showAIAnnotationSelector) {
-      fetchModels();
+    if (showAIAnnotationSelector && availableModels.length === 0 && !isLoadingModels) {
+      fetchAvailableModels();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showAIAnnotationSelector]);
+  }, [showAIAnnotationSelector, availableModels.length, isLoadingModels, fetchAvailableModels]);
 
   return (
     <div className="space-y-3">
@@ -95,8 +54,8 @@ const ModelSelectors = () => {
             >
               {isLoadingModels ? (
                 <option value="">Loading models...</option>
-              ) : aiModels.length > 0 ? (
-                aiModels.map((model) => (
+              ) : availableModels.length > 0 ? (
+                availableModels.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>

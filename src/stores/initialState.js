@@ -71,6 +71,8 @@ export const initialState = {
   models: {
     selectedModel: 'SAM2',
     completionModel: 'DINOv3',
+    availableModels: [], // List of available AI models from backend
+    isLoadingModels: false,
   },
   
   // Objects State

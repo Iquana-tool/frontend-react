@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
 import DatasetInfo from "./gallery/DatasetInfo";
 import DataManagementView from "./gallery/DataManagementView";
+import LabelManagementView from "./gallery/LabelManagementView";
 import LoadingState from "./gallery/LoadingState";
 import ErrorState from "./gallery/ErrorState";
 import SmallScreenMessage from "./gallery/SmallScreenMessage";
@@ -97,8 +98,7 @@ const DatasetGallery = () => {
   };
 
   const handleLabelManagementClick = () => {
-    // TODO: Navigate to label management page
-    console.log("Label Management clicked");
+    setCurrentView("labelManagement");
   };
 
   if (loading || loadingData) {
@@ -150,6 +150,13 @@ const DatasetGallery = () => {
                 onBack={() => setCurrentView("cards")}
                 onImageClick={handleImageClick}
                 onImagesUpdated={refreshImages}
+              />
+            ) : currentView === "labelManagement" ? (
+              <LabelManagementView
+                dataset={dataset}
+                labels={labels}
+                onBack={() => setCurrentView("cards")}
+                onLabelsUpdated={handleLabelsUpdated}
               />
             ) : null}
           </div>
