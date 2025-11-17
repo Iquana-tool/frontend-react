@@ -1,15 +1,23 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useCallback } from "react";
 import { Search, Image as ImageIcon } from "lucide-react";
 import { useLazyImageLoader } from "../../../hooks/useLazyImageLoader";
 import { useImageUpload } from "../../../hooks/useImageUpload";
 import ImageThumbnail from "./ImageThumbnail";
 import UploadModal from "./UploadModal";
 import GalleryHeader from "./GalleryHeader";
+import { 
+  useSearchTerm, 
+  useFilterStatus, 
+  useShowUploadModal,
+  useGalleryActions 
+} from "../../../stores/selectors";
 
 const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated }) => {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [showUploadModal, setShowUploadModal] = useState(false);
+  // Zustand store selectors - provides persistence across navigation
+  const searchTerm = useSearchTerm();
+  const filterStatus = useFilterStatus();
+  const showUploadModal = useShowUploadModal();
+  const galleryActions = useGalleryActions();
 
   // Filter images based on search and status
   const filteredImages = useMemo(() => {
@@ -51,19 +59,23 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
     removeFile,
     clearFiles,
     handleUpload,
-  } = useImageUpload(dataset, () => {
-    setShowUploadModal(false);
+  } = useImageUpload(dataset, useCallback(() => {
+    galleryActions.setShowUploadModal(false);
     if (onImagesUpdated) {
       onImagesUpdated();
     } else {
       window.location.reload();
     }
-  });
+  }, [galleryActions, onImagesUpdated]));
 
-  const handleFilterChange = (newFilter) => {
-    setFilterStatus(newFilter);
+  const handleSearchChange = useCallback((term) => {
+    galleryActions.setSearchTerm(term);
+  }, [galleryActions]);
+
+  const handleFilterChange = useCallback((newFilter) => {
+    galleryActions.setFilterStatus(newFilter);
     resetLoadedImages();
-  };
+  }, [galleryActions, resetLoadedImages]);
 
   if (images.length === 0) {
     return (
@@ -83,9 +95,9 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         imageCount={filteredImages.length}
         searchTerm={searchTerm}
         filterStatus={filterStatus}
-        onSearchChange={setSearchTerm}
+        onSearchChange={handleSearchChange}
         onFilterChange={handleFilterChange}
-        onAddImagesClick={() => setShowUploadModal(true)}
+        onAddImagesClick={() => galleryActions.setShowUploadModal(true)}
       />
 
       {/* Image Grid */}
@@ -119,7 +131,7 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
       {/* Upload Modal */}
       <UploadModal
         isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
+        onClose={() => galleryActions.setShowUploadModal(false)}
         dataset={dataset}
         uploadingFiles={uploadingFiles}
         uploadProgress={uploadProgress}
