@@ -67,7 +67,12 @@ const useAppStore = create()(
           uploadProgress: { current: 0, total: 0 },
           uploadingFiles: [],
           uploadErrors: [],
-          loadingErrors: new Map()
+          loadingErrors: new Map(),
+          // Thumbnail cache - Map<imageId, thumbnailUrl>
+          // This persists across component unmounts for better performance
+          thumbnailCache: new Map(),
+          // Maximum cache size to prevent memory issues
+          maxCacheSize: 500
         },
         
         // Actions grouped by domain
@@ -258,6 +263,52 @@ const useAppStore = create()(
             const newErrors = new Map(state.gallery.loadingErrors);
             newErrors.delete(imageId);
             state.gallery.loadingErrors = newErrors;
+          }),
+          
+          // Thumbnail cache actions
+          setThumbnail: (imageId, thumbnailUrl) => set(state => {
+            // if cache is full, remove oldest entries
+            if (state.gallery.thumbnailCache.size >= state.gallery.maxCacheSize) {
+              // Remove first 10% of entries
+              const entriesToRemove = Math.floor(state.gallery.maxCacheSize * 0.1);
+              const iterator = state.gallery.thumbnailCache.keys();
+              for (let i = 0; i < entriesToRemove; i++) {
+                const key = iterator.next().value;
+                if (key !== undefined) {
+                  state.gallery.thumbnailCache.delete(key);
+                }
+              }
+            }
+            state.gallery.thumbnailCache.set(imageId, thumbnailUrl);
+          }),
+          
+          setThumbnails: (thumbnails) => set(state => {
+            // Batch update thumbnails
+            thumbnails.forEach(([imageId, thumbnailUrl]) => {
+              if (state.gallery.thumbnailCache.size >= state.gallery.maxCacheSize) {
+                // Evict oldest entry
+                const firstKey = state.gallery.thumbnailCache.keys().next().value;
+                if (firstKey !== undefined) {
+                  state.gallery.thumbnailCache.delete(firstKey);
+                }
+              }
+              state.gallery.thumbnailCache.set(imageId, thumbnailUrl);
+            });
+          }),
+          
+          getThumbnail: (imageId) => {
+            const state = get();
+            return state.gallery.thumbnailCache.get(imageId);
+          },
+          
+          clearThumbnailCache: () => set(state => {
+            state.gallery.thumbnailCache.clear();
+          }),
+          
+          clearThumbnailsForDataset: (imageIds) => set(state => {
+            imageIds.forEach(id => {
+              state.gallery.thumbnailCache.delete(id);
+            });
           }),
           
           resetGalleryState: () => set(state => {
