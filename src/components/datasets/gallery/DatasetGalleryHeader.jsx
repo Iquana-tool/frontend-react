@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, BookOpen, Bug } from 'lucide-react';
+import AuthButtons from '../../auth/AuthButtons';
 
 const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
   const navigate = useNavigate();
@@ -51,6 +52,7 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
             <Play size={16} />
             <span>Start Annotation</span>
           </button>
+          <AuthButtons />
         </div>
       </div>
     </nav>

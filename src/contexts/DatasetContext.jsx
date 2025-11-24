@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as api from '../api';
+import { useAuth } from './AuthContext';
 
 const DatasetContext = createContext();
 
@@ -12,6 +13,7 @@ export const useDataset = () => {
 };
 
 export const DatasetProvider = ({ children }) => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [datasets, setDatasets] = useState([]);
   const [currentDataset, setCurrentDataset] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -121,10 +123,17 @@ export const DatasetProvider = ({ children }) => {
     setCurrentDataset(dataset);
   };
 
-  // Initialize datasets on mount
+  // Initialize datasets when authenticated
   useEffect(() => {
-    fetchDatasets();
-  }, [fetchDatasets]);
+    // Only fetch datasets if user is authenticated and auth is not loading
+    if (isAuthenticated && !authLoading) {
+      fetchDatasets();
+    } else if (!isAuthenticated && !authLoading) {
+      // Clear datasets when user logs out
+      setDatasets([]);
+      setCurrentDataset(null);
+    }
+  }, [isAuthenticated, authLoading, fetchDatasets]);
 
   const value = {
     datasets,

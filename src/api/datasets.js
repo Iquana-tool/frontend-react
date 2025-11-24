@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 import { getImageById } from "./images"; // Import the image fetching function
 
 const API_BASE_URL =
@@ -7,7 +7,9 @@ const API_BASE_URL =
 // Dataset API functions
 export const fetchDatasets = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/datasets/get_datasets`);
+        const response = await fetch(`${API_BASE_URL}/datasets/get_datasets`, {
+            headers: getAuthHeaders(),
+        });
         return handleApiError(response);
     } catch (error) {
         throw error;
@@ -23,6 +25,7 @@ export const createDataset = async (name, description, datasetType) => {
 
         const response = await fetch(url, {
             method: "POST",
+            headers: getAuthHeaders(),
         });
         return handleApiError(response);
     } catch (error) {
@@ -36,6 +39,7 @@ export const deleteDataset = async (datasetId) => {
             `${API_BASE_URL}/datasets/delete_dataset/${datasetId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);
@@ -47,7 +51,10 @@ export const deleteDataset = async (datasetId) => {
 export const getDataset = async (datasetId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/datasets/get_dataset/${datasetId}`
+            `${API_BASE_URL}/datasets/get_dataset/${datasetId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -60,7 +67,10 @@ export const getDataset = async (datasetId) => {
 export const getAnnotationProgress = async (datasetId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/datasets/get_annotation_progress/${datasetId}`
+            `${API_BASE_URL}/datasets/get_annotation_progress/${datasetId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -73,7 +83,10 @@ export const getAnnotationProgress = async (datasetId) => {
 export const getSampleImages = async (datasetId, limit = 4) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/images/list_images/${datasetId}`
+            `${API_BASE_URL}/images/list_images/${datasetId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         const data = await handleApiError(response);
 

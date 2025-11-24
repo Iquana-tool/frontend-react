@@ -9,6 +9,8 @@ import {
   HelpCircle,
   ArrowLeft,
 } from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import AuthButtons from "../components/auth/AuthButtons";
 
 import {
   DocumentationNavigation,
@@ -24,6 +26,7 @@ import {
 
 const DocumentationPage = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [expandedSections, setExpandedSections] = useState({
     gettingStarted: true,
     datasets: false,
@@ -142,13 +145,16 @@ const DocumentationPage = () => {
             >
               AquaMorph
             </button>
-            <button
-              onClick={() => navigate("/datasets")}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-lg transition-colors text-sm"
-            >
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Datasets</span>
-            </button>
+            {isAuthenticated && (
+              <button
+                onClick={() => navigate("/datasets")}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-1.5 px-3 rounded-lg transition-colors text-sm"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Datasets</span>
+              </button>
+            )}
+            <AuthButtons variant="mobile" />
           </div>
 
           {/* Desktop Layout */}
@@ -173,13 +179,16 @@ const DocumentationPage = () => {
             </div>
             
             <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate("/datasets")}
-                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Datasets</span>
-              </button>
+              {isAuthenticated && (
+                <button
+                  onClick={() => navigate("/datasets")}
+                  className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Datasets</span>
+                </button>
+              )}
+              <AuthButtons />
             </div>
           </div>
         </div>

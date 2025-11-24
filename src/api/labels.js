@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -10,7 +10,10 @@ export const fetchLabels = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/labels/get_labels/${datasetId}`
+            `${API_BASE_URL}/labels/get_labels/${datasetId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -45,6 +48,7 @@ export const createLabel = async (labelData, datasetId) => {
 
         const response = await fetch(url, {
             method: "POST",
+            headers: getAuthHeaders(),
         });
 
         return handleApiError(response);
@@ -76,6 +80,7 @@ export const updateLabel = async (labelId, labelData, datasetId) => {
 
         const response = await fetch(url, {
             method: "PUT",
+            headers: getAuthHeaders(),
         });
 
         return handleApiError(response);
@@ -99,6 +104,7 @@ export const deleteLabel = async (labelId, datasetId) => {
             `${API_BASE_URL}/labels/delete_label/label=${labelId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
 

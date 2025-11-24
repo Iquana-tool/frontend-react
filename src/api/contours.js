@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -7,7 +7,10 @@ const API_BASE_URL =
 export const getContoursForMask = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}`
+            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -19,7 +22,10 @@ export const getContoursForMask = async (maskId) => {
 export const getContourHierarchy = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`
+            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -34,6 +40,7 @@ export const deleteContour = async (contourId) => {
             `${API_BASE_URL}/contours/delete_contour/${contourId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);
@@ -48,6 +55,7 @@ export const deleteAllContours = async (maskId) =>{
             `${API_BASE_URL}/contours/delete_all_contours_of_mask/${maskId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);

@@ -1,6 +1,9 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
 import { DatasetProvider } from "./contexts/DatasetContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Login from "./components/auth/Login";
 import LandingPage from "./pages/LandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
@@ -9,21 +12,59 @@ import DocumentationPage from "./pages/DocumentationPage";
 
 function App() {
   return (
-    <DatasetProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/datasets" element={<DatasetsPage />} />
-          <Route path="/docs" element={<DocumentationPage />} />
-          <Route path="/dataset/:datasetId/gallery" element={<DatasetGalleryPage />} />
-          <Route path="/dataset/:datasetId/annotate" element={<AnnotationPageV2 />} />
-          <Route path="/dataset/:datasetId/annotate/:imageId" element={<AnnotationPageV2 />} />
-          <Route path="/annotate-v2" element={<AnnotationPageV2 />} />
-          {/* Catch-all route - redirect unknown routes to landing page */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
-    </DatasetProvider>
+    <AuthProvider>
+      <DatasetProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/docs" element={<DocumentationPage />} />
+            <Route
+              path="/datasets"
+              element={
+                <ProtectedRoute>
+                  <DatasetsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/gallery"
+              element={
+                <ProtectedRoute>
+                  <DatasetGalleryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/annotate"
+              element={
+                <ProtectedRoute>
+                  <AnnotationPageV2 />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/annotate/:imageId"
+              element={
+                <ProtectedRoute>
+                  <AnnotationPageV2 />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/annotate-v2"
+              element={
+                <ProtectedRoute>
+                  <AnnotationPageV2 />
+                </ProtectedRoute>
+              }
+            />
+            {/* Catch-all route - redirect unknown routes to landing page */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </DatasetProvider>
+    </AuthProvider>
   );
 }
 

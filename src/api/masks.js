@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -13,9 +13,9 @@ export const markMaskAsFinal = async (maskId) => {
         // Send request to mark the mask as final
         const response = await fetch(`${API_BASE_URL}/masks/finish_mask/${maskId}`, {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
         });
         return handleApiError(response);
     } catch (error) {
@@ -33,9 +33,9 @@ export const markMaskAsUnfinished = async (maskId) => {
         // Send request to mark the mask as unfinished
         const response = await fetch(`${API_BASE_URL}/masks/unfinish_mask/${maskId}`, {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
         });
         return handleApiError(response);
     } catch (error) {
@@ -53,9 +53,9 @@ export const getMaskAnnotationStatus = async (maskId) => {
         // Send request to get the annotation status of the mask
         const response = await fetch(`${API_BASE_URL}/masks/get_mask_annotation_status/${maskId}`, {
             method: "GET",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
         });
         return handleApiError(response);
     } catch (error) {
@@ -84,9 +84,9 @@ export const saveMask = async (imageId, label, contours) => {
 
         const createResponse = await fetch(createMaskUrl, {
             method: "PUT",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
         });
 
         if (!createResponse.ok) {
@@ -122,9 +122,9 @@ export const saveMask = async (imageId, label, contours) => {
 
             const addResponse = await fetch(addContourUrl, {
                 method: "POST",
-                headers: {
+                headers: getAuthHeaders({
                     "Content-Type": "application/json",
-                },
+                }),
                 body: JSON.stringify({
                     x: contour.x,
                     y: contour.y,
@@ -166,6 +166,7 @@ export const getMasksForImage = async (imageId) => {
             const response = await fetch(url, {
                 signal: controller.signal,
                 method: "GET",
+                headers: getAuthHeaders(),
             });
 
             clearTimeout(timeoutId);
@@ -254,6 +255,7 @@ export const getMaskWithContours = async (maskId) => {
             // First get the basic mask info
             const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`, {
                 signal: controller.signal,
+                headers: getAuthHeaders(),
             });
 
             // Handle 404 and other errors
@@ -281,6 +283,7 @@ export const getMaskWithContours = async (maskId) => {
                 `${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`,
                 {
                     signal: controller.signal,
+                    headers: getAuthHeaders(),
                 }
             );
 
@@ -379,9 +382,9 @@ export async function getFinalMask(imageId) {
                 `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`,
                 {
                     method: "GET",
-                    headers: {
+                    headers: getAuthHeaders({
                         "Content-Type": "application/json",
-                    },
+                    }),
                 }
             );
 
@@ -430,9 +433,9 @@ export async function getFinalMask(imageId) {
                     `${API_BASE_URL}/masks/get_contours_of_mask/${finalMask.id}`,
                     {
                         method: "GET",
-                        headers: {
+                        headers: getAuthHeaders({
                             "Content-Type": "application/json",
-                        },
+                        }),
                     }
                 );
 
@@ -445,15 +448,15 @@ export async function getFinalMask(imageId) {
                         // Try to fetch quantifications for the final mask
                         try {
                             // REFACTOR: This shoudnt be like this, import the quantification endpoint
-                            const quantResponse = await fetch(
-                                `${API_BASE_URL}/contours/get_contours_of_mask/${finalMask.id}&flattened=true`,
-                                {
-                                    method: "GET",
-                                    headers: {
-                                        "Content-Type": "application/json",
-                                    },
-                                }
-                            );
+                const quantResponse = await fetch(
+                    `${API_BASE_URL}/contours/get_contours_of_mask/${finalMask.id}&flattened=true`,
+                    {
+                        method: "GET",
+                        headers: getAuthHeaders({
+                            "Content-Type": "application/json",
+                        }),
+                    }
+                );
                             
                             if (quantResponse.ok) {
                                 const quantData = await quantResponse.json();
@@ -521,9 +524,9 @@ export async function createFinalMask(imageId) {
             `${API_BASE_URL}/masks/create_mask/${imageId}`,
             {
                 method: "PUT",
-                headers: {
+                headers: getAuthHeaders({
                     "Content-Type": "application/json",
-                },
+                }),
             }
         );
 
@@ -614,9 +617,9 @@ export async function addContourToFinalMask(imageId, contour) {
 
         const response = await fetch(requestUrl.toString(), {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify(contourData),
         });
 
@@ -695,9 +698,9 @@ export async function addContoursToFinalMask(imageId, contours) {
             `${API_BASE_URL}/masks/create_mask/${imageId}`,
             {
                 method: "PUT",
-                headers: {
+                headers: getAuthHeaders({
                     "Content-Type": "application/json",
-                },
+                }),
             }
         );
 
@@ -724,9 +727,9 @@ export async function addContoursToFinalMask(imageId, contours) {
 
         const response = await fetch(url, {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify(formattedContours),
         });
 
@@ -782,9 +785,9 @@ export const updateMask = async (mask) => {
         };
         const response = await fetch(`${API_BASE_URL}/masks/update_mask`, {
             method: "PUT",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify(requestData),
         });
         return handleApiError(response);
@@ -796,7 +799,9 @@ export const updateMask = async (mask) => {
 // Get a specific mask (basic version without contours)
 export const getMask = async (maskId) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`);
+        const response = await fetch(`${API_BASE_URL}/masks/get_mask/${maskId}`, {
+            headers: getAuthHeaders(),
+        });
         return handleApiError(response);
     } catch (error) {
         throw error;
@@ -810,6 +815,7 @@ export const deleteMask = async (maskId) => {
             `${API_BASE_URL}/masks/delete_mask/${maskId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);
@@ -835,9 +841,9 @@ export const editContourLabel = async (contourId, newLabelId) => {
         
         const response = await fetch(url, {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
         });
         
         return handleApiError(response);

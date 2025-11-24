@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
@@ -10,7 +10,10 @@ export const fetchImages = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/images/list_images/${datasetId}`
+            `${API_BASE_URL}/images/list_images/${datasetId}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -25,7 +28,10 @@ export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`
+            `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -65,6 +71,7 @@ export const uploadImages = async (files, datasetId) => {
 
                 const response = await fetch(url, {
                     method: "POST",
+                    headers: getAuthHeaders(),
                     body: formData,
                     signal: controller.signal,
                 });
@@ -198,6 +205,7 @@ export const uploadImage = async (file, datasetId) => {
 
                 const response = await fetch(url, {
                     method: "POST",
+                    headers: getAuthHeaders(),
                     body: formData,
                     signal: controller.signal,
                 });
@@ -313,7 +321,10 @@ export const getImageById = async (imageId, low_res) => {
         while (retries < maxRetries) {
             try {
                 const response = await fetch(
-                    `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`
+                    `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`,
+                    {
+                        headers: getAuthHeaders(),
+                    }
                 );
 
                 if (!response.ok) {
@@ -363,6 +374,7 @@ export const deleteImage = async (imageId) => {
             `${API_BASE_URL}/images/delete_image/${imageId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);
@@ -386,9 +398,9 @@ export const getImages = async (imageIds, low_res) => {
 
                 const response = await fetch(url, {
                     method: 'POST',
-                    headers: {
+                    headers: getAuthHeaders({
                         'Accept': 'application/json',
-                    }
+                    })
                 });
 
                 if (!response.ok) {

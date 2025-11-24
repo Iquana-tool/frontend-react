@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -6,7 +6,9 @@ const API_BASE_URL =
 // Get available prompted segmentation models from backend
 export const getPromptedModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/prompted_segmentation/models`);
+        const response = await fetch(`${API_BASE_URL}/prompted_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
         const data = await handleApiError(response);
 
         // The backend returns: { success, message, response: { success, message, available_models } }
@@ -36,7 +38,9 @@ export const getPromptedModels = async () => {
 // Get available automatic segmentation models from backend
 export const getAutomaticModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/models/get_automatic_models`);
+        const response = await fetch(`${API_BASE_URL}/models/get_automatic_models`, {
+            headers: getAuthHeaders(),
+        });
         const data = await handleApiError(response);
 
         if (data.success && data.models) {
@@ -65,7 +69,10 @@ export const getAutomaticModels = async () => {
 export const get3DModels = async () => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/models/get_automatic_3d_models`
+            `${API_BASE_URL}/models/get_automatic_3d_models`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         const data = await handleApiError(response);
 

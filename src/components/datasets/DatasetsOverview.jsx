@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
 import { Plus, FolderOpen, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import AuthButtons from "../auth/AuthButtons";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
@@ -13,6 +15,7 @@ import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const {
     datasets,
     loading,
@@ -194,6 +197,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 <BookOpen className="w-4 h-4" />
                 <span>Documentation</span>
               </button>
+              <AuthButtons />
             </div>
           </div>
         </div>

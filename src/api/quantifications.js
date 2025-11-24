@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -8,6 +8,9 @@ export const getQuantification = async (maskId) => {
     try {
         const response = await fetch(
             `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         const data = await handleApiError(response);
 

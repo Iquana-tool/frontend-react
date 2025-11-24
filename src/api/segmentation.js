@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -66,9 +66,9 @@ export const segmentImage = async (
 
         const response = await fetch(`${API_BASE_URL}/prompted_segmentation/segment_image`, {
             method: "POST",
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify(requestData),
         });
 
@@ -91,13 +91,13 @@ export const segmentImage = async (
 
             actualData.masks.forEach((mask) => {
                 if (mask.contours && mask.contours.length > 0) {
-                    // We'll use a placeholder for base64_masks since we'll use the contours directly
+                    // We will use a placeholder for base64_masks since we'll use the contours directly
                     actualData.base64_masks.push("placeholder");
                     actualData.quality.push(mask.predicted_iou);
                 }
             });
 
-            // Add the original response format to allow proper rendering later
+            // original response format to allow proper rendering later
             actualData.original_masks = actualData.masks;
         }
 
