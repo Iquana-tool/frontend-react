@@ -93,8 +93,7 @@ const DatasetGallery = () => {
   };
 
   const handleQuantificationsClick = () => {
-    // TODO: Navigate to quantifications page
-    console.log("Quantifications clicked");
+    navigate(`/dataset/${datasetId}/quantifications`);
   };
 
   const handleLabelManagementClick = () => {

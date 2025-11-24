@@ -9,6 +9,7 @@ import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
 import DocumentationPage from "./pages/DocumentationPage";
+import QuantificationPage from "./pages/QuantificationPage";
 
 function App() {
   return (
@@ -48,6 +49,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AnnotationPageV2 />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/quantifications"
+              element={
+                <ProtectedRoute>
+                  <QuantificationPage />
                 </ProtectedRoute>
               }
             />
