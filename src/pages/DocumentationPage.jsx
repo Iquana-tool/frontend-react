@@ -8,9 +8,11 @@ import {
   Download, 
   HelpCircle,
   ArrowLeft,
+  User,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "../components/auth/AuthButtons";
+import ReportBugLink from "../components/ui/ReportBugLink";
 
 import {
   DocumentationNavigation,
@@ -26,7 +28,7 @@ import {
 
 const DocumentationPage = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [expandedSections, setExpandedSections] = useState({
     gettingStarted: true,
     datasets: false,
@@ -145,6 +147,13 @@ const DocumentationPage = () => {
             >
               AquaMorph
             </button>
+            {isAuthenticated && user && (
+              <div className="flex items-center space-x-1 px-2 py-1.5 text-xs text-white">
+                <User className="w-3 h-3" />
+                <span className="font-medium hidden sm:inline">{user.username}</span>
+              </div>
+            )}
+            <ReportBugLink variant="mobile" />
             {isAuthenticated && (
               <button
                 onClick={() => navigate("/datasets")}
@@ -154,7 +163,7 @@ const DocumentationPage = () => {
                 <span className="hidden sm:inline">Datasets</span>
               </button>
             )}
-            <AuthButtons variant="mobile" />
+            <AuthButtons variant="mobile" showLogoutOnly={true} />
           </div>
 
           {/* Desktop Layout */}
@@ -175,6 +184,12 @@ const DocumentationPage = () => {
                 AquaMorph
               </button>
               <div className="h-6 w-px bg-teal-400"></div>
+              {isAuthenticated && user && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{user.username}</span>
+                </div>
+              )}
               <span className="text-lg font-medium">Documentation</span>
             </div>
             
@@ -188,7 +203,8 @@ const DocumentationPage = () => {
                   <span>Datasets</span>
                 </button>
               )}
-              <AuthButtons />
+              <ReportBugLink />
+              <AuthButtons showLogoutOnly={true} />
             </div>
           </div>
         </div>

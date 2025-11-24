@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, FolderOpen, BookOpen } from "lucide-react";
+import { Plus, FolderOpen, BookOpen, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import AuthButtons from "../auth/AuthButtons";
+import ReportBugLink from "../ui/ReportBugLink";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
@@ -15,7 +16,7 @@ import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const {
     datasets,
     loading,
@@ -190,6 +191,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              {isAuthenticated && user && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{user.username}</span>
+                </div>
+              )}
               <button
                 onClick={() => navigate("/docs")}
                 className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
@@ -197,7 +204,8 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 <BookOpen className="w-4 h-4" />
                 <span>Documentation</span>
               </button>
-              <AuthButtons />
+              <ReportBugLink />
+              <AuthButtons showLogoutOnly={true} />
             </div>
           </div>
         </div>

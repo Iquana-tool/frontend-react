@@ -1,13 +1,14 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Database, BookOpen } from "lucide-react";
+import { Database, BookOpen, User } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "./auth/AuthButtons";
+import ReportBugLink from "./ui/ReportBugLink";
 
 const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const isActive = (path) => {
     return location.pathname === path;
@@ -38,6 +39,14 @@ const Navbar = () => {
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-4">
+            {/* Username Display */}
+            {isAuthenticated && user && (
+              <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-600">
+                <User className="w-4 h-4" />
+                <span className="font-medium">{user.username}</span>
+              </div>
+            )}
+
             {isAuthenticated && (
               <button
                 onClick={() => navigate('/datasets')}
@@ -52,6 +61,7 @@ const Navbar = () => {
               </button>
             )}
 
+            
             <button
               onClick={() => navigate('/docs')}
               className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
@@ -64,6 +74,12 @@ const Navbar = () => {
               <span>Documentation</span>
             </button>
 
+            <ReportBugLink 
+              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-teal-600 hover:bg-gray-50 transition-all duration-200"
+              textColor="text-gray-600"
+              bgColor="hover:bg-gray-50"
+            />
+
             {/* Auth Section */}
             <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-200">
               <AuthButtons 
@@ -72,7 +88,7 @@ const Navbar = () => {
                   ? "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
                   : "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-white bg-teal-600 hover:bg-teal-700 transition-all duration-200"
                 }
-                usernameClass="flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-600"
+                showLogoutOnly={true}
               />
             </div>
           </div>

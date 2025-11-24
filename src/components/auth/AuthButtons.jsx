@@ -9,15 +9,17 @@ import { useAuth } from '../../contexts/AuthContext';
  * 
  * @param {Object} props
  * @param {string} props.variant - 'default' | 'mobile' - Controls button sizing
- * @param {string} props.textColor - Custom text color class (e.g., 'text-teal-100', 'text-gray-600')
+ * @param {string} props.textColor - Custom text color class
  * @param {string} props.buttonClass - Custom button class override
  * @param {string} props.usernameClass - Custom username container class override
+ * @param {boolean} props.showLogoutOnly - If true, only shows logout button (not username) when authenticated
  */
 const AuthButtons = ({ 
   variant = 'default',
   textColor = 'text-teal-100',
   buttonClass,
-  usernameClass
+  usernameClass,
+  showLogoutOnly = false
 }) => {
   const navigate = useNavigate();
   const { isAuthenticated, user, logout } = useAuth();
@@ -44,10 +46,12 @@ const AuthButtons = ({
   if (isAuthenticated) {
     return (
       <>
-        <div className={finalUsernameClass}>
-          <User className={iconSize} />
-          <span className={`font-medium ${isMobile ? 'hidden sm:inline' : ''}`}>{user?.username}</span>
-        </div>
+        {!showLogoutOnly && (
+          <div className={finalUsernameClass}>
+            <User className={iconSize} />
+            <span className={`font-medium ${isMobile ? 'hidden sm:inline' : ''}`}>{user?.username}</span>
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className={finalButtonClass}

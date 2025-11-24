@@ -1,10 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, BookOpen, Bug } from 'lucide-react';
+import { ArrowLeft, Play, BookOpen, User } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 import AuthButtons from '../../auth/AuthButtons';
+import ReportBugLink from '../../ui/ReportBugLink';
 
 const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   return (
     <nav className="bg-teal-600 text-white shadow-md sticky top-0 z-50">
@@ -29,6 +32,12 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
         </div>
 
         <div className="flex items-center space-x-4">
+          {isAuthenticated && user && (
+            <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+              <User className="w-4 h-4" />
+              <span className="font-medium">{user.username}</span>
+            </div>
+          )}
           <button
             onClick={() => navigate("/docs")}
             className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
@@ -36,23 +45,9 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
             <BookOpen className="w-4 h-4" />
             <span>Documentation</span>
           </button>
-          <a 
-            href="https://github.com/yapat-app/AquaMorph/issues" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <Bug size={16} />
-            <span>Report Bug</span>
-          </a>
-          <button
-            onClick={onStartAnnotation}
-            className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-          >
-            <Play size={16} />
-            <span>Start Annotation</span>
-          </button>
-          <AuthButtons />
+          <ReportBugLink />
+          
+          <AuthButtons showLogoutOnly={true} />
         </div>
       </div>
     </nav>

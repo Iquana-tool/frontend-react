@@ -1,9 +1,13 @@
 import React from 'react';
-import { ArrowLeft, Github, BookOpen } from 'lucide-react';
+import { ArrowLeft, Github, BookOpen, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
+import AuthButtons from '../../auth/AuthButtons';
+import ReportBugLink from '../../ui/ReportBugLink';
 
 const TopNavigation = () => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
 
   const handleNavigateBack = () => {
     // Navigate back to the previous page or datasets
@@ -26,10 +30,20 @@ const TopNavigation = () => {
             <h1 className="text-xl font-bold">AquaMorph</h1>
           </div>
           <div className="flex items-center space-x-3">
-            <button className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors">
+            {isAuthenticated && user && (
+              <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                <User className="w-4 h-4" />
+                <span className="font-medium hidden md:inline">{user.username}</span>
+              </div>
+            )}
+            <button 
+              onClick={() => navigate("/docs")}
+              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+            >
               <BookOpen className="w-4 h-4" />
               <span className="hidden md:inline">Documentation</span>
             </button>
+            <ReportBugLink hideTextOnMobile={true} />
             <a
               href="https://github.com/yapat-app/AquaMorph"
               target="_blank"
@@ -38,6 +52,7 @@ const TopNavigation = () => {
             >
               <Github className="w-6 h-6" />
             </a>
+            <AuthButtons showLogoutOnly={true} />
           </div>
         </div>
       </div>
