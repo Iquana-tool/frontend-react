@@ -25,25 +25,17 @@ export const getQuantification = async (maskId) => {
     }
 };
 
-// Get all quantifications for a dataset
-// TODO: Replace with actual endpoint
-// Expected endpoint: GET /quantifications/get_dataset_quantifications/{dataset_id}?include_manual={include_manual}&include_auto={include_auto}
-export const getDatasetQuantifications = async (datasetId, includeManual = true, includeAuto = true) => {
+// Get dataset object quantifications with hierarchical labels and aggregated metrics
+export const getDatasetObjectQuantifications = async (datasetId, includeManual = true, includeAuto = true) => {
     try {
-        // TODO: Uncomment when backend endpoint is available
-        /*
         const response = await fetch(
-            `${API_BASE_URL}/quantifications/get_dataset_quantifications/${datasetId}?include_manual=${includeManual}&include_auto=${includeAuto}`,
+            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&include_manual=${includeManual}&include_auto=${includeAuto}`,
             {
                 headers: getAuthHeaders(),
             }
         );
         const data = await handleApiError(response);
-        return data.quantifications || [];
-        */
-        
-        // Placeholder - return empty array for now
-        return [];
+        return data;
     } catch (error) {
         throw error;
     }
