@@ -47,12 +47,16 @@ export const SERVER_MESSAGE_TYPES = {
   // Object Operations
   OBJECT_ADDED: 'object_added',
   OBJECT_MODIFIED: 'object_modified',
-  OBJECT_DELETED: 'object_deleted',
+  OBJECT_REMOVED: 'object_removed', 
   OBJECT_FINALISED: 'object_finalised',
   
   // AI Segmentation
   SEGMENTATION_RESULT: 'segmentation_result',
   MODEL_SELECTED: 'model_selected',
+  
+  // Status Messages
+  SUCCESS: 'success',
+  WARNING: 'warning',
   
   // Errors
   ERROR: 'error',
