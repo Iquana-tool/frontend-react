@@ -190,30 +190,6 @@ const QuantificationPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="include-manual"
-                  checked={includeManual}
-                  onChange={(e) => setIncludeManual(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                />
-                <label htmlFor="include-manual" className="text-sm font-medium text-gray-700">
-                  Include Manual
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-              <input
-                  type="checkbox"
-                  id="include-auto"
-                  checked={includeAuto}
-                  onChange={(e) => setIncludeAuto(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                />
-                <label htmlFor="include-auto" className="text-sm font-medium text-gray-700">
-                  Include Auto
-                </label>
-              </div>
             </div>
             <div className="flex items-center space-x-2">
               <button
