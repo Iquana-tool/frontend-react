@@ -46,10 +46,10 @@ const useWebSocketObjectHandler = () => {
           label: contourData.label || null,
           labelId: contourData.label_id ?? null,
           added_by: contourData.added_by || null,
-          temporary: contourData.temporary ?? true,
           parent_id: contourData.parent_id ?? null,
           confidence: contourData.confidence ?? 1.0,
           quantification: contourData.quantification || null,
+          reviewed_by: contourData.reviewed_by || [],
         });
       }
     );
@@ -86,10 +86,10 @@ const useWebSocketObjectHandler = () => {
             label: data.label || null,
             labelId: data.label_id ?? null,
             added_by: data.added_by || null,
-            temporary: data.temporary ?? false,
             parent_id: data.parent_id ?? null,
             confidence: data.confidence ?? 1.0,
             quantification: data.quantification || null,
+            reviewed_by: data.reviewed_by || [],
             ...fieldsToUpdate,
           });
         }

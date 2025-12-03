@@ -96,7 +96,7 @@ export const createObjectsSlice = (set) => ({
           y: c.y || [],
           path: c.path || null, // SVG path from backend
           added_by: c.added_by || null,
-          temporary: !!c.temporary,
+          reviewed_by: c.reviewed_by || [],
           parent_id: c.parent_id ?? null,
           quantification: c.quantification || null,
           // Use label-based color if labeled, otherwise use ID-based color for stability

@@ -82,20 +82,28 @@ export default function InferenceInferenceCard({ model, dataset }) {
             let imageIds = [];
             if (manualAnnotations) {
                 const response = await fetchImagesWithAnnotationStatus(dataset.id, "finished");
-                imageIds = [...imageIds, ...response.images];
+                if (response.success && response.image_ids) {
+                    imageIds = [...imageIds, ...response.image_ids];
+                }
             }
             if (automaticAnnotations) {
-                const response = await fetchImagesWithAnnotationStatus(dataset.id, "generated");
-                imageIds = [...imageIds, ...response.images];
+                // Note: Backend doesn't distinguish between auto and manual annotations
+                // Using "finished" status for automatically annotated images
+                const response = await fetchImagesWithAnnotationStatus(dataset.id, "finished");
+                if (response.success && response.image_ids) {
+                    imageIds = [...imageIds, ...response.image_ids];
+                }
             }
             if (pendingAnnotations) {
-                const response = await fetchImagesWithAnnotationStatus(dataset.id, "missing");
-                imageIds = [...imageIds, ...response.images];
+                const response = await fetchImagesWithAnnotationStatus(dataset.id, "not_started");
+                if (response.success && response.image_ids) {
+                    imageIds = [...imageIds, ...response.image_ids];
+                }
             }
             setImages(imageIds);
         };
         fetchImages();
-        // cleanup for async (not always needed if you're not updating state)
+        // cleanup for async
         return () => { cancelled = true; };
     }, [manualAnnotations, automaticAnnotations, pendingAnnotations, dataset.id, cancelInference]);
 

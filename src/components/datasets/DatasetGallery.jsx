@@ -47,10 +47,10 @@ const DatasetGallery = () => {
   const handleStartAnnotation = async () => {
     try {
       // Get the first unannotated image
-      const response = await api.fetchImagesWithAnnotationStatus(dataset.id, "missing");
+      const response = await api.fetchImagesWithAnnotationStatus(dataset.id, "not_started");
       
-      if (response.success && response.images && response.images.length > 0) {
-        const firstUnannotatedImageId = response.images[0];
+      if (response.success && response.image_ids && response.image_ids.length > 0) {
+        const firstUnannotatedImageId = response.image_ids[0];
         navigate(`/dataset/${dataset.id}/annotate/${firstUnannotatedImageId}`);
       } else {
         // No unannotated images, go to general annotation page

@@ -6,11 +6,12 @@ import DatasetLoader from '../components/annotationPage/layout/DatasetLoader';
 import DatasetNavigation from '../components/annotationPage/layout/DatasetNavigation';
 import useAnnotationSession from '../hooks/useAnnotationSession';
 import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
-import { useSetObjectsFromHierarchy, useClearObjects } from '../stores/selectors/annotationSelectors';
+import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useObjectsList } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 import { useDataset } from '../contexts/DatasetContext';
 import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
+import * as api from '../api';
 
 const AnnotationPageV2 = () => {
   const { imageId: urlImageId } = useParams();
@@ -22,6 +23,8 @@ const AnnotationPageV2 = () => {
 
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const clearObjects = useClearObjects();
+  const setAnnotationStatus = useSetAnnotationStatus();
+  const objectsList = useObjectsList();
   const { currentDataset } = useDataset();
   const [hierarchyData, setHierarchyData] = React.useState(null); // Use state instead of ref to trigger re-renders
 
@@ -81,6 +84,67 @@ const AnnotationPageV2 = () => {
       loadObjectsWithLabels(hierarchyData, currentDataset);
     }
   }, [currentDataset, hierarchyData, loadObjectsWithLabels]);
+
+  // Fetch mask annotation status when image changes
+  useEffect(() => {
+    const fetchMaskStatus = async () => {
+      if (!imageId) {
+        setAnnotationStatus('not_started');
+        return;
+      }
+
+      try {
+        // Get mask for this image
+        const maskResponse = await api.getFinalMask(imageId);
+        
+        if (maskResponse.success && maskResponse.mask) {
+          // Fetch the annotation status
+          const statusResponse = await api.getMaskAnnotationStatus(maskResponse.mask.id);
+          
+          if (statusResponse.success) {
+            console.log('[AnnotationPageV2] Mask status:', statusResponse.status);
+            setAnnotationStatus(statusResponse.status);
+          } else {
+            console.warn('[AnnotationPageV2] Status response not successful:', statusResponse);
+            setAnnotationStatus('not_started');
+          }
+        } else {
+          // No mask exists, so status is not_started
+          console.log('[AnnotationPageV2] No mask found for image:', imageId);
+          setAnnotationStatus('not_started');
+        }
+      } catch (error) {
+        console.error('[AnnotationPageV2] Error fetching mask status:', error);
+        // Default to not_started on error
+        setAnnotationStatus('not_started');
+      }
+    };
+
+    fetchMaskStatus();
+  }, [imageId, setAnnotationStatus]);
+
+  // Refresh mask status when objects change (objects added/removed/labeled)
+  useEffect(() => {
+    const refreshStatus = async () => {
+      if (!imageId) return;
+
+      try {
+        const maskResponse = await api.getFinalMask(imageId);
+        if (maskResponse.success && maskResponse.mask) {
+          const statusResponse = await api.getMaskAnnotationStatus(maskResponse.mask.id);
+          if (statusResponse.success) {
+            setAnnotationStatus(statusResponse.status);
+          }
+        }
+      } catch (error) {
+        console.error('[AnnotationPageV2] Error refreshing mask status:', error);
+      }
+    };
+
+    // Debounce status refresh to avoid too many API calls
+    const timeoutId = setTimeout(refreshStatus, 500);
+    return () => clearTimeout(timeoutId);
+  }, [objectsList.length, imageId, setAnnotationStatus]);
 
   return (
     <DatasetLoader>

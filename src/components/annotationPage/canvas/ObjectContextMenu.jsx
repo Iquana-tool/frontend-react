@@ -16,12 +16,14 @@ import {
   useFocusModeActive,
   useExitFocusMode,
 } from '../../../stores/selectors/annotationSelectors';
-import { useZoomToObject } from '../../../hooks/useZoomToObject';
-import annotationSession from '../../../services/annotationSession';
+import { useRefinementMode } from '../../../hooks/useRefinementMode';
+import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
-import { editContourLabel } from '../../../api/masks';
 import { extractLabelsFromResponse, buildLabelHierarchy } from '../../../utils/labelHierarchy';
+import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
+import { getContourId } from '../../../utils/objectUtils';
+import { deleteObject } from '../../../utils/objectOperations';
 
 const ObjectContextMenu = () => {
   const visible = useContextMenuVisible();
@@ -42,13 +44,6 @@ const ObjectContextMenu = () => {
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
   
-  // Use the zoom hook for pan/zoom functionality
-  const { zoomToObject } = useZoomToObject({
-    marginPct: 0.25,
-    maxZoom: 4,
-    minZoom: 1,
-    animationDuration: 300
-  });
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
   const [labelHierarchy, setLabelHierarchy] = useState([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
@@ -145,6 +140,21 @@ const ObjectContextMenu = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
+  // Use shared label selection hook
+  const handleLabelSelectBase = useLabelSelection(
+    updateObject,
+    () => {
+      // onSuccess: switch tool and hide menu
+      setCurrentTool('ai_annotation');
+      hideContextMenu();
+    },
+    (error) => {
+      // onError: show error and hide menu
+      alert(`Failed to apply label: ${error.message || 'Unknown error'}`);
+      hideContextMenu();
+    }
+  );
+
   const handleLabelSelect = async (label) => {
     if (!targetObjectId) return;
 
@@ -155,40 +165,7 @@ const ObjectContextMenu = () => {
       return;
     }
 
-    // Use contour_id for backend calls if available, otherwise fall back to store ID
-    const contourId = targetObject.contour_id || targetObjectId;
-    
-    // label is now an object with { id, name }, extract the ID
-    const labelId = typeof label === 'object' ? label.id : label;
-    const labelName = typeof label === 'object' ? label.name : label;
-
-    try {
-      // Update label using REST API endpoint (WebSocket modifyObject doesn't support label updates)
-      await editContourLabel(contourId, labelId);
-      
-      // Update temporary flag to mark as reviewed (move from Reviewable to Reviewed Objects)
-      // The WebSocket modifyObject works for temporary field
-      await annotationSession.modifyObject(contourId, {
-        temporary: false,
-      });
-      
-      // Update the object in the store to mark it as reviewed (temporary: false)
-      // The store will automatically assign labelAssignmentOrder when label is assigned
-      updateObject(targetObjectId, {
-        label: labelName, // Store label name for display
-        labelId: labelId, // Store label ID for future reference
-        temporary: false,
-      });
-      
-      // Switch to AI assisted annotation tool
-      setCurrentTool('ai_annotation');
-      
-      hideContextMenu();
-    } catch (error) {
-      // Show user-friendly error message
-      alert(`Failed to apply label: ${error.message || 'Unknown error'}`);
-      hideContextMenu();
-    }
+    await handleLabelSelectBase(targetObject, label);
   };
 
   const handleFocusMode = () => {
@@ -229,29 +206,11 @@ const ObjectContextMenu = () => {
     };
 
     // Calculate rendered image dimensions (how the image is displayed in the container)
-    const imageAspect = imageDimensionsForCalc.width / imageDimensionsForCalc.height;
-    const containerAspect = containerWidth / containerHeight;
-
-    let renderedWidth, renderedHeight, x, y;
-
-    if (imageAspect > containerAspect) {
-      renderedWidth = containerWidth;
-      renderedHeight = containerWidth / imageAspect;
-      x = 0;
-      y = (containerHeight - renderedHeight) / 2;
-    } else {
-      renderedWidth = containerHeight * imageAspect;
-      renderedHeight = containerHeight;
-      x = (containerWidth - renderedWidth) / 2;
-      y = 0;
-    }
-
-    const renderedImageDimensions = {
-      width: renderedWidth,
-      height: renderedHeight,
-      x,
-      y
-    };
+    const renderedImageDimensions = calculateRenderedImageDimensions(
+      imageObject,
+      containerWidth,
+      containerHeight
+    );
 
     // Enter focus mode with zoom and center - pass all required parameters
     enterFocusModeWithZoom(
@@ -274,15 +233,8 @@ const ObjectContextMenu = () => {
       return;
     }
 
-    // Use contour_id for backend calls if available, otherwise fall back to store ID
-    const contourId = targetObject.contour_id || targetObjectId;
-
     try {
-      // Delete from backend
-      await annotationSession.deleteObject(contourId);
-      
-      // Remove from store
-      removeObject(targetObjectId);
+      await deleteObject(targetObject, removeObject);
       
       // Switch to AI assisted annotation tool
       setCurrentTool('ai_annotation');
@@ -294,6 +246,21 @@ const ObjectContextMenu = () => {
     }
   };
 
+  // Use shared refinement mode hook
+  const enterRefinementModeForObject = useRefinementMode({
+    enterRefinementMode,
+    setCurrentTool,
+    exitFocusMode,
+    focusModeActive,
+    imageObject,
+    containerRef: menuRef,
+    zoomOptions: {
+      marginPct: 0.25,
+      maxZoom: 4,
+      minZoom: 1,
+    },
+  });
+
   const handleRefine = async () => {
     if (!targetObjectId) return;
 
@@ -304,79 +271,8 @@ const ObjectContextMenu = () => {
       return;
     }
 
-    // Use contour_id for backend calls if available, otherwise fall back to store ID
-    const contourId = targetObject.contour_id || targetObjectId;
-
     try {
-      // Exit focus mode if active (refinement mode replaces focus mode)
-      if (focusModeActive) {
-        exitFocusMode();
-      }
-      
-      // Send refinement selection to backend
-      await annotationSession.selectRefinementObject(contourId);
-      
-      // Enter refinement mode in the store
-      enterRefinementMode(targetObjectId, contourId);
-      
-      // Switch to AI annotation tool
-      setCurrentTool('ai_annotation');
-      
-      // Zoom and pan to the object (similar to focus mode)
-      if (imageObject && targetObject.x && targetObject.y && targetObject.x.length > 0) {
-        const container = menuRef.current?.parentElement;
-        if (container) {
-          const containerWidth = container.offsetWidth || 800;
-          const containerHeight = container.offsetHeight || 600;
-          
-          if (containerWidth && containerHeight) {
-            const imageDimensionsForCalc = {
-              width: imageObject.width,
-              height: imageObject.height
-            };
-            
-            const containerDimensions = {
-              width: containerWidth,
-              height: containerHeight
-            };
-            
-            // Calculate rendered image dimensions (object-contain sizing)
-            const imageAspect = imageObject.width / imageObject.height;
-            const containerAspect = containerWidth / containerHeight;
-            
-            let renderedWidth, renderedHeight, renderedX, renderedY;
-            
-            if (imageAspect > containerAspect) {
-              renderedWidth = containerWidth;
-              renderedHeight = containerWidth / imageAspect;
-              renderedX = 0;
-              renderedY = (containerHeight - renderedHeight) / 2;
-            } else {
-              renderedWidth = containerHeight * imageAspect;
-              renderedHeight = containerHeight;
-              renderedX = (containerWidth - renderedWidth) / 2;
-              renderedY = 0;
-            }
-            
-            const renderedImageDimensions = {
-              width: renderedWidth,
-              height: renderedHeight,
-              x: renderedX,
-              y: renderedY
-            };
-            
-            // Use the zoom hook to zoom/pan to the object
-            zoomToObject(
-              targetObject, // Object with x, y arrays
-              imageDimensionsForCalc,
-              containerDimensions,
-              renderedImageDimensions,
-              { animateMs: 300, immediate: false }
-            );
-          }
-        }
-      }
-      
+      await enterRefinementModeForObject(targetObject);
       hideContextMenu();
     } catch (error) {
       alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);

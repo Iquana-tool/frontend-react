@@ -3,8 +3,8 @@ import { Layers, Plus } from 'lucide-react';
 import ObjectItem from './ObjectItem';
 
 /**
- * PermanentObjectsList - Displays user-confirmed/manually added objects
- * These objects are permanently saved to the annotation
+ * PermanentObjectsList - Displays reviewed objects
+ * These objects have been reviewed (reviewed_by is not empty)
  */
 const PermanentObjectsList = ({ objects = [] }) => {
   const handleAddManual = () => {

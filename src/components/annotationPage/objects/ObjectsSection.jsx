@@ -10,8 +10,8 @@ import { useObjectsList } from '../../../stores/selectors/annotationSelectors';
  */
 const ObjectsSection = () => {
   const [expandedSections, setExpandedSections] = useState({
-    temporary: true,
-    permanent: true,
+    unreviewed: true,
+    reviewed: true,
   });
 
   // Get all objects from store
@@ -28,13 +28,15 @@ const ObjectsSection = () => {
     return true;
   };
 
-  // Filter objects by temporary status
-  const { temporaryObjects, permanentObjects } = useMemo(() => {
-    const temporary = allObjects.filter(obj => obj.temporary === true);
-    const permanent = allObjects.filter(obj => obj.temporary === false || obj.temporary === undefined);
+  // Filter objects by review status
+  const { unreviewedObjects, reviewedObjects } = useMemo(() => {
+    // Unreviewed: objects with empty or missing reviewed_by list
+    const unreviewed = allObjects.filter(obj => !obj.reviewed_by || obj.reviewed_by.length === 0);
+    // Reviewed: objects with at least one reviewer
+    const reviewed = allObjects.filter(obj => obj.reviewed_by && obj.reviewed_by.length > 0);
     
-    // Sort permanent objects: labeled first (by ID), then unlabeled (by ID)
-    const sortedPermanent = [...permanent].sort((a, b) => {
+    // Sort reviewed objects: labeled first (by ID), then unlabeled (by ID)
+    const sortedReviewed = [...reviewed].sort((a, b) => {
       const aHasLabel = hasValidLabel(a);
       const bHasLabel = hasValidLabel(b);
       
@@ -49,8 +51,8 @@ const ObjectsSection = () => {
     });
     
     return {
-      temporaryObjects: temporary,
-      permanentObjects: sortedPermanent
+      unreviewedObjects: unreviewed,
+      reviewedObjects: sortedReviewed
     };
   }, [allObjects]);
 
@@ -63,22 +65,22 @@ const ObjectsSection = () => {
 
   return (
     <div className="space-y-4">
-      {/* Temporary Objects Section */}
+      {/* Unreviewed Objects Section */}
       <div className="border border-purple-200 rounded-lg overflow-hidden bg-white">
         {/* Collapsible Header */}
         <button
-          onClick={() => toggleSection('temporary')}
+          onClick={() => toggleSection('unreviewed')}
           className="w-full flex items-center justify-between p-2 md:p-3 bg-purple-50 hover:bg-purple-100 transition-colors"
         >
           <div className="flex items-center space-x-1.5 md:space-x-2">
             <span className="text-xs md:text-sm font-semibold text-purple-900">
-            Reviewable Objects
+            Unreviewed Objects
             </span>
             <span className="text-[10px] md:text-xs bg-purple-200 text-purple-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-              {temporaryObjects.length}
+              {unreviewedObjects.length}
             </span>
           </div>
-          {expandedSections.temporary ? (
+          {expandedSections.unreviewed ? (
             <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-700" />
           ) : (
             <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-700" />
@@ -86,18 +88,18 @@ const ObjectsSection = () => {
         </button>
 
         {/* Content */}
-        {expandedSections.temporary && (
+        {expandedSections.unreviewed && (
           <div className="p-2 md:p-3 border-t border-purple-100">
-            <TemporaryObjectsList objects={temporaryObjects} />
+            <TemporaryObjectsList objects={unreviewedObjects} />
           </div>
         )}
       </div>
 
-      {/* Permanent Objects Section */}
+      {/* Reviewed Objects Section */}
       <div className="border border-teal-200 rounded-lg overflow-hidden bg-white">
         {/* Collapsible Header */}
         <button
-          onClick={() => toggleSection('permanent')}
+          onClick={() => toggleSection('reviewed')}
           className="w-full flex items-center justify-between p-2 md:p-3 bg-teal-50 hover:bg-teal-100 transition-colors"
         >
           <div className="flex items-center space-x-1.5 md:space-x-2">
@@ -105,10 +107,10 @@ const ObjectsSection = () => {
             Reviewed Objects
             </span>
             <span className="text-[10px] md:text-xs bg-teal-200 text-teal-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-              {permanentObjects.length}
+              {reviewedObjects.length}
             </span>
           </div>
-          {expandedSections.permanent ? (
+          {expandedSections.reviewed ? (
             <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-teal-700" />
           ) : (
             <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-teal-700" />
@@ -116,9 +118,9 @@ const ObjectsSection = () => {
         </button>
 
         {/* Content */}
-        {expandedSections.permanent && (
+        {expandedSections.reviewed && (
           <div className="p-2 md:p-3 border-t border-teal-100">
-            <PermanentObjectsList objects={permanentObjects} />
+            <PermanentObjectsList objects={reviewedObjects} />
           </div>
         )}
       </div>

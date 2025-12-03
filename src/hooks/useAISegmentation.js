@@ -43,13 +43,13 @@ const useAISegmentation = () => {
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
-   * Handles object_added and object_modified message formats with contour data
+   * Handles object_added, object_modified, and success message formats with contour data
    */
   const transformResponseToMask = useCallback((response) => {
     let contour = null;
     
-    // Handle: object_added or object_modified message with contour data
-    if (response && (response.type === 'object_added' || response.type === 'object_modified') && response.data) {
+    // Handle: object_added, object_modified, or success message with contour data
+    if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && response.data) {
       contour = response.data;
     }
     // Handle direct contour data
@@ -141,7 +141,7 @@ const useAISegmentation = () => {
             imageObject.height
           );
           
-          // Backend expects a SINGLE box_prompt object, not an array of boxes
+          // Backend expects a SINGLE box_prompt object
           // If we have multiple boxes, only use the last one
           wsPrompts.box_prompt = {
             min_x: minNormalized.x,
@@ -176,7 +176,8 @@ const useAISegmentation = () => {
           ? Number(contourId) 
           : (typeof contourId === 'number' ? contourId : contourId);
         
-        // Handle message types generically: object_modified updates existing, object_added creates new
+        // Handle message types generically: object_modified updates existing, object_added/success creates new
+        // Note: 'success' type is a fallback for backward compatibility
         const isModified = response && response.type === 'object_modified';
         
         if (isModified) {
@@ -213,20 +214,20 @@ const useAISegmentation = () => {
               contour_id: normalizedId,
               pixelCount: mask.pixelCount || 0,
               label: mask.label || `Object #${objectsList.length + 1}`,
-              temporary: true,
+              reviewed_by: [], // Not reviewed yet, will appear in Unreviewed Objects
               x: mask.x || [],
               y: mask.y || [],
               path: mask.path || mask.mask?.path,
             });
           }
         } else {
-          // object_added: Add as a temporary object
+          // object_added: Add as an unreviewed object
           addObject({
             mask: mask,
             contour_id: normalizedId, // Store the backend contour_id for API calls (consistent format)
             pixelCount: mask.pixelCount || 0,
             label: mask.label || `Object #${objectsList.length + 1}`,
-            temporary: true, // Mark as temporary so it appears in Reviewable Objects
+            reviewed_by: [], // Not reviewed yet, will appear in Unreviewed Objects
             // Include x and y coordinate arrays if available from backend response
             x: mask.x || [],
             y: mask.y || [],

@@ -96,9 +96,12 @@ class AnnotationSession {
             this.runningServices = message.data?.running || [];
             this.failedServices = message.data?.failed || [];
             
-            if (message.success) {
+            // Session is ready if we have at least one running service
+            // This allows the session to work even if some services failed
+            if (this.runningServices.length > 0) {
               this._updateSessionState(SessionState.READY);
             } else {
+              // Only set to ERROR if no services are running at all
               this._updateSessionState(SessionState.ERROR);
             }
 

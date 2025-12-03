@@ -63,3 +63,23 @@ export const deleteAllContours = async (maskId) =>{
         throw error;
     }
 }
+
+// Mark a contour as reviewed
+export const markContourAsReviewed = async (contourId) => {
+    try {
+        if (!contourId || typeof contourId !== "number") {
+            throw new Error("Invalid contour ID provided");
+        }
+
+        const response = await fetch(
+            `${API_BASE_URL}/contours/mark_as_reviewed/${contourId}`,
+            {
+                method: "GET",
+                headers: getAuthHeaders(),
+            }
+        );
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+}

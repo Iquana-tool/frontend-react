@@ -11,7 +11,7 @@ export const markMaskAsFinal = async (maskId) => {
         }
 
         // Send request to mark the mask as final
-        const response = await fetch(`${API_BASE_URL}/masks/finish_mask/${maskId}`, {
+        const response = await fetch(`${API_BASE_URL}/masks/mark_as_fully_annotated/${maskId}`, {
             method: "POST",
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
@@ -31,7 +31,7 @@ export const markMaskAsUnfinished = async (maskId) => {
         }
 
         // Send request to mark the mask as unfinished
-        const response = await fetch(`${API_BASE_URL}/masks/unfinish_mask/${maskId}`, {
+        const response = await fetch(`${API_BASE_URL}/masks/unmark_as_fully_annotated/${maskId}`, {
             method: "POST",
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
@@ -160,8 +160,7 @@ export const getMasksForImage = async (imageId) => {
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         try {
-            // Update to use path parameter format to match backend implementation
-            const url = `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`;
+            const url = `${API_BASE_URL}/masks/get_mask_for_image/${imageId}`;
 
             const response = await fetch(url, {
                 signal: controller.signal,
@@ -204,9 +203,17 @@ export const getMasksForImage = async (imageId) => {
 
             const data = await response.json();
 
-            // If the response is in unexpected format, normalize it
+            
+            if (data.success && data.mask) {
+                return {
+                    success: true,
+                    message: data.message || "Mask retrieved successfully",
+                    masks: [data.mask], // Convert single mask to array
+                };
+            }
+
+            // Handle legacy array format
             if (Array.isArray(data)) {
-                // Backend is returning just an array of masks without the success wrapper
                 return {
                     success: true,
                     masks: data.map((mask) => ({
@@ -216,8 +223,8 @@ export const getMasksForImage = async (imageId) => {
                 };
             }
 
-            // Handle the case where masks might be missing or null
-            if (data && !data.masks) {
+            // Handle the case where mask might be missing or null
+            if (data && !data.mask && !data.masks) {
                 return {
                     ...data,
                     success: true,
@@ -280,7 +287,7 @@ export const getMaskWithContours = async (maskId) => {
 
             // Now fetch the contours for this mask
             const contoursResponse = await fetch(
-                `${API_BASE_URL}/masks/get_contours_of_mask/${maskId}`,
+                `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=true`,
                 {
                     signal: controller.signal,
                     headers: getAuthHeaders(),
@@ -379,7 +386,7 @@ export async function getFinalMask(imageId) {
     while (attempts < MAX_RETRIES) {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/masks/get_masks_for_image/${imageId}`,
+                `${API_BASE_URL}/masks/get_mask_for_image/${imageId}`,
                 {
                     method: "GET",
                     headers: getAuthHeaders({
@@ -412,25 +419,23 @@ export async function getFinalMask(imageId) {
             }
 
             // Parse and return the successful response
-            const masks = await response.json();
+            const data = await response.json();
 
-            if (!masks || masks.length === 0) {
+            // Backend returns {success: True, mask: mask} - extract the mask
+            if (!data.success || !data.mask) {
                 return {
                     success: false,
                     message: "No masks found for this image.",
                 };
             }
 
-            // Find the "final" mask - prioritize finished masks, then take the first one
-            let finalMask = masks.find((mask) => mask.finished === true);
-            if (!finalMask) {
-                finalMask = masks[0]; // Fallback to first mask if none are marked as finished
-            }
+            // Get the mask 
+            const finalMask = data.mask;
 
             // Get contours for the final mask
             try {
                 const contoursResponse = await fetch(
-                    `${API_BASE_URL}/masks/get_contours_of_mask/${finalMask.id}`,
+                    `${API_BASE_URL}/contours/get_contours_of_mask/${finalMask.id}&flattened=true`,
                     {
                         method: "GET",
                         headers: getAuthHeaders({
@@ -475,7 +480,6 @@ export async function getFinalMask(imageId) {
                                 }
                             }
                         } catch (quantError) {
-                            console.warn("Could not fetch quantifications for final mask:", quantError);
                             // Don't fail the entire operation if quantifications can't be fetched
                         }
                     } else {
@@ -485,7 +489,6 @@ export async function getFinalMask(imageId) {
                     finalMask.contours = [];
                 }
             } catch (contoursError) {
-                console.error("❌ Error fetching contours:", contoursError);
                 finalMask.contours = [];
             }
 
@@ -848,7 +851,6 @@ export const editContourLabel = async (contourId, newLabelId) => {
         
         return handleApiError(response);
     } catch (error) {
-        console.error("Edit contour label error:", error);
         throw error;
     }
 };

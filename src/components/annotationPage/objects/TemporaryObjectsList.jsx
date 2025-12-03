@@ -3,8 +3,8 @@ import { Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import ObjectItem from './ObjectItem';
 
 /**
- * TemporaryObjectsList - Displays AI-generated objects that need user confirmation
- * These objects are temporary until the user accepts/rejects them
+ * TemporaryObjectsList - Displays unreviewed objects that need user review
+ * These objects haven't been reviewed yet (reviewed_by is empty)
  */
 const TemporaryObjectsList = ({ objects = [] }) => {
   const handleAcceptAll = () => {

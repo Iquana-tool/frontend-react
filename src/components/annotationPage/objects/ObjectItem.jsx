@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle, X } from 'lucide-react';
+import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle, X, UserCheck } from 'lucide-react';
 import { 
   useSelectedObjects, 
   useSelectObject, 
@@ -16,14 +16,19 @@ import {
   useCurrentTool,
   useEnterFocusMode,
   useRefinementModeActive,
+  useAnnotationStatus,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
-import annotationSession from '../../../services/annotationSession';
+import { useRefinementMode } from '../../../hooks/useRefinementMode';
+import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
-import { editContourLabel } from '../../../api/masks';
+import { markContourAsReviewed } from '../../../api/contours';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 import { hexToRgba } from '../../../utils/labelColors';
+import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
+import { getContourId, extractLabelInfo } from '../../../utils/objectUtils';
+import { deleteObject } from '../../../utils/objectOperations';
 
 const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
@@ -38,6 +43,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const currentTool = useCurrentTool();
   const enterFocusMode = useEnterFocusMode();
   const refinementModeActive = useRefinementModeActive();
+  const annotationStatus = useAnnotationStatus();
   const { currentDataset } = useDataset();
   const imageObject = useImageObject();
   const setZoomLevel = useSetZoomLevel();
@@ -58,6 +64,11 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   
   const isSelected = selectedObjects.includes(object.id);
   const isVisible = true; // For now, assume all objects are visible
+  // Determine if reviewed based on reviewed_by field (ignore prop, use actual data)
+  const isReviewed = object.reviewed_by && object.reviewed_by.length > 0;
+  // An object is "temporary" (unreviewed) if it hasn't been reviewed yet
+  const isUnreviewed = !isReviewed;
+  const isReviewable = annotationStatus === 'reviewable' || annotationStatus === 'finished';
 
   // Helper function to check if an object has a valid label
   const hasValidLabel = (obj) => {
@@ -72,14 +83,14 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
   // Compute display name: if labeled, show "{label} #{id}", otherwise "Object #{id}"
   const displayName = React.useMemo(() => {
-    // Only compute label-based name for permanent/reviewed objects with valid labels
-    if (!isTemporary && hasValidLabel(object)) {
+    // Only compute label-based name for reviewed objects with valid labels
+    if (isReviewed && hasValidLabel(object)) {
       return `${object.label} #${object.id}`;
     }
     
-    // For unlabeled objects or temporary objects, show default format
+    // For unlabeled objects or unreviewed objects, show default format
     return `Object #${object.id}`;
-  }, [object.id, object.label, isTemporary]);
+  }, [object.id, object.label, isReviewed]);
 
   const handleToggleSelection = () => {
     if (isSelected) {
@@ -101,7 +112,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     };
 
     // Find the canvas container
-    const container = document.querySelector('.relative.overflow-hidden');
+    const container = getCanvasContainer(null);
     if (!container) {
       return;
     }
@@ -114,29 +125,18 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     }
 
     // Calculate rendered image dimensions (object-contain sizing)
-    const imageAspect = imageObject.width / imageObject.height;
-    const containerAspect = containerWidth / containerHeight;
-
-    let renderedWidth, renderedHeight, renderedX, renderedY;
-
-    if (imageAspect > containerAspect) {
-      renderedWidth = containerWidth;
-      renderedHeight = containerWidth / imageAspect;
-      renderedX = 0;
-      renderedY = (containerHeight - renderedHeight) / 2;
-    } else {
-      renderedWidth = containerHeight * imageAspect;
-      renderedHeight = containerHeight;
-      renderedX = (containerWidth - renderedWidth) / 2;
-      renderedY = 0;
-    }
+    const renderedImageDimensions = calculateRenderedImageDimensions(
+      imageObject,
+      containerWidth,
+      containerHeight
+    );
 
     // Use the modular zoom hook
     zoomToObjectFn(
       object, // Object with x, y arrays
       imageDimensions,
       { width: containerWidth, height: containerHeight },
-      { width: renderedWidth, height: renderedHeight, x: renderedX, y: renderedY },
+      renderedImageDimensions,
       {
         animateMs: 320, // Smooth animation
         immediate: false
@@ -150,80 +150,25 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     setPanOffset({ x: 0, y: 0 });
   };
 
+  // Use shared refinement mode hook
+  const enterRefinementModeForObject = useRefinementMode({
+    enterRefinementMode,
+    setCurrentTool,
+    exitFocusMode,
+    focusModeActive,
+    imageObject,
+    containerRef: null, // Will use getCanvasContainer fallback
+    zoomOptions: {
+      marginPct: 0.2,
+      maxZoom: 4,
+      minZoom: 1,
+    },
+  });
+
   const handleDoubleClick = async () => {
     // Double-click enters refinement mode
-    const contourId = object.contour_id || object.id;
-    
     try {
-      // Exit focus mode if active (refinement mode replaces focus mode)
-      if (focusModeActive) {
-        exitFocusMode();
-      }
-      
-      // Send refinement selection to backend
-      await annotationSession.selectRefinementObject(contourId);
-      
-      // Enter refinement mode in the store
-      enterRefinementMode(object.id, contourId);
-      
-      // Switch to AI annotation tool
-      setCurrentTool('ai_annotation');
-      
-      // Zoom and pan to the object (similar to focus mode)
-      if (imageObject && object.x && object.y && object.x.length > 0) {
-        // Find the canvas container
-        const container = document.querySelector('.relative.overflow-hidden');
-        if (container) {
-          const containerWidth = container.offsetWidth;
-          const containerHeight = container.offsetHeight;
-          
-          if (containerWidth && containerHeight) {
-            const imageDimensionsForCalc = {
-              width: imageObject.width,
-              height: imageObject.height
-            };
-            
-            const containerDimensions = {
-              width: containerWidth,
-              height: containerHeight
-            };
-            
-            // Calculate rendered image dimensions (object-contain sizing)
-            const imageAspect = imageObject.width / imageObject.height;
-            const containerAspect = containerWidth / containerHeight;
-            
-            let renderedWidth, renderedHeight, renderedX, renderedY;
-            
-            if (imageAspect > containerAspect) {
-              renderedWidth = containerWidth;
-              renderedHeight = containerWidth / imageAspect;
-              renderedX = 0;
-              renderedY = (containerHeight - renderedHeight) / 2;
-            } else {
-              renderedWidth = containerHeight * imageAspect;
-              renderedHeight = containerHeight;
-              renderedX = (containerWidth - renderedWidth) / 2;
-              renderedY = 0;
-            }
-            
-            const renderedImageDimensions = {
-              width: renderedWidth,
-              height: renderedHeight,
-              x: renderedX,
-              y: renderedY
-            };
-            
-            // Use the zoom hook to zoom/pan to the object
-            zoomToObjectFn(
-              object, // Object with x, y arrays
-              imageDimensionsForCalc,
-              containerDimensions,
-              renderedImageDimensions,
-              { animateMs: 300, immediate: false }
-            );
-          }
-        }
-      }
+      await enterRefinementModeForObject(object);
     } catch (error) {
       alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);
     }
@@ -302,16 +247,9 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
   const handleDelete = async (e) => {
     e?.stopPropagation();
-    // Delete from backend first
-    const contourId = object.contour_id || object.id;
     
     try {
-      // Delete from backend
-      await annotationSession.deleteObject(contourId);
-      
-      // Remove from store
-      removeObject(object.id);
-      
+      await deleteObject(object, removeObject);
     } catch (error) {
       alert(`Failed to delete object: ${error.message || 'Unknown error'}`);
     }
@@ -356,37 +294,16 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     setShowLabelModal(true);
   };
 
-  const handleLabelSelect = async (label) => {
+  // Use shared label selection hook
+  const handleLabelSelect = useLabelSelection(
+    updateObject,
+    () => setShowLabelModal(false), // onSuccess: close modal
+    (error) => alert(`Failed to accept object: ${error.message || 'Unknown error'}`) // onError
+  );
+
+  const handleLabelSelectWrapper = async (label) => {
     if (!label) return;
-
-    // Use contour_id for backend calls if available, otherwise fall back to store ID
-    const contourId = object.contour_id || object.id;
-    
-    // label is now an object with { id, name }, extract the ID
-    const labelId = typeof label === 'object' ? label.id : label;
-    const labelName = typeof label === 'object' ? label.name : label;
-
-    try {
-      // Update label using REST API endpoint
-      await editContourLabel(contourId, labelId);
-      
-      // Update temporary flag to mark as reviewed (move from Reviewable to Reviewed Objects)
-      await annotationSession.modifyObject(contourId, {
-        temporary: false,
-      });
-      
-      // Update the object in the store to mark it as reviewed (temporary: false)
-      // The store will automatically assign labelAssignmentOrder when label is assigned
-      updateObject(object.id, {
-        label: labelName, // Store label name for display
-        labelId: labelId, // Store label ID for future reference
-        temporary: false,
-      });
-      
-      setShowLabelModal(false);
-    } catch (error) {
-      alert(`Failed to accept object: ${error.message || 'Unknown error'}`);
-    }
+    await handleLabelSelect(object, label);
   };
 
   const handleCloseModal = () => {
@@ -396,16 +313,28 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const handleReject = async (e) => {
     e?.stopPropagation();
     // Reject temporary object: delete it
-    const contourId = object.contour_id || object.id;
-    
     try {
-      // Delete from backend
-      await annotationSession.deleteObject(contourId);
-      
-      // Remove from store
-      removeObject(object.id);
+      await deleteObject(object, removeObject);
     } catch (error) {
       alert(`Failed to reject object: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleMarkAsReviewed = async (e) => {
+    e?.stopPropagation();
+    const contourId = getContourId(object);
+    
+    try {
+      // Mark contour as reviewed
+      const response = await markContourAsReviewed(contourId);
+      
+      // Update the object in the store to mark it as reviewed
+      // Use actual reviewer data from response if available
+      updateObject(object.id, {
+        reviewed_by: response.reviewed_by || ['current_user'],
+      });
+    } catch (error) {
+      alert(`Failed to mark as reviewed: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -462,13 +391,13 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         
         {/* Action Buttons */}
         <div className="flex items-center space-x-1">
-          {isTemporary ? (
-            // Temporary object actions (Accept/Reject)
+          {isUnreviewed ? (
+            // Unreviewed object actions (Accept/Reject - accepting assigns label which auto-reviews)
             <>
               <button
                 onClick={handleAccept}
                 className="p-1 hover:bg-green-100 rounded transition-colors"
-                title="Accept object"
+                title="Assign label (auto-reviews)"
               >
                 <CheckCircle className="w-4 h-4 text-green-600" />
               </button>
@@ -482,8 +411,26 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
               </button>
             </>
           ) : (
-            // Permanent object actions (Visibility/Edit/Delete)
+            // Reviewed object actions (Visibility/Review/Edit/Delete)
             <>
+              {/* Show review button for reviewable objects that could have additional reviewers */}
+              {isReviewable && (
+                <button
+                  onClick={handleMarkAsReviewed}
+                  className="p-1 hover:bg-blue-100 rounded transition-colors"
+                  title="Add yourself as reviewer"
+                >
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                </button>
+              )}
+              
+              {/* Show reviewed badge for reviewed objects */}
+              {isReviewed && (
+                <div className="p-1" title={`Reviewed by: ${object.reviewed_by?.join(', ')}`}>
+                  <UserCheck className="w-4 h-4 text-green-600" />
+                </div>
+              )}
+              
               <button
                 onClick={() => {/* TODO: Toggle visibility */}}
                 className="p-1 hover:bg-gray-200 rounded transition-colors"
@@ -574,7 +521,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
                 {labels.map((label) => (
                   <button
                     key={label.id}
-                    onClick={() => handleLabelSelect(label)}
+                    onClick={() => handleLabelSelectWrapper(label)}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center border border-gray-200 rounded-lg"
                   >
                     <div className="w-2 h-2 rounded-full bg-gray-300 mr-3 flex-shrink-0"></div>
