@@ -70,9 +70,11 @@ export const initialState = {
   // Model State
   models: {
     selectedModel: 'SAM2',
-    completionModel: 'DINOv3',
+    completionModel: 'dino_1000_cosine_he_max_agg', // Default completion model
     availableModels: [], // List of available AI models from backend
+    availableCompletionModels: [], // List of available completion models from backend
     isLoadingModels: false,
+    isLoadingCompletionModels: false,
   },
   
   // Objects State

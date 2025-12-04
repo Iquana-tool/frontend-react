@@ -1,9 +1,13 @@
-import { getPromptedModels } from '../../api/models';
+import { getPromptedModels, getCompletionModels } from '../../api/models';
 
 // Fallback models if backend doesn't return any
 const FALLBACK_MODELS = [
   { id: 'SAM2', name: 'SAM2' },
   { id: 'SAM', name: 'SAM' }
+];
+
+const FALLBACK_COMPLETION_MODELS = [
+  { id: 'dino_1000_cosine_he_max_agg', name: 'DINO Completion' }
 ];
 
 /**
@@ -17,6 +21,55 @@ export const createModelsSlice = (set) => ({
   setCompletionModel: (model) => set((state) => {
     state.models.completionModel = model;
   }),
+
+  fetchAvailableCompletionModels: async () => {
+    set((state) => {
+      state.models.isLoadingCompletionModels = true;
+    });
+
+    try {
+      const result = await getCompletionModels();
+      if (result.success && result.models && result.models.length > 0) {
+        // Transform backend models to frontend format
+        const transformedModels = result.models.map(model => ({
+          id: model.identifier_str || model.id,
+          name: model.name || model.identifier_str || model.id,
+          description: model.description,
+          tags: model.tags,
+          supports_refinement: model.supports_refinement
+        }));
+
+        set((state) => {
+          state.models.availableCompletionModels = transformedModels;
+          state.models.isLoadingCompletionModels = false;
+          
+          // Set default model if none is selected and models are available
+          if (!state.models.completionModel && transformedModels.length > 0) {
+            state.models.completionModel = transformedModels[0].id;
+          }
+        });
+      } else {
+        // Fallback to hardcoded models if backend doesn't return any
+        set((state) => {
+          state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+          state.models.isLoadingCompletionModels = false;
+          if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
+            state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching completion models:', error);
+      // Fallback to hardcoded models on error
+      set((state) => {
+        state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+        state.models.isLoadingCompletionModels = false;
+        if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
+          state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
+        }
+      });
+    }
+  },
 
   fetchAvailableModels: async () => {
     set((state) => {

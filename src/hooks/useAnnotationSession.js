@@ -91,8 +91,9 @@ const useAnnotationSession = (imageId, options = {}) => {
 
   /**
    * Close current session
+   * @param {boolean} sendFinish - Whether to send finish_annotation message (default: false)
    */
-  const closeSession = useCallback(async (sendFinish = true) => {
+  const closeSession = useCallback(async (sendFinish = false) => {
     try {
       await annotationSession.close(sendFinish);
       resetState();
@@ -176,7 +177,8 @@ const useAnnotationSession = (imageId, options = {}) => {
       // Small delay to avoid closing during React StrictMode double-mount
       setTimeout(() => {
         if (!isMounted.current && annotationSession.getCurrentImageId() !== null) {
-          closeSession(true);
+          // Don't mark as finished when unmounting - user must explicitly mark it
+          closeSession(false);
         }
       }, 100);
     };

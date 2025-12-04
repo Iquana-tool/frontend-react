@@ -59,7 +59,6 @@ const useAISegmentation = () => {
     
     // Backend should always provide path - if missing, it's an error
     if (!contour || !contour.path) {
-      console.warn('No valid contour with path found in response:', response);
       return null;
     }
 
@@ -207,34 +206,10 @@ const useAISegmentation = () => {
               path: mask.path || null,
             });
           } else {
-            console.warn(`Object not found for object_modified. Adding as new object.`);
-            // Fallback: if object not found, add as new
-            addObject({
-              mask: mask,
-              contour_id: normalizedId,
-              pixelCount: mask.pixelCount || 0,
-              label: mask.label || `Object #${objectsList.length + 1}`,
-              reviewed_by: [], // Not reviewed yet, will appear in Unreviewed Objects
-              x: mask.x || [],
-              y: mask.y || [],
-              path: mask.path || mask.mask?.path,
-            });
+            // Note: Don't manually add here - let useWebSocketObjectHandler handle it to avoid duplicates
           }
-        } else {
-          // object_added: Add as an unreviewed object
-          addObject({
-            mask: mask,
-            contour_id: normalizedId, // Store the backend contour_id for API calls (consistent format)
-            pixelCount: mask.pixelCount || 0,
-            label: mask.label || `Object #${objectsList.length + 1}`,
-            reviewed_by: [], // Not reviewed yet, will appear in Unreviewed Objects
-            // Include x and y coordinate arrays if available from backend response
-            x: mask.x || [],
-            y: mask.y || [],
-            // Ensure path is available for rendering
-            path: mask.path || mask.mask?.path,
-          });
         }
+        // The handler will receive the OBJECT_ADDED message and add it once
         
         // Exit refinement mode after successful segmentation so the object is clickable
         if (refinementModeActive) {

@@ -19,6 +19,12 @@ export const createObjectsSlice = (set) => ({
       ? Number(rawContourId)
       : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
     
+    // Check if object with this contour_id already exists (prevent duplicates)
+    if (contourId !== null && state.objects.list.some(obj => obj.contour_id === contourId)) {
+      console.warn(`Object with contour_id ${contourId} already exists. Skipping duplicate addition.`);
+      return;
+    }
+    
     const newObject = {
       id: objectId, // Store ID (normalized format for consistent color calculation)
       contour_id: contourId, // Backend contour ID for API calls (normalized format)

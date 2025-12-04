@@ -15,15 +15,18 @@ import {
   useRefinementModeActive,
   useFocusModeActive,
   useExitFocusMode,
+  useCompletionModel,
+  useWebSocketIsReady,
 } from '../../../stores/selectors/annotationSelectors';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
+import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
+import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentation';
 import { useDataset } from '../../../contexts/DatasetContext';
-import { fetchLabels } from '../../../api/labels';
-import { extractLabelsFromResponse, buildLabelHierarchy } from '../../../utils/labelHierarchy';
-import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
-import { getContourId } from '../../../utils/objectUtils';
+import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import ContextMenuItem from './ContextMenuItem';
+import HierarchicalLabelList from './HierarchicalLabelList';
 
 const ObjectContextMenu = () => {
   const visible = useContextMenuVisible();
@@ -41,13 +44,21 @@ const ObjectContextMenu = () => {
   const refinementModeActive = useRefinementModeActive();
   const focusModeActive = useFocusModeActive();
   const exitFocusMode = useExitFocusMode();
+  const completionModel = useCompletionModel();
+  const wsIsReady = useWebSocketIsReady();
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
   
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
-  const [labelHierarchy, setLabelHierarchy] = useState([]);
-  const [labelsLoading, setLabelsLoading] = useState(false);
-  const [labelMap, setLabelMap] = useState(new Map()); // Map to store all labels for parent lookup
+  
+  // Use labels hierarchy hook
+  const { labelHierarchy, labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
+  
+  // Use completion segmentation hook
+  const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation(
+    null, // onSuccess: objects are automatically added via WebSocket
+    (error) => alert(`Failed to suggest similar instances: ${error.message || 'Unknown error'}`)
+  );
 
   // Adjust position to keep menu within container bounds and place it intuitively next to the object
   useEffect(() => {
@@ -86,37 +97,6 @@ const ObjectContextMenu = () => {
 
     setAdjustedPosition({ x: adjustedX, y: adjustedY });
   }, [visible, x, y]);
-
-  // Fetch labels when dataset changes or menu becomes visible
-  useEffect(() => {
-    if (!visible || !currentDataset) return;
-
-    const loadLabels = async () => {
-      setLabelsLoading(true);
-      try {
-        const labelsData = await fetchLabels(currentDataset.id);
-        const labelsArray = extractLabelsFromResponse(labelsData, false); // Include all labels (parent and sub-labels)
-        
-        // Build hierarchical structure
-        const hierarchy = buildLabelHierarchy(labelsArray);
-        setLabelHierarchy(hierarchy);
-        
-        // Create a map for quick lookup
-        const map = new Map();
-        labelsArray.forEach(label => {
-          map.set(label.id, label);
-        });
-        setLabelMap(map);
-      } catch (error) {
-        setLabelHierarchy([]);
-        setLabelMap(new Map());
-      } finally {
-        setLabelsLoading(false);
-      }
-    };
-
-    loadLabels();
-  }, [visible, currentDataset]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -280,6 +260,30 @@ const ObjectContextMenu = () => {
     }
   };
 
+  const handleSuggestSimilar = async () => {
+    if (!targetObjectId) return;
+
+    // Find the target object to get its contour_id
+    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
+    if (!targetObject || !targetObject.contour_id) {
+      alert('Could not find contour ID for this object');
+      hideContextMenu();
+      return;
+    }
+
+    // Check if WebSocket is ready
+    if (!wsIsReady) {
+      alert('WebSocket connection is not ready. Please wait or refresh the page.');
+      hideContextMenu();
+      return;
+    }
+
+    hideContextMenu();
+    
+    // Use the completion hook
+    await runCompletion(targetObject.contour_id, completionModel, targetObject.labelId);
+  };
+
   if (!visible) return null;
 
   return (
@@ -292,85 +296,73 @@ const ObjectContextMenu = () => {
       }}
     >
       {/* Reject Object Option */}
-      <button
+      <ContextMenuItem
         onClick={handleReject}
-        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-150 flex items-center border-b border-gray-100"
-      >
-        <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-        Reject object
-      </button>
+        className="hover:bg-red-50 hover:text-red-700"
+        label="Reject object"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        }
+      />
 
       {/* Focus Mode Option - Disabled in refinement mode */}
-      <button
+      <ContextMenuItem
         onClick={handleFocusMode}
         disabled={refinementModeActive}
-        className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center border-b border-gray-100 ${
-          refinementModeActive
-            ? 'text-gray-400 cursor-not-allowed opacity-50'
-            : 'text-gray-700 hover:bg-blue-50 hover:text-blue-700'
-        }`}
         title={refinementModeActive ? 'Focus mode is disabled during refinement' : 'Enter focus mode'}
-      >
-        <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-        </svg>
-        Focus Mode
-      </button>
+        label="Focus Mode"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+          </svg>
+        }
+      />
 
       {/* Refine Option */}
-      <button
+      <ContextMenuItem
         onClick={handleRefine}
-        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-150 flex items-center border-b border-gray-100"
-      >
-        <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        </svg>
-        Refine Object
-      </button>
+        className="hover:bg-purple-50 hover:text-purple-700"
+        label="Refine Object"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        }
+      />
 
-      {/* Compact header */}
+      {/* Suggest Similar Instances Option */}
+      <ContextMenuItem
+        onClick={handleSuggestSimilar}
+        disabled={isRunningCompletion || !completionModel || !wsIsReady}
+        className="hover:bg-green-50 hover:text-green-700"
+        title={
+          !completionModel 
+            ? 'Select a completion model first' 
+            : !wsIsReady 
+              ? 'WebSocket not ready' 
+              : 'Find similar instances using completion segmentation'
+        }
+        label={isRunningCompletion ? 'Finding similar...' : 'Suggest Similar Instances'}
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+        }
+      />
+
+      {/* Label section header */}
       <div className="px-3 py-1 text-xs font-medium text-gray-600 border-b border-gray-100">
         Label
       </div>
       
-      {/* Label options */}
-      {labelsLoading ? (
-        <div className="px-3 py-2 text-xs text-gray-500 text-center">
-          Loading labels...
-        </div>
-      ) : labelHierarchy.length === 0 ? (
-        <div className="px-3 py-2 text-xs text-gray-500 text-center">
-          No labels available
-        </div>
-      ) : (
-        (() => {
-          // Flatten hierarchy with proper indentation for display
-          const renderLabel = (label, depth = 0) => {
-            const indent = depth * 16; // 16px indent per level
-            
-            return (
-              <React.Fragment key={label.id}>
-                <button
-                  onClick={() => handleLabelSelect(label)}
-                  className="w-full text-left py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center"
-                  style={{ paddingLeft: `${12 + indent}px`, paddingRight: '12px' }}
-                >
-                  <div className="w-2 h-2 rounded-full bg-gray-300 mr-2 flex-shrink-0"></div>
-                  <span className="truncate">{label.name}</span>
-                </button>
-                {/* Render children if any */}
-                {label.children && label.children.length > 0 && 
-                  label.children.map(child => renderLabel(child, depth + 1))
-                }
-              </React.Fragment>
-            );
-          };
-          
-          return labelHierarchy.map(label => renderLabel(label));
-        })()
-      )}
+      {/* Hierarchical label list */}
+      <HierarchicalLabelList
+        labelHierarchy={labelHierarchy}
+        labelsLoading={labelsLoading}
+        onLabelSelect={handleLabelSelect}
+      />
     </div>
   );
 };

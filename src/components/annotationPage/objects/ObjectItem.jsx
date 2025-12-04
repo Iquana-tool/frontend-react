@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, EyeOff, Edit3, Trash2, ChevronDown, CheckCircle, XCircle, X, UserCheck } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { 
   useSelectedObjects, 
   useSelectObject, 
@@ -21,14 +21,16 @@ import {
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
+import { useMarkAsReviewed } from '../../../hooks/useMarkAsReviewed';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
-import { markContourAsReviewed } from '../../../api/contours';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 import { hexToRgba } from '../../../utils/labelColors';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
-import { getContourId, extractLabelInfo } from '../../../utils/objectUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import ObjectActions from './ObjectActions';
+import ObjectDetails from './ObjectDetails';
+import LabelSelectionModal from './LabelSelectionModal';
 
 const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const selectedObjects = useSelectedObjects();
@@ -301,6 +303,13 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     (error) => alert(`Failed to accept object: ${error.message || 'Unknown error'}`) // onError
   );
 
+  // Use shared mark as reviewed hook
+  const markAsReviewed = useMarkAsReviewed(
+    updateObject,
+    null, // onSuccess: no additional action needed
+    (error) => alert(`Failed to mark as reviewed: ${error.message || 'Unknown error'}`) // onError
+  );
+
   const handleLabelSelectWrapper = async (label) => {
     if (!label) return;
     await handleLabelSelect(object, label);
@@ -322,20 +331,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
   const handleMarkAsReviewed = async (e) => {
     e?.stopPropagation();
-    const contourId = getContourId(object);
-    
-    try {
-      // Mark contour as reviewed
-      const response = await markContourAsReviewed(contourId);
-      
-      // Update the object in the store to mark it as reviewed
-      // Use actual reviewer data from response if available
-      updateObject(object.id, {
-        reviewed_by: response.reviewed_by || ['current_user'],
-      });
-    } catch (error) {
-      alert(`Failed to mark as reviewed: ${error.message || 'Unknown error'}`);
-    }
+    await markAsReviewed(object);
   };
 
   // Use object's color for styling
@@ -390,158 +386,37 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         </div>
         
         {/* Action Buttons */}
-        <div className="flex items-center space-x-1">
-          {isUnreviewed ? (
-            // Unreviewed object actions (Accept/Reject - accepting assigns label which auto-reviews)
-            <>
-              <button
-                onClick={handleAccept}
-                className="p-1 hover:bg-green-100 rounded transition-colors"
-                title="Assign label (auto-reviews)"
-              >
-                <CheckCircle className="w-4 h-4 text-green-600" />
-              </button>
-              
-              <button
-                onClick={handleReject}
-                className="p-1 hover:bg-red-100 rounded transition-colors"
-                title="Reject object"
-              >
-                <XCircle className="w-4 h-4 text-red-600" />
-              </button>
-            </>
-          ) : (
-            // Reviewed object actions (Visibility/Review/Edit/Delete)
-            <>
-              {/* Show review button for reviewable objects that could have additional reviewers */}
-              {isReviewable && (
-                <button
-                  onClick={handleMarkAsReviewed}
-                  className="p-1 hover:bg-blue-100 rounded transition-colors"
-                  title="Add yourself as reviewer"
-                >
-                  <UserCheck className="w-4 h-4 text-blue-600" />
-                </button>
-              )}
-              
-              {/* Show reviewed badge for reviewed objects */}
-              {isReviewed && (
-                <div className="p-1" title={`Reviewed by: ${object.reviewed_by?.join(', ')}`}>
-                  <UserCheck className="w-4 h-4 text-green-600" />
-                </div>
-              )}
-              
-              <button
-                onClick={() => {/* TODO: Toggle visibility */}}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-                title={isVisible ? 'Hide object' : 'Show object'}
-              >
-                {isVisible ? (
-                  <Eye className="w-4 h-4 text-gray-600" />
-                ) : (
-                  <EyeOff className="w-4 h-4 text-gray-400" />
-                )}
-              </button>
-              
-              <button
-                onClick={handleEdit}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-                title="Edit object"
-              >
-                <Edit3 className="w-4 h-4 text-gray-600" />
-              </button>
-              
-              <button
-                onClick={handleDelete}
-                className="p-1 hover:bg-red-100 rounded transition-colors"
-                title="Delete object"
-              >
-                <Trash2 className="w-4 h-4 text-red-600" />
-              </button>
-            </>
-          )}
-        </div>
+        <ObjectActions
+          isReviewed={isReviewed}
+          isReviewable={isReviewable}
+          isVisible={isVisible}
+          onAccept={handleAccept}
+          onReject={handleReject}
+          onMarkAsReviewed={handleMarkAsReviewed}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onToggleVisibility={() => {/* TODO: Toggle visibility */}}
+          reviewedBy={object.reviewed_by || []}
+        />
       </div>
       
       {/* Object Details (shown when selected) */}
       {isSelected && (
-        <div className="space-y-2 text-xs text-gray-600">
-          <div className="flex items-center space-x-2">
-            <div 
-              className="w-3 h-3 rounded border border-gray-300" 
-              style={{ backgroundColor: object.color }}
-            />
-            <span>{object.pixelCount || 0} pixels</span>
-          </div>
-          
-          {object.label && (
-            <div className="bg-gray-100 px-2 py-1 rounded text-xs">
-              {object.label}
-            </div>
-          )}
-        </div>
+        <ObjectDetails
+          color={object.color}
+          pixelCount={object.pixelCount}
+          label={object.label}
+        />
       )}
 
       {/* Label Selection Modal */}
-      {showLabelModal && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-          onClick={handleCloseModal}
-        >
-          <div 
-            className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 max-w-md w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Select Label</h3>
-              <button
-                onClick={handleCloseModal}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                title="Close"
-              >
-                <X className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
-            
-            <p className="text-sm text-gray-600 mb-4">
-              Please select a label for this object before accepting it.
-            </p>
-
-            {labelsLoading ? (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-sm">Loading labels...</div>
-              </div>
-            ) : labels.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-sm font-medium mb-2">No labels available</div>
-                <div className="text-xs">Please create labels for this dataset first.</div>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {labels.map((label) => (
-                  <button
-                    key={label.id}
-                    onClick={() => handleLabelSelectWrapper(label)}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center border border-gray-200 rounded-lg"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-gray-300 mr-3 flex-shrink-0"></div>
-                    {label.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={handleCloseModal}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LabelSelectionModal
+        isOpen={showLabelModal}
+        onClose={handleCloseModal}
+        labels={labels}
+        labelsLoading={labelsLoading}
+        onLabelSelect={handleLabelSelectWrapper}
+      />
     </div>
   );
 };

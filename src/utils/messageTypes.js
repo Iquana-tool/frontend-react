@@ -32,6 +32,7 @@ export const CLIENT_MESSAGE_TYPES = {
   
   // Session Management
   COMPLETION_ENABLE: 'completion_enable',
+  COMPLETION_INFERENCE: 'completion_inference',
   FINISH_ANNOTATION: 'finish_annotation',
 };
 
@@ -208,6 +209,21 @@ export const MessageBuilders = {
   enableCompletion: () => createMessage(
     CLIENT_MESSAGE_TYPES.COMPLETION_ENABLE,
     {}
+  ),
+
+  /**
+   * Request completion inference to find similar instances
+   * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
+   * @param {string} modelKey - Completion model key (e.g., 'DINOv3')
+   * @param {number|null} labelId - Optional label ID to assign to found instances
+   */
+  runCompletion: (seedContourIds, modelKey, labelId = null) => createMessage(
+    CLIENT_MESSAGE_TYPES.COMPLETION_INFERENCE,
+    {
+      seed_contour_ids: seedContourIds,
+      model_key: modelKey,
+      label_id: labelId,
+    }
   ),
 
   /**

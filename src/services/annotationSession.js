@@ -123,10 +123,10 @@ class AnnotationSession {
 
   /**
    * Close the current session
-   * @param {boolean} sendFinishMessage - Whether to send finish_annotation message
+   * @param {boolean} sendFinishMessage - Whether to send finish_annotation message (default: false)
    * @returns {Promise<void>}
    */
-  async close(sendFinishMessage = true) {
+  async close(sendFinishMessage = false) {
     try {
       if (sendFinishMessage && websocketService.isConnected()) {
         const message = MessageBuilders.finishAnnotation();
@@ -158,8 +158,8 @@ class AnnotationSession {
       };
     }
 
-    // Close current session
-    await this.close(true);
+    // Close current session (don't mark as finished when switching)
+    await this.close(false);
 
     // Initialize new session
     return this.initialize(newImageId, this.currentUserId);
@@ -284,6 +284,27 @@ class AnnotationSession {
   async unselectRefinementObject() {
     this._ensureReady();
     const message = MessageBuilders.unselectRefinementObject();
+    return websocketService.send(message, true);
+  }
+
+  // ==================== COMPLETION SEGMENTATION ====================
+
+  /**
+   * Run completion segmentation to find similar instances
+   * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
+   * @param {string} modelKey - Completion model (e.g., 'DINOv3', 'DINOv2')
+   * @param {number|null} labelId - Optional label ID to assign to found instances
+   * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
+   */
+  async runCompletion(seedContourIds, modelKey, labelId = null) {
+    this._ensureReady();
+    
+    // Check if completion service is available
+    if (!this.isServiceAvailable('completion_segmentation')) {
+      throw new Error('Completion segmentation service is not available. Please check your connection.');
+    }
+    
+    const message = MessageBuilders.runCompletion(seedContourIds, modelKey, labelId);
     return websocketService.send(message, true);
   }
 

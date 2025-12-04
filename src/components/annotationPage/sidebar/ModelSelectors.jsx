@@ -7,8 +7,11 @@ import {
   useSetCompletionModel, 
   useCurrentTool,
   useAvailableModels,
+  useAvailableCompletionModels,
   useIsLoadingModels,
-  useFetchAvailableModels
+  useIsLoadingCompletionModels,
+  useFetchAvailableModels,
+  useFetchAvailableCompletionModels
 } from '../../../stores/selectors/annotationSelectors';
 import ModelDescription from './ModelDescription';
 
@@ -19,16 +22,15 @@ const ModelSelectors = () => {
   const setSelectedModel = useSetSelectedModel();
   const setCompletionModel = useSetCompletionModel();
   const availableModels = useAvailableModels();
+  const availableCompletionModels = useAvailableCompletionModels();
   const isLoadingModels = useIsLoadingModels();
+  const isLoadingCompletionModels = useIsLoadingCompletionModels();
   const fetchAvailableModels = useFetchAvailableModels();
+  const fetchAvailableCompletionModels = useFetchAvailableCompletionModels();
 
   const showAIAnnotationSelector = currentTool === 'ai_annotation';
-  const showCompletionSelector = currentTool === 'completion';
-
-  const completionModels = [
-    { id: 'DINOv3', name: 'DINOv3' },
-    { id: 'DINOv2', name: 'DINOv2' }
-  ];
+  // Show completion selector when in completion tool OR ai_annotation tool (for "Suggest Similar" context menu feature)
+  const showCompletionSelector = currentTool === 'completion' || currentTool === 'ai_annotation';
 
   // Fetch AI models from backend when AI annotation tool is selected
   useEffect(() => {
@@ -37,13 +39,20 @@ const ModelSelectors = () => {
     }
   }, [showAIAnnotationSelector, availableModels.length, isLoadingModels, fetchAvailableModels]);
 
+  // Fetch completion models from backend when completion tool is selected
+  useEffect(() => {
+    if (showCompletionSelector && availableCompletionModels.length === 0 && !isLoadingCompletionModels) {
+      fetchAvailableCompletionModels();
+    }
+  }, [showCompletionSelector, availableCompletionModels.length, isLoadingCompletionModels, fetchAvailableCompletionModels]);
+
   return (
     <div className="space-y-3">
       {/* AI Annotation Model Selector */}
       {showAIAnnotationSelector && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            Selected Model
+            AI Segmentation Model
           </label>
           <div className="relative">
             <select
@@ -78,19 +87,26 @@ const ModelSelectors = () => {
       {showCompletionSelector && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            Selected Model
+            Completion Model
           </label>
           <div className="relative">
             <select
-              value={completionModel}
+              value={completionModel || ''}
               onChange={(e) => setCompletionModel(e.target.value)}
-              className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500"
+              disabled={isLoadingCompletionModels}
+              className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              {completionModels.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
+              {isLoadingCompletionModels ? (
+                <option value="">Loading models...</option>
+              ) : availableCompletionModels.length > 0 ? (
+                availableCompletionModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">No models available</option>
+              )}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
           </div>

@@ -30,7 +30,9 @@ export const usePanOffset = () => useAnnotationStore(state => state.images.panOf
 export const useSelectedModel = () => useAnnotationStore(state => state.models.selectedModel);
 export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
 export const useAvailableModels = () => useAnnotationStore(state => state.models.availableModels);
+export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
 export const useIsLoadingModels = () => useAnnotationStore(state => state.models.isLoadingModels);
+export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
@@ -61,6 +63,7 @@ export const useClearObjects = () => useAnnotationStore(state => state.clearObje
 export const useSetSelectedModel = () => useAnnotationStore(state => state.setSelectedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
 export const useFetchAvailableModels = () => useAnnotationStore(state => state.fetchAvailableModels);
+export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
 export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);
