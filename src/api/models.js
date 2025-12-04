@@ -97,3 +97,34 @@ export const get3DModels = async () => {
         };
     }
 };
+
+// Get available completion segmentation models from backend
+export const getCompletionModels = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/completion_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
+        const data = await handleApiError(response);
+
+        if (data.success && data.response && data.response.available_models) {
+            return {
+                success: true,
+                models: data.response.available_models,
+            };
+        }
+
+        // Fallback to empty array if backend doesn't return any
+        return {
+            success: true,
+            models: [],
+            fallback: true,
+        };
+    } catch (error) {
+        console.warn("Error fetching completion models, using fallback:", error);
+        return {
+            success: true,
+            models: [],
+            fallback: true,
+        };
+    }
+};
