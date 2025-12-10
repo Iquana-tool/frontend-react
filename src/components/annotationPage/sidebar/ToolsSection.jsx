@@ -20,7 +20,7 @@ const ToolsSection = () => {
     { id: 'selection', name: 'Selection', icon: MousePointer, description: 'Select and manipulate objects', disabled: false },
     { id: 'manual_drawing', name: 'Manual Drawing', icon: Pencil, description: 'Draw annotations manually', disabled: true },
     { id: 'ai_annotation', name: 'AI assisted Annotation', icon: Sparkles, description: 'Use AI models for automatic segmentation', disabled: false },
-    { id: 'completion', name: 'Annotation Completion', icon: CheckCircle, description: 'Complete and refine annotations', disabled: true },
+    { id: 'completion', name: 'Annotation Completion', icon: CheckCircle, description: 'Automatically detect new objects given one or multiple examples', disabled: true },
   ];
 
   if (leftSidebarCollapsed) {
