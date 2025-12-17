@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import annotationSession from '../services/annotationSession';
+import {useCompletionModel, useSetCompletionModel} from "../stores/selectors/annotationSelectors";
 
 /**
  * Hook for running completion segmentation to find similar instances
@@ -10,8 +11,15 @@ import annotationSession from '../services/annotationSession';
  */
 export function useCompletionSegmentation(onSuccess, onError) {
   const [isRunning, setIsRunning] = useState(false);
+  const completionModel = useCompletionModel();
+  const setCompletionModel = useSetCompletionModel();
 
-  const runCompletion = useCallback(async (contourId, completionModel, labelId) => {
+  const runCompletion = useCallback(async (contourId, labelId) => {
+    setCompletionModel({
+          ...completionModel,
+          model_status: "busy",
+        }
+    )
     if (!contourId) {
       const error = new Error('Contour ID is required');
       if (onError) {
@@ -45,17 +53,23 @@ export function useCompletionSegmentation(onSuccess, onError) {
 
     try {
       // Call WebSocket method - objects will be added automatically via OBJECT_ADDED messages
-      await annotationSession.runCompletion(
+      const response = await annotationSession.runCompletion(
         [contourId],      // Array of seed contour IDs
-        completionModel,  // Model name
+        completionModel.id,  // Model name
         labelId           // Label ID
       );
-      
-      console.log('Completion segmentation completed successfully');
-      
-      // Call success callback if provided
-      if (onSuccess) {
-        onSuccess();
+      if (response.success){
+        setCompletionModel({
+            ...completionModel,
+            model_status: "ready",
+          }
+        )
+      } else {
+        setCompletionModel({
+            ...completionModel,
+            model_status: "error",
+          }
+        )
       }
     } catch (error) {
       console.error('Completion segmentation error:', error);

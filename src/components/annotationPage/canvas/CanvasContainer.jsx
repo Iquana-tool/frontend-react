@@ -10,13 +10,13 @@ import RefinementOverlay from './RefinementOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
-import { 
+import {
   useCurrentTool,
   useInstantSegmentation,
   useAIPrompts,
   usePromptedModel,
   useIsSubmitting,
-  useRefinementModeActive,
+  useRefinementModeActive, useSetPromptedModel,
 } from '../../../stores/selectors/annotationSelectors';
 
 const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDragging }) => {
@@ -25,7 +25,8 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   const currentTool = useCurrentTool();
   const instantSegmentation = useInstantSegmentation();
   const prompts = useAIPrompts();
-  const selectedModel = usePromptedModel();
+  const promptedModel = usePromptedModel();
+  const setPromptedModel = useSetPromptedModel();
   const isSubmitting = useIsSubmitting();
   const refinementModeActive = useRefinementModeActive();
   const previousPromptsLengthRef = useRef(0);
@@ -75,7 +76,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
     if (
       instantSegmentation &&
       currentTool === 'ai_annotation' &&
-      selectedModel &&
+      promptedModel &&
       !isSubmitting &&
       prompts.length > 0 &&
       prompts.length > previousPromptsLengthRef.current
@@ -105,7 +106,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
     
     // Update the previous prompts length
     previousPromptsLengthRef.current = prompts.length;
-  }, [instantSegmentation, currentTool, selectedModel, isSubmitting, prompts.length, refinementModeActive, handleRunAI]);
+  }, [instantSegmentation, currentTool, promptedModel, isSubmitting, prompts.length, refinementModeActive, handleRunAI]);
 
   // Cursor for non-AI tools (base image remains mounted for all tools)
   const getCanvasCursor = () => {

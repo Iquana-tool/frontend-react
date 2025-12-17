@@ -2,8 +2,7 @@ import { getPromptedModels, getCompletionModels } from '../../api/models';
 
 // Fallback models if backend doesn't return any
 const FALLBACK_MODELS = [
-  { id: 'SAM2', name: 'SAM2' },
-  { id: 'SAM', name: 'SAM' }
+  { id: 'sam2_tiny', name: 'SAM2 - Tiny' },
 ];
 
 const FALLBACK_COMPLETION_MODELS = [

@@ -292,7 +292,6 @@ class AnnotationSession {
   /**
    * Run completion segmentation to find similar instances
    * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
-   * @param {string} modelKey - Completion model (e.g., 'DINOv3', 'DINOv2')
    * @param {number|null} labelId - Optional label ID to assign to found instances
    * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
    */

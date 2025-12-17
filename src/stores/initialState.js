@@ -4,7 +4,7 @@
 export const initialState = {
   // UI State
   ui: {
-    currentTool: 'selection',
+    currentTool: 'ai_annotation',
     leftSidebarCollapsed: false,
     rightSidebarCollapsed: false,
     visibilityControlsExpanded: true,
@@ -69,8 +69,8 @@ export const initialState = {
   
   // Model State
   models: {
-    selectedModel: 'SAM2',
-    completionModel: 'dino_1000_cosine_he_max_agg', // Default completion model
+    selectedModel: {},
+    completionModel: {}, // Default completion model
     availableModels: [], // List of available AI models from backend
     availableCompletionModels: [], // List of available completion models from backend
     isLoadingModels: false,

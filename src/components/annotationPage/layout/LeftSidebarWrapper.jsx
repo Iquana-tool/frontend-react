@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLeftSidebarCollapsed, useToggleLeftSidebar } from '../../../stores/selectors/annotationSelectors';
 import ToolsSection from '../sidebar/ToolsSection';
 import StatusSection from '../sidebar/StatusSection';
+import Services from "../sidebar/Services";
 
 const LeftSidebarWrapper = () => {
   const leftSidebarCollapsed = useLeftSidebarCollapsed();
@@ -30,6 +31,7 @@ const LeftSidebarWrapper = () => {
             {leftSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
+        <Services />
         <StatusSection />
       </div>
     </div>

@@ -14,7 +14,7 @@ import {
   useRefinementModeActive,
   useRefinementModeObjectId,
   useExitRefinementMode,
-  useSetCurrentTool,
+  useSetCurrentTool, useSetPromptedModel,
 } from '../stores/selectors/annotationSelectors';
 
 /**
@@ -26,7 +26,8 @@ const useAISegmentation = () => {
 
   // Store state
   const prompts = useAIPrompts();
-  const selectedModel = usePromptedModel();
+  const promptedModel = usePromptedModel();
+  const setPromptedModel = useSetPromptedModel();
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
   const objectsList = useObjectsList();
@@ -80,7 +81,11 @@ const useAISegmentation = () => {
    * Run AI segmentation via WebSocket
    */
   const runSegmentation = useCallback(async () => {
-    if (!currentImage || !selectedModel || prompts.length === 0) {
+    setPromptedModel({
+        ...promptedModel,
+        model_status: "busy"
+      });
+    if (!currentImage || !promptedModel || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
     }
@@ -151,15 +156,7 @@ const useAISegmentation = () => {
         }
       });
 
-      // Map model names to backend identifiers
-      const modelMap = {
-        'SAM2': 'sam2_tiny',
-        'SAM2Tiny': 'sam2_tiny',
-        'SAM2Small': 'sam2_small',
-        'SAM2Base': 'sam2_base',
-        'SAM2Large': 'sam2_large',
-      };
-      const modelIdentifier = modelMap[selectedModel] || 'sam2_tiny';
+      const modelIdentifier = promptedModel.id;
 
       // Send segmentation request via WebSocket
       const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts);
@@ -205,8 +202,6 @@ const useAISegmentation = () => {
               // Ensure path is available for rendering - explicitly set from new refined object
               path: mask.path || null,
             });
-          } else {
-            // Note: Don't manually add here - let useWebSocketObjectHandler handle it to avoid duplicates
           }
         }
         // The handler will receive the OBJECT_ADDED message and add it once
@@ -216,19 +211,16 @@ const useAISegmentation = () => {
           try {
             await annotationSession.unselectRefinementObject();
             exitRefinementMode();
-            // Switch back to selection tool so clicking the object can enter focus mode
-            setCurrentTool('selection');
           } catch (error) {
            
             // Continue anyway - the object was updated/added successfully
           }
-        } else {
-          // If not in refinement mode, switch to selection tool after segmentation
-          // so the newly created object can be clicked to enter focus mode
-          setCurrentTool('selection');
         }
-        
         clearAllPrompts();
+        setPromptedModel({
+          ...promptedModel,
+          model_status: "ready"
+        });
         return { success: true, mask };
       } else {
         throw new Error('No valid mask returned from server');
@@ -236,13 +228,17 @@ const useAISegmentation = () => {
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
+      setPromptedModel({
+        ...promptedModel,
+        model_status: "error"
+      });
       return { success: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
     }
   }, [
     currentImage,
-    selectedModel,
+    promptedModel,
     prompts,
     imageObject,
     objectsList,
@@ -260,7 +256,7 @@ const useAISegmentation = () => {
   return {
     runSegmentation,
     error,
-    isReady: currentImage && selectedModel && prompts.length > 0,
+    isReady: currentImage && promptedModel && prompts.length > 0,
   };
 };
 
