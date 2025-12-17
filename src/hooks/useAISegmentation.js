@@ -3,7 +3,7 @@ import annotationSession from '../services/annotationSession';
 import { pixelToNormalized } from '../utils/coordinateUtils';
 import {
   useAIPrompts,
-  useSelectedModel,
+  usePromptedModel,
   useCurrentImage,
   useClearAllPrompts,
   useSetIsSubmittingAI,
@@ -26,7 +26,7 @@ const useAISegmentation = () => {
 
   // Store state
   const prompts = useAIPrompts();
-  const selectedModel = useSelectedModel();
+  const selectedModel = usePromptedModel();
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
   const objectsList = useObjectsList();

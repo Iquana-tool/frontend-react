@@ -7,7 +7,7 @@ import {
   useAddBoxPrompt,
   useSetActivePreview,
   useCurrentTool,
-  useSelectedModel,
+  usePromptedModel,
   useCurrentImage,
   useImageObject,
   useImageLoading,
@@ -45,7 +45,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
   // Store state
   const currentTool = useCurrentTool();
-  const selectedModel = useSelectedModel();
+  const selectedModel = usePromptedModel();
   const currentImage = useCurrentImage();
   const prompts = useAIPrompts();
   const activePreview = useActivePreview();

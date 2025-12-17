@@ -1,31 +1,31 @@
 import React, { useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { 
-  useSelectedModel, 
+  usePromptedModel,
   useCompletionModel, 
-  useSetSelectedModel, 
+  useSetPromptedModel,
   useSetCompletionModel, 
   useCurrentTool,
-  useAvailableModels,
+  useAvailablePromptedModels,
   useAvailableCompletionModels,
-  useIsLoadingModels,
+  useIsLoadingPromptedModels,
   useIsLoadingCompletionModels,
-  useFetchAvailableModels,
+  useFetchAvailablePromptedModels,
   useFetchAvailableCompletionModels
 } from '../../../stores/selectors/annotationSelectors';
 import ModelDescription from './ModelDescription';
 
 const ModelSelectors = () => {
   const currentTool = useCurrentTool();
-  const promptedModel = useSelectedModel();
+  const promptedModel = usePromptedModel();
   const completionModel = useCompletionModel();
-  const setPromptedModel = useSetSelectedModel();
+  const setPromptedModel = useSetPromptedModel();
   const setCompletionModel = useSetCompletionModel();
-  const availableModels = useAvailableModels();
+  const availableModels = useAvailablePromptedModels();
   const availableCompletionModels = useAvailableCompletionModels();
-  const isLoadingModels = useIsLoadingModels();
+  const isLoadingModels = useIsLoadingPromptedModels();
   const isLoadingCompletionModels = useIsLoadingCompletionModels();
-  const fetchAvailableModels = useFetchAvailableModels();
+  const fetchAvailableModels = useFetchAvailablePromptedModels();
   const fetchAvailableCompletionModels = useFetchAvailableCompletionModels();
 
   const showAIAnnotationSelector = currentTool === 'ai_annotation';

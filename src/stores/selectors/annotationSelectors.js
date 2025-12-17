@@ -27,11 +27,11 @@ export const useImageError = () => useAnnotationStore(state => state.images.imag
 export const useZoomLevel = () => useAnnotationStore(state => state.images.zoomLevel);
 export const usePanOffset = () => useAnnotationStore(state => state.images.panOffset);
 
-export const useSelectedModel = () => useAnnotationStore(state => state.models.selectedModel);
+export const usePromptedModel = () => useAnnotationStore(state => state.models.selectedModel);
 export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
-export const useAvailableModels = () => useAnnotationStore(state => state.models.availableModels);
+export const useAvailablePromptedModels = () => useAnnotationStore(state => state.models.availableModels);
 export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
-export const useIsLoadingModels = () => useAnnotationStore(state => state.models.isLoadingModels);
+export const useIsLoadingPromptedModels = () => useAnnotationStore(state => state.models.isLoadingModels);
 export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
@@ -60,9 +60,9 @@ export const useClearSelection = () => useAnnotationStore(state => state.clearSe
 export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => state.setObjectsFromHierarchy);
 export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
 
-export const useSetSelectedModel = () => useAnnotationStore(state => state.setSelectedModel);
+export const useSetPromptedModel = () => useAnnotationStore(state => state.setSelectedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
-export const useFetchAvailableModels = () => useAnnotationStore(state => state.fetchAvailableModels);
+export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailableModels);
 export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
-import { useCurrentTool, useSelectedModel } from '../../../stores/selectors/annotationSelectors';
+import { useCurrentTool, usePromptedModel } from '../../../stores/selectors/annotationSelectors';
 
 /**
  * Model Selection Hint Component
@@ -8,7 +8,7 @@ import { useCurrentTool, useSelectedModel } from '../../../stores/selectors/anno
  */
 const ModelSelectionHint = () => {
   const currentTool = useCurrentTool();
-  const selectedModel = useSelectedModel();
+  const selectedModel = usePromptedModel();
 
   // Only show when AI annotation tool is active and no model selected
   if (currentTool !== 'ai_annotation' || selectedModel) {

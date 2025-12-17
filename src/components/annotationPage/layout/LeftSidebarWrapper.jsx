@@ -30,8 +30,6 @@ const LeftSidebarWrapper = () => {
             {leftSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
-        
-        <ToolsSection />
         <StatusSection />
       </div>
     </div>

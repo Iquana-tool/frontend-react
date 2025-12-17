@@ -2,7 +2,7 @@ import React from 'react';
 import { Sparkles, Loader2 } from 'lucide-react';
 import {
   useCurrentTool,
-  useSelectedModel,
+  usePromptedModel,
   useAIPrompts,
   useIsSubmitting,
   useInstantSegmentation,
@@ -14,7 +14,7 @@ import {
  */
 const RunAIButton = ({ onRunAI }) => {
   const currentTool = useCurrentTool();
-  const selectedModel = useSelectedModel();
+  const selectedModel = usePromptedModel();
   const prompts = useAIPrompts();
   const isSubmitting = useIsSubmitting();
   const instantSegmentation = useInstantSegmentation();

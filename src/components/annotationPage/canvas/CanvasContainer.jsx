@@ -14,7 +14,7 @@ import {
   useCurrentTool,
   useInstantSegmentation,
   useAIPrompts,
-  useSelectedModel,
+  usePromptedModel,
   useIsSubmitting,
   useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
@@ -25,7 +25,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   const currentTool = useCurrentTool();
   const instantSegmentation = useInstantSegmentation();
   const prompts = useAIPrompts();
-  const selectedModel = useSelectedModel();
+  const selectedModel = usePromptedModel();
   const isSubmitting = useIsSubmitting();
   const refinementModeActive = useRefinementModeActive();
   const previousPromptsLengthRef = useRef(0);
