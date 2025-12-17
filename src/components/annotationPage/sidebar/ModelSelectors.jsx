@@ -17,9 +17,9 @@ import ModelDescription from './ModelDescription';
 
 const ModelSelectors = () => {
   const currentTool = useCurrentTool();
-  const selectedModel = useSelectedModel();
+  const promptedModel = useSelectedModel();
   const completionModel = useCompletionModel();
-  const setSelectedModel = useSetSelectedModel();
+  const setPromptedModel = useSetSelectedModel();
   const setCompletionModel = useSetCompletionModel();
   const availableModels = useAvailableModels();
   const availableCompletionModels = useAvailableCompletionModels();
@@ -56,8 +56,8 @@ const ModelSelectors = () => {
           </label>
           <div className="relative">
             <select
-              value={selectedModel || ''}
-              onChange={(e) => setSelectedModel(e.target.value)}
+              value={promptedModel || ''}
+              onChange={(e) => setPromptedModel(e.target.value)}
               disabled={isLoadingModels}
               className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
@@ -78,7 +78,7 @@ const ModelSelectors = () => {
           
           {/* Model Description */}
           <div className="mt-1.5">
-            <ModelDescription model={selectedModel} modelType="segmentation" />
+            <ModelDescription model={promptedModel} modelType="segmentation" />
           </div>
         </div>
       )}
