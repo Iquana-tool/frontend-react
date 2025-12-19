@@ -450,7 +450,7 @@ export const useSegmentation = () => {
     isSegmenting,
     processedMaskImages,
     maskImagesLoading,
-    selectedModel,
+    promptedModel: selectedModel,
     selectedContourIds,
 
     // Actions

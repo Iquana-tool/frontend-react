@@ -16,7 +16,7 @@ export const useUILoading = () => useAppStore(state => state.ui.loading);
 export const useUIError = () => useAppStore(state => state.ui.error);
 export const useUISuccessMessage = () => useAppStore(state => state.ui.successMessage);
 export const useIsSegmenting = () => useAppStore(state => state.ui.isSegmenting);
-export const useSelectedModel = () => useAppStore(state => state.ui.selectedModel);
+export const useSelectedModel = () => useAppStore(state => state.ui.promptedModel);
 export const useSuppressLoadingModal = () => useAppStore(state => state.ui.suppressLoadingModal);
 
 // UI actions

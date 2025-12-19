@@ -25,7 +25,7 @@ const useAppStore = create()(
           successMessage: null,
           // StatusBar specific state
           isSegmenting: false,
-          selectedModel: null,
+          promptedModel: null,
           suppressLoadingModal: false
         },
         
@@ -112,7 +112,7 @@ const useAppStore = create()(
           }),
           
           setPromptedModel: (model) => set(state => {
-            state.ui.selectedModel = model;
+            state.ui.promptedModel = model;
           }),
           
           setSuppressLoadingModal: (suppress) => set(state => {

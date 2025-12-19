@@ -14,12 +14,61 @@ const FALLBACK_COMPLETION_MODELS = [
  */
 export const createModelsSlice = (set) => ({
   setPromptedModel: (model) => set((state) => {
-    state.models.selectedModel = model;
+    state.models.promptedModel = model;
   }),
   
   setCompletionModel: (model) => set((state) => {
     state.models.completionModel = model;
   }),
+
+  loadPromptedModel: async (model) => {
+    set((state) => {
+      state.models.promptedModel = true;
+    });
+
+    try {
+      const result = await getCompletionModels();
+      if (result.success && result.models && result.models.length > 0) {
+        // Transform backend models to frontend format
+        const transformedModels = result.models.map(model => ({
+          id: model.identifier_str || model.id,
+          name: model.name || model.identifier_str || model.id,
+          description: model.description,
+          tags: model.tags,
+          supports_refinement: model.supports_refinement
+        }));
+
+        set((state) => {
+          state.models.availableCompletionModels = transformedModels;
+          state.models.isLoadingCompletionModels = false;
+
+          // Set default model if none is selected and models are available
+          if (!state.models.completionModel && transformedModels.length > 0) {
+            state.models.completionModel = transformedModels[0].id;
+          }
+        });
+      } else {
+        // Fallback to hardcoded models if backend doesn't return any
+        set((state) => {
+          state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+          state.models.isLoadingCompletionModels = false;
+          if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
+            state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching completion models:', error);
+      // Fallback to hardcoded models on error
+      set((state) => {
+        state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+        state.models.isLoadingCompletionModels = false;
+        if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
+          state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
+        }
+      });
+    }
+  },
 
   fetchAvailableCompletionModels: async () => {
     set((state) => {
@@ -94,8 +143,8 @@ export const createModelsSlice = (set) => ({
           state.models.isLoadingModels = false;
           
           // Set default model if none is selected and models are available
-          if (!state.models.selectedModel && transformedModels.length > 0) {
-            state.models.selectedModel = transformedModels[0].id;
+          if (!state.models.promptedModel && transformedModels.length > 0) {
+            state.models.promptedModel = transformedModels[0].id;
           }
         });
       } else {
@@ -103,8 +152,8 @@ export const createModelsSlice = (set) => ({
         set((state) => {
           state.models.availableModels = FALLBACK_MODELS;
           state.models.isLoadingModels = false;
-          if (!state.models.selectedModel && FALLBACK_MODELS.length > 0) {
-            state.models.selectedModel = FALLBACK_MODELS[0].id;
+          if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
+            state.models.promptedModel = FALLBACK_MODELS[0].id;
           }
         });
       }
@@ -114,8 +163,8 @@ export const createModelsSlice = (set) => ({
       set((state) => {
         state.models.availableModels = FALLBACK_MODELS;
         state.models.isLoadingModels = false;
-        if (!state.models.selectedModel && FALLBACK_MODELS.length > 0) {
-          state.models.selectedModel = FALLBACK_MODELS[0].id;
+        if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
+          state.models.promptedModel = FALLBACK_MODELS[0].id;
         }
       });
     }

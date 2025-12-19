@@ -27,7 +27,7 @@ export const useImageError = () => useAnnotationStore(state => state.images.imag
 export const useZoomLevel = () => useAnnotationStore(state => state.images.zoomLevel);
 export const usePanOffset = () => useAnnotationStore(state => state.images.panOffset);
 
-export const usePromptedModel = () => useAnnotationStore(state => state.models.selectedModel);
+export const usePromptedModel = () => useAnnotationStore(state => state.models.promptedModel);
 export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
 export const useAvailablePromptedModels = () => useAnnotationStore(state => state.models.availableModels);
 export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
