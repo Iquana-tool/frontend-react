@@ -32,7 +32,7 @@ const Services = () => {
             models: useAvailablePromptedModels(),
             isLoading: useIsLoadingPromptedModels(),
             selectedModel: usePromptedModel(),
-            setSelectedModel: useSetPromptedModel(),
+            setPromptedModel: useSetPromptedModel(),
             updateAvailableModels: useFetchAvailablePromptedModels(),
         },
         {
@@ -40,7 +40,7 @@ const Services = () => {
             models: useAvailableCompletionModels(),
             isLoading: useIsLoadingCompletionModels(),
             selectedModel: useCompletionModel(),
-            setSelectedModel: useSetCompletionModel(),
+            setPromptedModel: useSetCompletionModel(),
             updateAvailableModels: useFetchAvailableCompletionModels(),
         },
     ]

@@ -13,7 +13,7 @@ const FALLBACK_COMPLETION_MODELS = [
  * Models slice - manages AI model selection and available models
  */
 export const createModelsSlice = (set) => ({
-  setSelectedModel: (model) => set((state) => {
+  setPromptedModel: (model) => set((state) => {
     state.models.selectedModel = model;
   }),
   
@@ -70,7 +70,7 @@ export const createModelsSlice = (set) => ({
     }
   },
 
-  fetchAvailableModels: async () => {
+  fetchAvailablePromptedModels: async () => {
     set((state) => {
       state.models.isLoadingModels = true;
     });

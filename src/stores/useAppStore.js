@@ -111,7 +111,7 @@ const useAppStore = create()(
             state.ui.isSegmenting = isSegmenting;
           }),
           
-          setSelectedModel: (model) => set(state => {
+          setPromptedModel: (model) => set(state => {
             state.ui.selectedModel = model;
           }),
           
