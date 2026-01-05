@@ -58,7 +58,7 @@ const Services = () => {
                     models={service.models}
                     isLoading={service.isLoading}
                     selectedModel={service.promptedModel}
-                    setSelectedModel={service.setSelectedModel}
+                    setSelectedModel={service.setPromptedModel}
                     onModelSwitch={service.updateAvailableModels}
                 />
             ))}

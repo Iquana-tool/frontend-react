@@ -60,9 +60,9 @@ export const useClearSelection = () => useAnnotationStore(state => state.clearSe
 export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => state.setObjectsFromHierarchy);
 export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
 
-export const useSetPromptedModel = () => useAnnotationStore(state => state.setSelectedModel);
+export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
-export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailableModels);
+export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
 export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
