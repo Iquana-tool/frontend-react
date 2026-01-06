@@ -65,14 +65,18 @@ const ModelInfo = ({ description, tags, isExpanded }) => {
   if (!isExpanded) return null;
   return (
     <Box sx={{ mb: 2, mt: 1 }}>
-      <Typography variant="body2" color="text.secondary" gutterBottom>
-        {description}
-      </Typography>
-      <Stack direction="row" spacing={1} flexWrap="wrap">
-        {tags.map((tag) => (
-          <Chip key={tag} label={tag} size="small" />
-        ))}
-      </Stack>
+      {description && (
+        <Typography variant="body2" color="text.secondary" gutterBottom>
+          {description}
+        </Typography>
+      )}
+      {tags && Array.isArray(tags) && tags.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap">
+          {tags.map((tag) => (
+            <Chip key={tag} label={tag} size="small" />
+          ))}
+        </Stack>
+      )}
     </Box>
   );
 };

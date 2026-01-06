@@ -31,16 +31,16 @@ const Services = () => {
             name: "Prompted Segmentation",
             models: useAvailablePromptedModels(),
             isLoading: useIsLoadingPromptedModels(),
-            selectedModel: usePromptedModel(),
-            setSelectedModel: useSetPromptedModel(),
+            promptedModel: usePromptedModel(),
+            setPromptedModel: useSetPromptedModel(),
             updateAvailableModels: useFetchAvailablePromptedModels(),
         },
         {
             name: "Prompted Completion",
             models: useAvailableCompletionModels(),
             isLoading: useIsLoadingCompletionModels(),
-            selectedModel: useCompletionModel(),
-            setSelectedModel: useSetCompletionModel(),
+            promptedModel: useCompletionModel(),
+            setPromptedModel: useSetCompletionModel(),
             updateAvailableModels: useFetchAvailableCompletionModels(),
         },
     ]
@@ -57,8 +57,8 @@ const Services = () => {
                     serviceName={service.name}
                     models={service.models}
                     isLoading={service.isLoading}
-                    selectedModel={service.selectedModel}
-                    setSelectedModel={service.setSelectedModel}
+                    selectedModel={service.promptedModel}
+                    setSelectedModel={service.setPromptedModel}
                     onModelSwitch={service.updateAvailableModels}
                 />
             ))}
