@@ -23,7 +23,7 @@ export const createModelsSlice = (set) => ({
 
   loadPromptedModel: async (model) => {
     set((state) => {
-      state.models.promptedModel = true;
+      state.models.promptedModel = {...state.models.promptedModel, model_status: "busy"};
     });
 
     try {
@@ -139,7 +139,7 @@ export const createModelsSlice = (set) => ({
         }));
 
         set((state) => {
-          state.models.availableModels = transformedModels;
+          state.models.availablePromptedModels = transformedModels;
           state.models.isLoadingModels = false;
           
           // Set default model if none is selected and models are available
@@ -150,7 +150,7 @@ export const createModelsSlice = (set) => ({
       } else {
         // Fallback to hardcoded models if backend doesn't return any
         set((state) => {
-          state.models.availableModels = FALLBACK_MODELS;
+          state.models.availablePromptedModels = FALLBACK_MODELS;
           state.models.isLoadingModels = false;
           if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
             state.models.promptedModel = FALLBACK_MODELS[0].id;
@@ -161,7 +161,7 @@ export const createModelsSlice = (set) => ({
       console.error('Error fetching AI models:', error);
       // Fallback to hardcoded models on error
       set((state) => {
-        state.models.availableModels = FALLBACK_MODELS;
+        state.models.availablePromptedModels = FALLBACK_MODELS;
         state.models.isLoadingModels = false;
         if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
           state.models.promptedModel = FALLBACK_MODELS[0].id;

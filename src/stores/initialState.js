@@ -71,7 +71,7 @@ export const initialState = {
   models: {
     promptedModel: {},
     completionModel: {}, // Default completion model
-    availableModels: [], // List of available AI models from backend
+    availablePromptedModels: [], // List of available AI models from backend
     availableCompletionModels: [], // List of available completion models from backend
     isLoadingModels: false,
     isLoadingCompletionModels: false,
