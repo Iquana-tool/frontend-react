@@ -1,6 +1,6 @@
 // Services.jsx
-import React, {useEffect} from 'react';
-import {Box, Typography} from '@mui/material';
+import React, { useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
 import ServiceCard from "./Service"
 import {
     useAvailableCompletionModels,
@@ -45,24 +45,33 @@ const Services = () => {
         },
     ]
 
-
     return (
-        <Box sx={{p: 2, width: 350}}>
-            <Typography variant="h7" gutterBottom>
-                Annotation Services
-            </Typography>
-            {services.map((service, index) => (
-                <ServiceCard
-                    key={service.name}
-                    serviceName={service.name}
-                    models={service.models}
-                    isLoading={service.isLoading}
-                    selectedModel={service.promptedModel}
-                    setSelectedModel={service.setPromptedModel}
-                    onModelSwitch={service.updateAvailableModels}
-                />
-            ))}
-        </Box>
+        <div className="flex-1 flex flex-col overflow-y-auto">
+            <div className="p-3 space-y-3">
+                <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center">
+                            <div className="p-1.5 bg-gradient-to-br from-teal-500 to-cyan-500 rounded-lg mr-2 shadow-sm">
+                                <Sparkles className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            Annotation Services
+                        </h3>
+                    </div>
+                    <p className="text-xs text-gray-500 ml-8">AI-powered models for segmentation</p>
+                </div>
+                {services.map((service, index) => (
+                    <ServiceCard
+                        key={service.name}
+                        serviceName={service.name}
+                        models={service.models}
+                        isLoading={service.isLoading}
+                        selectedModel={service.promptedModel}
+                        setSelectedModel={service.setPromptedModel}
+                        onModelSwitch={service.updateAvailableModels}
+                    />
+                ))}
+            </div>
+        </div>
     );
 };
 

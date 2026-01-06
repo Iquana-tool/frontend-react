@@ -1,83 +1,83 @@
-import React, {useEffect, useState} from 'react';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Chip,
-  Collapse,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Select,
-  Skeleton,
-  Stack,
-  Switch,
-  Typography,
-  Tooltip,
-} from '@mui/material';
-import {
-  ExpandLess as ExpandLessIcon,
-  ExpandMore as ExpandMoreIcon,
-  FiberManualRecord as StatusIcon,
-  Refresh as RefreshIcon,
-} from '@mui/icons-material';
+import React, { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp, Loader2, Circle } from 'lucide-react';
 
 const StatusIndicator = ({ status }) => {
-  const getStatusIcon = () => {
+  const getStatusConfig = () => {
     switch (status) {
       case 'busy':
-        return <RefreshIcon className="animate-spin" color="primary" fontSize="small" />;
+        return {
+          icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
+          bgColor: 'bg-blue-100',
+          color: 'text-blue-600',
+          tooltip: 'Model is busy',
+          ring: 'ring-blue-200'
+        };
       case 'error':
-        return <StatusIcon color="error" />;
+        return {
+          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
+          bgColor: 'bg-red-100',
+          color: 'text-red-600',
+          tooltip: 'Model not available',
+          ring: 'ring-red-200'
+        };
       case 'ready':
-        return <StatusIcon color="success" />;
+        return {
+          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
+          bgColor: 'bg-emerald-100',
+          color: 'text-emerald-600',
+          tooltip: 'Model is ready',
+          ring: 'ring-emerald-200'
+        };
       default:
-        console.log("Rendered with unsupported status: " + status)
-        return <StatusIcon color="secondary" fontSize="small" />;
+        return {
+          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
+          bgColor: 'bg-gray-100',
+          color: 'text-gray-500',
+          tooltip: 'Unknown status',
+          ring: 'ring-gray-200'
+        };
     }
   };
 
-  const getToolTip = () => {
-    switch (status) {
-      case 'busy':
-        return <Tooltip title="Model is busy" color="primary"> {getStatusIcon()} </Tooltip>;
-      case 'error':
-        return <Tooltip title="Model not available" color="error"> {getStatusIcon()} </Tooltip>;
-      case 'ready':
-        return <Tooltip title="Model is ready" color="success"> {getStatusIcon()} </Tooltip>;
-      default:
-        console.log("Rendered with unsupported status: " + status)
-        return <Tooltip title="Model is busy" color="secondary"> {getStatusIcon()} </Tooltip>;
-    }
-  }
+  const config = getStatusConfig();
 
   return (
-    <Box display="flex" alignItems="center" ml={1}>
-      {getToolTip()}
-    </Box>
+    <div className="relative group flex items-center">
+      <div className={`${config.bgColor} ${config.color} p-1.5 rounded-lg ring-2 ${config.ring} flex items-center shadow-sm`}>
+        {config.icon}
+      </div>
+      <div className="absolute right-0 top-8 z-50 hidden group-hover:block animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap shadow-lg">
+          {config.tooltip}
+          <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+        </div>
+      </div>
+    </div>
   );
 };
 
 const ModelInfo = ({ description, tags, isExpanded }) => {
   if (!isExpanded) return null;
   return (
-    <Box sx={{ mb: 2, mt: 1 }}>
+    <div className="mt-2 mb-2">
       {description && (
-        <Typography variant="body2" color="text.secondary" gutterBottom>
+        <p className="text-xs text-gray-600 leading-relaxed mb-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
           {description}
-        </Typography>
+        </p>
       )}
       {tags && Array.isArray(tags) && tags.length > 0 && (
-        <Stack direction="row" spacing={1} flexWrap="wrap">
+        <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <Chip key={tag} label={tag} size="small" />
+            <span 
+              key={tag} 
+              className="inline-block px-2.5 py-1 bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 text-xs font-medium rounded-full border border-teal-100 shadow-sm"
+            >
+              {tag}
+            </span>
           ))}
-        </Stack>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 
@@ -116,116 +116,127 @@ const ServiceCard = ({
 
   if (isLoading) {
     return (
-      <Card variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
-        <CardContent>
-          <Skeleton variant="text" width="60%" sx={{ mb: 1 }} />
-          <Skeleton variant="rectangular" width="100%" height={40} sx={{ mb: 2 }} />
-          <Skeleton variant="rectangular" width="100%" height={60} sx={{ mb: 1 }} />
-          <Skeleton variant="rectangular" width="40%" height={20} />
-        </CardContent>
-      </Card>
+      <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-sm animate-pulse">
+        <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-2/3 mb-3"></div>
+        <div className="h-10 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-full mb-3"></div>
+        <div className="h-6 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-full mb-2"></div>
+        <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-1/3"></div>
+      </div>
     );
   }
 
   if (!models || models.length === 0) {
     return (
-      <Card variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
-        <CardContent>
-          <Box display="flex" alignItems="center">
-            {Icon && <Icon fontSize="small" sx={{ mr: 1 }} />}
-            <Typography variant="subtitle2" component="div" gutterBottom>
-              {serviceName}
-            </Typography>
+      <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <h4 className="text-xs font-bold text-gray-900">{serviceName}</h4>
             <StatusIndicator status={selectedModel?.model_status || "error"} />
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            No models available.
-          </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<RefreshIcon />}
-            onClick={() => window.location.reload()}
-          >
-            Refresh
-          </Button>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={instantMode}
-                onChange={handleInstantModeToggle}
-                color="primary"
-                disabled
-              />
-            }
-            label="Instant Mode"
-          />
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mb-3 bg-red-50 border border-red-100 rounded-lg p-2">
+          No models available.
+        </p>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center space-x-2 text-xs text-gray-400">
+            <div className="relative w-10 h-5 bg-gray-200 rounded-full cursor-not-allowed opacity-50">
+              <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm"></div>
+            </div>
+            <span>Instant Mode</span>
+          </label>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" mb={1}>
-          <FormControl fullWidth sx={{ mb: 1 }}>
-            <InputLabel>{serviceName} Model</InputLabel>
-            <Select
-              value={selectedModel?.id || models[0].id}
-              label={`${serviceName} Model`}
+    <div className="group/card bg-gradient-to-br from-white to-gray-50/50 border border-gray-200 rounded-xl p-4 hover:border-teal-200 hover:shadow-md transition-all duration-300">
+      {/* Service Header with Model Selection */}
+      <div className="mb-3">
+        <label className="block text-xs font-bold text-gray-900 mb-2 flex items-center">
+          <div className="w-1 h-4 bg-gradient-to-b from-teal-500 to-cyan-500 rounded-full mr-2"></div>
+          {serviceName} Model
+        </label>
+        <div className="relative flex items-center space-x-2">
+          <div className="flex-1 relative">
+            <select
+              value={selectedModel?.id || models[0]?.id || ''}
               onChange={handleModelChange}
-              size="small"
-              variant="outlined"
+              className="w-full px-3 py-2.5 text-xs font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all duration-200"
             >
               {models.map((model) => (
-                <MenuItem variant="subtitle3" key={model.id} value={model.id}>
+                <option key={model.id} value={model.id}>
                   {model.name}
-                </MenuItem>
+                </option>
               ))}
-            </Select>
-          </FormControl>
-          {Icon && <Icon fontSize="small" sx={{ mr: 1 }} />}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover/card:text-teal-500 transition-colors" />
+          </div>
           <StatusIndicator status={selectedModel?.model_status || "error"} />
-        </Box>
+        </div>
+      </div>
 
-        {selectedModel && (
-          <>
-            <Box display="flex" alignItems="center" mb={1}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={instantMode}
-                    onChange={handleInstantModeToggle}
-                    color="primary"
-                    size="small"
-                  />
-                }
-                label={
-                  <Typography variant="caption">Instant Mode</Typography>
-                }
-              />
-              <IconButton
-                size="small"
-                onClick={() => setExpanded(!expanded)}
-              >
-                {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-              </IconButton>
-              <Typography variant="subtitle2" sx={{ ml: 1 }}>
-                Description
-              </Typography>
-            </Box>
-            <Collapse in={expanded}>
+      {selectedModel && (
+        <>
+          {/* Instant Mode Toggle and Description Button */}
+          <div className="flex items-center justify-between mb-2 bg-white/50 rounded-lg p-2 border border-gray-100">
+            <label className="flex items-center space-x-2.5 cursor-pointer group/toggle">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={instantMode}
+                  onChange={handleInstantModeToggle}
+                  className="sr-only peer"
+                />
+                <div className={`w-11 h-6 rounded-full transition-all duration-300 shadow-inner ${
+                  instantMode 
+                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 shadow-teal-200' 
+                    : 'bg-gray-300 group-hover/toggle:bg-gray-400'
+                }`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                    instantMode ? 'translate-x-6' : 'translate-x-1'
+                  }`}>
+                    {instantMode && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs font-medium text-gray-700 group-hover/toggle:text-gray-900 transition-colors">
+                Instant Mode
+              </span>
+            </label>
+            
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center space-x-1 text-xs font-medium text-gray-600 hover:text-teal-600 px-2 py-1 rounded-md hover:bg-teal-50 transition-all duration-200"
+            >
+              <span>Info</span>
+              {expanded ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+
+          {/* Expandable Description */}
+          <div className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            expanded ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0'
+          }`}>
+            <div className="pt-2 border-t border-gray-200">
               <ModelInfo
                 description={selectedModel?.description}
                 tags={selectedModel?.tags}
                 isExpanded={expanded}
               />
-            </Collapse>
-          </>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   );
 };
 
