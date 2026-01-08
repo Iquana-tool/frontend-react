@@ -242,8 +242,6 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           }
         }
       }
-      
-      console.log(`Entered refinement mode for object ${object.id} (contour_id: ${contourId})`);
     } catch (error) {
       console.error('Failed to enter refinement mode:', error);
     }
@@ -479,18 +477,6 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         const isFocused = focusModeActive && focusedObjectId === object.id;
         const isRefinementObject = refinementModeActive && refinementModeObjectId === object.id;
         
-        // Debug logging for refinement object
-        if (isRefinementObject) {
-          console.log('Rendering refinement object:', {
-            id: object.id,
-            hasPath: !!object.path,
-            hasMaskPath: !!object.mask?.path,
-            hasXY: !!(object.x && object.y),
-            xLength: object.x?.length,
-            yLength: object.y?.length,
-          });
-        }
-        
         // In focus mode, completely skip rendering the focused object's overlay
         // This ensures no color overlay appears on the focused object
         if (isFocused) {
@@ -529,16 +515,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         // If no path available, try to generate from x, y coordinates
         if (!maskPath && object.x && object.y && object.x.length > 0 && imageObject) {
           maskPath = generatePathFromCoordinates(object.x, object.y, imageObject.width, imageObject.height);
-          console.log(`Generated path from coordinates for object ${object.id}:`, {
-            numPoints: object.x.length,
-            imageSize: { width: imageObject.width, height: imageObject.height },
-            firstPoint: { x: object.x[0], y: object.y[0] }
-          });
         }
         
         // Skip if still no path available
         if (!maskPath) {
-          console.warn(`No path or coordinates available for object ${object.id}`);
           return null;
         }
         
