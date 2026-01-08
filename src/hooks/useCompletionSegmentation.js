@@ -8,20 +8,26 @@ import {useCompletionModel, useSetCompletionModel} from "../stores/selectors/ann
  * @param {Function} onSuccess - Optional callback on successful completion
  * @param {Function} onError - Optional callback on error
  * @returns {Object} - { runCompletion, isRunning }
+ * 
+ * runCompletion accepts either a single contour ID or an array of contour IDs as seeds
  */
 export function useCompletionSegmentation(onSuccess, onError) {
   const [isRunning, setIsRunning] = useState(false);
   const completionModel = useCompletionModel();
   const setCompletionModel = useSetCompletionModel();
 
-  const runCompletion = useCallback(async (contourId, labelId) => {
+  const runCompletion = useCallback(async (contourIdOrIds, labelId) => {
     setCompletionModel({
           ...completionModel,
           model_status: "busy",
         }
     )
-    if (!contourId) {
-      const error = new Error('Contour ID is required');
+    
+    // Normalize to array
+    const contourIds = Array.isArray(contourIdOrIds) ? contourIdOrIds : [contourIdOrIds];
+    
+    if (!contourIds || contourIds.length === 0) {
+      const error = new Error('Contour ID(s) required');
       if (onError) {
         onError(error);
       }
@@ -54,7 +60,7 @@ export function useCompletionSegmentation(onSuccess, onError) {
     try {
       // Call WebSocket method - objects will be added automatically via OBJECT_ADDED messages
       const response = await annotationSession.runCompletion(
-        [contourId],      // Array of seed contour IDs
+        contourIds,       // Array of seed contour IDs (can be single or multiple)
         completionModel.id,  // Model name
         labelId           // Label ID
       );

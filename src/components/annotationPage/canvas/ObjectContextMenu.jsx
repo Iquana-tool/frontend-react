@@ -7,6 +7,7 @@ import {
   useHideContextMenu,
   useEnterFocusModeWithZoom,
   useObjectsList,
+  useSelectedObjects,
   useImageObject,
   useUpdateObject,
   useRemoveObject,
@@ -36,6 +37,7 @@ const ObjectContextMenu = () => {
   const hideContextMenu = useHideContextMenu();
   const enterFocusModeWithZoom = useEnterFocusModeWithZoom();
   const objectsList = useObjectsList();
+  const selectedObjects = useSelectedObjects();
   const imageObject = useImageObject();
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
@@ -50,6 +52,13 @@ const ObjectContextMenu = () => {
   const menuRef = useRef(null);
   
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
+  
+  // Get all selected objects (targets for batch operations)
+  const targetObjects = React.useMemo(() => {
+    return objectsList.filter(obj => selectedObjects.includes(obj.id));
+  }, [objectsList, selectedObjects]);
+  
+  const isMultiSelect = targetObjects.length > 1;
   
   // Use labels hierarchy hook
   const { labelHierarchy, labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
@@ -136,21 +145,27 @@ const ObjectContextMenu = () => {
   );
 
   const handleLabelSelect = async (label) => {
-    if (!targetObjectId) return;
-
-    // Find the target object to get its contour_id
-    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
-    if (!targetObject) {
+    if (targetObjects.length === 0) {
       hideContextMenu();
       return;
     }
 
-    await handleLabelSelectBase(targetObject, label);
+    // Apply label to all selected objects
+    try {
+      for (const targetObject of targetObjects) {
+        await handleLabelSelectBase(targetObject, label);
+      }
+      
+      // Success: menu is already hidden by handleLabelSelectBase
+    } catch (error) {
+      // Error is already handled by handleLabelSelectBase
+      hideContextMenu();
+    }
   };
 
   const handleFocusMode = () => {
-    // Disable focus mode when in refinement mode
-    if (refinementModeActive) {
+    // Disable focus mode when in refinement mode or multiple objects selected
+    if (refinementModeActive || isMultiSelect) {
       return;
     }
     
@@ -204,24 +219,23 @@ const ObjectContextMenu = () => {
   };
 
   const handleReject = async () => {
-    if (!targetObjectId) return;
-
-    // Find the target object to get its contour_id
-    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
-    if (!targetObject) {
+    if (targetObjects.length === 0) {
       hideContextMenu();
       return;
     }
 
     try {
-      await deleteObject(targetObject, removeObject);
+      // Delete all selected objects
+      for (const targetObject of targetObjects) {
+        await deleteObject(targetObject, removeObject);
+      }
       
       // Switch to AI assisted annotation tool
       setCurrentTool('ai_annotation');
       
       hideContextMenu();
     } catch (error) {
-      alert(`Failed to reject object: ${error.message || 'Unknown error'}`);
+      alert(`Failed to reject object(s): ${error.message || 'Unknown error'}`);
       hideContextMenu();
     }
   };
@@ -242,6 +256,11 @@ const ObjectContextMenu = () => {
   });
 
   const handleRefine = async () => {
+    // Disable refinement mode for multiple objects
+    if (isMultiSelect) {
+      return;
+    }
+    
     if (!targetObjectId) return;
 
     // Find the target object to get its contour_id
@@ -261,12 +280,18 @@ const ObjectContextMenu = () => {
   };
 
   const handleSuggestSimilar = async () => {
-    if (!targetObjectId) return;
+    if (targetObjects.length === 0) {
+      hideContextMenu();
+      return;
+    }
 
-    // Find the target object to get its contour_id
-    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
-    if (!targetObject || !targetObject.contour_id) {
-      alert('Could not find contour ID for this object');
+    // Get all contour IDs from selected objects
+    const contourIds = targetObjects
+      .map(obj => obj.contour_id)
+      .filter(id => id !== null && id !== undefined);
+    
+    if (contourIds.length === 0) {
+      alert('Could not find contour IDs for selected objects');
       hideContextMenu();
       return;
     }
@@ -280,8 +305,12 @@ const ObjectContextMenu = () => {
 
     hideContextMenu();
     
-    // Use the completion hook
-    await runCompletion(targetObject.contour_id, completionModel, targetObject.labelId);
+    // Use the completion hook with all selected contour IDs as seeds
+    // For multiple seeds, we'll use the first object's labelId as the default
+    const labelId = targetObjects[0]?.labelId;
+    
+    // Pass contour IDs (hook handles both single and array)
+    await runCompletion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
   };
 
   if (!visible) return null;
@@ -295,11 +324,18 @@ const ObjectContextMenu = () => {
         top: `${adjustedPosition.y}px`,
       }}
     >
+      {/* Header showing selection count */}
+      {isMultiSelect && (
+        <div className="px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border-b border-blue-100">
+          {targetObjects.length} objects selected
+        </div>
+      )}
+      
       {/* Reject Object Option */}
       <ContextMenuItem
         onClick={handleReject}
         className="hover:bg-red-50 hover:text-red-700"
-        label="Reject object"
+        label={isMultiSelect ? `Reject ${targetObjects.length} objects` : "Reject object"}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -307,11 +343,17 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Focus Mode Option - Disabled in refinement mode */}
+      {/* Focus Mode Option - Disabled in refinement mode or multi-select */}
       <ContextMenuItem
         onClick={handleFocusMode}
-        disabled={refinementModeActive}
-        title={refinementModeActive ? 'Focus mode is disabled during refinement' : 'Enter focus mode'}
+        disabled={refinementModeActive || isMultiSelect}
+        title={
+          isMultiSelect 
+            ? 'Focus mode is disabled for multiple selections' 
+            : refinementModeActive 
+              ? 'Focus mode is disabled during refinement' 
+              : 'Enter focus mode'
+        }
         label="Focus Mode"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -320,9 +362,11 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Refine Option */}
+      {/* Refine Option - Disabled for multi-select */}
       <ContextMenuItem
         onClick={handleRefine}
+        disabled={isMultiSelect}
+        title={isMultiSelect ? 'Refinement mode is disabled for multiple selections' : 'Refine object'}
         className="hover:bg-purple-50 hover:text-purple-700"
         label="Refine Object"
         icon={
@@ -342,7 +386,9 @@ const ObjectContextMenu = () => {
             ? 'Select a completion model first' 
             : !wsIsReady 
               ? 'WebSocket not ready' 
-              : 'Find similar instances using completion segmentation'
+              : isMultiSelect
+                ? `Use ${targetObjects.length} objects as seeds for completion segmentation`
+                : 'Find similar instances using completion segmentation'
         }
         label={isRunningCompletion ? 'Finding similar...' : 'Suggest Similar Instances'}
         icon={
@@ -354,7 +400,7 @@ const ObjectContextMenu = () => {
 
       {/* Label section header */}
       <div className="px-3 py-1 text-xs font-medium text-gray-600 border-b border-gray-100">
-        Label
+        {isMultiSelect ? `Assign label to ${targetObjects.length} objects` : 'Label'}
       </div>
       
       {/* Hierarchical label list */}

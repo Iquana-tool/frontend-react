@@ -182,6 +182,19 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       return;
     }
     
+    // Check if Shift key is held for multi-select
+    const isShiftHeld = e.shiftKey;
+    
+    // If Shift is held, toggle selection immediately without focus mode
+    if (isShiftHeld) {
+      if (isSelected) {
+        deselectObject(object.id);
+      } else {
+        selectObject(object.id);
+      }
+      return;
+    }
+    
     // Detect double-click
     const currentTime = Date.now();
     const timeDiff = currentTime - lastClickTime;

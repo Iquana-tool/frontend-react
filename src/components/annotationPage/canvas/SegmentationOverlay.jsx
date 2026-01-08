@@ -9,6 +9,7 @@ import {
   useSelectedObjects,
   useSelectObject,
   useDeselectObject,
+  useClearSelection,
   useFocusModeActive,
   useFocusModeObjectId,
   useRefinementModeActive,
@@ -61,6 +62,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
+  const clearSelection = useClearSelection();
   const focusModeActive = useFocusModeActive();
   const focusedObjectId = useFocusModeObjectId();
   const refinementModeActive = useRefinementModeActive();
@@ -251,6 +253,20 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const handleObjectLeftClick = (e, object) => {
     e.stopPropagation();
     
+    // Check if Shift key is held for multi-select
+    const isShiftHeld = e.shiftKey;
+    
+    // If Shift is held, toggle selection and skip focus mode behavior
+    if (isShiftHeld) {
+      const isAlreadySelected = selectedObjects.includes(object.id);
+      if (isAlreadySelected) {
+        deselectObject(object.id);
+      } else {
+        selectObject(object.id);
+      }
+      return;
+    }
+    
     // Detect double-click
     const currentTime = Date.now();
     const lastClickTime = lastClickTimesRef.current[object.id] || 0;
@@ -287,6 +303,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     if (refinementModeActive) {
       return;
     }
+    
+    // Clear previous selection and select only this object
+    clearSelection();
+    selectObject(object.id);
     
     // Enter focus mode for both selection and AI annotation tools
     if (currentTool === 'selection' || currentTool === 'ai_annotation') {
@@ -336,6 +356,19 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const handleObjectRightClick = (e, object) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // If the object is not already selected, select it (and add to multi-select if Shift is held)
+    const isAlreadySelected = selectedObjects.includes(object.id);
+    if (!isAlreadySelected) {
+      if (e.shiftKey) {
+        // Add to selection
+        selectObject(object.id);
+      } else {
+        // Replace selection
+        clearSelection();
+        selectObject(object.id);
+      }
+    }
     
     // Click is already on the SVG path element, so it's inside the object
     // (browser SVG hit-testing handles this)
@@ -555,6 +588,27 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                   <feMergeNode in="SourceGraphic"/>
                 </feMerge>
               </filter>
+              
+              {/* Animation styles for selected objects */}
+              {isSelected && (
+                <style>
+                  {`
+                    @keyframes dash-${object.id} {
+                      to {
+                        stroke-dashoffset: -30;
+                      }
+                    }
+                    @keyframes pulse-${object.id} {
+                      0%, 100% {
+                        stroke-width: ${strokeWidth};
+                      }
+                      50% {
+                        stroke-width: ${strokeWidth + 1};
+                      }
+                    }
+                  `}
+                </style>
+              )}
             </defs>
             
             <path
@@ -564,6 +618,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
               strokeLinecap="round"
+              strokeDasharray={isSelected ? "15,10" : "none"}
               filter={
                 isRefinementObject
                   ? `url(#selected-glow-${object.id})` // Use selected glow for refinement object
@@ -577,7 +632,8 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 transition: 'all 0.2s ease-in-out',
                 cursor: refinementModeActive ? 'default' : 'pointer',
                 // In refinement mode, disable pointer events so clicks pass through to canvas
-                pointerEvents: refinementModeActive ? 'none' : 'auto'
+                pointerEvents: refinementModeActive ? 'none' : 'auto',
+                animation: isSelected ? `dash-${object.id} 2s linear infinite, pulse-${object.id} 2s ease-in-out infinite` : 'none'
               }}
               onClick={(e) => handleObjectLeftClick(e, object)}
               onContextMenu={(e) => handleObjectRightClick(e, object)}

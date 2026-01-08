@@ -10,6 +10,7 @@ import RefinementOverlay from './RefinementOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
+import useMultiSelectShortcuts from '../../../hooks/useMultiSelectShortcuts';
 import {
   useCurrentTool,
   useInstantSegmentation,
@@ -41,6 +42,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   
   // Enable Escape key to exit focus mode
   useFocusModeEscape();
+  
+  // Enable keyboard shortcuts for multi-select operations
+  useMultiSelectShortcuts();
 
   const handleRunAI = useCallback(async () => {
     const result = await runSegmentation();
