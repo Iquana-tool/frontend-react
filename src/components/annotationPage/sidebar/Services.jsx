@@ -14,17 +14,27 @@ import {
     useSetCompletionModel,
     useSetPromptedModel
 } from "../../../stores/selectors/annotationSelectors";
+import annotationSession from '../../../services/annotationSession';
+import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 
 const Services = () => {
     // Fetch models functions
     const fetchPromptedModels = useFetchAvailablePromptedModels();
     const fetchCompletionModels = useFetchAvailableCompletionModels();
+    
+    // Get current model selections
+    const promptedModel = usePromptedModel();
+    const completionModel = useCompletionModel();
 
     // Load models on component mount
     useEffect(() => {
         fetchPromptedModels();
         fetchCompletionModels();
     }, [fetchPromptedModels, fetchCompletionModels]);
+
+    // Preload models when they change
+    useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
+    useModelSwitchPreloader(completionModel, annotationSession.selectCompletionModel.bind(annotationSession), 'completion');
 
     const services = [
         {

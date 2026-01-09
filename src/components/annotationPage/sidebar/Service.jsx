@@ -85,7 +85,7 @@ const ServiceCard = ({
   serviceName,
   models,
   isLoading,
-  selectedModel,
+  selectedModel, // This is now a model ID string
   setSelectedModel,
   onModelSwitch,
   icon: Icon,
@@ -93,6 +93,9 @@ const ServiceCard = ({
   const [instantMode, setInstantMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState();
+  
+  // Get the actual model object from the models array
+  const selectedModelObj = models.find(m => m.id === selectedModel) || models[0];
 
   const handleModelChange = (event) => {
     setSelectedId(event.target.value);
@@ -103,9 +106,10 @@ const ServiceCard = ({
       setSelectedId(models[0]?.id);
     }
     // Collect all logic for model id switch here!
-    // Load new model from available models and set the state:
-    const selected = models.find((model) => model.id === selectedId);
-    setSelectedModel(selected);
+    // Store only the model ID (string), not the whole object
+    if (selectedId) {
+      setSelectedModel(selectedId);
+    }
     // Run dependent scripts like model loading here:
 
   }, [selectedId, setSelectedModel, models]);
@@ -131,7 +135,7 @@ const ServiceCard = ({
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <h4 className="text-xs font-bold text-gray-900">{serviceName}</h4>
-            <StatusIndicator status={selectedModel?.model_status || "error"} />
+            <StatusIndicator status={selectedModelObj?.model_status || "error"} />
           </div>
         </div>
         <p className="text-xs text-gray-500 mb-3 bg-red-50 border border-red-100 rounded-lg p-2">
@@ -160,7 +164,7 @@ const ServiceCard = ({
         <div className="relative flex items-center space-x-2">
           <div className="flex-1 relative">
             <select
-              value={selectedModel?.id || models[0]?.id || ''}
+              value={selectedModel || models[0]?.id || ''}
               onChange={handleModelChange}
               className="w-full px-3 py-2.5 text-xs font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all duration-200"
             >
@@ -172,11 +176,11 @@ const ServiceCard = ({
             </select>
             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover/card:text-teal-500 transition-colors" />
           </div>
-          <StatusIndicator status={selectedModel?.model_status || "error"} />
+          <StatusIndicator status={selectedModelObj?.model_status || "error"} />
         </div>
       </div>
 
-      {selectedModel && (
+      {selectedModelObj && (
         <>
           {/* Instant Mode Toggle and Description Button */}
           <div className="flex items-center justify-between mb-2 bg-white/50 rounded-lg p-2 border border-gray-100">
@@ -228,8 +232,8 @@ const ServiceCard = ({
           }`}>
             <div className="pt-2 border-t border-gray-200">
               <ModelInfo
-                description={selectedModel?.description}
-                tags={selectedModel?.tags}
+                description={selectedModelObj?.description}
+                tags={selectedModelObj?.tags}
                 isExpanded={expanded}
               />
             </div>

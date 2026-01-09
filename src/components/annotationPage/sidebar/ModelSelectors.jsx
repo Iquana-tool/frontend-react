@@ -14,6 +14,8 @@ import {
   useFetchAvailableCompletionModels
 } from '../../../stores/selectors/annotationSelectors';
 import ModelDescription from './ModelDescription';
+import annotationSession from '../../../services/annotationSession';
+import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 
 const ModelSelectors = () => {
   const currentTool = useCurrentTool();
@@ -45,6 +47,10 @@ const ModelSelectors = () => {
       fetchAvailableCompletionModels();
     }
   }, [showCompletionSelector, availableCompletionModels.length, isLoadingCompletionModels, fetchAvailableCompletionModels]);
+
+  // Preload models when they change
+  useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
+  useModelSwitchPreloader(completionModel, annotationSession.selectCompletionModel.bind(annotationSession), 'completion');
 
   return (
     <div className="space-y-3">

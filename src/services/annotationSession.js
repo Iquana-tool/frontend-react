@@ -168,14 +168,123 @@ class AnnotationSession {
   // ==================== AI SEGMENTATION OPERATIONS ====================
 
   /**
-   * Select AI model for segmentation
+   * Select AI model for prompted segmentation
+   * @param {string} modelName - Segmentation Model identifier
+   * @returns {Promise<Object>} Response message
+   */
+  async selectPromptedModel(modelName) {
+    this._ensureReady();
+    if (!modelName) {
+      return Promise.resolve({ success: true, message: 'No model to select' });
+    }
+    
+    // Only send message if prompted segmentation service is available
+    if (!this.isServiceAvailable('prompted_segmentation')) {
+      return Promise.resolve({ success: false, message: 'Service not available' });
+    }
+    
+    const message = MessageBuilders.selectPromptedModel(modelName);
+    return websocketService.send(message, true);
+  }
+
+  /**
+   * Select model for completion segmentation
+   * @param {string} modelIdentifier - Completion model identifier
+   * @returns {Promise<Object>} Response message
+   */
+  async selectCompletionModel(modelIdentifier) {
+    this._ensureReady();
+    if (!modelIdentifier) {
+      return Promise.resolve({ success: true, message: 'No model to select' });
+    }
+    
+    // Only send message if completion service is available
+    if (!this.isServiceAvailable('completion_segmentation')) {
+      return Promise.resolve({ success: false, message: 'Service not available' });
+    }
+    
+    const message = MessageBuilders.selectCompletionModel(modelIdentifier);
+    return websocketService.send(message, true);
+  }
+
+  /**
+   * Select model for semantic segmentation
+   * @param {string} modelName - Semantic model identifier
+   * @returns {Promise<Object>} Response message
+   */
+  async selectSemanticModel(modelName) {
+    this._ensureReady();
+    if (!modelName) {
+      return Promise.resolve({ success: true, message: 'No model to select' });
+    }
+    
+    // Only send message if semantic service is available
+    if (!this.isServiceAvailable('semantic_segmentation')) {
+      return Promise.resolve({ success: false, message: 'Service not available' });
+    }
+    
+    const message = MessageBuilders.selectSemanticModel(modelName);
+    return websocketService.send(message, true);
+  }
+
+  /**
+   * Preload models into backend memory after session initialization
+   * This sends select_model messages to preload the currently selected models
+   * @param {Object} selectedModels - Object with promptedModel, completionModel, semanticModel
+   * @returns {Promise<void>}
+   */
+  async preloadModels(selectedModels = {}) {
+    if (!this.isReady()) {
+      return;
+    }
+
+    const { promptedModel, completionModel, semanticModel } = selectedModels;
+
+    // Extract model IDs (handle both string IDs and model objects)
+    const promptedModelId = typeof promptedModel === 'string' ? promptedModel : promptedModel?.id;
+    const completionModelId = typeof completionModel === 'string' ? completionModel : completionModel?.id;
+    const semanticModelId = typeof semanticModel === 'string' ? semanticModel : semanticModel?.id;
+
+    // Send model selection messages to preload models into memory
+    // These calls won't throw errors if services aren't available
+    const promises = [];
+
+    if (promptedModelId && this.isServiceAvailable('prompted_segmentation')) {
+      promises.push(
+        this.selectPromptedModel(promptedModelId).catch(() => {
+          // Error handled silently
+        })
+      );
+    }
+
+    if (completionModelId && this.isServiceAvailable('completion_segmentation')) {
+      promises.push(
+        this.selectCompletionModel(completionModelId).catch(() => {
+          // Error handled silently
+        })
+      );
+    }
+
+    if (semanticModelId && this.isServiceAvailable('semantic_segmentation')) {
+      promises.push(
+        this.selectSemanticModel(semanticModelId).catch(() => {
+          // Error handled silently
+        })
+      );
+    }
+
+    // Wait for all preload operations to complete
+    await Promise.allSettled(promises);
+  }
+
+  /**
+   * @deprecated Use selectPromptedModel instead
+   * Select AI model for segmentation (legacy method)
    * @param {string} modelName - Segmentation Model identifier
    * @returns {Promise<Object>} Response message
    */
   async selectModel(modelName) {
-    this._ensureReady();
-    const message = MessageBuilders.selectModel(modelName);
-    return websocketService.send(message, true);
+    return this.selectPromptedModel(modelName);
   }
 
   /**

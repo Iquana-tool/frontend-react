@@ -24,6 +24,12 @@ export const CLIENT_MESSAGE_TYPES = {
   PROMPTED_SELECT_MODEL: 'prompted_select_model',
   PROMPTED_SEGMENTATION: 'prompted_segmentation',
   
+  // Completion Segmentation
+  COMPLETION_SELECT_MODEL: 'completion_select_model',
+  
+  // Semantic Segmentation
+  SEMANTIC_SELECT_MODEL: 'semantic_select_model',
+  
   // Object Management
   OBJECT_ADD_MANUAL: 'object_add_manual',
   OBJECT_FINALISE: 'object_finalise',
@@ -127,11 +133,29 @@ export const MessageBuilders = {
   ),
 
   /**
-   * Select AI model for segmentation
+   * Select AI model for prompted segmentation
    * @param {string} modelName - Segmentation Model identifier
    */
-  selectModel: (modelName) => createMessage(
+  selectPromptedModel: (modelName) => createMessage(
     CLIENT_MESSAGE_TYPES.PROMPTED_SELECT_MODEL,
+    { selected_model: modelName }
+  ),
+
+  /**
+   * Select model for completion segmentation
+   * @param {string} modelIdentifier - Completion model identifier
+   */
+  selectCompletionModel: (modelIdentifier) => createMessage(
+    CLIENT_MESSAGE_TYPES.COMPLETION_SELECT_MODEL,
+    { model_identifier: modelIdentifier }
+  ),
+
+  /**
+   * Select model for semantic segmentation
+   * @param {string} modelName - Semantic model identifier
+   */
+  selectSemanticModel: (modelName) => createMessage(
+    CLIENT_MESSAGE_TYPES.SEMANTIC_SELECT_MODEL,
     { selected_model: modelName }
   ),
 
