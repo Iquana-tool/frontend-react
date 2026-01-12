@@ -48,11 +48,17 @@ export const DatasetProvider = ({ children }) => {
     try {
       const response = await api.getAnnotationProgress(datasetId);
       if (response.success) {
+        const statusCounts = response.num_masks_with_status || {};
+        const notStarted = statusCounts.not_started || 0;
+        const inProgress = statusCounts.in_progress || 0;
+        const reviewable = statusCounts.reviewable || 0;
+        const finished = statusCounts.finished || 0;
+        
         return {
-          manuallyAnnotated: response.manually_annotated,
-          autoAnnotated: (response.auto_annotated_reviewed) + (response.auto_annotated_without_review),
-          missing: response.missing, // This would need to be calculated based on total images vs annotated
-          total: response.total_images
+          manuallyAnnotated: finished, // Fully annotated and reviewed
+          autoAnnotated: reviewable + inProgress, // Auto-annotated (needs review or in progress)
+          missing: notStarted, // No annotations yet
+          total: response.total_images || 0
         };
       }
       return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 };
