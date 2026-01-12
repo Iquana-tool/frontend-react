@@ -165,3 +165,17 @@ export const useEnterFocusModeWithZoom = () => useAnnotationStore(state => state
 export const usePanZoomToObject = () => useAnnotationStore(state => state.panZoomToObject);
 export const useExitFocusMode = () => useAnnotationStore(state => state.exitFocusMode);
 
+
+// Edit Mode selectors
+export const useEditModeActive = () => useAnnotationStore(state => state.editMode.active);
+export const useEditModeObjectId = () => useAnnotationStore(state => state.editMode.objectId);
+export const useEditModeContourId = () => useAnnotationStore(state => state.editMode.contourId);
+export const useEditModeOriginalCoordinates = () => useAnnotationStore(state => state.editMode.originalCoordinates);
+export const useEditModeDraftCoordinates = () => useAnnotationStore(state => state.editMode.draftCoordinates);
+export const useEditModeIsDirty = () => useAnnotationStore(state => state.editMode.isDirty);
+
+// Edit Mode actions
+export const useEnterEditMode = () => useAnnotationStore(state => state.enterEditMode);
+export const useUpdateDraftPoint = () => useAnnotationStore(state => state.updateDraftPoint);
+export const useResetDraft = () => useAnnotationStore(state => state.resetDraft);
+export const useExitEditMode = () => useAnnotationStore(state => state.exitEditMode);

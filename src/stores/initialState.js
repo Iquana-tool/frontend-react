@@ -52,6 +52,16 @@ export const initialState = {
     objectMask: null, // Store mask for boundary checking
   },
   
+  // Edit Mode State (for contour editing)
+  editMode: {
+    active: false,
+    objectId: null,
+    contourId: null,
+    originalCoordinates: null, // { x: [], y: [] }
+    draftCoordinates: null, // { x: [], y: [] }
+    isDirty: false, // Track if changes have been made
+  },
+  
   // Image State
   images: {
     currentImage: null,

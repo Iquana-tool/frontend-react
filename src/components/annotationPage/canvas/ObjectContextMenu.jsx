@@ -18,6 +18,7 @@ import {
   useExitFocusMode,
   useCompletionModel,
   useWebSocketIsReady,
+  useEnterEditMode,
 } from '../../../stores/selectors/annotationSelectors';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
@@ -48,6 +49,7 @@ const ObjectContextMenu = () => {
   const exitFocusMode = useExitFocusMode();
   const completionModel = useCompletionModel();
   const wsIsReady = useWebSocketIsReady();
+  const enterEditMode = useEnterEditMode();
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
   
@@ -313,6 +315,49 @@ const ObjectContextMenu = () => {
     await runCompletion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
   };
 
+  const handleEditContour = () => {
+    // Disable edit mode for multiple objects
+    if (isMultiSelect) {
+      return;
+    }
+    
+    if (!targetObjectId) {
+      hideContextMenu();
+      return;
+    }
+
+    // Find the target object
+    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
+    if (!targetObject) {
+      hideContextMenu();
+      return;
+    }
+
+    // Ensure object has valid coordinates
+    if (!targetObject.x || !targetObject.y || targetObject.x.length === 0 || targetObject.y.length === 0) {
+      alert('Cannot edit object: missing or invalid coordinates');
+      hideContextMenu();
+      return;
+    }
+    
+    // Ensure contour_id exists for backend communication
+    if (!targetObject.contour_id && targetObject.contour_id !== 0) {
+      alert('Cannot edit object: missing contour_id');
+      hideContextMenu();
+      return;
+    }
+
+    // Exit focus mode if active
+    if (focusModeActive) {
+      exitFocusMode();
+    }
+
+    // Enter edit mode
+    enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+    
+    hideContextMenu();
+  };
+
   if (!visible) return null;
 
   return (
@@ -372,6 +417,20 @@ const ObjectContextMenu = () => {
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        }
+      />
+
+      {/* Edit Contour Option - Disabled for multi-select */}
+      <ContextMenuItem
+        onClick={handleEditContour}
+        disabled={isMultiSelect}
+        title={isMultiSelect ? 'Edit contour is disabled for multiple selections' : 'Edit contour shape'}
+        className="hover:bg-blue-50 hover:text-blue-700"
+        label="Edit Contour"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
           </svg>
         }
       />

@@ -11,6 +11,7 @@ import { createContextMenuSlice } from './slices/contextMenuSlice';
 import { createWebSocketSlice } from './slices/websocketSlice';
 import { createImagesSlice } from './slices/imagesSlice';
 import { createFocusModeSlice } from './slices/focusModeSlice';
+import { createEditModeSlice } from './slices/editModeSlice';
 import { createAIAnnotationSlice } from './slices/aiAnnotationSlice';
 import { createObjectsSlice } from './slices/objectsSlice';
 
@@ -25,6 +26,7 @@ import { createObjectsSlice } from './slices/objectsSlice';
  * - WebSocket: Connection and session state
  * - Images: Image loading, zoom, pan state
  * - Focus Mode: Focus mode for annotation
+ * - Edit Mode: Contour editing mode
  * - AI Annotation: AI prompts and undo/redo
  * - Objects: Annotation objects, selection, visibility
  */
@@ -43,6 +45,7 @@ const useAnnotationStore = create()(
         ...createWebSocketSlice(set),
         ...createImagesSlice(set),
         ...createFocusModeSlice(set),
+        ...createEditModeSlice(set),
         ...createAIAnnotationSlice(set),
         ...createObjectsSlice(set),
       }))

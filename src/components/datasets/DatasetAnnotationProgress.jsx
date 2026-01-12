@@ -25,9 +25,9 @@ const DatasetAnnotationProgress = ({ stats }) => {
   }
 
   const data = [
-    { name: "Manual", value: manuallyAnnotated },
-    { name: "Auto", value: autoAnnotated },
-    { name: "Missing", value: missing }
+    { name: "Completed", value: manuallyAnnotated },
+    { name: "In Progress", value: autoAnnotated },
+    { name: "Not Started", value: missing }
   ];
 
   return (
@@ -42,21 +42,21 @@ const DatasetAnnotationProgress = ({ stats }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[0] }}></div>
-              <span>Manually annotated:</span>
+              <span>Completed:</span>
             </div>
             <span className="font-medium">{manuallyAnnotated} ({Math.round((manuallyAnnotated / total) * 100)}%)</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[1] }}></div>
-              <span>Auto annotated:</span>
+              <span>In Progress:</span>
             </div>
             <span className="font-medium">{autoAnnotated} ({Math.round((autoAnnotated / total) * 100)}%)</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[2] }}></div>
-              <span>Missing:</span>
+              <span>Not Started:</span>
             </div>
             <span className="font-medium">{missing} ({Math.round((missing / total) * 100)}%)</span>
           </div>

@@ -17,6 +17,7 @@ import {
   useEnterFocusMode,
   useRefinementModeActive,
   useAnnotationStatus,
+  useEnterEditMode,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
@@ -46,6 +47,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const enterFocusMode = useEnterFocusMode();
   const refinementModeActive = useRefinementModeActive();
   const annotationStatus = useAnnotationStatus();
+  const enterEditMode = useEnterEditMode();
   const { currentDataset } = useDataset();
   const imageObject = useImageObject();
   const setZoomLevel = useSetZoomLevel();
@@ -68,8 +70,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const isVisible = true; // For now, assume all objects are visible
   // Determine if reviewed based on reviewed_by field (ignore prop, use actual data)
   const isReviewed = object.reviewed_by && object.reviewed_by.length > 0;
-  // An object is "temporary" (unreviewed) if it hasn't been reviewed yet
-  const isUnreviewed = !isReviewed;
   const isReviewable = annotationStatus === 'reviewable' || annotationStatus === 'finished';
 
   // Helper function to check if an object has a valid label
@@ -92,7 +92,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     
     // For unlabeled objects or unreviewed objects, show default format
     return `Object #${object.id}`;
-  }, [object.id, object.label, isReviewed]);
+  }, [object, isReviewed]);
 
   const handleToggleSelection = () => {
     if (isSelected) {
@@ -257,7 +257,31 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
 
   const handleEdit = (e) => {
     e?.stopPropagation();
-    // TODO: Implement edit functionality
+    
+    // Ensure object has valid coordinates
+    if (!object.x || !object.y || object.x.length === 0 || object.y.length === 0) {
+      console.error('Cannot edit object: missing or invalid coordinates');
+      return;
+    }
+    
+    // Ensure contour_id exists for backend communication
+    if (!object.contour_id && object.contour_id !== 0) {
+      console.error('Cannot edit object: missing contour_id');
+      return;
+    }
+    
+    // Exit focus mode if active
+    if (focusModeActive) {
+      exitFocusMode();
+    }
+    
+    // Enter edit mode
+    enterEditMode(object.id, object.contour_id, object.x, object.y);
+    
+    // Optionally select the object for better visibility
+    if (!isSelected) {
+      selectObject(object.id);
+    }
   };
 
   const handleDelete = async (e) => {

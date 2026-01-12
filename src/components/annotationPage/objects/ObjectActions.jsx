@@ -32,7 +32,7 @@ const ObjectActions = ({
   return (
     <div className="flex items-center space-x-1">
       {isUnreviewed ? (
-        // Unreviewed object actions (Accept/Reject - accepting assigns label which auto-reviews)
+        // Unreviewed object actions (Accept/Reject/Edit - accepting assigns label which auto-reviews)
         <>
           <button
             onClick={onAccept}
@@ -48,6 +48,15 @@ const ObjectActions = ({
             title="Reject object"
           >
             <XCircle className="w-4 h-4 text-red-600" />
+          </button>
+          
+          {/* Edit button available for all objects */}
+          <button
+            onClick={onEdit}
+            className="p-1 hover:bg-gray-200 rounded transition-colors"
+            title="Edit contour"
+          >
+            <Edit3 className="w-4 h-4 text-gray-600" />
           </button>
         </>
       ) : (
@@ -75,7 +84,7 @@ const ObjectActions = ({
           <button
             onClick={onEdit}
             className="p-1 hover:bg-gray-200 rounded transition-colors"
-            title="Edit object"
+            title="Edit contour"
           >
             <Edit3 className="w-4 h-4 text-gray-600" />
           </button>
