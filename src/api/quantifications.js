@@ -28,8 +28,10 @@ export const getQuantification = async (maskId) => {
 // Get dataset object quantifications with hierarchical labels and aggregated metrics
 export const getDatasetObjectQuantifications = async (datasetId, includeManual = true, includeAuto = true) => {
     try {
+        const excludeUnreviewedObjects = !includeAuto;
+        
         const response = await fetch(
-            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&include_manual=${includeManual}&include_auto=${includeAuto}`,
+            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
             {
                 headers: getAuthHeaders(),
             }
