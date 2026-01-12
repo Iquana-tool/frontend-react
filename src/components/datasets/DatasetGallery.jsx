@@ -88,8 +88,7 @@ const DatasetGallery = () => {
   };
 
   const handleModelZooClick = () => {
-    // TODO: Navigate to model zoo page
-    console.log("Model Zoo clicked");
+    navigate("/models");
   };
 
   const handleQuantificationsClick = () => {

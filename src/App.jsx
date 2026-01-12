@@ -10,6 +10,7 @@ import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
 import DocumentationPage from "./pages/DocumentationPage";
 import QuantificationPage from "./pages/QuantificationPage";
+import ModelZooPage from "./pages/ModelZooPage";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<LandingPage />} />
             <Route path="/docs" element={<DocumentationPage />} />
+            <Route path="/models" element={<ModelZooPage />} />
             <Route
               path="/datasets"
               element={

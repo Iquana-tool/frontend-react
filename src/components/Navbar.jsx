@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Database, BookOpen, User } from "lucide-react";
+import { Database, BookOpen, User, Brain } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "./auth/AuthButtons";
 import ReportBugLink from "./ui/ReportBugLink";
@@ -61,6 +61,17 @@ const Navbar = () => {
               </button>
             )}
 
+            <button
+              onClick={() => navigate('/models')}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                isActive('/models') 
+                  ? 'text-teal-600 bg-teal-50' 
+                  : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
+              }`}
+            >
+              <Brain className="w-4 h-4" />
+              <span>Models</span>
+            </button>
             
             <button
               onClick={() => navigate('/docs')}
