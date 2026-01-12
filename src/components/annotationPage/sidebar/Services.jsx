@@ -1,5 +1,5 @@
 // Services.jsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import ServiceCard from "./Service"
 import {

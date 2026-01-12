@@ -1,9 +1,10 @@
 /**
  * Hook to preload models when they are switched by the user
  * This is to ensure newly selected models are loaded into backend memory
+ * Only sends message when model CHANGES, not on initial mount
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import annotationSession from '../services/annotationSession';
 
 /**
@@ -13,15 +14,28 @@ import annotationSession from '../services/annotationSession';
  * @param {string} modelType - Type of model for logging (e.g., 'prompted', 'completion')
  */
 const useModelSwitchPreloader = (model, preloadFn, modelType) => {
+  const previousModel = useRef(null);
+  const isFirstRender = useRef(true);
+
   useEffect(() => {
-    if (model && annotationSession.isReady()) {
+    // Skip on first render (initial mount)
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      previousModel.current = model;
+      return;
+    }
+
+    // Only send if model actually changed AND session is ready
+    if (model && model !== previousModel.current && annotationSession.isReady()) {
       // Extract model ID (handle both string IDs and model objects)
       const modelId = typeof model === 'string' ? model : model?.id;
       if (modelId) {
-        preloadFn(modelId).catch(() => {
-          // Error handled silently
+        console.log(`[useModelSwitchPreloader] ${modelType} model changed to:`, modelId);
+        preloadFn(modelId).catch((err) => {
+          console.warn(`[useModelSwitchPreloader] Failed to preload ${modelType} model:`, err);
         });
       }
+      previousModel.current = model;
     }
   }, [model, preloadFn, modelType]);
 };
