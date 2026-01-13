@@ -1,20 +1,34 @@
 import React from 'react';
 import { Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import ObjectItem from './ObjectItem';
+import { useRemoveObject } from '../../../stores/selectors/annotationSelectors';
+import { deleteObject } from '../../../utils/objectOperations';
 
 /**
  * TemporaryObjectsList - Displays unreviewed objects that need user review
  * These objects haven't been reviewed yet (reviewed_by is empty)
  */
 const TemporaryObjectsList = ({ objects = [] }) => {
+  const removeObject = useRemoveObject();
+
   const handleAcceptAll = () => {
     // TODO: Implement accept all functionality
     console.log('Accept all temporary objects');
   };
 
-  const handleRejectAll = () => {
-    // TODO: Implement reject all functionality
-    console.log('Reject all temporary objects');
+  const handleRejectAll = async () => {
+    if (objects.length === 0) {
+      return;
+    }
+
+    try {
+      // Delete all unreviewed objects
+      for (const object of objects) {
+        await deleteObject(object, removeObject);
+      }
+    } catch (error) {
+      alert(`Failed to reject all objects: ${error.message || 'Unknown error'}`);
+    }
   };
 
   return (
