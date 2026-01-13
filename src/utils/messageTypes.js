@@ -170,6 +170,7 @@ export const MessageBuilders = {
     CLIENT_MESSAGE_TYPES.PROMPTED_SEGMENTATION,
     {
       model_identifier: modelIdentifier,
+      model_key: modelIdentifier,  // Failsafe
       prompts: {
         point_prompts: prompts.point_prompts || [],
         box_prompt: prompts.box_prompt || null,
