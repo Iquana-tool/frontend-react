@@ -13,15 +13,11 @@ import {useCompletionModel, useSetCompletionModel} from "../stores/selectors/ann
  */
 export function useCompletionSegmentation(onSuccess, onError) {
   const [isRunning, setIsRunning] = useState(false);
-  const completionModel = useCompletionModel();
+  const completionModelId = useCompletionModel(); // This is a string ID, not an object
   const setCompletionModel = useSetCompletionModel();
 
   const runCompletion = useCallback(async (contourIdOrIds, labelId) => {
-    setCompletionModel({
-          ...completionModel,
-          model_status: "busy",
-        }
-    )
+    // Note: Model status is handled by the backend, no need to update here
     
     // Normalize to array
     const contourIds = Array.isArray(contourIdOrIds) ? contourIdOrIds : [contourIdOrIds];
@@ -34,7 +30,7 @@ export function useCompletionSegmentation(onSuccess, onError) {
       return;
     }
 
-    if (!completionModel) {
+    if (!completionModelId) {
       const error = new Error('Please select a completion model first');
       if (onError) {
         onError(error);
@@ -59,23 +55,16 @@ export function useCompletionSegmentation(onSuccess, onError) {
 
     try {
       // Call WebSocket method - objects will be added automatically via OBJECT_ADDED messages
+      // completionModelId is already the string identifier we need
       const response = await annotationSession.runCompletion(
-        contourIds,       // Array of seed contour IDs (can be single or multiple)
-        completionModel.id,  // Model name
-        labelId           // Label ID
+        contourIds,         // Array of seed contour IDs (can be single or multiple)
+        completionModelId,  // Model identifier (string)
+        labelId             // Label ID
       );
-      if (response.success){
-        setCompletionModel({
-            ...completionModel,
-            model_status: "ready",
-          }
-        )
-      } else {
-        setCompletionModel({
-            ...completionModel,
-            model_status: "error",
-          }
-        )
+      
+      // Note: Model status is handled by the backend, no need to update here
+      if (!response.success) {
+        throw new Error(response.message || 'Completion failed');
       }
     } catch (error) {
       console.error('Completion segmentation error:', error);
@@ -89,7 +78,7 @@ export function useCompletionSegmentation(onSuccess, onError) {
     } finally {
       setIsRunning(false);
     }
-  }, [onSuccess, onError]);
+  }, [completionModelId, onSuccess, onError]);
 
   return { runCompletion, isRunning };
 }
