@@ -33,6 +33,7 @@ export const useAvailablePromptedModels = () => useAnnotationStore(state => stat
 export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
 export const useIsLoadingPromptedModels = () => useAnnotationStore(state => state.models.isLoadingModels);
 export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
+export const useIsRunningCompletion = () => useAnnotationStore(state => state.models.isRunningCompletion);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
@@ -62,6 +63,7 @@ export const useClearObjects = () => useAnnotationStore(state => state.clearObje
 
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
+export const useSetIsRunningCompletion = () => useAnnotationStore(state => state.setIsRunningCompletion);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
 export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
@@ -164,7 +166,6 @@ export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFo
 export const useEnterFocusModeWithZoom = () => useAnnotationStore(state => state.enterFocusModeWithZoom);
 export const usePanZoomToObject = () => useAnnotationStore(state => state.panZoomToObject);
 export const useExitFocusMode = () => useAnnotationStore(state => state.exitFocusMode);
-
 
 // Edit Mode selectors
 export const useEditModeActive = () => useAnnotationStore(state => state.editMode.active);

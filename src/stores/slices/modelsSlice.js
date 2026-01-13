@@ -20,6 +20,10 @@ export const createModelsSlice = (set) => ({
   setCompletionModel: (model) => set((state) => {
     state.models.completionModel = model;
   }),
+  
+  setIsRunningCompletion: (isRunning) => set((state) => {
+    state.models.isRunningCompletion = isRunning;
+  }),
 
   loadPromptedModel: async (model) => {
     set((state) => {

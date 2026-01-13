@@ -89,6 +89,7 @@ const ServiceCard = ({
   setSelectedModel,
   onModelSwitch,
   icon: Icon,
+  isRunning = false, // Track when a service operation is running 
 }) => {
   const [instantMode, setInstantMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -176,7 +177,22 @@ const ServiceCard = ({
             </select>
             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover/card:text-teal-500 transition-colors" />
           </div>
-          <StatusIndicator status={selectedModelObj?.model_status || "error"} />
+          <div className="flex items-center space-x-2">
+            {isRunning && (
+              <div className="relative group flex items-center">
+                <div className="bg-blue-100 text-blue-600 p-1.5 rounded-lg ring-2 ring-blue-200 flex items-center shadow-sm">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                </div>
+                <div className="absolute right-0 top-8 z-50 hidden group-hover:block animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap shadow-lg">
+                    Finding similar instances...
+                    <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <StatusIndicator status={selectedModelObj?.model_status || "error"} />
+          </div>
         </div>
       </div>
 

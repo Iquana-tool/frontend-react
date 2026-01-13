@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import annotationSession from '../services/annotationSession';
-import {useCompletionModel, useSetCompletionModel} from "../stores/selectors/annotationSelectors";
+import {useCompletionModel, useIsRunningCompletion, useSetIsRunningCompletion} from "../stores/selectors/annotationSelectors";
 
 /**
  * Hook for running completion segmentation to find similar instances
@@ -12,9 +12,9 @@ import {useCompletionModel, useSetCompletionModel} from "../stores/selectors/ann
  * runCompletion accepts either a single contour ID or an array of contour IDs as seeds
  */
 export function useCompletionSegmentation(onSuccess, onError) {
-  const [isRunning, setIsRunning] = useState(false);
+  const isRunning = useIsRunningCompletion();
+  const setIsRunning = useSetIsRunningCompletion();
   const completionModelId = useCompletionModel(); // This is a string ID, not an object
-  const setCompletionModel = useSetCompletionModel();
 
   const runCompletion = useCallback(async (contourIdOrIds, labelId) => {
     // Note: Model status is handled by the backend, no need to update here

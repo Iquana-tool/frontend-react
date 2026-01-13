@@ -85,6 +85,7 @@ export const initialState = {
     availableCompletionModels: [], // List of available completion models from backend
     isLoadingModels: false,
     isLoadingCompletionModels: false,
+    isRunningCompletion: false, // Track when completion segmentation (suggest similar) is running
   },
   
   // Objects State

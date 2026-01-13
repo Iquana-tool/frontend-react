@@ -10,6 +10,7 @@ import {
     useFetchAvailablePromptedModels,
     useIsLoadingCompletionModels,
     useIsLoadingPromptedModels,
+    useIsRunningCompletion,
     usePromptedModel,
     useSetCompletionModel,
     useSetPromptedModel
@@ -25,6 +26,9 @@ const Services = () => {
     // Get current model selections
     const promptedModel = usePromptedModel();
     const completionModel = useCompletionModel();
+    
+    // Get running state for completion service
+    const isRunningCompletion = useIsRunningCompletion();
 
     // Load models on component mount
     useEffect(() => {
@@ -44,6 +48,7 @@ const Services = () => {
             promptedModel: usePromptedModel(),
             setPromptedModel: useSetPromptedModel(),
             updateAvailableModels: useFetchAvailablePromptedModels(),
+            isRunning: false,
         },
         {
             name: "Prompted Completion",
@@ -52,6 +57,7 @@ const Services = () => {
             promptedModel: useCompletionModel(),
             setPromptedModel: useSetCompletionModel(),
             updateAvailableModels: useFetchAvailableCompletionModels(),
+            isRunning: isRunningCompletion,
         },
     ]
 
@@ -78,6 +84,7 @@ const Services = () => {
                         selectedModel={service.promptedModel}
                         setSelectedModel={service.setPromptedModel}
                         onModelSwitch={service.updateAvailableModels}
+                        isRunning={service.isRunning}
                     />
                 ))}
             </div>
