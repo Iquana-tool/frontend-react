@@ -26,7 +26,7 @@ const useAISegmentation = () => {
 
   // Store state
   const prompts = useAIPrompts();
-  const promptedModel = usePromptedModel();
+  const promptedModelId = usePromptedModel(); // This is a string ID, not an object
   const setPromptedModel = useSetPromptedModel();
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
@@ -81,11 +81,9 @@ const useAISegmentation = () => {
    * Run AI segmentation via WebSocket
    */
   const runSegmentation = useCallback(async () => {
-    setPromptedModel({
-        ...promptedModel,
-        model_status: "busy"
-      });
-    if (!currentImage || !promptedModel || prompts.length === 0) {
+    // Note: promptedModelId is just a string ID, we don't need to set model_status here
+    // The status is handled by the backend
+    if (!currentImage || !promptedModelId || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
     }
@@ -156,7 +154,8 @@ const useAISegmentation = () => {
         }
       });
 
-      const modelIdentifier = promptedModel.id;
+      // promptedModelId is already the string identifier we need
+      const modelIdentifier = promptedModelId;
 
       // Send segmentation request via WebSocket
       const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts);
@@ -217,10 +216,7 @@ const useAISegmentation = () => {
           }
         }
         clearAllPrompts();
-        setPromptedModel({
-          ...promptedModel,
-          model_status: "ready"
-        });
+        // Note: Model status is handled by the backend, no need to update here
         return { success: true, mask };
       } else {
         throw new Error('No valid mask returned from server');
@@ -228,17 +224,14 @@ const useAISegmentation = () => {
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
-      setPromptedModel({
-        ...promptedModel,
-        model_status: "error"
-      });
+      // Note: Model status is handled by the backend, no need to update here
       return { success: false, error: errorMessage };
     } finally {
       setIsSubmitting(false);
     }
   }, [
     currentImage,
-    promptedModel,
+    promptedModelId,
     prompts,
     imageObject,
     objectsList,
@@ -256,7 +249,7 @@ const useAISegmentation = () => {
   return {
     runSegmentation,
     error,
-    isReady: currentImage && promptedModel && prompts.length > 0,
+    isReady: currentImage && promptedModelId && prompts.length > 0,
   };
 };
 
