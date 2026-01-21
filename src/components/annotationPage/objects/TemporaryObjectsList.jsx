@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import ObjectItem from './ObjectItem';
-import { useRemoveObject } from '../../../stores/selectors/annotationSelectors';
+import LabelSelectionModal from './LabelSelectionModal';
+import { useRemoveObject, useUpdateObject } from '../../../stores/selectors/annotationSelectors';
+import { useDataset } from '../../../contexts/DatasetContext';
+import { fetchLabels } from '../../../api/labels';
+import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 import { deleteObject } from '../../../utils/objectOperations';
+import { useLabelSelection } from '../../../hooks/useLabelSelection';
 
 /**
  * TemporaryObjectsList - Displays unreviewed objects that need user review
@@ -10,10 +15,72 @@ import { deleteObject } from '../../../utils/objectOperations';
  */
 const TemporaryObjectsList = ({ objects = [] }) => {
   const removeObject = useRemoveObject();
+  const updateObject = useUpdateObject();
+  const { currentDataset } = useDataset();
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
+
+  // Fetch labels when modal opens
+  useEffect(() => {
+    if (!showLabelModal || !currentDataset) return;
+
+    const loadLabels = async () => {
+      setLabelsLoading(true);
+      try {
+        const labelsData = await fetchLabels(currentDataset.id);
+        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
+        setLabels(labelsArray);
+      } catch (error) {
+        setLabels([]);
+      } finally {
+        setLabelsLoading(false);
+      }
+    };
+
+    loadLabels();
+  }, [showLabelModal, currentDataset]);
 
   const handleAcceptAll = () => {
-    // TODO: Implement accept all functionality
-    console.log('Accept all temporary objects');
+    if (objects.length === 0) {
+      return;
+    }
+
+    if (!currentDataset) {
+      alert('Please select a dataset first');
+      return;
+    }
+
+    // Show label selection modal
+    setShowLabelModal(true);
+  };
+
+  // Use shared label selection hook
+  const handleLabelSelect = useLabelSelection(
+    updateObject,
+    null, // onSuccess: handled in wrapper
+    (error) => alert(`Failed to accept objects: ${error.message || 'Unknown error'}`)
+  );
+
+  const handleLabelSelectWrapper = async (label) => {
+    if (!label || objects.length === 0) {
+      setShowLabelModal(false);
+      return;
+    }
+
+    try {
+      // Apply the selected label to all unreviewed objects
+      for (const object of objects) {
+        await handleLabelSelect(object, label);
+      }
+      setShowLabelModal(false);
+    } catch (error) {
+      alert(`Failed to accept all objects: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowLabelModal(false);
   };
 
   const handleRejectAll = async () => {
@@ -96,6 +163,15 @@ const TemporaryObjectsList = ({ objects = [] }) => {
           </p>
         </div>
       )}
+
+      {/* Label Selection Modal for Accept All */}
+      <LabelSelectionModal
+        isOpen={showLabelModal}
+        onClose={handleCloseModal}
+        labels={labels}
+        labelsLoading={labelsLoading}
+        onLabelSelect={handleLabelSelectWrapper}
+      />
     </div>
   );
 };
