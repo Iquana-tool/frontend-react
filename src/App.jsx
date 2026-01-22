@@ -31,7 +31,7 @@ function App() {
               }
             />
             <Route
-              path="/dataset/:datasetId/gallery"
+              path="/dataset/:datasetId/datamanagement"
               element={
                 <ProtectedRoute>
                   <DatasetGalleryPage />

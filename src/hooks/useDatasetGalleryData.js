@@ -57,7 +57,21 @@ export const useDatasetGalleryData = (datasetId, galleryActions) => {
         ]);
 
         if (imagesResponse.success) {
-          const imageList = imagesResponse.images || [];
+         
+          const imageDataList = imagesResponse.image_data || imagesResponse.images || [];
+          // Transform API response to our format
+          const imageList = imageDataList.map((img) => ({
+            id: img.image_id || img.id,
+            name: img.file_name || img.filename || `image_${img.image_id || img.id}`,
+            width: img.width,
+            height: img.height,
+            hash: img.hash_code || img.hash,
+            finished: img.status === 'finished' || img.finished || false,
+            generated: img.generated || false,
+            status: img.status || (img.finished ? 'completed' : 'not_started'),
+            mask_id: img.mask_id,
+            isFromAPI: true,
+          }));
           // Set all images without pre-loading thumbnails - ImageGallery will handle lazy loading
           galleryActions.setImages(imageList.map(img => ({ ...img, thumbnail: null })));
         }

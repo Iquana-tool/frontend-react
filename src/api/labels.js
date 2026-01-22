@@ -10,7 +10,7 @@ export const fetchLabels = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/labels/get_labels/${datasetId}`,
+            `${API_BASE_URL}/datasets/get_labels/${datasetId}`,
             {
                 headers: getAuthHeaders(),
             }
@@ -39,16 +39,16 @@ export const createLabel = async (labelData, datasetId) => {
 
         const url = new URL(`${API_BASE_URL}/labels/create`);
         url.searchParams.append("label_name", name);
-        url.searchParams.append("dataset_id", datasetId);
+        url.searchParams.append("dataset_id", String(datasetId));
 
         // Send null for top-level, actual ID for subclasses
         if (parent_id !== null) {
-            url.searchParams.append("parent_label_id", parent_id);
+            url.searchParams.append("parent_label_id", String(parent_id));
         }
 
         // Send value if provided
         if (value !== null) {
-            url.searchParams.append("label_value", value);
+            url.searchParams.append("label_value", String(value));
         }
 
         const response = await fetch(url, {

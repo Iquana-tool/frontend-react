@@ -14,7 +14,7 @@ const DatasetNavigation = () => {
 
   const handleBackToGallery = () => {
     if (currentDataset) {
-      navigate(`/dataset/${currentDataset.id}/gallery`);
+      navigate(`/dataset/${currentDataset.id}/datamanagement`);
     } else {
       navigate('/datasets');
     }
