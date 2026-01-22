@@ -54,7 +54,7 @@ const DatasetCard = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      // Download failed
     } finally {
       setCreatingCSV(false);
     }
@@ -96,7 +96,7 @@ const DatasetCard = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      // Download failed
     } finally {
       setCreatingDataset(false);
     }
@@ -118,7 +118,7 @@ const DatasetCard = ({
         <div className="grid grid-cols-4 gap-2 mb-4">
           {Array.from({ length: 4 }).map((_, index) => {
             const image = sampleImages[index];
-            if (image) {
+            if (image && image.base64) {
               return (
                 <div
                   key={index}

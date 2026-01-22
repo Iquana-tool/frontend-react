@@ -83,17 +83,22 @@ const DatasetLoader = ({ children }) => {
       // Fetch images from API
       const response = await fetchImages(dataset.id);
 
-      if (response.success && response.images) {
+      
+      const imageDataList = response.image_data || response.images || [];
+
+      if (response.success && imageDataList.length > 0) {
         // Transform API response to our format
-        const apiImages = response.images.map((img) => ({
-          id: img.id,
-          name: img.file_name,
+        // We need to fetch full image details or use what we have
+        const apiImages = imageDataList.map((img) => ({
+          id: img.image_id || img.id,
+          name: img.file_name || img.filename || `image_${img.image_id || img.id}`,
           width: img.width,
           height: img.height,
-          hash: img.hash_code,
-          finished: img.finished,
-          generated: img.generated,
-          status: img.finished ? 'completed' : 'not_started',
+          hash: img.hash_code || img.hash,
+          finished: img.status === 'finished' || img.finished || false,
+          generated: img.generated || false,
+          status: img.status || (img.finished ? 'completed' : 'not_started'),
+          mask_id: img.mask_id,
           isFromAPI: true,
         }));
 
