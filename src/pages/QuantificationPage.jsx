@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { Download } from "lucide-react";
 import { getDatasetObjectQuantifications } from "../api/quantifications";
-import { getDataset } from "../api/datasets";
 import MetricCard from "../components/quantification/MetricCard";
 import LabelTree from "../components/quantification/LabelTree";
 import ComparisonCharts from "../components/quantification/ComparisonCharts";
 import SummaryCards from "../components/quantification/SummaryCards";
+import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
 import {
   createLabelIdToNameMap,
   prepareComparisonData,
@@ -17,11 +17,9 @@ import {
 
 const QuantificationPage = () => {
   const { datasetId } = useParams();
-  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [dataset, setDataset] = useState(null);
   const [includeManual, setIncludeManual] = useState(true);
   const [includeAuto, setIncludeAuto] = useState(true);
   const [expandedLabels, setExpandedLabels] = useState(new Set());
@@ -31,12 +29,6 @@ const QuantificationPage = () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Load dataset info
-        if (datasetId) {
-          const datasetData = await getDataset(parseInt(datasetId));
-          setDataset(datasetData);
-        }
 
         // Load quantifications
         const response = await getDatasetObjectQuantifications(
@@ -104,44 +96,38 @@ const QuantificationPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading quantifications...</p>
+      <DatasetManagementLayout>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading quantifications...</p>
+          </div>
         </div>
-      </div>
+      </DatasetManagementLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Error: {error}</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600"
-          >
-            Go Back
-          </button>
+      <DatasetManagementLayout>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Error: {error}</p>
+          </div>
         </div>
-      </div>
+      </DatasetManagementLayout>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">No data available</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600"
-          >
-            Go Back
-          </button>
+      <DatasetManagementLayout>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-gray-600 mb-4">No data available</p>
+          </div>
         </div>
-      </div>
+      </DatasetManagementLayout>
     );
   }
 
@@ -150,67 +136,56 @@ const QuantificationPage = () => {
   const comparisonData = prepareComparisonData(data.metrics_per_label_id, labelIdToName);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => navigate(-1)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label="Go back"
-              >
-                <ArrowLeft className="w-5 h-5 text-gray-600" />
-              </button>
+    <DatasetManagementLayout>
+      <div className="h-full flex flex-col bg-white overflow-y-auto">
+        {/* Page Header */}
+        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   Dataset Quantifications
                 </h1>
-                {dataset && (
-                  <p className="text-sm text-gray-600 mt-1">{dataset.name}</p>
-                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleExport}
+                  className="flex items-center space-x-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export Quantification</span>
+                </button>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-            <button
-              // onClick={handleExport}
-              className="flex items-center space-x-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-                <span>Export Quantification</span>
-            </button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-6">
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleExpandAll}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Expand All
+                </button>
+                <button
+                  onClick={handleCollapseAll}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Collapse All
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handleExpandAll}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Expand All
-              </button>
-              <button
-                onClick={handleCollapseAll}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Collapse All
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Main Content */}
+        <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
         {/* Summary Cards */}
         <SummaryCards data={data} labelsWithMetrics={labelsWithMetrics} />
 
@@ -260,8 +235,9 @@ const QuantificationPage = () => {
           </div>
         )}
 
+        </div>
       </div>
-    </div>
+    </DatasetManagementLayout>
   );
 };
 

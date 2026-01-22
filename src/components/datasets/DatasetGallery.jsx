@@ -1,45 +1,34 @@
 import React, { useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
-import DatasetInfo from "./gallery/DatasetInfo";
 import DataManagementView from "./gallery/DataManagementView";
 import LabelManagementView from "./gallery/LabelManagementView";
-import LoadingState from "./gallery/LoadingState";
-import ErrorState from "./gallery/ErrorState";
-import SmallScreenMessage from "./gallery/SmallScreenMessage";
-import DatasetGalleryHeader from "./gallery/DatasetGalleryHeader";
 import ManagementCardsView from "./gallery/ManagementCardsView";
+import DatasetManagementLayout from "./gallery/DatasetManagementLayout";
 import * as api from "../../api";
 import { 
-  useGalleryImages, 
-  useGalleryLabels, 
-  useGalleryStats, 
-  useGalleryLoadingData, 
-  useGalleryError,
+  useGalleryImages,
+  useGalleryLabels,
   useGalleryActions 
 } from "../../stores/selectors";
-import { useDatasetGalleryData } from "../../hooks/useDatasetGalleryData";
 
 const DatasetGallery = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
-  const { loading } = useDataset();
+  const { currentDataset } = useDataset();
   
-  // Zustand store selectors - selective subscriptions for better performance
+  // Zustand store selectors
   const images = useGalleryImages();
   const labels = useGalleryLabels();
-  const stats = useGalleryStats();
-  const loadingData = useGalleryLoadingData();
-  const error = useGalleryError();
   const galleryActions = useGalleryActions();
   
   // Local UI state (view-specific, doesn't need to be in store)
   const [currentView, setCurrentView] = useState("cards");
   
-  // Use custom hook for data fetching and initialization
-  const dataset = useDatasetGalleryData(datasetId, galleryActions);
+  // Get dataset from context (set by DatasetManagementLayout)
+  const dataset = currentDataset;
 
-  // Handle labels updated from DatasetInfo component
+  // Handle labels updated from LabelManagementView
   const handleLabelsUpdated = useCallback((updatedLabels) => {
     galleryActions.setLabels(updatedLabels);
   }, [galleryActions]);
@@ -88,7 +77,7 @@ const DatasetGallery = () => {
   };
 
   const handleModelZooClick = () => {
-    navigate("/models");
+    navigate("/models", { state: { datasetId: dataset?.id } });
   };
 
   const handleQuantificationsClick = () => {
@@ -99,68 +88,35 @@ const DatasetGallery = () => {
     setCurrentView("labelManagement");
   };
 
-  if (loading || loadingData) {
-    return <LoadingState />;
-  }
-
-  if (error || !dataset) {
-    return <ErrorState error={error} />;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <SmallScreenMessage />
-
-      {/* Large Screen Content - Show dataset gallery on screens 1024px and above */}
-      <div className="hidden lg:block">
-        <DatasetGalleryHeader 
-          datasetName={dataset.name}
-          onStartAnnotation={handleStartAnnotation}
-        />
-
-        {/* Main Content */}
-        <div className="max-w-full mx-auto flex h-[calc(100vh-73px)]">
-          {/* Left Sidebar - Dataset Info */}
-          <div className="w-100 bg-white border-r border-gray-200 flex-shrink-0">
-            <DatasetInfo 
-              dataset={dataset}
-              stats={stats}
-              labels={labels}
-              onStartAnnotation={handleStartAnnotation}
-              onLabelsUpdated={handleLabelsUpdated}
-            />
-          </div>
-
-          {/* Center - Dynamic Content */}
-          <div className="flex-1 overflow-hidden">
-            {currentView === "cards" ? (
-              <ManagementCardsView
-                onDataManagementClick={handleDataManagementClick}
-                onModelZooClick={handleModelZooClick}
-                onQuantificationsClick={handleQuantificationsClick}
-                onStartAnnotation={handleStartAnnotation}
-                onLabelManagementClick={handleLabelManagementClick}
-              />
-            ) : currentView === "dataManagement" ? (
-              <DataManagementView
-                images={images}
-                dataset={dataset}
-                onBack={() => setCurrentView("cards")}
-                onImageClick={handleImageClick}
-                onImagesUpdated={refreshImages}
-              />
-            ) : currentView === "labelManagement" ? (
-              <LabelManagementView
-                dataset={dataset}
-                labels={labels}
-                onBack={() => setCurrentView("cards")}
-                onLabelsUpdated={handleLabelsUpdated}
-              />
-            ) : null}
-          </div>
-        </div>
+    <DatasetManagementLayout>
+      <div className="h-full overflow-hidden">
+        {currentView === "cards" ? (
+          <ManagementCardsView
+            onDataManagementClick={handleDataManagementClick}
+            onModelZooClick={handleModelZooClick}
+            onQuantificationsClick={handleQuantificationsClick}
+            onStartAnnotation={handleStartAnnotation}
+            onLabelManagementClick={handleLabelManagementClick}
+          />
+        ) : currentView === "dataManagement" ? (
+          <DataManagementView
+            images={images}
+            dataset={dataset}
+            onBack={() => setCurrentView("cards")}
+            onImageClick={handleImageClick}
+            onImagesUpdated={refreshImages}
+          />
+        ) : currentView === "labelManagement" ? (
+          <LabelManagementView
+            dataset={dataset}
+            labels={labels}
+            onBack={() => setCurrentView("cards")}
+            onLabelsUpdated={handleLabelsUpdated}
+          />
+        ) : null}
       </div>
-    </div>
+    </DatasetManagementLayout>
   );
 };
 

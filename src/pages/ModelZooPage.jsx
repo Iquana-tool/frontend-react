@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { BookOpen, User, Brain, Filter } from "lucide-react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { BookOpen, User, Brain, Filter, ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
 import ModelCard from "../components/models/ModelCard";
+import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
 
 // Static model data - organized by service
 const MODELS_DATA = {
@@ -86,8 +87,28 @@ const MODELS_DATA = {
 
 const ModelZooPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { datasetId } = useParams();
   const { isAuthenticated, user } = useAuth();
   const [selectedService, setSelectedService] = useState("All");
+
+  // Check if we came from a dataset management page
+  const datasetIdFromState = location.state?.datasetId || datasetId;
+  const isFromDatasetManagement = !!datasetIdFromState;
+
+  // Check if we came from a dataset management page
+  const handleBack = () => {
+    if (datasetIdFromState) {
+      navigate(`/dataset/${datasetIdFromState}/datamanagement`);
+    } else {
+      // Try to go back in history, or navigate to datasets
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate("/datasets");
+      }
+    }
+  };
 
   const handleModelAction = (model, actionType) => {
     console.log(`Action ${actionType} for model ${model.identifier}`);
@@ -107,42 +128,9 @@ const ModelZooPage = () => {
 
   const filteredModels = getFilteredModels();
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white">
-        <div className="max-w-[98%] mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1
-                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
-                onClick={() => navigate("/")}
-              >
-                AquaMorph
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              {isAuthenticated && user && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
-                  <User className="w-4 h-4" />
-                  <span className="font-medium">{user.username}</span>
-                </div>
-              )}
-              <button
-                onClick={() => navigate("/docs")}
-                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Documentation</span>
-              </button>
-              <ReportBugLink />
-              <AuthButtons showLogoutOnly={true} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
+  // Content component that can be wrapped or standalone
+  const ModelZooContent = () => (
+    <div className="h-full overflow-y-auto bg-gray-50">
       <div className="max-w-[98%] mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="mb-8">
@@ -216,6 +204,63 @@ const ModelZooPage = () => {
           </div>
         )}
       </div>
+    </div>
+  );
+
+  // If accessed from dataset management, use the shared layout with sidebar
+  if (isFromDatasetManagement && datasetIdFromState) {
+    return (
+      <DatasetManagementLayout datasetId={datasetIdFromState}>
+        <ModelZooContent />
+      </DatasetManagementLayout>
+    );
+  }
+
+  // Otherwise, show standalone page without sidebar
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white">
+        <div className="max-w-[98%] mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleBack}
+                className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
+              >
+                <ArrowLeft size={20} />
+                <span>Back</span>
+              </button>
+              <div className="h-6 w-px bg-teal-400"></div>
+              <h1
+                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+                onClick={() => navigate("/")}
+              >
+                AquaMorph
+              </h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              {isAuthenticated && user && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{user.username}</span>
+                </div>
+              )}
+              <button
+                onClick={() => navigate("/docs")}
+                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Documentation</span>
+              </button>
+              <ReportBugLink />
+              <AuthButtons showLogoutOnly={true} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ModelZooContent />
     </div>
   );
 };
