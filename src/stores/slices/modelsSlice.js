@@ -1,14 +1,5 @@
 import { getPromptedModels, getCompletionModels } from '../../api/models';
 
-// Fallback models if backend doesn't return any
-const FALLBACK_MODELS = [
-  { id: 'sam2_tiny', name: 'SAM2 - Tiny' },
-];
-
-const FALLBACK_COMPLETION_MODELS = [
-  { id: 'dino_1000_cosine_he_max_agg', name: 'DINO Completion' }
-];
-
 /**
  * Models slice - manages AI model selection and available models
  */
@@ -52,24 +43,19 @@ export const createModelsSlice = (set) => ({
           }
         });
       } else {
-        // Fallback to hardcoded models if backend doesn't return any
+        // No models returned from backend - show empty list
+        console.warn('No completion models returned from backend in loadPromptedModel');
         set((state) => {
-          state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+          state.models.availableCompletionModels = [];
           state.models.isLoadingCompletionModels = false;
-          if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
-            state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
-          }
         });
       }
     } catch (error) {
       console.error('Error fetching completion models:', error);
-      // Fallback to hardcoded models on error
+      // Don't use fallback - show empty list on error
       set((state) => {
-        state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+        state.models.availableCompletionModels = [];
         state.models.isLoadingCompletionModels = false;
-        if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
-          state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
-        }
       });
     }
   },
@@ -101,24 +87,19 @@ export const createModelsSlice = (set) => ({
           }
         });
       } else {
-        // Fallback to hardcoded models if backend doesn't return any
+        // No models returned from backend - show empty list
+        console.warn('No completion models returned from backend');
         set((state) => {
-          state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+          state.models.availableCompletionModels = [];
           state.models.isLoadingCompletionModels = false;
-          if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
-            state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
-          }
         });
       }
     } catch (error) {
       console.error('Error fetching completion models:', error);
-      // Fallback to hardcoded models on error
+      //show empty list on error
       set((state) => {
-        state.models.availableCompletionModels = FALLBACK_COMPLETION_MODELS;
+        state.models.availableCompletionModels = [];
         state.models.isLoadingCompletionModels = false;
-        if (!state.models.completionModel && FALLBACK_COMPLETION_MODELS.length > 0) {
-          state.models.completionModel = FALLBACK_COMPLETION_MODELS[0].id;
-        }
       });
     }
   },
@@ -152,24 +133,19 @@ export const createModelsSlice = (set) => ({
           }
         });
       } else {
-        // Fallback to hardcoded models if backend doesn't return any
+        // No models returned from backend - show empty list
+        console.warn('No prompted models returned from backend');
         set((state) => {
-          state.models.availablePromptedModels = FALLBACK_MODELS;
+          state.models.availablePromptedModels = [];
           state.models.isLoadingModels = false;
-          if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
-            state.models.promptedModel = FALLBACK_MODELS[0].id;
-          }
         });
       }
     } catch (error) {
       console.error('Error fetching AI models:', error);
-      // Fallback to hardcoded models on error
+      // show empty list on error
       set((state) => {
-        state.models.availablePromptedModels = FALLBACK_MODELS;
+        state.models.availablePromptedModels = [];
         state.models.isLoadingModels = false;
-        if (!state.models.promptedModel && FALLBACK_MODELS.length > 0) {
-          state.models.promptedModel = FALLBACK_MODELS[0].id;
-        }
       });
     }
   },

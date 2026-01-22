@@ -19,18 +19,16 @@ export const getPromptedModels = async () => {
             };
         }
 
-        // Fallback to hardcoded models if backend doesn't return any
+        // No models returned from backend
         return {
             success: true,
             models: [],
-            fallback: true,
         };
     } catch (error) {
-        console.warn("Error fetching prompted models, using fallback:", error);
         return {
-            success: true,
+            success: false,
             models: [],
-            fallback: true,
+            error: error.message,
         };
     }
 };
@@ -56,7 +54,6 @@ export const getAutomaticModels = async () => {
             message: "No automatic models available",
         };
     } catch (error) {
-        console.error("Error fetching automatic models:", error);
         return {
             success: false,
             models: [],
@@ -89,7 +86,6 @@ export const get3DModels = async () => {
             message: "No 3D models available",
         };
     } catch (error) {
-        console.error("Error fetching 3D models:", error);
         return {
             success: false,
             models: [],
@@ -113,18 +109,16 @@ export const getCompletionModels = async () => {
             };
         }
 
-        // Fallback to empty array if backend doesn't return any
+        // No models returned from backend
         return {
             success: true,
             models: [],
-            fallback: true,
         };
     } catch (error) {
-        console.warn("Error fetching completion models, using fallback:", error);
         return {
-            success: true,
+            success: false,
             models: [],
-            fallback: true,
+            error: error.message,
         };
     }
 };
