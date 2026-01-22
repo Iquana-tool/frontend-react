@@ -22,12 +22,12 @@ export const fetchLabels = async (datasetId) => {
 };
 
 // Create a new label (class)
-// labelData: { name: string, parent_id: number | null }
+// labelData: { name: string, parent_id: number | null, value: number | null }
 // parent_id: null for top-level labels, actual ID for subclasses
 export const createLabel = async (labelData, datasetId) => {
     try {
         // Extract values from the label data object
-        const { name, parent_id = null } = labelData;
+        const { name, parent_id = null, value = null } = labelData;
 
         if (!name) {
             throw new Error("Label name is required");
@@ -37,13 +37,18 @@ export const createLabel = async (labelData, datasetId) => {
             throw new Error("Dataset ID is required");
         }
 
-        const url = new URL(`${API_BASE_URL}/labels/create_label`);
+        const url = new URL(`${API_BASE_URL}/labels/create`);
         url.searchParams.append("label_name", name);
         url.searchParams.append("dataset_id", datasetId);
 
         // Send null for top-level, actual ID for subclasses
         if (parent_id !== null) {
             url.searchParams.append("parent_label_id", parent_id);
+        }
+
+        // Send value if provided
+        if (value !== null) {
+            url.searchParams.append("label_value", value);
         }
 
         const response = await fetch(url, {
@@ -69,19 +74,17 @@ export const updateLabel = async (labelId, labelData, datasetId) => {
             throw new Error("Label name is required");
         }
 
-        if (!datasetId) {
-            throw new Error("Dataset ID is required");
-        }
-
-        const url = new URL(`${API_BASE_URL}/labels/update_label`);
-        url.searchParams.append("label_id", labelId);
-        url.searchParams.append("label_name", labelData.name);
-        url.searchParams.append("dataset_id", datasetId);
-
-        const response = await fetch(url, {
-            method: "PUT",
-            headers: getAuthHeaders(),
-        });
+        const response = await fetch(
+            `${API_BASE_URL}/labels/${labelId}`,
+            {
+                method: "PATCH",
+                headers: {
+                    ...getAuthHeaders(),
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ name: labelData.name }),
+            }
+        );
 
         return handleApiError(response);
     } catch (error) {
@@ -96,12 +99,8 @@ export const deleteLabel = async (labelId, datasetId) => {
             throw new Error("Label ID is required");
         }
 
-        if (!datasetId) {
-            throw new Error("Dataset ID is required");
-        }
-
         const response = await fetch(
-            `${API_BASE_URL}/labels/delete_label/label=${labelId}`,
+            `${API_BASE_URL}/labels/${labelId}`,
             {
                 method: "DELETE",
                 headers: getAuthHeaders(),

@@ -37,7 +37,7 @@ export const getContourHierarchy = async (maskId) => {
 export const deleteContour = async (contourId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/delete_contour/${contourId}`,
+            `${API_BASE_URL}/contours/${contourId}`,
             {
                 method: "DELETE",
                 headers: getAuthHeaders(),
@@ -72,9 +72,9 @@ export const markContourAsReviewed = async (contourId) => {
         }
 
         const response = await fetch(
-            `${API_BASE_URL}/contours/mark_as_reviewed/${contourId}`,
+            `${API_BASE_URL}/contours/${contourId}/reviews/add`,
             {
-                method: "GET",
+                method: "POST",
                 headers: getAuthHeaders(),
             }
         );
@@ -82,4 +82,4 @@ export const markContourAsReviewed = async (contourId) => {
     } catch (error) {
         throw error;
     }
-}
+};

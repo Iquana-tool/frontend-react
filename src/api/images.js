@@ -10,7 +10,7 @@ export const fetchImages = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/images/list_images/${datasetId}`,
+            `${API_BASE_URL}/datasets/${datasetId}/images`,
             {
                 headers: getAuthHeaders(),
             }
@@ -21,18 +21,17 @@ export const fetchImages = async (datasetId) => {
     }
 };
 
-// Fetch list of unannotated images
+// Fetch list of images with specific annotation status
 export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
     try {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
-        const response = await fetch(
-            `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`,
-            {
-                headers: getAuthHeaders(),
-            }
-        );
+        const url = new URL(`${API_BASE_URL}/datasets/${datasetId}/images`);
+        url.searchParams.append("status", status);
+        const response = await fetch(url, {
+            headers: getAuthHeaders(),
+        });
         return handleApiError(response);
     } catch (error) {
         throw error;
@@ -66,7 +65,7 @@ export const uploadImages = async (files, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for multiple files
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload_images`);
+                const url = new URL(`${API_BASE_URL}/images/upload_multi`);
                 url.searchParams.append("dataset_id", datasetId);
 
                 const response = await fetch(url, {
@@ -200,7 +199,7 @@ export const uploadImage = async (file, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload_image`);
+                const url = new URL(`${API_BASE_URL}/images/upload`);
                 url.searchParams.append("dataset_id", datasetId);
 
                 const response = await fetch(url, {
@@ -320,8 +319,13 @@ export const getImageById = async (imageId, low_res) => {
 
         while (retries < maxRetries) {
             try {
+                // Use thumbnail endpoint if low_res is true, otherwise use full image endpoint
+                const endpoint = low_res 
+                    ? `${API_BASE_URL}/images/${imageId}/thumbnail`
+                    : `${API_BASE_URL}/images/${imageId}/b64`;
+                
                 const response = await fetch(
-                    `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`,
+                    endpoint,
                     {
                         headers: getAuthHeaders(),
                     }
@@ -371,7 +375,7 @@ export const getImageById = async (imageId, low_res) => {
 export const deleteImage = async (imageId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/images/delete_image/${imageId}`,
+            `${API_BASE_URL}/images/${imageId}`,
             {
                 method: "DELETE",
                 headers: getAuthHeaders(),
@@ -392,12 +396,16 @@ export const getImages = async (imageIds, low_res) => {
 
         while (retries < maxRetries) {
             try {
-                const url = new URL(`${API_BASE_URL}/images/get_images`);
+                // Use thumbnails endpoint if low_res is true, otherwise use full images endpoint
+                const endpoint = low_res 
+                    ? `${API_BASE_URL}/images/ids/thumbnails`
+                    : `${API_BASE_URL}/images/ids/b64`;
+                
+                const url = new URL(endpoint);
                 url.searchParams.append('image_ids', JSON.stringify(imageIds));
-                url.searchParams.append('low_res', low_res);
 
                 const response = await fetch(url, {
-                    method: 'POST',
+                    method: 'GET',
                     headers: getAuthHeaders({
                         'Accept': 'application/json',
                     })
