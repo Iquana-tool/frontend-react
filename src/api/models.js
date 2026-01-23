@@ -11,12 +11,13 @@ export const getPromptedModels = async () => {
         });
         const data = await handleApiError(response);
 
-        // The backend returns: { success, message, response: { success, message, available_models } }
-        if (data.success && data.response && data.response.available_models) {
-            return {
-                success: true,
-                models: data.response.available_models,
-            };
+        if (data.success && data.response && data.response.result) {
+            if (Array.isArray(data.response.result) && data.response.result.length > 0) {
+                return {
+                    success: true,
+                    models: data.response.result,
+                };
+            }
         }
 
         // No models returned from backend
@@ -102,11 +103,13 @@ export const getCompletionModels = async () => {
         });
         const data = await handleApiError(response);
 
-        if (data.success && data.response && data.response.available_models) {
-            return {
-                success: true,
-                models: data.response.available_models,
-            };
+        if (data.success && data.response && data.response.result) {
+            if (Array.isArray(data.response.result) && data.response.result.length > 0) {
+                return {
+                    success: true,
+                    models: data.response.result,
+                };
+            }
         }
 
         // No models returned from backend

@@ -26,11 +26,11 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.identifier_str || model.id,
-          name: model.name || model.identifier_str || model.id,
+          id: model.registry_key,
+          name: model.name,
           description: model.description,
           tags: model.tags,
-          supports_refinement: model.supports_refinement
+          supports_refinement: model.refinement_supported
         }));
 
         set((state) => {
@@ -70,11 +70,11 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.identifier_str || model.id,
-          name: model.name || model.identifier_str || model.id,
+          id: model.registry_key,
+          name: model.name,
           description: model.description,
           tags: model.tags,
-          supports_refinement: model.supports_refinement
+          supports_refinement: model.refinement_supported
         }));
 
         set((state) => {
@@ -113,14 +113,13 @@ export const createModelsSlice = (set) => ({
       const result = await getPromptedModels();
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
-        // Backend returns models with identifier_str and name fields
         const transformedModels = result.models.map(model => ({
-          id: model.identifier_str || model.id,
-          name: model.name || model.identifier_str || model.id,
+          id: model.registry_key,
+          name: model.name,
           description: model.description,
           tags: model.tags,
-          supported_prompt_types: model.supported_prompt_types,
-          supports_refinement: model.supports_refinement
+          supported_prompt_types: model.prompt_types_supported,
+          supports_refinement: model.refinement_supported
         }));
 
         set((state) => {
