@@ -7,7 +7,7 @@ const API_BASE_URL =
 export const getContoursForMask = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}`,
+            `${API_BASE_URL}/masks/${maskId}/contours?flattened=true`,
             {
                 headers: getAuthHeaders(),
             }
@@ -22,7 +22,7 @@ export const getContoursForMask = async (maskId) => {
 export const getContourHierarchy = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`,
+            `${API_BASE_URL}/masks/${maskId}/contours?flattened=false`,
             {
                 headers: getAuthHeaders(),
             }

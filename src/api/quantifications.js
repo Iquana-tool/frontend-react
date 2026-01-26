@@ -7,7 +7,7 @@ const API_BASE_URL =
 export const getQuantification = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/get_contours_of_mask/${maskId}&flattened=false`,
+            `${API_BASE_URL}/masks/${maskId}/contours?flattened=false`,
             {
                 headers: getAuthHeaders(),
             }
@@ -31,7 +31,7 @@ export const getDatasetObjectQuantifications = async (datasetId, includeManual =
         const excludeUnreviewedObjects = !includeAuto;
         
         const response = await fetch(
-            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
+            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}?exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
             {
                 headers: getAuthHeaders(),
             }
