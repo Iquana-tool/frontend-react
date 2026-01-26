@@ -129,83 +129,115 @@ const ModelZooPage = () => {
   const filteredModels = getFilteredModels();
 
   // Content component that can be wrapped or standalone
-  const ModelZooContent = () => (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      <div className="max-w-[98%] mx-auto px-4 py-8">
-        {/* Page Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                <Brain className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900">Model Zoo</h2>
-                <p className="text-gray-600 mt-1">
-                  Explore and use state-of-the-art models for segmentation tasks
-                </p>
-              </div>
-            </div>
-          </div>
+  const ModelZooContent = () => {
+    const handleBackToOverview = () => {
+      if (datasetIdFromState) {
+        navigate(`/dataset/${datasetIdFromState}/datamanagement`);
+      }
+    };
 
-          {/* Service Filter */}
-          <div className="flex items-center space-x-3 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filter by service:</span>
-            <div className="flex flex-wrap gap-2">
-              {services.map((service) => (
-                <button
-                  key={service}
-                  onClick={() => setSelectedService(service)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    selectedService === service
-                      ? "bg-teal-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {service}
-                </button>
-              ))}
+    return (
+      <div className="h-full flex flex-col bg-white">
+        {/* Header with Back Button (when accessed from dataset management) */}
+        {isFromDatasetManagement && datasetIdFromState && (
+          <div className="p-3 sm:p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+            <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
+              <button
+                onClick={handleBackToOverview}
+                className="flex items-center space-x-1.5 sm:space-x-2 text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base"
+              >
+                <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+                <span className="hidden sm:inline">Back to Overview</span>
+                <span className="sm:hidden">Back</span>
+              </button>
+              <div className="h-5 sm:h-6 w-px bg-gray-300"></div>
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                Model Zoo
+              </h2>
             </div>
-          </div>
-        </div>
-
-        {/* Models Grid by Service */}
-        {Object.keys(filteredModels).map((serviceName) => (
-          <div key={serviceName} className="mb-12">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full"></div>
-              <h3 className="text-2xl font-bold text-gray-900">{serviceName}</h3>
-              <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredModels[serviceName].map((model) => (
-                <ModelCard
-                  key={model.identifier}
-                  model={model}
-                  onAction={handleModelAction}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Empty State (if no models) */}
-        {Object.keys(filteredModels).length === 0 && (
-          <div className="text-center py-12">
-            <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No models found
-            </h3>
-            <p className="text-gray-600">
-              Try selecting a different service filter
-            </p>
           </div>
         )}
+
+        <div className="h-full overflow-y-auto bg-gray-50">
+          <div className="max-w-[98%] mx-auto px-4 py-8">
+            {/* Page Header - Only show when NOT accessed from dataset management */}
+            {!isFromDatasetManagement && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-bold text-gray-900">Model Zoo</h2>
+                      <p className="text-gray-600 mt-1">
+                        Explore and use state-of-the-art models for segmentation tasks
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Service Filter */}
+            <div className={`flex items-center space-x-3 bg-white p-4 rounded-lg shadow-sm border border-gray-200 ${isFromDatasetManagement ? 'mb-8' : 'mb-8'}`}>
+              <Filter className="w-5 h-5 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Filter by service:</span>
+              <div className="flex flex-wrap gap-2">
+                {services.map((service) => (
+                  <button
+                    key={service}
+                    onClick={() => setSelectedService(service)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      selectedService === service
+                        ? "bg-teal-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {service}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Models Grid by Service */}
+            {Object.keys(filteredModels).map((serviceName) => (
+              <div key={serviceName} className="mb-12">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full"></div>
+                  <h3 className="text-2xl font-bold text-gray-900">{serviceName}</h3>
+                  <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20"></div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredModels[serviceName].map((model) => (
+                    <ModelCard
+                      key={model.identifier}
+                      model={model}
+                      onAction={handleModelAction}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {/* Empty State (if no models) */}
+            {Object.keys(filteredModels).length === 0 && (
+              <div className="text-center py-12">
+                <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  No models found
+                </h3>
+                <p className="text-gray-600">
+                  Try selecting a different service filter
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // If accessed from dataset management, use the shared layout with sidebar
   if (isFromDatasetManagement && datasetIdFromState) {
