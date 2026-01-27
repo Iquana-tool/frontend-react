@@ -26,5 +26,5 @@ RUN npm install -g serve
 
 RUN npx update-browserslist-db@latest
 
-# Define the command to run the app in detached mode
-CMD ["npm", "start"]
+# Serve the production build
+CMD ["serve", "-s", "build", "-l", "3000"]
