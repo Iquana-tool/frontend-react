@@ -1,4 +1,4 @@
-import { handleApiError, getAuthHeaders } from "../api/util";
+import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -37,19 +37,22 @@ export const createLabel = async (labelData, datasetId) => {
             throw new Error("Dataset ID is required");
         }
 
-        const url = new URL(`${API_BASE_URL}/labels/create`);
-        url.searchParams.append("label_name", name);
-        url.searchParams.append("dataset_id", String(datasetId));
+        const urlParams = {
+            label_name: name,
+            dataset_id: datasetId
+        };
 
         // Send null for top-level, actual ID for subclasses
         if (parent_id !== null) {
-            url.searchParams.append("parent_label_id", String(parent_id));
+            urlParams.parent_label_id = parent_id;
         }
 
         // Send value if provided
         if (value !== null) {
-            url.searchParams.append("label_value", String(value));
+            urlParams.label_value = value;
         }
+
+        const url = buildUrl(API_BASE_URL, '/labels/create', urlParams);
 
         const response = await fetch(url, {
             method: "POST",

@@ -1,4 +1,4 @@
-import { handleApiError, getAuthHeaders } from "../api/util";
+import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
@@ -27,8 +27,9 @@ export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
-        const url = new URL(`${API_BASE_URL}/datasets/${datasetId}/images`);
-        url.searchParams.append("status", status);
+        const url = buildUrl(API_BASE_URL, `/datasets/${datasetId}/images`, {
+            status: status
+        });
         const response = await fetch(url, {
             headers: getAuthHeaders(),
         });
@@ -65,8 +66,9 @@ export const uploadImages = async (files, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for multiple files
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload_multi`);
-                url.searchParams.append("dataset_id", datasetId);
+                const url = buildUrl(API_BASE_URL, '/images/upload_multi', {
+                    dataset_id: datasetId
+                });
 
                 const response = await fetch(url, {
                     method: "POST",
@@ -199,8 +201,9 @@ export const uploadImage = async (file, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload`);
-                url.searchParams.append("dataset_id", datasetId);
+                const url = buildUrl(API_BASE_URL, '/images/upload', {
+                    dataset_id: datasetId
+                });
 
                 const response = await fetch(url, {
                     method: "POST",
@@ -397,12 +400,13 @@ export const getImages = async (imageIds, low_res) => {
         while (retries < maxRetries) {
             try {
                 // Use thumbnails endpoint if low_res is true, otherwise use full images endpoint
-                const endpoint = low_res 
-                    ? `${API_BASE_URL}/images/ids/thumbnails`
-                    : `${API_BASE_URL}/images/ids/b64`;
+                const path = low_res 
+                    ? '/images/ids/thumbnails'
+                    : '/images/ids/b64';
                 
-                const url = new URL(endpoint);
-                url.searchParams.append('image_ids', JSON.stringify(imageIds));
+                const url = buildUrl(API_BASE_URL, path, {
+                    image_ids: JSON.stringify(imageIds)
+                });
 
                 const response = await fetch(url, {
                     method: 'GET',

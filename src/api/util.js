@@ -21,6 +21,44 @@ export const getAuthHeaders = (additionalHeaders = {}) => {
     return headers;
 };
 
+/**
+ * Build a URL with query parameters that works with both absolute and relative base URLs
+ * @param {string} baseUrl - The base URL (can be absolute like http://... or relative like /api)
+ * @param {string} path - The path to append to the base URL
+ * @param {Object} params - Query parameters as key-value pairs
+ * @returns {string} The complete URL with query parameters
+ */
+export const buildUrl = (baseUrl, path, params = {}) => {
+    // Remove trailing slash from base and leading slash from path for clean joining
+    const cleanBase = baseUrl.replace(/\/$/, '');
+    const cleanPath = path.replace(/^\//, '');
+    
+    // Check if base is absolute or relative
+    const isAbsolute = cleanBase.startsWith('http://') || cleanBase.startsWith('https://');
+    
+    if (isAbsolute) {
+        // Use URL API for absolute URLs
+        const url = new URL(cleanPath, cleanBase);
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) {
+                url.searchParams.append(key, String(value));
+            }
+        });
+        return url.toString();
+    } else {
+        // Handle relative URLs with string concatenation
+        const fullPath = `${cleanBase}/${cleanPath}`;
+        const urlParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => {
+            if (value !== null && value !== undefined) {
+                urlParams.append(key, String(value));
+            }
+        });
+        const queryString = urlParams.toString();
+        return queryString ? `${fullPath}?${queryString}` : fullPath;
+    }
+};
+
 // Function to handle API errors
 export const handleApiError = async (response) => {
     if (!response.ok) {

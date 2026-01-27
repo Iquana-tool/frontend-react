@@ -1,4 +1,4 @@
-import { handleApiError, getAuthHeaders } from "../api/util";
+import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -109,16 +109,17 @@ export const saveMask = async (imageId, label, contours) => {
         for (let i = 0; i < contours.length; i++) {
             const contour = contours[i];
 
-            // Create the query parameters
-            const params = new URLSearchParams();
-            params.append("mask_id", maskId);
+            // Build URL with query parameters
+            const urlParams = {
+                mask_id: maskId
+            };
 
             if (i > 0 && results.length > 0 && results[i - 1].contour_id) {
                 // If we have a previous contour, we can set it as parent
-                params.append("parent_contour_id", results[i - 1].contour_id);
+                urlParams.parent_contour_id = results[i - 1].contour_id;
             }
 
-            const addContourUrl = `${API_BASE_URL}/masks/add_contour?${params.toString()}`;
+            const addContourUrl = buildUrl(API_BASE_URL, '/masks/add_contour', urlParams);
 
             const addResponse = await fetch(addContourUrl, {
                 method: "POST",
@@ -593,19 +594,19 @@ export async function addContourToFinalMask(imageId, contour) {
             label_id: contour.labelId ?? contour.label_id ?? (typeof contour.label === 'number' ? contour.label : null),
         };
 
-        // Add parent_contour_id if provided
-        const requestUrl = new URL(`${API_BASE_URL}/contours/add_contour`);
-        requestUrl.searchParams.append("mask_id", maskId);
+        // Build URL params
+        const urlParams = {
+            mask_id: maskId
+        };
 
         // Add parent_contour_id if specified
         if (contour.parent_contour_id) {
-            requestUrl.searchParams.append(
-                "parent_contour_id",
-                contour.parent_contour_id
-            );
+            urlParams.parent_contour_id = contour.parent_contour_id;
         }
 
-        const response = await fetch(requestUrl.toString(), {
+        const url = buildUrl(API_BASE_URL, '/contours/add_contour', urlParams);
+
+        const response = await fetch(url, {
             method: "POST",
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
@@ -705,8 +706,9 @@ export async function addContoursToFinalMask(imageId, contours) {
         const maskId = createResult.mask_id;
 
         // Now add the contours using the correct endpoint
-        const url = new URL(`${API_BASE_URL}/contours/add_contours`);
-        url.searchParams.append("mask_id", maskId);
+        const url = buildUrl(API_BASE_URL, '/contours/add_contours', {
+            mask_id: maskId
+        });
 
         // Format contours for the backend
         const formattedContours = contours.map((contour) => ({

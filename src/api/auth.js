@@ -1,4 +1,4 @@
-import { handleApiError } from "./util";
+import { handleApiError, buildUrl } from "./util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
@@ -11,9 +11,10 @@ const API_BASE_URL =
  */
 export const register = async (username, password) => {
     try {
-        const url = new URL(`${API_BASE_URL}/auth/register`);
-        url.searchParams.append("name", username);
-        url.searchParams.append("password", password);
+        const url = buildUrl(API_BASE_URL, '/auth/register', {
+            name: username,
+            password: password
+        });
 
         const response = await fetch(url, {
             method: "POST",

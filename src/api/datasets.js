@@ -1,4 +1,4 @@
-import { handleApiError, getAuthHeaders } from "../api/util";
+import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 import { getImageById } from "./images"; // Import the image fetching function
 
 const API_BASE_URL =
@@ -18,10 +18,11 @@ export const fetchDatasets = async () => {
 
 export const createDataset = async (name, description, datasetType) => {
     try {
-        const url = new URL(`${API_BASE_URL}/datasets/create`);
-        url.searchParams.append("name", name);
-        url.searchParams.append("description", description);
-        url.searchParams.append("dataset_type", datasetType);
+        const url = buildUrl(API_BASE_URL, '/datasets/create', {
+            name: name,
+            description: description,
+            dataset_type: datasetType
+        });
 
         const response = await fetch(url, {
             method: "POST",
