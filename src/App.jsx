@@ -16,7 +16,7 @@ function App() {
   return (
     <AuthProvider>
       <DatasetProvider>
-        <Router>
+        <Router basename={process.env.PUBLIC_URL || ""}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<LandingPage />} />
