@@ -1,0 +1,37 @@
+# Dependencies (installed in container)
+node_modules
+.pnp
+.pnp.js
+
+# Build output (generated in container)
+build
+dist
+
+# Git and IDE
+.git
+.gitignore
+.vscode
+.idea
+*.log
+
+# Docs and tests (not needed for build)
+README.md
+*.md
+coverage
+.nyc_output
+__tests__
+*.test.js
+*.test.jsx
+*.spec.js
+*.spec.jsx
+
+# Env files (use build args instead)
+.env
+.env.*
+!.env.example
+
+# Misc
+.DS_Store
+Dockerfile*
+docker-compose*
+.dockerignore
