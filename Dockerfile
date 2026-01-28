@@ -9,7 +9,7 @@ ARG REACT_APP_API_BASE_URL
 ARG REACT_APP_WS_URL
 ARG PUBLIC_URL
 
-# Set as environment variables for build
+# Set as environment variables for build (PUBLIC_URL overrides package.json "homepage")
 ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
 ENV REACT_APP_WS_URL=$REACT_APP_WS_URL
 ENV PUBLIC_URL=$PUBLIC_URL
