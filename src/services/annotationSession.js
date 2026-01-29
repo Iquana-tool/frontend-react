@@ -70,7 +70,7 @@ class AnnotationSession {
       this._updateSessionState(SessionState.INITIALIZING);
 
       // Construct WebSocket URL
-      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/user=${this.currentUserId}&image=${this.currentImageId}`;
+      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws?user=${this.currentUserId}&image=${this.currentImageId}`;
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
