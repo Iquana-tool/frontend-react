@@ -31,7 +31,7 @@ export const getDatasetObjectQuantifications = async (datasetId, includeManual =
         const excludeUnreviewedObjects = !includeAuto;
         
         const response = await fetch(
-            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}?exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
+            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
             {
                 headers: getAuthHeaders(),
             }
