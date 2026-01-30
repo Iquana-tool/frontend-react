@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -8,7 +8,9 @@ const API_BASE_URL =
 export const getBaseModels = async () => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/get_available_base_models`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_available_base_models`, {
+                headers: getAuthHeaders(),
+            })
         );
     } catch (error) {
         throw error;
@@ -19,7 +21,9 @@ export const getBaseModels = async () => {
 export const getTrainedModels = async (dataset_id) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/get_trained_models_of_dataset/${dataset_id}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_trained_models_of_dataset/${dataset_id}`, {
+                headers: getAuthHeaders(),
+            })
         );
     } catch (error) {
         throw error;
@@ -32,6 +36,7 @@ export const deleteModel = async (model_id) => {
         return handleApiError(
             await fetch(`${API_BASE_URL}/automatic_segmentation/delete_model/${model_id}`, {
                 method: 'DELETE',
+                headers: getAuthHeaders(),
             })
         );
     } catch (error) {
@@ -42,7 +47,9 @@ export const deleteModel = async (model_id) => {
 /* Get the model with the given job ID. */
 export const fetchModel = async (jobID) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/automatic_segmentation/get_model_metadata/${jobID}`);
+        const response = await fetch(`${API_BASE_URL}/automatic_segmentation/get_model_metadata/${jobID}`, {
+            headers: getAuthHeaders(),
+        });
         return handleApiError(response);
     } catch (error) {
         throw error;
@@ -54,6 +61,7 @@ export const uploadDataset = async (dataset_id) => {
         return handleApiError(
             await fetch(`${API_BASE_URL}/automatic_segmentation/upload_dataset/${dataset_id}`, {
                 method: 'POST',
+                headers: getAuthHeaders(),
             })
         );
     } catch (error) {
@@ -73,9 +81,9 @@ export const startTraining = async ({
     try {
         const response = await fetch(`${API_BASE_URL}/automatic_segmentation/start_training`, {
             method: 'POST',
-            headers: {
+            headers: getAuthHeaders({
                 "Content-Type": "application/json",
-            },
+            }),
             body: JSON.stringify({
                 dataset_id,
                 model_identifier,
@@ -96,7 +104,9 @@ export const startTraining = async ({
 export const getTrainingStatus = async (modelID) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/get_training_status/${modelID}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/get_training_status/${modelID}`, {
+                headers: getAuthHeaders(),
+            })
         );
     } catch (error) {
         throw error;
@@ -107,7 +117,9 @@ export const getTrainingStatus = async (modelID) => {
 export const cancelTraining = async (modelID) => {
     try {
         return handleApiError(
-            await fetch(`${API_BASE_URL}/automatic_segmentation/cancel_training_of_model/${modelID}`)
+            await fetch(`${API_BASE_URL}/automatic_segmentation/cancel_training_of_model/${modelID}`, {
+                headers: getAuthHeaders(),
+            })
         );
     } catch (error) {
         throw error;
@@ -123,9 +135,9 @@ export const segmentBatchOfImages = async (model_identifier, ImageIDs) => {
                 `${API_BASE_URL}/automatic_segmentation/segment_batch/${encodeURIComponent(model_identifier)}`,
                 {
                     method: 'POST',
-                    headers: {
+                    headers: getAuthHeaders({
                         "Content-Type": "application/json",
-                    },
+                    }),
                     body: JSON.stringify(ImageIDs), // ImageIDs should be an array
                 }
             )

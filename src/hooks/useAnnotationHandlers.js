@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import * as api from '../api';
+import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 
 export const useAnnotationHandlers = ({
   currentDataset,
@@ -49,9 +50,11 @@ export const useAnnotationHandlers = ({
     }
 
     try {
-      const labels = await api.fetchLabels(currentDataset.id);
-      if (labels && labels.length > 0) {
-        const formattedLabels = labels.map((label) => ({
+      const labelsData = await api.fetchLabels(currentDataset.id);
+      const labelsArray = extractLabelsFromResponse(labelsData);
+      
+      if (labelsArray && labelsArray.length > 0) {
+        const formattedLabels = labelsArray.map((label) => ({
           id: label.id,
           name: label.name,
         }));

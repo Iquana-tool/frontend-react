@@ -18,10 +18,10 @@ const GettingStartedSection = () => {
           <ol className="text-green-800 space-y-1.5 sm:space-y-2 text-sm sm:text-base">
             <li>1. Create or upload a dataset</li>
             <li>2. Define your labels</li>
-            <li>3. Start annotating images</li>
-            <li>4. Use AI segmentation</li>
-            <li>5. View Quantifications</li>
-            <li>6. Export results</li>
+            <li>3. Start annotating images using AI-assisted annotation</li>
+            <li>4. Review and refine your annotations</li>
+            <li>5. Accept or reject objects and mark them as reviewed</li>
+            <li>6. View quantifications and export results</li>
           </ol>
         </div>
       </div>

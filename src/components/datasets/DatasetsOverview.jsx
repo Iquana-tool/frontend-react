@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, FolderOpen, BookOpen } from "lucide-react";
+import { Plus, FolderOpen, BookOpen, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import AuthButtons from "../auth/AuthButtons";
+import ReportBugLink from "../ui/ReportBugLink";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
@@ -9,9 +12,11 @@ import DeleteDatasetModal from "./DeleteDatasetModal";
 import DatasetCard from "./DatasetCard";
 import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
+import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
   const {
     datasets,
     loading,
@@ -102,18 +107,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     try {
       // Check if the dataset has any labels
       const labelsResponse = await api.fetchLabels(dataset.id);
-      
-      // Handle different response formats
-      let labels = [];
-      
-      if (Array.isArray(labelsResponse)) {
-        labels = labelsResponse;
-      } else if (labelsResponse && Array.isArray(labelsResponse.labels)) {
-        labels = labelsResponse.labels;
-      } else if (labelsResponse && typeof labelsResponse === 'object') {
-        // Handle case where response might be an object with no labels property
-        labels = [];
-      }
+      const labels = extractLabelsFromResponse(labelsResponse);
       
       // Filter out any invalid labels and orphaned sublabels
       const validLabels = labels.filter(label => {
@@ -197,6 +191,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
+              {isAuthenticated && user && (
+                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{user.username}</span>
+                </div>
+              )}
               <button
                 onClick={() => navigate("/docs")}
                 className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
@@ -204,6 +204,8 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 <BookOpen className="w-4 h-4" />
                 <span>Documentation</span>
               </button>
+              <ReportBugLink />
+              <AuthButtons showLogoutOnly={true} />
             </div>
           </div>
         </div>

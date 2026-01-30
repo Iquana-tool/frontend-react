@@ -1,4 +1,4 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
@@ -10,7 +10,10 @@ export const fetchImages = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/images/list_images/${datasetId}`
+            `${API_BASE_URL}/datasets/${datasetId}/images`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         return handleApiError(response);
     } catch (error) {
@@ -18,15 +21,18 @@ export const fetchImages = async (datasetId) => {
     }
 };
 
-// Fetch list of unannotated images
+// Fetch list of images with specific annotation status
 export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
     try {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
-        const response = await fetch(
-            `${API_BASE_URL}/images/list_images_with_annotation_status/${datasetId}&status=${status}`
-        );
+        const url = buildUrl(API_BASE_URL, `/datasets/${datasetId}/images`, {
+            status: status
+        });
+        const response = await fetch(url, {
+            headers: getAuthHeaders(),
+        });
         return handleApiError(response);
     } catch (error) {
         throw error;
@@ -60,11 +66,13 @@ export const uploadImages = async (files, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for multiple files
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload_images`);
-                url.searchParams.append("dataset_id", datasetId);
+                const url = buildUrl(API_BASE_URL, '/images/upload_multi', {
+                    dataset_id: datasetId
+                });
 
                 const response = await fetch(url, {
                     method: "POST",
+                    headers: getAuthHeaders(),
                     body: formData,
                     signal: controller.signal,
                 });
@@ -193,11 +201,13 @@ export const uploadImage = async (file, datasetId) => {
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
             try {
-                const url = new URL(`${API_BASE_URL}/images/upload_image`);
-                url.searchParams.append("dataset_id", datasetId);
+                const url = buildUrl(API_BASE_URL, '/images/upload', {
+                    dataset_id: datasetId
+                });
 
                 const response = await fetch(url, {
                     method: "POST",
+                    headers: getAuthHeaders(),
                     body: formData,
                     signal: controller.signal,
                 });
@@ -312,8 +322,16 @@ export const getImageById = async (imageId, low_res) => {
 
         while (retries < maxRetries) {
             try {
+                // Use thumbnail endpoint if low_res is true, otherwise use full image endpoint
+                const endpoint = low_res 
+                    ? `${API_BASE_URL}/images/${imageId}/thumbnail`
+                    : `${API_BASE_URL}/images/${imageId}/b64`;
+                
                 const response = await fetch(
-                    `${API_BASE_URL}/images/get_image/${imageId}&${low_res}`
+                    endpoint,
+                    {
+                        headers: getAuthHeaders(),
+                    }
                 );
 
                 if (!response.ok) {
@@ -360,9 +378,10 @@ export const getImageById = async (imageId, low_res) => {
 export const deleteImage = async (imageId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/images/delete_image/${imageId}`,
+            `${API_BASE_URL}/images/${imageId}`,
             {
                 method: "DELETE",
+                headers: getAuthHeaders(),
             }
         );
         return handleApiError(response);
@@ -380,15 +399,20 @@ export const getImages = async (imageIds, low_res) => {
 
         while (retries < maxRetries) {
             try {
-                const url = new URL(`${API_BASE_URL}/images/get_images`);
-                url.searchParams.append('image_ids', JSON.stringify(imageIds));
-                url.searchParams.append('low_res', low_res);
+                // Use thumbnails endpoint if low_res is true, otherwise use full images endpoint
+                const path = low_res 
+                    ? '/images/ids/thumbnails'
+                    : '/images/ids/b64';
+                
+                const url = buildUrl(API_BASE_URL, path, {
+                    image_ids: JSON.stringify(imageIds)
+                });
 
                 const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
+                    method: 'GET',
+                    headers: getAuthHeaders({
                         'Accept': 'application/json',
-                    }
+                    })
                 });
 
                 if (!response.ok) {

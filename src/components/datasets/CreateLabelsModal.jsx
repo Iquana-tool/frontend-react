@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { X, Plus, ChevronRight, ChevronDown, Clock, Tag } from 'lucide-react';
+import { X, Plus, Clock, Tag } from 'lucide-react';
 import * as api from '../../api';
 import { getNextAvailableColor } from '../../utils/labelColors';
 import { 
-  hasChildren, 
   flattenHierarchy 
 } from '../../utils/labelHierarchy';
+import { useLabelHierarchy } from '../../hooks/useLabelHierarchy';
+import LabelHierarchyRenderer from './shared/LabelHierarchyRenderer';
 
 const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
-  const [labelHierarchy, setLabelHierarchy] = useState([]);
-  const [expandedLabels, setExpandedLabels] = useState(new Set());
+  const {
+    labelHierarchy,
+    expandedLabels,
+    setLabelHierarchy,
+    toggleExpanded,
+    expandLabel,
+  } = useLabelHierarchy([]);
+  
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [showLabelCreation, setShowLabelCreation] = useState(false);
@@ -27,16 +34,6 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
     return nextId;
   };
 
-  // Toggle expanded state for a label
-  const toggleExpanded = (labelId) => {
-    const newExpanded = new Set(expandedLabels);
-    if (newExpanded.has(labelId)) {
-      newExpanded.delete(labelId);
-    } else {
-      newExpanded.add(labelId);
-    }
-    setExpandedLabels(newExpanded);
-  };
 
   const handleAddLabel = (parentLabel = null) => {
     const newLabel = {
@@ -61,7 +58,7 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
       };
       setLabelHierarchy(updateLabelHierarchy(labelHierarchy));
       // Auto-expand the parent
-      setExpandedLabels(prev => new Set([...prev, parentLabel.id]));
+      expandLabel(parentLabel.id);
     } else {
       // Add as root label
       setLabelHierarchy([...labelHierarchy, newLabel]);
@@ -157,77 +154,21 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
     setError(null);
   };
 
-  // Recursive component to render label hierarchy
-  const renderLabelHierarchy = (labels, depth = 0) => {
-    return labels.map((label) => {
-      const hasChildLabels = hasChildren(label);
-      const isExpanded = expandedLabels.has(label.id);
-      const marginLeft = depth * 20; // Indent based on depth
-      
-      return (
-        <div key={label.id} className="border rounded-lg mb-3">
-          {/* Main Label */}
-          <div className="flex items-center p-3">
-            {hasChildLabels && (
-              <button
-                onClick={() => toggleExpanded(label.id)}
-                className="p-1 mr-2 text-gray-500 hover:text-gray-700"
-                title={isExpanded ? "Collapse" : "Expand"}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
-              </button>
-            )}
-            
-            <div 
-              className="w-6 h-6 rounded-full mr-3 flex-shrink-0" 
-              style={{ backgroundColor: label.color, marginLeft: `${marginLeft}px` }}
-            ></div>
-            
-            <input
-              type="text"
-              value={label.name}
-              onChange={(e) => handleLabelNameChange(label.id, e.target.value)}
-              placeholder={depth > 0 ? "Sublabel name" : "Label name"}
-              className="flex-1 px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-0"
-            />
-            
-            {hasChildLabels && (
-              <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full mr-2">
-                {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            
-            <button
-              onClick={() => handleAddLabel(label)}
-              className="p-1 text-gray-500 hover:text-gray-700 mr-2"
-              title="Add sublabel"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-            
-            <button
-              onClick={() => handleDeleteLabel(label.id)}
-              className="p-1 text-red-500 hover:text-red-700"
-              title="Delete label"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Children Labels */}
-          {hasChildLabels && isExpanded && label.children && (
-            <div className="border-t bg-gray-50 p-3">
-              {renderLabelHierarchy(label.children, depth + 1)}
-            </div>
-          )}
-        </div>
-      );
-    });
+  // Get label color
+  const getLabelColor = (label) => {
+    return label.color || getNextAvailableColor([]);
   };
+
+  // Render label input for creation mode
+  const renderLabelInput = (label, depth) => (
+    <input
+      type="text"
+      value={label.name}
+      onChange={(e) => handleLabelNameChange(label.id, e.target.value)}
+      placeholder={depth > 0 ? "Sublabel name" : "Label name"}
+      className="flex-1 px-2 py-1 border-0 bg-transparent focus:outline-none focus:ring-0"
+    />
+  );
 
   if (!isOpen) return null;
 
@@ -308,7 +249,16 @@ const CreateLabelsModal = ({ isOpen, onClose, dataset, onLabelsCreated }) => {
                     <p className="text-xs mt-1">Click "Add new label" to get started</p>
                   </div>
                 ) : (
-                  renderLabelHierarchy(labelHierarchy)
+                  <LabelHierarchyRenderer
+                    labels={labelHierarchy}
+                    expandedLabels={expandedLabels}
+                    onToggleExpanded={toggleExpanded}
+                    onAddLabel={handleAddLabel}
+                    onDeleteLabel={(label) => handleDeleteLabel(label.id)}
+                    mode="creation"
+                    getLabelColor={getLabelColor}
+                    renderLabelInput={renderLabelInput}
+                  />
                 )}
               </div>
 

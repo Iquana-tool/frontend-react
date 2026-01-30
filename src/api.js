@@ -1,4 +1,5 @@
 // Re-export grouped API modules
+export * from "./api/auth";
 export * from "./api/images";
 export * from "./api/segmentation";
 export * from "./api/masks";

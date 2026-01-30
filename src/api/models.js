@@ -1,33 +1,33 @@
-import { handleApiError } from "../api/util";
+import { handleApiError, getAuthHeaders } from "../api/util";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
 
 // Get available prompted segmentation models from backend
+
 export const getPromptedModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/models/get_prompted_models`);
+        const response = await fetch(`${API_BASE_URL}/prompted_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
         const data = await handleApiError(response);
 
-        if (data.success && data.models) {
+        if (data.success && Array.isArray(data.result)) {
             return {
                 success: true,
-                models: data.models,
+                models: data.result,
             };
         }
 
-        // Fallback to hardcoded models if backend doesn't return any
         return {
             success: true,
             models: [],
-            fallback: true,
         };
     } catch (error) {
-        console.warn("Error fetching prompted models, using fallback:", error);
         return {
-            success: true,
+            success: false,
             models: [],
-            fallback: true,
+            error: error.message,
         };
     }
 };
@@ -35,7 +35,9 @@ export const getPromptedModels = async () => {
 // Get available automatic segmentation models from backend
 export const getAutomaticModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/models/get_automatic_models`);
+        const response = await fetch(`${API_BASE_URL}/models/get_automatic_models`, {
+            headers: getAuthHeaders(),
+        });
         const data = await handleApiError(response);
 
         if (data.success && data.models) {
@@ -51,7 +53,6 @@ export const getAutomaticModels = async () => {
             message: "No automatic models available",
         };
     } catch (error) {
-        console.error("Error fetching automatic models:", error);
         return {
             success: false,
             models: [],
@@ -64,7 +65,10 @@ export const getAutomaticModels = async () => {
 export const get3DModels = async () => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/models/get_automatic_3d_models`
+            `${API_BASE_URL}/models/get_automatic_3d_models`,
+            {
+                headers: getAuthHeaders(),
+            }
         );
         const data = await handleApiError(response);
 
@@ -81,11 +85,66 @@ export const get3DModels = async () => {
             message: "No 3D models available",
         };
     } catch (error) {
-        console.error("Error fetching 3D models:", error);
         return {
             success: false,
             models: [],
             message: error.message,
+        };
+    }
+};
+
+// Get available completion segmentation models from backend
+export const getCompletionModels = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/completion_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
+        const data = await handleApiError(response);
+
+        if (data.success && Array.isArray(data.result)) {
+            return {
+                success: true,
+                models: data.result,
+            };
+        }
+
+        return {
+            success: true,
+            models: [],
+        };
+    } catch (error) {
+        return {
+            success: false,
+            models: [],
+            error: error.message,
+        };
+    }
+};
+
+// Get available semantic segmentation models from backend
+export const getSemanticModels = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/semantic_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
+        const data = await handleApiError(response);
+
+        if (data.success && Array.isArray(data.result)) {
+            return {
+                success: true,
+                models: data.result,
+            };
+        }
+
+        return {
+            success: true,
+            models: [],
+        };
+    } catch (error) {
+        return {
+            success: false,
+            models: [],
+            error: error.message,
         };
     }
 };

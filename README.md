@@ -82,7 +82,7 @@ This frontend is designed to work with the FastAPI backend for coral segmentatio
 
 ## Components
 
-- **AnnotationPage** - Main component for image viewing and interaction
+- **AnnotationPageV2** - Main component for image viewing and interaction
 - **PromptingCanvas** - Canvas for adding segmentation prompts
 - **API** - Handles communication with the backend
 
@@ -121,7 +121,7 @@ src/
 ├── App.jsx         # Main application component
 ├── components/
 │   └── prompting/  # Segmentation components
-│       ├── AnnotationPage.jsx
+│       ├── AnnotationPageV2.jsx
 │       ├── PromptingCanvas.jsx
 │       ├── index.js
 │       └── utils.js

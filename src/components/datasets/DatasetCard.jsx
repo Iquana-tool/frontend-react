@@ -1,9 +1,10 @@
-import React, {useState} from "react";
+import React from "react";
 import {Download, Loader2} from "lucide-react";
 import DeleteDatasetButton from "./DeleteDatasetButton";
 import PlaceholderImage from "../ui/PlaceholderImage";
 import DatasetAnnotationProgress from "./DatasetAnnotationProgress";
 import {DownloadQuantifications, DownloadImageDataset} from "../../api/downloads";
+import { useIsCreatingDataset, useIsCreatingCSV, useDownloadActions } from "../../stores/selectors";
 
 const DatasetCard = ({
   dataset,
@@ -12,11 +13,13 @@ const DatasetCard = ({
   onDelete,
   onOpenDataset
 }) => {
-  const [isCreatingDataset, setIsCreatingDataset] = useState(false);
-  const [isCreatingCSV, setIsCreatingCSV] = useState(false);
+  // Replace local state with Zustand selectors
+  const isCreatingDataset = useIsCreatingDataset();
+  const isCreatingCSV = useIsCreatingCSV();
+  const { setCreatingDataset, setCreatingCSV } = useDownloadActions();
 
   const handleCSVDownload = async () => {
-    setIsCreatingCSV(true);
+    setCreatingCSV(true);
     try {
       // Call the function that returns the streaming response
       const response = await DownloadQuantifications(dataset.id);
@@ -51,14 +54,14 @@ const DatasetCard = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      // Download failed
     } finally {
-      setIsCreatingCSV(false);
+      setCreatingCSV(false);
     }
   };
 
   const handleImagesDownload = async () => {
-    setIsCreatingDataset(true);
+    setCreatingDataset(true);
     try {
       // Call the function that returns the streaming response
       const response = await DownloadImageDataset(dataset.id);
@@ -93,9 +96,9 @@ const DatasetCard = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      // Download failed
     } finally {
-      setIsCreatingDataset(false);
+      setCreatingDataset(false);
     }
   };
 
@@ -115,7 +118,7 @@ const DatasetCard = ({
         <div className="grid grid-cols-4 gap-2 mb-4">
           {Array.from({ length: 4 }).map((_, index) => {
             const image = sampleImages[index];
-            if (image) {
+            if (image && image.base64) {
               return (
                 <div
                   key={index}

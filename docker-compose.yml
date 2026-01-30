@@ -8,6 +8,30 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
     restart: unless-stopped
     labels:
-      - "authors=prathmesh"
+      - "authors=dev-team"
+   
+
+  # Development service - run with: docker-compose up dev
+  dev:
+    container_name: react-frontend-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    labels:
+      - "authors=dev-team"
