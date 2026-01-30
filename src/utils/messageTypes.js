@@ -39,6 +39,7 @@ export const CLIENT_MESSAGE_TYPES = {
   // Session Management
   COMPLETION_ENABLE: 'completion_enable',
   COMPLETION_INFERENCE: 'completion_inference',
+  SEMANTIC_INFERENCE: 'semantic_inference',
   FINISH_ANNOTATION: 'finish_annotation',
 };
 
@@ -248,6 +249,17 @@ export const MessageBuilders = {
       seed_contour_ids: seedContourIds,
       model_key: modelKey,
       label_id: labelId,
+    }
+  ),
+
+  /**
+   * Request semantic segmentation inference
+   * @param {string} modelKey - Semantic model key
+   */
+  runSemantic: (modelKey) => createMessage(
+    CLIENT_MESSAGE_TYPES.SEMANTIC_INFERENCE,
+    {
+      model_key: modelKey,
     }
   ),
 

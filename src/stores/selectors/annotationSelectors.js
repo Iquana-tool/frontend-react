@@ -29,11 +29,15 @@ export const usePanOffset = () => useAnnotationStore(state => state.images.panOf
 
 export const usePromptedModel = () => useAnnotationStore(state => state.models.promptedModel);
 export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
+export const useSemanticModel = () => useAnnotationStore(state => state.models.semanticModel);
 export const useAvailablePromptedModels = () => useAnnotationStore(state => state.models.availablePromptedModels);
 export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
+export const useAvailableSemanticModels = () => useAnnotationStore(state => state.models.availableSemanticModels);
 export const useIsLoadingPromptedModels = () => useAnnotationStore(state => state.models.isLoadingModels);
 export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
+export const useIsLoadingSemanticModels = () => useAnnotationStore(state => state.models.isLoadingSemanticModels);
 export const useIsRunningCompletion = () => useAnnotationStore(state => state.models.isRunningCompletion);
+export const useIsRunningSemantic = () => useAnnotationStore(state => state.models.isRunningSemantic);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
@@ -63,9 +67,12 @@ export const useClearObjects = () => useAnnotationStore(state => state.clearObje
 
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
 export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
+export const useSetSemanticModel = () => useAnnotationStore(state => state.setSemanticModel);
 export const useSetIsRunningCompletion = () => useAnnotationStore(state => state.setIsRunningCompletion);
+export const useSetIsRunningSemantic = () => useAnnotationStore(state => state.setIsRunningSemantic);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
 export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
+export const useFetchAvailableSemanticModels = () => useAnnotationStore(state => state.fetchAvailableSemanticModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
 export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);

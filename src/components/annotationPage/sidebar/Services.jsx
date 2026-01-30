@@ -1,44 +1,71 @@
 // Services.jsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import ServiceCard from "./Service"
 import {
     useAvailableCompletionModels,
     useAvailablePromptedModels,
+    useAvailableSemanticModels,
     useCompletionModel,
     useFetchAvailableCompletionModels,
     useFetchAvailablePromptedModels,
+    useFetchAvailableSemanticModels,
     useIsLoadingCompletionModels,
     useIsLoadingPromptedModels,
+    useIsLoadingSemanticModels,
     useIsRunningCompletion,
+    useIsRunningSemantic,
     usePromptedModel,
+    useSemanticModel,
     useSetCompletionModel,
-    useSetPromptedModel
+    useSetPromptedModel,
+    useSetSemanticModel
 } from "../../../stores/selectors/annotationSelectors";
 import annotationSession from '../../../services/annotationSession';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
+import { useSemanticSegmentation } from '../../../hooks/useSemanticSegmentation';
+import SemanticWarningModal from '../modals/SemanticWarningModal';
 
 const Services = () => {
     // Fetch models functions
     const fetchPromptedModels = useFetchAvailablePromptedModels();
     const fetchCompletionModels = useFetchAvailableCompletionModels();
+    const fetchSemanticModels = useFetchAvailableSemanticModels();
     
     // Get current model selections
     const promptedModel = usePromptedModel();
     const completionModel = useCompletionModel();
+    const semanticModel = useSemanticModel();
     
-    // Get running state for completion service
+    // Get running states
     const isRunningCompletion = useIsRunningCompletion();
+    const isRunningSemantic = useIsRunningSemantic();
+
+    // Semantic segmentation warning modal
+    const [showSemanticWarning, setShowSemanticWarning] = useState(false);
+    const { runSemantic } = useSemanticSegmentation();
 
     // Load models on component mount
     useEffect(() => {
         fetchPromptedModels();
         fetchCompletionModels();
-    }, [fetchPromptedModels, fetchCompletionModels]);
+        fetchSemanticModels();
+    }, [fetchPromptedModels, fetchCompletionModels, fetchSemanticModels]);
 
     // Preload models when they change
     useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
     useModelSwitchPreloader(completionModel, annotationSession.selectCompletionModel.bind(annotationSession), 'completion');
+    useModelSwitchPreloader(semanticModel, annotationSession.selectSemanticModel.bind(annotationSession), 'semantic');
+
+    // Handle semantic segmentation with warning
+    const handleSemanticRun = () => {
+        setShowSemanticWarning(true);
+    };
+
+    const handleSemanticConfirm = () => {
+        setShowSemanticWarning(false);
+        runSemantic();
+    };
 
     const services = [
         {
@@ -58,6 +85,16 @@ const Services = () => {
             setPromptedModel: useSetCompletionModel(),
             updateAvailableModels: useFetchAvailableCompletionModels(),
             isRunning: isRunningCompletion,
+        },
+        {
+            name: "Semantic Segmentation",
+            models: useAvailableSemanticModels(),
+            isLoading: useIsLoadingSemanticModels(),
+            promptedModel: useSemanticModel(),
+            setPromptedModel: useSetSemanticModel(),
+            updateAvailableModels: useFetchAvailableSemanticModels(),
+            isRunning: isRunningSemantic,
+            onRun: handleSemanticRun,
         },
     ]
 
@@ -85,9 +122,17 @@ const Services = () => {
                         setSelectedModel={service.setPromptedModel}
                         onModelSwitch={service.updateAvailableModels}
                         isRunning={service.isRunning}
+                        onRun={service.onRun}
                     />
                 ))}
             </div>
+
+            {/* Semantic Segmentation Warning Modal */}
+            <SemanticWarningModal
+                isOpen={showSemanticWarning}
+                onClose={() => setShowSemanticWarning(false)}
+                onConfirm={handleSemanticConfirm}
+            />
         </div>
     );
 };

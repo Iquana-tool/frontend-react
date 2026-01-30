@@ -81,11 +81,15 @@ export const initialState = {
   models: {
     promptedModel: null, // Store model ID as string, not object
     completionModel: null, // Store model ID as string, not object
+    semanticModel: null, // Store model ID as string, not object
     availablePromptedModels: [], // List of available AI models from backend
     availableCompletionModels: [], // List of available completion models from backend
+    availableSemanticModels: [], // List of available semantic segmentation models from backend
     isLoadingModels: false,
     isLoadingCompletionModels: false,
+    isLoadingSemanticModels: false,
     isRunningCompletion: false, // Track when completion segmentation (suggest similar) is running
+    isRunningSemantic: false, // Track when semantic segmentation is running
   },
   
   // Objects State

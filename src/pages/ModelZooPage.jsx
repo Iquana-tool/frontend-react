@@ -1,89 +1,30 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { BookOpen, User, Brain, Filter, ArrowLeft } from "lucide-react";
+import { BookOpen, User, Brain, Filter, ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
 import ModelCard from "../components/models/ModelCard";
+import TrainingModal from "../components/models/TrainingModal";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
+import { getAllModels, startSemanticTraining, startPromptedTraining, startCompletionTraining } from "../api/training";
 
-// Static model data - organized by service
-const MODELS_DATA = {
-  "Prompted Segmentation": [
-    {
-      identifier: "sam2_tiny",
-      name: "SAM2 Tiny",
-      description: "Segment Anything Model 2 - Tiny version. The smallest and fastest model. Accuracy is lower than other models.",
-      tags: ["META AI", "Tiny", "Fast", "General Purpose"],
-      service: "Prompted Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-    {
-      identifier: "sam2_small",
-      name: "SAM2 Small",
-      description: "Segment Anything Model 2 - Small version. A good balance between speed and accuracy.",
-      tags: ["META AI", "Small", "Fast", "General Purpose"],
-      service: "Prompted Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-    {
-      identifier: "sam2_baseplus",
-      name: "SAM2 Base+",
-      description: "Segment Anything Model 2 - Base+ version. A larger model with better accuracy.",
-      tags: ["META AI", "Accurate", "Medium", "General Purpose"],
-      service: "Prompted Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-    {
-      identifier: "sam2_large",
-      name: "SAM2 Large",
-      description: "Segment Anything Model 2 - Large version. The largest SAM2 model with the best accuracy. Requires more VRAM and is hence slower.",
-      tags: ["META AI", "Large", "Slow", "General Purpose"],
-      service: "Prompted Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-  ],
-  "Completion Segmentation": [
-    {
-      identifier: "cosine_sim",
-      name: "Cosine Similarity Predictor",
-      description: "A dual encoder decoder architecture using DINO v3 backbone with an image size of 1024 px. The decoder uses cosine similarity with maximum similarity aggregation and histogram equalization to find similar objects in the image. SAM is used to refine the proposed masks.",
-      tags: ["Experimental"],
-      service: "Completion Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-    {
-      identifier: "sam3",
-      name: "SAM 3",
-      description: "SAM 3 is a unified foundation model for promptable segmentation in images and videos. It can detect, segment, and track objects using text or visual prompts such as points, boxes, and masks. Compared to its predecessor SAM 2, SAM 3 introduces the ability to exhaustively segment all instances of an open-vocabulary concept specified by a short text phrase or exemplars. Unlike prior work, SAM 3 can handle a vastly larger set of open-vocabulary prompts. It achieves 75-80% of human performance on our new SA-CO benchmark which contains 270K unique concepts, over 50 times more than existing benchmarks.",
-      tags: ["Meta AI"],
-      service: "Completion Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-    {
-      identifier: "geco",
-      name: "GeCo",
-      description: "GeCo, a low-shot counter that achieves accurate object detection, segmentation, and count estimation in a unified architecture. GeCo robustly generalizes the prototypes across objects appearances through a novel dense object query formulation.",
-      tags: ["SOTA"],
-      service: "Completion Segmentation",
-      supportsTraining: true,
-      supportsFinetuning: true,
-      supportsInference: true,
-    },
-  ],
-};
+// Helper to transform backend model to UI format
+const transformModel = (model) => ({
+  identifier: model.identifier || model.registry_key,
+  name: model.name,
+  description: model.description,
+  tags: model.tags || [],
+  service: model.service,
+  // Backend fields
+  trainable: model.trainable !== false, // Default to true unless explicitly false
+  finetunable: model.finetunable !== false, // Default to true unless explicitly false
+  pretrained: model.pretrained !== false, // Default to true unless explicitly false
+  // UI compatibility
+  supportsTraining: model.trainable !== false,
+  supportsFinetuning: model.finetunable !== false,
+  supportsInference: true, // All models support inference
+});
 
 const ModelZooPage = () => {
   const navigate = useNavigate();
@@ -91,10 +32,54 @@ const ModelZooPage = () => {
   const { datasetId } = useParams();
   const { isAuthenticated, user } = useAuth();
   const [selectedService, setSelectedService] = useState("All");
+  const [modelsData, setModelsData] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Training modal state
+  const [trainingModal, setTrainingModal] = useState({
+    isOpen: false,
+    model: null,
+    actionType: null,
+  });
 
   // Check if we came from a dataset management page
   const datasetIdFromState = location.state?.datasetId || datasetId;
   const isFromDatasetManagement = !!datasetIdFromState;
+
+  // Fetch models from backend
+  useEffect(() => {
+    const fetchModels = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await getAllModels();
+        
+        if (result.success && result.models) {
+          // Group models by service
+          const groupedModels = result.models.reduce((acc, model) => {
+            const transformedModel = transformModel(model);
+            const service = transformedModel.service;
+            if (!acc[service]) {
+              acc[service] = [];
+            }
+            acc[service].push(transformedModel);
+            return acc;
+          }, {});
+          
+          setModelsData(groupedModels);
+        } else {
+          setError(result.error || 'Failed to load models from backend');
+        }
+      } catch (err) {
+        setError(err.message || 'Failed to load models');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchModels();
+  }, []);
 
   // Check if we came from a dataset management page
   const handleBack = () => {
@@ -111,19 +96,52 @@ const ModelZooPage = () => {
   };
 
   const handleModelAction = (model, actionType) => {
-    console.log(`Action ${actionType} for model ${model.identifier}`);
-    // Action handlers to be implemented later
+    if (actionType === 'training' || actionType === 'finetuning') {
+      // Open training modal
+      setTrainingModal({
+        isOpen: true,
+        model: model,
+        actionType: actionType,
+      });
+    } else if (actionType === 'inference') {
+      // Navigate to inference page (implement if needed)
+      // TODO: Implement inference navigation
+    }
+  };
+
+  const handleTrainingSubmit = async (trainingParams) => {
+    const { model } = trainingModal;
+    
+    try {
+      let response;
+      
+      // Only Semantic Segmentation models support training
+      if (model.service === 'Semantic Segmentation') {
+        response = await startSemanticTraining(trainingParams);
+        
+        if (response.success) {
+          alert(`Training started successfully! Task ID: ${response.task_id || 'N/A'}`);
+        } else {
+          throw new Error(response.message || 'Training failed');
+        }
+      } else {
+        // Prompted and Completion Segmentation don't support training
+        throw new Error(`Training is not supported for ${model.service} models. These models are for inference only.`);
+      }
+    } catch (error) {
+      throw error; // Re-throw to let modal handle the error
+    }
   };
 
   // Get all services
-  const services = ["All", ...Object.keys(MODELS_DATA)];
+  const services = ["All", ...Object.keys(modelsData)];
 
   // Filter models based on selected service
   const getFilteredModels = () => {
     if (selectedService === "All") {
-      return MODELS_DATA;
+      return modelsData;
     }
-    return { [selectedService]: MODELS_DATA[selectedService] };
+    return { [selectedService]: modelsData[selectedService] || [] };
   };
 
   const filteredModels = getFilteredModels();
@@ -160,6 +178,25 @@ const ModelZooPage = () => {
 
         <div className="h-full overflow-y-auto bg-gray-50">
           <div className="max-w-[98%] mx-auto px-4 py-8">
+            {/* Loading State */}
+            {isLoading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
+                <p className="text-gray-600">Loading models...</p>
+              </div>
+            )}
+
+            {/* Error State */}
+            {error && !isLoading && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                <p className="text-red-800 font-medium mb-2">Failed to load models</p>
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Content - Only show when not loading and no error */}
+            {!isLoading && !error && (
+              <>
             {/* Page Header - Only show when NOT accessed from dataset management */}
             {!isFromDatasetManagement && (
               <div className="mb-8">
@@ -233,8 +270,19 @@ const ModelZooPage = () => {
                 </p>
               </div>
             )}
+            </>
+            )}
           </div>
         </div>
+
+        {/* Training Modal */}
+        <TrainingModal
+          isOpen={trainingModal.isOpen}
+          onClose={() => setTrainingModal({ isOpen: false, model: null, actionType: null })}
+          model={trainingModal.model}
+          onSubmit={handleTrainingSubmit}
+          datasetId={datasetIdFromState}
+        />
       </div>
     );
   };

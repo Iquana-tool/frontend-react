@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Circle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Circle, Play } from 'lucide-react';
 
 const StatusIndicator = ({ status }) => {
   const getStatusConfig = () => {
@@ -90,6 +90,7 @@ const ServiceCard = ({
   onModelSwitch,
   icon: Icon,
   isRunning = false, // Track when a service operation is running 
+  onRun = null, // Optional callback to run the service (for semantic segmentation)
 }) => {
   const [instantMode, setInstantMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -200,34 +201,58 @@ const ServiceCard = ({
         <>
           {/* Instant Mode Toggle and Description Button */}
           <div className="flex items-center justify-between mb-2 bg-white/50 rounded-lg p-2 border border-gray-100">
-            <label className="flex items-center space-x-2.5 cursor-pointer group/toggle">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={instantMode}
-                  onChange={handleInstantModeToggle}
-                  className="sr-only peer"
-                />
-                <div className={`w-11 h-6 rounded-full transition-all duration-300 shadow-inner ${
-                  instantMode 
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 shadow-teal-200' 
-                    : 'bg-gray-300 group-hover/toggle:bg-gray-400'
-                }`}>
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${
-                    instantMode ? 'translate-x-6' : 'translate-x-1'
+            {!onRun ? (
+              <label className="flex items-center space-x-2.5 cursor-pointer group/toggle">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={instantMode}
+                    onChange={handleInstantModeToggle}
+                    className="sr-only peer"
+                  />
+                  <div className={`w-11 h-6 rounded-full transition-all duration-300 shadow-inner ${
+                    instantMode 
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 shadow-teal-200' 
+                      : 'bg-gray-300 group-hover/toggle:bg-gray-400'
                   }`}>
-                    {instantMode && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
-                      </div>
-                    )}
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                      instantMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}>
+                      {instantMode && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 bg-teal-500 rounded-full"></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <span className="text-xs font-medium text-gray-700 group-hover/toggle:text-gray-900 transition-colors">
-                Instant Mode
-              </span>
-            </label>
+                <span className="text-xs font-medium text-gray-700 group-hover/toggle:text-gray-900 transition-colors">
+                  Instant Mode
+                </span>
+              </label>
+            ) : (
+              <button
+                onClick={onRun}
+                disabled={isRunning}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  isRunning 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-sm hover:shadow-md'
+                }`}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Running...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Run</span>
+                  </>
+                )}
+              </button>
+            )}
             
             <button
               onClick={() => setExpanded(!expanded)}

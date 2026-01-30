@@ -4,6 +4,7 @@ const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
 
 // Get available prompted segmentation models from backend
+
 export const getPromptedModels = async () => {
     try {
         const response = await fetch(`${API_BASE_URL}/prompted_segmentation/models`, {
@@ -11,16 +12,13 @@ export const getPromptedModels = async () => {
         });
         const data = await handleApiError(response);
 
-        if (data.success && data.response && data.response.result) {
-            if (Array.isArray(data.response.result) && data.response.result.length > 0) {
-                return {
-                    success: true,
-                    models: data.response.result,
-                };
-            }
+        if (data.success && Array.isArray(data.result)) {
+            return {
+                success: true,
+                models: data.result,
+            };
         }
 
-        // No models returned from backend
         return {
             success: true,
             models: [],
@@ -103,16 +101,41 @@ export const getCompletionModels = async () => {
         });
         const data = await handleApiError(response);
 
-        if (data.success && data.response && data.response.result) {
-            if (Array.isArray(data.response.result) && data.response.result.length > 0) {
-                return {
-                    success: true,
-                    models: data.response.result,
-                };
-            }
+        if (data.success && Array.isArray(data.result)) {
+            return {
+                success: true,
+                models: data.result,
+            };
         }
 
-        // No models returned from backend
+        return {
+            success: true,
+            models: [],
+        };
+    } catch (error) {
+        return {
+            success: false,
+            models: [],
+            error: error.message,
+        };
+    }
+};
+
+// Get available semantic segmentation models from backend
+export const getSemanticModels = async () => {
+    try {
+        const response = await fetch(`${API_BASE_URL}/semantic_segmentation/models`, {
+            headers: getAuthHeaders(),
+        });
+        const data = await handleApiError(response);
+
+        if (data.success && Array.isArray(data.result)) {
+            return {
+                success: true,
+                models: data.result,
+            };
+        }
+
         return {
             success: true,
             models: [],

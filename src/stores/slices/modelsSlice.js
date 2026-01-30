@@ -1,4 +1,4 @@
-import { getPromptedModels, getCompletionModels } from '../../api/models';
+import { getPromptedModels, getCompletionModels, getSemanticModels } from '../../api/models';
 
 /**
  * Models slice - manages AI model selection and available models
@@ -12,8 +12,16 @@ export const createModelsSlice = (set) => ({
     state.models.completionModel = model;
   }),
   
+  setSemanticModel: (model) => set((state) => {
+    state.models.semanticModel = model;
+  }),
+  
   setIsRunningCompletion: (isRunning) => set((state) => {
     state.models.isRunningCompletion = isRunning;
+  }),
+  
+  setIsRunningSemantic: (isRunning) => set((state) => {
+    state.models.isRunningSemantic = isRunning;
   }),
 
   loadPromptedModel: async (model) => {
@@ -145,6 +153,50 @@ export const createModelsSlice = (set) => ({
       set((state) => {
         state.models.availablePromptedModels = [];
         state.models.isLoadingModels = false;
+      });
+    }
+  },
+
+  fetchAvailableSemanticModels: async () => {
+    set((state) => {
+      state.models.isLoadingSemanticModels = true;
+    });
+
+    try {
+      const result = await getSemanticModels();
+      if (result.success && result.models && result.models.length > 0) {
+        // Transform backend models to frontend format
+        const transformedModels = result.models.map(model => ({
+          id: model.registry_key,
+          name: model.name,
+          description: model.description,
+          tags: model.tags,
+          model_status: model.model_status || 'ready'
+        }));
+
+        set((state) => {
+          state.models.availableSemanticModels = transformedModels;
+          state.models.isLoadingSemanticModels = false;
+          
+          // Set default model if none is selected and models are available
+          if (!state.models.semanticModel && transformedModels.length > 0) {
+            state.models.semanticModel = transformedModels[0].id;
+          }
+        });
+      } else {
+        // No models returned from backend - show empty list
+        console.warn('No semantic models returned from backend');
+        set((state) => {
+          state.models.availableSemanticModels = [];
+          state.models.isLoadingSemanticModels = false;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching semantic models:', error);
+      // show empty list on error
+      set((state) => {
+        state.models.availableSemanticModels = [];
+        state.models.isLoadingSemanticModels = false;
       });
     }
   },

@@ -416,6 +416,25 @@ class AnnotationSession {
     return websocketService.send(message, true);
   }
 
+  // ==================== SEMANTIC SEGMENTATION ====================
+
+  /**
+   * Run semantic segmentation inference
+   * @param {string} modelKey - Semantic model key
+   * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
+   */
+  async runSemantic(modelKey) {
+    this._ensureReady();
+    
+    // Check if semantic service is available
+    if (!this.isServiceAvailable('semantic_segmentation')) {
+      throw new Error('Semantic segmentation service is not available. Please check your connection.');
+    }
+    
+    const message = MessageBuilders.runSemantic(modelKey);
+    return websocketService.send(message, true);
+  }
+
   // ==================== SESSION MANAGEMENT ====================
 
   /**
