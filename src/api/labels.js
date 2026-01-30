@@ -10,7 +10,7 @@ export const fetchLabels = async (datasetId) => {
             throw new Error("Dataset ID is required");
         }
         const response = await fetch(
-            `${API_BASE_URL}/datasets/get_labels/${datasetId}`,
+            `${API_BASE_URL}/datasets/${datasetId}/labels`,
             {
                 headers: getAuthHeaders(),
             }
