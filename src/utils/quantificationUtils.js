@@ -111,3 +111,56 @@ export const getLabelsToAutoExpand = (metricsPerLabelId, childCountsPerLabelId) 
   
   return labelsToExpand;
 };
+
+// Transform flat contour data to hierarchical aggregated format
+export const transformFlatDataToHierarchical = (flatDataResponse) => {
+  if (!flatDataResponse || !flatDataResponse.data) {
+    return null;
+  }
+
+  // Parse the JSON string data
+  const contours = JSON.parse(flatDataResponse.data);
+  
+  // Aggregate metrics per label
+  const metricsPerLabelId = {};
+  
+  contours.forEach(contour => {
+    const labelId = contour.label_id || 'null';
+    
+    if (!metricsPerLabelId[labelId]) {
+      metricsPerLabelId[labelId] = {
+        area: [],
+        perimeter: [],
+        circularity: [],
+        max_diameter: []
+      };
+    }
+    
+    // Add metrics
+    if (contour.area !== null && contour.area !== undefined) {
+      metricsPerLabelId[labelId].area.push(contour.area);
+    }
+    if (contour.perimeter !== null && contour.perimeter !== undefined) {
+      metricsPerLabelId[labelId].perimeter.push(contour.perimeter);
+    }
+    if (contour.circularity !== null && contour.circularity !== undefined) {
+      metricsPerLabelId[labelId].circularity.push(contour.circularity);
+    }
+    if (contour.diameter_avg !== null && contour.diameter_avg !== undefined) {
+      const diameter = parseFloat(contour.diameter_avg);
+      if (!isNaN(diameter)) {
+        metricsPerLabelId[labelId].max_diameter.push(diameter);
+      }
+    }
+  });
+
+  // For now, return a simplified structure without full label hierarchy
+  // We'll fetch labels separately if needed
+  return {
+    success: true,
+    message: "Successfully transformed quantification data.",
+    metrics_per_label_id: metricsPerLabelId,
+    child_counts_per_label_id: {},
+    labels: null // Will need to be fetched separately
+  };
+};

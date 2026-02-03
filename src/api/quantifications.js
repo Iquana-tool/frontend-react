@@ -1,4 +1,5 @@
 import { handleApiError, getAuthHeaders } from "../api/util";
+import { transformFlatDataToHierarchical } from "../utils/quantificationUtils";
 
 const API_BASE_URL =
     process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
@@ -26,18 +27,39 @@ export const getQuantification = async (maskId) => {
 };
 
 // Get dataset object quantifications with hierarchical labels and aggregated metrics
-export const getDatasetObjectQuantifications = async (datasetId, includeManual = true, includeAuto = true) => {
+export const getDatasetObjectQuantifications = async (datasetId, includeManual = true, includeAuto = true, includeLabelIds = null, asDownload = false) => {
     try {
-        const excludeUnreviewedObjects = !includeAuto;
+        // Map the include flags to exclude parameters
+        const excludeUnreviewed = !includeAuto;
+        const excludeNotFullyAnnotated = !includeManual;
         
-        const response = await fetch(
-            `${API_BASE_URL}/export/get_dataset_object_quantifications/${datasetId}&exclude_unreviewed_objects=${excludeUnreviewedObjects}`,
-            {
-                headers: getAuthHeaders(),
-            }
-        );
-        const data = await handleApiError(response);
-        return data;
+        // Build query parameters
+        const params = new URLSearchParams();
+        params.append("exclude_unreviewed", excludeUnreviewed);
+        params.append("exclude_not_fully_annotated", excludeNotFullyAnnotated);
+        params.append("as_download", asDownload);
+        
+        if (includeLabelIds && includeLabelIds.length > 0) {
+            includeLabelIds.forEach(id => params.append("include_label_ids", id));
+        }
+        
+        const queryString = params.toString();
+        const quantUrl = `${API_BASE_URL}/datasets/${datasetId}/quantification${queryString ? `?${queryString}` : ''}`;
+        
+        // Fetch quantification data and labels in parallel
+        const [quantData, labelsData] = await Promise.all([
+            fetch(quantUrl, { headers: getAuthHeaders() }).then(handleApiError),
+            fetch(`${API_BASE_URL}/datasets/${datasetId}/labels`, { headers: getAuthHeaders() }).then(handleApiError)
+        ]);
+        
+        // Transform flat data to hierarchical format
+        const transformedData = transformFlatDataToHierarchical(quantData);
+        
+        // Combine with labels
+        return {
+            ...transformedData,
+            labels: labelsData.labels
+        };
     } catch (error) {
         throw error;
     }
