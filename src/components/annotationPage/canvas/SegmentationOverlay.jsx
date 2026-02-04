@@ -114,11 +114,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         const isLabelVisible = visibility.labels[labelIdKey] !== false; // Default to true if not set
         if (!isLabelVisible) return false;
       } else {
-        // If object has no labelId, hide it when labels are configured
-        // Only show unlabeled objects when no labels are configured yet
-        if (Object.keys(visibility.labels).length > 0) {
-          return false;
-        }
+        // If object has no labelId, ALWAYS show it 
       }
 
       return true;
@@ -312,8 +308,22 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         return;
       }
 
-      const mask = object.mask || (object.path ? { path: object.path } : null);
-      enterFocusMode(object.id, mask);
+      // Create mask from x,y arrays if mask doesn't exist or doesn't have points
+      let mask = object.mask;
+      
+      // If mask doesn't exist or doesn't have points, create it from x,y arrays
+      if (!mask || !mask.points) {
+        // Convert normalized x,y arrays to pixel coordinates and create points array
+        const points = object.x.map((x, i) => [
+          x * imageObject.width,
+          object.y[i] * imageObject.height
+        ]);
+        mask = { points: points };
+      }
+      
+      if (mask && mask.points && mask.points.length > 0) {
+        enterFocusMode(object.id, mask);
+      }
 
       const container = containerRef.current;
       if (!container) return;
@@ -509,12 +519,17 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           strokeColor = object.color;
         }
         
-        // Get mask path from backend (precomputed) or fallback to mask.path
-        let maskPath = object.path || object.mask?.path;
+        // ALWAYS generate path from x,y coordinates if available )
+        // Backend path is pre-generated at a different resolution, causing coordinate mismatch
+        let maskPath = null;
         
-        // If no path available, try to generate from x, y coordinates
-        if (!maskPath && object.x && object.y && object.x.length > 0 && imageObject) {
+        if (object.x && object.y && object.x.length > 0 && imageObject) {
           maskPath = generatePathFromCoordinates(object.x, object.y, imageObject.width, imageObject.height);
+        }
+        
+        // Fallback to backend path only if coordinate generation failed
+        if (!maskPath) {
+          maskPath = object.path || object.mask?.path;
         }
         
         // Skip if still no path available

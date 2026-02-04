@@ -5,7 +5,7 @@ import {
   useContextMenuY,
   useContextMenuTargetObjectId,
   useHideContextMenu,
-  useEnterFocusModeWithZoom,
+  useEnterFocusMode,
   useObjectsList,
   useSelectedObjects,
   useImageObject,
@@ -21,6 +21,7 @@ import {
   useEnterEditMode,
 } from '../../../stores/selectors/annotationSelectors';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
+import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
 import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentation';
@@ -36,7 +37,7 @@ const ObjectContextMenu = () => {
   const y = useContextMenuY();
   const targetObjectId = useContextMenuTargetObjectId();
   const hideContextMenu = useHideContextMenu();
-  const enterFocusModeWithZoom = useEnterFocusModeWithZoom();
+  const enterFocusMode = useEnterFocusMode();
   const objectsList = useObjectsList();
   const selectedObjects = useSelectedObjects();
   const imageObject = useImageObject();
@@ -48,6 +49,13 @@ const ObjectContextMenu = () => {
   const focusModeActive = useFocusModeActive();
   const exitFocusMode = useExitFocusMode();
   const completionModel = useCompletionModel();
+  
+  // Use the same zoom hook as refinement mode
+  const { zoomToObject } = useZoomToObject({
+    marginPct: 0.2,
+    maxZoom: 4,
+    minZoom: 1,
+  });
   const wsIsReady = useWebSocketIsReady();
   const enterEditMode = useEnterEditMode();
   const { currentDataset } = useDataset();
@@ -175,10 +183,20 @@ const ObjectContextMenu = () => {
 
     // Find the target object
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
-    if (!targetObject || !targetObject.mask) {
+    if (!targetObject || !targetObject.x || !targetObject.y || targetObject.x.length === 0) {
       hideContextMenu();
       return;
     }
+    
+    // Create mask from x,y arrays for focus mode boundary checking
+    const points = targetObject.x.map((x, i) => [
+      x * imageObject.width,
+      targetObject.y[i] * imageObject.height
+    ]);
+    const objectMask = { points: points };
+    
+    // Enter focus mode (without zoom - zoom is handleded externally)
+    enterFocusMode(targetObjectId, objectMask);
 
     // Get the container element (the canvas container)
     const container = menuRef.current?.parentElement;
@@ -190,16 +208,16 @@ const ObjectContextMenu = () => {
     const containerWidth = container.offsetWidth || 800;
     const containerHeight = container.offsetHeight || 600;
 
+    // Calculate image dimensions (actual image size)
+    const imageDimensions = {
+      width: imageObject.width || 800,
+      height: imageObject.height || 600
+    };
+
     // Calculate container dimensions
     const containerDimensions = {
       width: containerWidth,
       height: containerHeight
-    };
-
-    // Calculate image dimensions (actual image size)
-    const imageDimensionsForCalc = {
-      width: imageObject.width || 800,
-      height: imageObject.height || 600
     };
 
     // Calculate rendered image dimensions (how the image is displayed in the container)
@@ -209,14 +227,15 @@ const ObjectContextMenu = () => {
       containerHeight
     );
 
-    // Enter focus mode with zoom and center - pass all required parameters
-    enterFocusModeWithZoom(
-      targetObjectId, 
-      targetObject.mask, 
-      imageDimensionsForCalc, 
+    // Use the same zoom logic as refinement mode
+    zoomToObject(
+      targetObject, 
+      imageDimensions, 
       containerDimensions, 
-      renderedImageDimensions
+      renderedImageDimensions,
+      { animateMs: 300, immediate: false }
     );
+    
     hideContextMenu();
   };
 

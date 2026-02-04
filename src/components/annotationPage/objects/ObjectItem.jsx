@@ -243,8 +243,20 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         // 3. Object has valid coordinates
         if (!refinementModeActive && currentTool === 'selection' && 
             imageObject && object.x && object.y && object.x.length > 0) {
-          const mask = object.mask || (object.path ? { path: object.path } : null);
-          if (mask) {
+          // Create mask from x,y arrays if mask doesn't exist or doesn't have points
+          let mask = object.mask;
+          
+          // If mask doesn't exist or doesn't have points, create it from x,y arrays
+          if (!mask || !mask.points) {
+            // Convert normalized x,y arrays to pixel coordinates and create points array
+            const points = object.x.map((x, i) => [
+              x * imageObject.width,
+              object.y[i] * imageObject.height
+            ]);
+            mask = { points: points };
+          }
+          
+          if (mask && mask.points && mask.points.length > 0) {
             enterFocusMode(object.id, mask);
           }
         }

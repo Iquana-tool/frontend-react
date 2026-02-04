@@ -6,12 +6,10 @@ import {
   useExitFocusMode,
   useObjectsList,
   useImageObject,
-  useEnterFocusModeWithZoom,
   useSetPanOffset,
   useRefinementModeActive,
   useSetZoomLevel,
 } from '../../../stores/selectors/annotationSelectors';
-import { calculateBoundingBox, calculateFocusTransformSimple } from '../../../utils/geometryUtils';
 
 const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const focusModeActive = useFocusModeActive();
@@ -20,13 +18,11 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   const exitFocusMode = useExitFocusMode();
   const objectsList = useObjectsList();
   const imageObject = useImageObject();
-  const enterFocusModeWithZoom = useEnterFocusModeWithZoom();
   const setPanOffset = useSetPanOffset();
   const setZoomLevel = useSetZoomLevel();
   const refinementModeActive = useRefinementModeActive();
   const containerRef = canvasRef; // Use the same container reference as SegmentationOverlay
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
-  const [hasAppliedFocusZoom, setHasAppliedFocusZoom] = useState(false);
 
   const handleExitFocusMode = () => {
     // Reset zoom and pan before exiting
@@ -96,35 +92,6 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
     };
   }, [imageObject]);
 
-  // Auto-zoom and center when focus mode is activated
-  useEffect(() => {
-    if (focusModeActive && focusedObjectId && focusedObjectMask && imageDimensions.width > 0 && !hasAppliedFocusZoom) {
-      // Find the focused object
-      const focusedObject = objectsList.find(obj => obj.id === focusedObjectId);
-      if (focusedObject && focusedObject.mask && focusedObject.mask.points) {
-        const imageDimensionsForCalc = {
-          width: imageObject.width,
-          height: imageObject.height
-        };
-        
-        const containerDimensions = {
-          width: containerRef.current?.offsetWidth || 800,
-          height: containerRef.current?.offsetHeight || 600
-        };
-        
-        // Apply the focus transform with proper dimensions
-        enterFocusModeWithZoom(focusedObjectId, focusedObjectMask, imageDimensionsForCalc, containerDimensions, imageDimensions);
-        setHasAppliedFocusZoom(true);
-      }
-    }
-  }, [focusModeActive, focusedObjectId, focusedObjectMask, imageDimensions, hasAppliedFocusZoom, objectsList, imageObject, enterFocusModeWithZoom]);
-
-  // Reset focus zoom flag when exiting focus mode
-  useEffect(() => {
-    if (!focusModeActive) {
-      setHasAppliedFocusZoom(false);
-    }
-  }, [focusModeActive]);
 
   // Note: Pan calculation is now handled by the improved calculateFocusTransformSimple function
   // No additional pan adjustment needed here
@@ -145,8 +112,28 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
     return null;
   }
 
+  // Generate path from points if path doesn't exist
+  let maskPath = focusedObjectMask.path;
+  if (!maskPath && focusedObjectMask.points && imageObject) {
+    // Convert points array to SVG path
+    if (focusedObjectMask.points.length > 0) {
+      const firstPoint = focusedObjectMask.points[0];
+      const startX = Array.isArray(firstPoint) ? firstPoint[0] : firstPoint.x;
+      const startY = Array.isArray(firstPoint) ? firstPoint[1] : firstPoint.y;
+      maskPath = `M ${startX} ${startY}`;
+      
+      for (let i = 1; i < focusedObjectMask.points.length; i++) {
+        const point = focusedObjectMask.points[i];
+        const x = Array.isArray(point) ? point[0] : point.x;
+        const y = Array.isArray(point) ? point[1] : point.y;
+        maskPath += ` L ${x} ${y}`;
+      }
+      maskPath += ' Z';
+    }
+  }
+
   // Validate mask data
-  if (!focusedObjectMask.path) {
+  if (!maskPath) {
     exitFocusMode();
     return null;
   }
@@ -183,7 +170,7 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
               <mask id="focus-mask">
                 <rect width="100%" height="100%" fill="white" />
                 <path
-                  d={focusedObjectMask.path}
+                  d={maskPath}
                   fill="black"
                 />
               </mask>
