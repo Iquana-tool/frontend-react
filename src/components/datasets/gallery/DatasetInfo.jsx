@@ -59,12 +59,14 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
               <div className="flex justify-between">
                 <span>Completed:</span>
                 <span className="font-medium text-green-600">
-                  {((stats.manuallyAnnotated || 0) + (stats.autoAnnotated || 0))}
+                  {(stats.finished || 0) + (stats.reviewable || 0)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Remaining:</span>
-                <span className="font-medium text-orange-600">{stats.missing || 0}</span>
+                <span className="font-medium text-orange-600">
+                  {(stats.not_started || 0) + (stats.in_progress || 0)}
+                </span>
               </div>
             </div>
           </div>

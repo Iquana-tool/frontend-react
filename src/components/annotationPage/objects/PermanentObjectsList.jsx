@@ -37,18 +37,6 @@ const PermanentObjectsList = ({ objects = [] }) => {
           </div>
         )}
       </div>
-
-      {/* Stats Footer */}
-      {objects.length > 0 && (
-        <div className="bg-teal-50 border border-teal-100 rounded-lg p-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-teal-700 font-medium">Total Coverage:</span>
-            <span className="text-teal-800 font-semibold">
-              {objects.reduce((sum, obj) => sum + (obj.pixelCount || 0), 0).toLocaleString()} px
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

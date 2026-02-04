@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Loader2, Circle, Play } from 'lucide-react';
+import {
+  useInstantSegmentation,
+  useToggleInstantSegmentation,
+} from '../../../stores/selectors/annotationSelectors';
 
 const StatusIndicator = ({ status }) => {
   const getStatusConfig = () => {
@@ -92,9 +96,14 @@ const ServiceCard = ({
   isRunning = false, // Track when a service operation is running 
   onRun = null, // Optional callback to run the service (for semantic segmentation)
 }) => {
-  const [instantMode, setInstantMode] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState();
+  
+  // Connect Instant Mode to store (only for Prompted Segmentation service)
+  const instantSegmentation = useInstantSegmentation();
+  const toggleInstantSegmentation = useToggleInstantSegmentation();
+  const isPromptedSegmentation = serviceName === 'Prompted Segmentation';
+  const instantMode = isPromptedSegmentation ? instantSegmentation : false;
   
   // Get the actual model object from the models array
   const selectedModelObj = models.find(m => m.id === selectedModel) || models[0];
@@ -117,7 +126,9 @@ const ServiceCard = ({
   }, [selectedId, setSelectedModel, models]);
 
   const handleInstantModeToggle = () => {
-    setInstantMode(!instantMode);
+    if (isPromptedSegmentation) {
+      toggleInstantSegmentation();
+    }
   };
 
   if (isLoading) {
@@ -201,7 +212,29 @@ const ServiceCard = ({
         <>
           {/* Instant Mode Toggle and Description Button */}
           <div className="flex items-center justify-between mb-2 bg-white/50 rounded-lg p-2 border border-gray-100">
-            {!onRun ? (
+            {onRun ? (
+              <button
+                onClick={onRun}
+                disabled={isRunning}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
+                  isRunning 
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-sm hover:shadow-md'
+                }`}
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Running...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3.5 h-3.5" />
+                    <span>Run</span>
+                  </>
+                )}
+              </button>
+            ) : isPromptedSegmentation ? (
               <label className="flex items-center space-x-2.5 cursor-pointer group/toggle">
                 <div className="relative">
                   <input
@@ -230,29 +263,7 @@ const ServiceCard = ({
                   Instant Mode
                 </span>
               </label>
-            ) : (
-              <button
-                onClick={onRun}
-                disabled={isRunning}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                  isRunning 
-                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-sm hover:shadow-md'
-                }`}
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Running...</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-3.5 h-3.5" />
-                    <span>Run</span>
-                  </>
-                )}
-              </button>
-            )}
+            ) : null}
             
             <button
               onClick={() => setExpanded(!expanded)}

@@ -7,14 +7,15 @@ import {
   ResponsiveContainer
 } from "recharts";
 
-const COLORS = ["#2563EB", "#059669", "#DC2626"]; // Improved Blue, Green, Red
+const COLORS = ["#DC2626", "#F59E0B", "#3B82F6", "#059669"]; // Red (Not started), Orange (In progress), Blue (Reviewable), Green (Finished)
 
 const DatasetAnnotationProgress = ({ stats }) => {
   // Ensure we have valid numbers, default to 0 if undefined/null
-  const manuallyAnnotated = stats?.manuallyAnnotated || 0;
-  const autoAnnotated = stats?.autoAnnotated || 0;
-  const missing = stats?.missing || 0;
-  const total = manuallyAnnotated + autoAnnotated + missing;
+  const notStarted = stats?.not_started || 0;
+  const inProgress = stats?.in_progress || 0;
+  const reviewable = stats?.reviewable || 0;
+  const finished = stats?.finished || 0;
+  const total = stats?.total || (notStarted + inProgress + reviewable + finished);
 
   if (total === 0) {
     return (
@@ -25,10 +26,11 @@ const DatasetAnnotationProgress = ({ stats }) => {
   }
 
   const data = [
-    { name: "Completed", value: manuallyAnnotated },
-    { name: "In Progress", value: autoAnnotated },
-    { name: "Not Started", value: missing }
-  ];
+    { name: "Not started", value: notStarted },
+    { name: "In progress", value: inProgress },
+    { name: "Reviewable", value: reviewable },
+    { name: "Finished", value: finished }
+  ].filter(item => item.value > 0); // Only show statuses with counts > 0
 
   return (
     <div className="mb-4">
@@ -42,23 +44,30 @@ const DatasetAnnotationProgress = ({ stats }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[0] }}></div>
-              <span>Completed:</span>
+              <span>Not started:</span>
             </div>
-            <span className="font-medium">{manuallyAnnotated} ({Math.round((manuallyAnnotated / total) * 100)}%)</span>
+            <span className="font-medium">{notStarted} ({Math.round((notStarted / total) * 100)}%)</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[1] }}></div>
-              <span>In Progress:</span>
+              <span>In progress:</span>
             </div>
-            <span className="font-medium">{autoAnnotated} ({Math.round((autoAnnotated / total) * 100)}%)</span>
+            <span className="font-medium">{inProgress} ({Math.round((inProgress / total) * 100)}%)</span>
           </div>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[2] }}></div>
-              <span>Not Started:</span>
+              <span>Reviewable:</span>
             </div>
-            <span className="font-medium">{missing} ({Math.round((missing / total) * 100)}%)</span>
+            <span className="font-medium">{reviewable} ({Math.round((reviewable / total) * 100)}%)</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[3] }}></div>
+              <span>Finished:</span>
+            </div>
+            <span className="font-medium">{finished} ({Math.round((finished / total) * 100)}%)</span>
           </div>
         </div>
 
@@ -77,9 +86,13 @@ const DatasetAnnotationProgress = ({ stats }) => {
                 stroke="white"
                 strokeWidth={2}
               >
-                {data.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
+                {data.map((entry, index) => {
+                  // Map data entry back to color index
+                  const colorIndex = entry.name === "Not started" ? 0 :
+                                   entry.name === "In progress" ? 1 :
+                                   entry.name === "Reviewable" ? 2 : 3;
+                  return <Cell key={`cell-${index}`} fill={COLORS[colorIndex]} />;
+                })}
               </Pie>
               <Tooltip 
                 formatter={(value, name) => [`${value} (${Math.round((value / total) * 100)}%)`, name]}

@@ -96,7 +96,7 @@ export const useSetRightSidebarCollapsed = () => useAnnotationStore(state => sta
 export const useToggleLeftSidebar = () => useAnnotationStore(state => state.toggleLeftSidebar);
 export const useToggleRightSidebar = () => useAnnotationStore(state => state.toggleRightSidebar);
 
-// Visibility controls actions
+// Annotation Overview actions
 export const useSetVisibilityControlsExpanded = () => useAnnotationStore(state => state.setVisibilityControlsExpanded);
 export const useToggleVisibilityControls = () => useAnnotationStore(state => state.toggleVisibilityControls);
 

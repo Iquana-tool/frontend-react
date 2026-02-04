@@ -55,16 +55,17 @@ export const DatasetProvider = ({ children }) => {
         const finished = statusCounts.finished || 0;
         
         return {
-          manuallyAnnotated: finished, // Fully annotated and reviewed
-          autoAnnotated: reviewable + inProgress, // Auto-annotated (needs review or in progress)
-          missing: notStarted, // No annotations yet
+          not_started: notStarted,
+          in_progress: inProgress,
+          reviewable: reviewable,
+          finished: finished,
           total: response.total_images || 0
         };
       }
-      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 };
+      return { not_started: 0, in_progress: 0, reviewable: 0, finished: 0, total: 0 };
     } catch (err) {
       console.error('Error fetching annotation progress:', err);
-      return { manuallyAnnotated: 0, autoAnnotated: 0, missing: 0, total: 0 };
+      return { not_started: 0, in_progress: 0, reviewable: 0, finished: 0, total: 0 };
     }
   };
 

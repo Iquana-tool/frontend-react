@@ -38,7 +38,8 @@ export const createModelsSlice = (set) => ({
           name: model.name,
           description: model.description,
           tags: model.tags,
-          supports_refinement: model.refinement_supported
+          supports_refinement: model.refinement_supported,
+          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
         }));
 
         set((state) => {
@@ -46,8 +47,13 @@ export const createModelsSlice = (set) => ({
           state.models.isLoadingCompletionModels = false;
 
           // Set default model if none is selected and models are available
+          // Prefer SAM3, otherwise use first model
           if (!state.models.completionModel && transformedModels.length > 0) {
-            state.models.completionModel = transformedModels[0].id;
+            const sam3Model = transformedModels.find(m => 
+              m.name?.toLowerCase().includes('sam3') || 
+              m.id?.toLowerCase().includes('sam3')
+            );
+            state.models.completionModel = sam3Model?.id || transformedModels[0].id;
           }
         });
       } else {
@@ -82,7 +88,8 @@ export const createModelsSlice = (set) => ({
           name: model.name,
           description: model.description,
           tags: model.tags,
-          supports_refinement: model.refinement_supported
+          supports_refinement: model.refinement_supported,
+          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
         }));
 
         set((state) => {
@@ -90,8 +97,13 @@ export const createModelsSlice = (set) => ({
           state.models.isLoadingCompletionModels = false;
           
           // Set default model if none is selected and models are available
+          // Prefer SAM3, otherwise use first model
           if (!state.models.completionModel && transformedModels.length > 0) {
-            state.models.completionModel = transformedModels[0].id;
+            const sam3Model = transformedModels.find(m => 
+              m.name?.toLowerCase().includes('sam3') || 
+              m.id?.toLowerCase().includes('sam3')
+            );
+            state.models.completionModel = sam3Model?.id || transformedModels[0].id;
           }
         });
       } else {
@@ -127,7 +139,8 @@ export const createModelsSlice = (set) => ({
           description: model.description,
           tags: model.tags,
           supported_prompt_types: model.prompt_types_supported,
-          supports_refinement: model.refinement_supported
+          supports_refinement: model.refinement_supported,
+          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
         }));
 
         set((state) => {

@@ -19,7 +19,7 @@ import { createObjectsSlice } from './slices/objectsSlice';
  * Combined annotation store using Zustand with Immer middleware
  * 
  * The store is organized into domain-specific slices:
- * - UI: Tool selection, sidebar state, visibility controls
+ * - UI: Tool selection, sidebar state, Annotation Overview
  * - Models: AI model selection
  * - Canvas: Prompts, segmentation state
  * - Context Menu: Context menu state

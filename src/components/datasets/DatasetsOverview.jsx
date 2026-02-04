@@ -81,9 +81,10 @@ const DatasetsOverview = ({ onOpenDataset }) => {
             );
             imagesData[dataset.id] = [];
             statsData[dataset.id] = {
-              manuallyAnnotated: 0,
-              autoAnnotated: 0,
-              missing: 0,
+              not_started: 0,
+              in_progress: 0,
+              reviewable: 0,
+              finished: 0,
               total: 0,
             };
           }
@@ -260,9 +261,10 @@ const DatasetsOverview = ({ onOpenDataset }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {datasets.map((dataset) => {
               const stats = datasetStats[dataset.id] || {
-                manuallyAnnotated: 0,
-                autoAnnotated: 0,
-                missing: 0,
+                not_started: 0,
+                in_progress: 0,
+                reviewable: 0,
+                finished: 0,
                 total: 0
               };
               const sampleImages = datasetImages[dataset.id] || [];

@@ -455,6 +455,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
           color={object.color}
           pixelCount={object.pixelCount}
           label={object.label}
+          quantification={object.quantification}
         />
       )}
 

@@ -1,5 +1,5 @@
 /**
- * UI slice - manages UI state (tool, sidebars, visibility controls)
+ * UI slice - manages UI state (tool, sidebars, Annotation Overview)
  */
 export const createUISlice = (set) => ({
   setCurrentTool: (tool) => set((state) => {
@@ -23,7 +23,7 @@ export const createUISlice = (set) => ({
     state.ui.rightSidebarCollapsed = !state.ui.rightSidebarCollapsed;
   }),
   
-  // Visibility controls actions
+  // Annotation Overview actions
   setVisibilityControlsExpanded: (expanded) => set((state) => {
     state.ui.visibilityControlsExpanded = expanded;
   }),

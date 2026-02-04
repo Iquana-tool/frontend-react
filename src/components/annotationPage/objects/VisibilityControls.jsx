@@ -42,7 +42,7 @@ const VisibilityControls = () => {
           initializeLabelVisibility(labelsArray);
         }
       } catch (error) {
-        console.error('Failed to fetch labels for visibility controls:', error);
+        console.error('Failed to fetch labels for Annotation Overview:', error);
         setLabels([]);
       } finally {
         setLoading(false);
