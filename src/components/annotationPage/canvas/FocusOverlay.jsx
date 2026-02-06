@@ -10,6 +10,7 @@ import {
   useRefinementModeActive,
   useSetZoomLevel,
 } from '../../../stores/selectors/annotationSelectors';
+import annotationSession from '../../../services/annotationSession';
 
 const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const focusModeActive = useFocusModeActive();
@@ -24,7 +25,16 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   const containerRef = canvasRef; // Use the same container reference as SegmentationOverlay
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
 
-  const handleExitFocusMode = () => {
+  const handleExitFocusMode = async () => {
+    try {
+      // Send unfocus message to backend via WebSocket
+      if (annotationSession.isReady()) {
+        await annotationSession.unfocusImage();
+      }
+    } catch (error) {
+      console.error('Failed to send unfocus message:', error);
+    }
+    
     // Reset zoom and pan before exiting
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
@@ -108,6 +118,12 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   // Find the focused object
   const focusedObject = objectsList.find(obj => obj.id === focusedObjectId);
   if (!focusedObject) {
+    // Cleanup: send unfocus if session is ready
+    if (annotationSession.isReady()) {
+      annotationSession.unfocusImage().catch(err => 
+        console.error('Failed to send unfocus message:', err)
+      );
+    }
     exitFocusMode();
     return null;
   }
@@ -134,6 +150,12 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
 
   // Validate mask data
   if (!maskPath) {
+    // Cleanup: send unfocus if session is ready
+    if (annotationSession.isReady()) {
+      annotationSession.unfocusImage().catch(err => 
+        console.error('Failed to send unfocus message:', err)
+      );
+    }
     exitFocusMode();
     return null;
   }

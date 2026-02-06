@@ -28,6 +28,8 @@ import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentat
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import annotationSession from '../../../services/annotationSession';
+import { getContourId } from '../../../utils/objectUtils';
 import ContextMenuItem from './ContextMenuItem';
 import HierarchicalLabelList from './HierarchicalLabelList';
 
@@ -173,7 +175,7 @@ const ObjectContextMenu = () => {
     }
   };
 
-  const handleFocusMode = () => {
+  const handleFocusMode = async () => {
     // Disable focus mode when in refinement mode or multiple objects selected
     if (refinementModeActive || isMultiSelect) {
       return;
@@ -188,6 +190,9 @@ const ObjectContextMenu = () => {
       return;
     }
     
+    // Get contour ID for WebSocket message
+    const contourId = getContourId(targetObject);
+    
     // Create mask from x,y arrays for focus mode boundary checking
     const points = targetObject.x.map((x, i) => [
       x * imageObject.width,
@@ -195,8 +200,17 @@ const ObjectContextMenu = () => {
     ]);
     const objectMask = { points: points };
     
-    // Enter focus mode (without zoom - zoom is handleded externally)
-    enterFocusMode(targetObjectId, objectMask);
+    try {
+      // Send focus message to backend via WebSocket
+      await annotationSession.focusImage(contourId);
+      
+      // Enter focus mode in the store (without zoom - zoom is handled externally)
+      enterFocusMode(targetObjectId, objectMask);
+    } catch (error) {
+      console.error('Failed to enter focus mode:', error);
+      hideContextMenu();
+      return;
+    }
 
     // Get the container element (the canvas container)
     const container = menuRef.current?.parentElement;
@@ -368,6 +382,12 @@ const ObjectContextMenu = () => {
 
     // Exit focus mode if active
     if (focusModeActive) {
+      // Send unfocus message to backend
+      if (annotationSession.isReady()) {
+        annotationSession.unfocusImage().catch(err => 
+          console.error('Failed to send unfocus message:', err)
+        );
+      }
       exitFocusMode();
     }
 

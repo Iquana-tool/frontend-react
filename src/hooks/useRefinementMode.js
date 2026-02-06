@@ -43,6 +43,10 @@ export function useRefinementMode({
     try {
       // Exit focus mode if active (refinement mode replaces focus mode)
       if (focusModeActive && exitFocusMode) {
+        // Send unfocus message to backend
+        if (annotationSession.isReady()) {
+          await annotationSession.unfocusImage();
+        }
         exitFocusMode();
       }
 

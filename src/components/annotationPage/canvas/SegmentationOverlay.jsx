@@ -21,6 +21,7 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
+import { getContourId } from '../../../utils/objectUtils';
 
 /**
  * Helper function to generate SVG path from x, y coordinate arrays
@@ -191,6 +192,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     try {
       // Exit focus mode if active (refinement mode replaces focus mode)
       if (focusModeActive) {
+        // Send unfocus message to backend
+        if (annotationSession.isReady()) {
+          await annotationSession.unfocusImage();
+        }
         exitFocusMode();
       }
       
@@ -292,7 +297,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   };
 
   // Handle single-click on objects (enter focus mode in both selection and AI annotation tools)
-  const handleSingleClick = (object) => {
+  const handleSingleClick = async (object) => {
     // Disable focus mode when in refinement mode
     if (refinementModeActive) {
       return;
@@ -322,7 +327,19 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       }
       
       if (mask && mask.points && mask.points.length > 0) {
-        enterFocusMode(object.id, mask);
+        // Get contour ID for WebSocket message
+        const contourId = getContourId(object);
+        
+        try {
+          // Send focus message to backend via WebSocket
+          await annotationSession.focusImage(contourId);
+          
+          // Enter focus mode in the store
+          enterFocusMode(object.id, mask);
+        } catch (error) {
+          console.error('Failed to enter focus mode:', error);
+          return;
+        }
       }
 
       const container = containerRef.current;

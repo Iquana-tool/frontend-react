@@ -28,6 +28,8 @@ import { fetchLabels } from '../../../api/labels';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 import { hexToRgba } from '../../../utils/labelColors';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
+import annotationSession from '../../../services/annotationSession';
+import { getContourId } from '../../../utils/objectUtils';
 import { deleteObject } from '../../../utils/objectOperations';
 import ObjectActions from './ObjectActions';
 import ObjectDetails from './ObjectDetails';
@@ -218,7 +220,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     }
     
     // Delay single-click action to allow double-click detection
-    singleClickTimeoutRef.current = setTimeout(() => {
+    singleClickTimeoutRef.current = setTimeout(async () => {
       singleClickTimeoutRef.current = null;
       
       // Single click: Toggle selection, enter focus mode (if appropriate), and zoom/pan to object
@@ -227,6 +229,12 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         deselectObject(object.id);
         // Exit focus mode if active
         if (focusModeActive) {
+          // Send unfocus message to backend
+          if (annotationSession.isReady()) {
+            annotationSession.unfocusImage().catch(err => 
+              console.error('Failed to send unfocus message:', err)
+            );
+          }
           exitFocusMode();
         }
         // If this was the only selected object, reset view
@@ -257,7 +265,18 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
           }
           
           if (mask && mask.points && mask.points.length > 0) {
-            enterFocusMode(object.id, mask);
+            // Get contour ID for WebSocket message
+            const contourId = getContourId(object);
+            
+            try {
+              // Send focus message to backend via WebSocket
+              await annotationSession.focusImage(contourId);
+              
+              // Enter focus mode in the store
+              enterFocusMode(object.id, mask);
+            } catch (error) {
+              console.error('Failed to enter focus mode:', error);
+            }
           }
         }
         
@@ -284,6 +303,12 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     
     // Exit focus mode if active
     if (focusModeActive) {
+      // Send unfocus message to backend
+      if (annotationSession.isReady()) {
+        annotationSession.unfocusImage().catch(err => 
+          console.error('Failed to send unfocus message:', err)
+        );
+      }
       exitFocusMode();
     }
     
