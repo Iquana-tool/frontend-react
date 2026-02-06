@@ -30,9 +30,9 @@ const HeroSection = ({ scrollY }) => {
             transform: `translate3d(0, ${scrollY * 0.08}px, 0)`
           }}
         >
-          Aqua
+          I
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-cyan-500 to-blue-600 animate-gradient">
-            Morph
+            Quana
           </span>
         </h1>
         

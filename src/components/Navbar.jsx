@@ -33,7 +33,7 @@ const Navbar = () => {
                 navigate('/');
               }}
             >
-              Aqua<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Morph</span>
+              I<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Quana</span>
             </span>
           </div>
 

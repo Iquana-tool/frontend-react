@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="py-2 max-w-7xl mx-auto px-6">
         <div className="text-center">
           <h3 className="text-2xl font-bold mb-2 text-gray-900">
-            Aqua<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">Morph</span>
+            I<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-400">Quana</span>
           </h3>
           <p className="text-base text-gray-700 mb-4 max-w-2xl mx-auto leading-relaxed">
             Advanced coral segmentation platform for marine biodiversity research
