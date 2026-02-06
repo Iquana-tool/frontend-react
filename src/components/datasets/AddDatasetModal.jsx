@@ -155,7 +155,7 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
         {/* Header */}
         <div className="bg-teal-600 text-white p-6 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">AquaMorph</h2>
+            <h2 className="text-2xl font-bold">IQuana</h2>
             <button
               onClick={onClose}
               className="text-white hover:text-teal-200 transition-colors"

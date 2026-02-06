@@ -25,7 +25,7 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
             className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
             onClick={() => navigate('/')}
           >
-            AquaMorph
+            IQuana
           </h1>
           <div className="h-6 w-px bg-teal-400"></div>
           <span className="text-lg font-medium">{datasetName}</span>

@@ -32,7 +32,7 @@ const Footer = () => {
           <div className="w-24 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto mb-3"></div>
           
           <p className="text-gray-500 text-sm">
-            © 2025 AquaMorph. A collaborative research initiative bridging AI and marine ecology.
+            © 2025 IQuana. A collaborative research initiative bridging AI and marine ecology.
           </p>
         </div>
       </div>

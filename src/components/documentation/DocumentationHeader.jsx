@@ -13,7 +13,7 @@ const DocumentationHeader = () => {
           </div>
         </div>
         <p className="text-teal-100 text-lg max-w-4xl">
-          Comprehensive guide to using the AquaMorph application for dataset management, 
+          Comprehensive guide to using the IQuana application for dataset management, 
           AI-powered segmentation, and quantification analysis.
         </p>
       </div>

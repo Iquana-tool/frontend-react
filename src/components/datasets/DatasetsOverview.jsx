@@ -188,7 +188,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
                 onClick={() => navigate('/')}
               >
-                AquaMorph
+                IQuana
               </h1>
             </div>
             <div className="flex items-center space-x-4">

@@ -25,7 +25,7 @@ const CTASection = ({ scrollY }) => {
           Advance Marine Research with AI
         </h2>
         <p className="text-xl text-gray-600 mb-12 leading-relaxed">
-          Use AquaMorph for coral segmentation and morphological analysis.
+          Use IQuana for coral segmentation and morphological analysis.
         </p>
         <button
           onClick={() => navigate('/datasets')}

@@ -145,7 +145,7 @@ const DocumentationPage = () => {
               onClick={() => navigate("/")}
               className="text-lg font-bold hover:text-teal-200 transition-colors cursor-pointer"
             >
-              AquaMorph
+              IQuana
             </button>
             {isAuthenticated && user && (
               <div className="flex items-center space-x-1 px-2 py-1.5 text-xs text-white">
@@ -181,7 +181,7 @@ const DocumentationPage = () => {
                 onClick={() => navigate("/")}
                 className="text-2xl font-bold hover:text-teal-200 transition-colors cursor-pointer"
               >
-                AquaMorph
+                IQuana
               </button>
               <div className="h-6 w-px bg-teal-400"></div>
               {isAuthenticated && user && (
@@ -220,7 +220,7 @@ const DocumentationPage = () => {
             </div>
           </div>
           <p className="text-gray-600 text-base sm:text-lg max-w-4xl">
-          A complete guide to use the AquaMorph application for efficient dataset management, AI-driven image segmentation, and quantification analysis.
+          A complete guide to use the IQuana application for efficient dataset management, AI-driven image segmentation, and quantification analysis.
           </p>
         </div>
       </div>

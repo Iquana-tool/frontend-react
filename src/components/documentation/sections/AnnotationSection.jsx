@@ -7,7 +7,7 @@ const AnnotationSection = () => {
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-3">Annotation Interface Overview</h3>
         <p className="text-gray-700 mb-4">
-          The AquaMorph annotation interface provides a comprehensive set of features for marking, 
+          The IQuana annotation interface provides a comprehensive set of features for marking, 
           segmenting, and analyzing coral regions in your images. The sidebar allows you to select 
           models for prompted segmentation and completion segmentation. You can use point and box 
           prompts to guide AI segmentation, manage objects with a review workflow, and use advanced 

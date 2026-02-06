@@ -10,9 +10,9 @@ export const markMaskAsFinal = async (maskId) => {
             throw new Error("Invalid mask ID provided");
         }
 
-        // Send request to mark the mask as final
-        const response = await fetch(`${API_BASE_URL}/masks/mark_as_fully_annotated/${maskId}`, {
-            method: "POST",
+        // Send request to mark the mask as complete
+        const response = await fetch(`${API_BASE_URL}/masks/${maskId}/status/complete`, {
+            method: "PATCH",
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
             }),
@@ -30,9 +30,9 @@ export const markMaskAsUnfinished = async (maskId) => {
             throw new Error("Invalid mask ID provided");
         }
 
-        // Send request to mark the mask as unfinished
-        const response = await fetch(`${API_BASE_URL}/masks/unmark_as_fully_annotated/${maskId}`, {
-            method: "POST",
+        // Send request to mark the mask as incomplete
+        const response = await fetch(`${API_BASE_URL}/masks/${maskId}/status/incomplete`, {
+            method: "PATCH",
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
             }),

@@ -4,9 +4,9 @@ const GettingStartedSection = () => {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Welcome to AquaMorph</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 sm:mb-3">Welcome to IQuana</h3>
         <p className="text-gray-700 mb-3 sm:mb-4 text-sm sm:text-base">
-          AquaMorph is a tool for coral analysis, combining AI-powered segmentation 
+          IQuana is a tool for coral analysis, combining AI-powered segmentation 
           with manual annotation capabilities. This application helps researchers and marine biologists 
           analyze coral images efficiently.
         </p>

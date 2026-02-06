@@ -32,7 +32,7 @@ const MissionSection = ({ scrollY }) => {
           }}
         >
           <p className="text-xl text-gray-800 max-w-4xl mx-auto leading-relaxed font-medium">
-            AquaMorph represents a collaboration between the{" "}
+            IQuana represents a collaboration between the{" "}
             <span className="text-teal-600 font-bold bg-gradient-to-r from-teal-50 to-cyan-50 px-2 py-1 rounded-lg">
               German Research Center for Artificial Intelligence (DFKI)
             </span>{" "}

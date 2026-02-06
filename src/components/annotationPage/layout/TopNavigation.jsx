@@ -27,7 +27,7 @@ const TopNavigation = () => {
               <span className="font-medium">Navigate to</span>
             </button>
             <div className="h-6 w-px bg-teal-400"></div>
-            <h1 className="text-xl font-bold">AquaMorph</h1>
+            <h1 className="text-xl font-bold">IQuana</h1>
           </div>
           <div className="flex items-center space-x-3">
             {isAuthenticated && user && (
@@ -45,7 +45,7 @@ const TopNavigation = () => {
             </button>
             <ReportBugLink hideTextOnMobile={true} />
             <a
-              href="https://github.com/yapat-app/AquaMorph"
+              href="https://github.com/yapat-app/IQuana"
               target="_blank"
               rel="noopener noreferrer"
               className="text-white hover:text-teal-200 transition-colors"
