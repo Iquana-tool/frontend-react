@@ -115,14 +115,18 @@ export const startSemanticTraining = async ({
     image_size = [512, 512],
 }) => {
     try {
-        const response = await fetch(`${API_BASE_URL}/semantic_segmentation/training/start`, {
+        
+        const queryParams = new URLSearchParams({
+            model_registry_key: model_key,
+            dataset_id: dataset_id.toString(),
+        });
+
+        const response = await fetch(`${API_BASE_URL}/semantic_segmentation/training/start?${queryParams}`, {
             method: 'POST',
             headers: getAuthHeaders({
                 "Content-Type": "application/json",
             }),
             body: JSON.stringify({
-                model_key,
-                dataset_id,
                 finetune,
                 pretrained,
                 epochs,
