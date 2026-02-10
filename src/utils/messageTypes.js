@@ -22,7 +22,7 @@ export const CLIENT_MESSAGE_TYPES = {
   
   // AI Segmentation
   PROMPTED_SELECT_MODEL: 'prompted_select_model',
-  PROMPTED_SEGMENTATION: 'prompted_segmentation',
+  PROMPTED_SEGMENTATION: 'prompted_inference',
   
   // Completion Segmentation
   COMPLETION_SELECT_MODEL: 'completion_select_model',
