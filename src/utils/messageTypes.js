@@ -259,7 +259,7 @@ export const MessageBuilders = {
   runSemantic: (modelKey) => createMessage(
     CLIENT_MESSAGE_TYPES.SEMANTIC_INFERENCE,
     {
-      model_key: modelKey,
+      model_registry_key: modelKey,
     }
   ),
 
