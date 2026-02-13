@@ -78,7 +78,7 @@ const Services = () => {
             isRunning: false,
         },
         {
-            name: "Prompted Completion",
+            name: "Instance Discovery",
             models: useAvailableCompletionModels(),
             isLoading: useIsLoadingCompletionModels(),
             promptedModel: useCompletionModel(),
