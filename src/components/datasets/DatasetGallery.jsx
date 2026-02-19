@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useCallback } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
 import DataManagementView from "./gallery/DataManagementView";
 import LabelManagementView from "./gallery/LabelManagementView";
 import ManagementCardsView from "./gallery/ManagementCardsView";
 import DatasetManagementLayout from "./gallery/DatasetManagementLayout";
 import * as api from "../../api";
+import { normalizeImage } from "../../hooks/useDatasetGalleryData";
 import { 
   useGalleryImages,
   useGalleryLabels,
@@ -15,6 +16,7 @@ import {
 const DatasetGallery = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentDataset } = useDataset();
   
   // Zustand store selectors
@@ -22,8 +24,13 @@ const DatasetGallery = () => {
   const labels = useGalleryLabels();
   const galleryActions = useGalleryActions();
   
-  // Local UI state (view-specific, doesn't need to be in store)
-  const [currentView, setCurrentView] = useState("cards");
+  // Derive current view from URL path so refresh preserves the view
+  const pathname = location.pathname;
+  const currentView = pathname.endsWith("/images")
+    ? "dataManagement"
+    : pathname.endsWith("/labels")
+    ? "labelManagement"
+    : "cards";
   
   // Get dataset from context (set by DatasetManagementLayout)
   const dataset = currentDataset;
@@ -56,15 +63,17 @@ const DatasetGallery = () => {
     navigate(`/dataset/${dataset.id}/annotate/${image.id}`);
   };
 
-  // Refresh images list
+  // Refresh images list - uses normalizeImage to ensure consistent shape
+  // (the API returns image_id not id; without normalization data-image-id is
+  // undefined and the IntersectionObserver cannot load thumbnails)
   const refreshImages = useCallback(async () => {
     if (!dataset) return;
     
     try {
       const imagesResponse = await api.fetchImages(dataset.id);
       if (imagesResponse.success) {
-        const imageList = imagesResponse.images || [];
-        galleryActions.setImages(imageList.map(img => ({ ...img, thumbnail: null })));
+        const imageDataList = imagesResponse.image_data || imagesResponse.images || [];
+        galleryActions.setImages(imageDataList.map(normalizeImage));
       }
     } catch (err) {
       console.error("Error refreshing images:", err);
@@ -73,7 +82,7 @@ const DatasetGallery = () => {
 
   // Card click handlers
   const handleDataManagementClick = () => {
-    setCurrentView("dataManagement");
+    navigate(`/dataset/${datasetId}/datamanagement/images`);
   };
 
   const handleModelZooClick = () => {
@@ -85,7 +94,7 @@ const DatasetGallery = () => {
   };
 
   const handleLabelManagementClick = () => {
-    setCurrentView("labelManagement");
+    navigate(`/dataset/${datasetId}/datamanagement/labels`);
   };
 
   return (
@@ -103,7 +112,7 @@ const DatasetGallery = () => {
           <DataManagementView
             images={images}
             dataset={dataset}
-            onBack={() => setCurrentView("cards")}
+            onBack={() => navigate(`/dataset/${datasetId}/datamanagement`)}
             onImageClick={handleImageClick}
             onImagesUpdated={refreshImages}
           />
@@ -111,7 +120,7 @@ const DatasetGallery = () => {
           <LabelManagementView
             dataset={dataset}
             labels={labels}
-            onBack={() => setCurrentView("cards")}
+            onBack={() => navigate(`/dataset/${datasetId}/datamanagement`)}
             onLabelsUpdated={handleLabelsUpdated}
           />
         ) : null}

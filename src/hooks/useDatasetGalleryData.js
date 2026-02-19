@@ -6,6 +6,25 @@ import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import useAppStore from '../stores/useAppStore';
 
 /**
+ * Normalizes a raw image object from the API into the shape expected by the UI.
+ * Used both on initial load and after operations like upload/delete so the
+ * image list is always consistently shaped.
+ */
+export const normalizeImage = (img) => ({
+  id: img.image_id || img.id,
+  name: img.file_name || img.filename || `image_${img.image_id || img.id}`,
+  width: img.width,
+  height: img.height,
+  hash: img.hash_code || img.hash,
+  finished: img.status === 'finished' || img.finished || false,
+  generated: img.generated || false,
+  status: img.status || (img.finished ? 'completed' : 'not_started'),
+  mask_id: img.mask_id,
+  thumbnail: null,
+  isFromAPI: true,
+});
+
+/**
  * Custom hook to handle dataset gallery data fetching and initialization
  */
 export const useDatasetGalleryData = (datasetId, galleryActions) => {
@@ -57,23 +76,8 @@ export const useDatasetGalleryData = (datasetId, galleryActions) => {
         ]);
 
         if (imagesResponse.success) {
-         
           const imageDataList = imagesResponse.image_data || imagesResponse.images || [];
-          // Transform API response to our format
-          const imageList = imageDataList.map((img) => ({
-            id: img.image_id || img.id,
-            name: img.file_name || img.filename || `image_${img.image_id || img.id}`,
-            width: img.width,
-            height: img.height,
-            hash: img.hash_code || img.hash,
-            finished: img.status === 'finished' || img.finished || false,
-            generated: img.generated || false,
-            status: img.status || (img.finished ? 'completed' : 'not_started'),
-            mask_id: img.mask_id,
-            isFromAPI: true,
-          }));
-          // Set all images without pre-loading thumbnails - ImageGallery will handle lazy loading
-          galleryActions.setImages(imageList.map(img => ({ ...img, thumbnail: null })));
+          galleryActions.setImages(imageDataList.map(normalizeImage));
         }
 
         const labelsArray = extractLabelsFromResponse(labelsResponse);

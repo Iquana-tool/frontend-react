@@ -7,21 +7,18 @@ const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 2000;
 
 /**
- * Custom hook for lazy loading images with intersection observer
- * Uses Zustand store for persistent thumbnail caching
- * @param {Array} imageIds - Array of image IDs to potentially load
- * @param {Object} options - Configuration options
- * @returns {Object} - { loadedImages, imageThumbnails, resetLoadedImages }
+ * Custom hook for lazy loading images with intersection observer.
+ * Uses refs for mutable state to keep the IntersectionObserver stable across renders,
+ * preventing the observer from being destroyed and recreated on every batch load.
  */
 export const useLazyImageLoader = (imageIds = [], options = {}) => {
   const {
     threshold = 0.1,
-    rootMargin = '100% 0px',
+    rootMargin = '200px 0px',
     batchSize = BATCH_SIZE,
     maxRetries = MAX_RETRIES,
   } = options;
 
-  // Get thumbnail cache and actions from Zustand store
   const thumbnailCache = useAppStore((state) => state.gallery.thumbnailCache);
   const setThumbnails = useAppStore((state) => state.galleryActions.setThumbnails);
 
@@ -29,6 +26,12 @@ export const useLazyImageLoader = (imageIds = [], options = {}) => {
   const [loadingErrors, setLoadingErrors] = useState(new Map());
   const observerRef = useRef(null);
   const retryTimeoutsRef = useRef(new Map());
+
+  // Keep refs in sync with latest state so the observer callback never has stale closures
+  const loadedImagesRef = useRef(loadedImages);
+  const loadingErrorsRef = useRef(loadingErrors);
+  useEffect(() => { loadedImagesRef.current = loadedImages; }, [loadedImages]);
+  useEffect(() => { loadingErrorsRef.current = loadingErrors; }, [loadingErrors]);
 
   // Initialize loaded images from cache
   useEffect(() => {
@@ -43,12 +46,15 @@ export const useLazyImageLoader = (imageIds = [], options = {}) => {
     }
   }, [imageIds, thumbnailCache]);
 
-  // Load image thumbnails in batches
+  // Load image thumbnails in batches.
+  // Reads loadedImages/loadingErrors via refs so its reference stays stable
+  // and the IntersectionObserver does not need to be recreated on every load.
   const loadImageThumbnails = useCallback(
     async (idsToLoad) => {
-      // Filter out already loaded images and those with too many retries
       const newIds = idsToLoad.filter(
-        (id) => !loadedImages.has(id) && (loadingErrors.get(id) || 0) < maxRetries
+        (id) =>
+          !loadedImagesRef.current.has(id) &&
+          (loadingErrorsRef.current.get(id) || 0) < maxRetries
       );
 
       if (newIds.length === 0) return;
@@ -57,14 +63,11 @@ export const useLazyImageLoader = (imageIds = [], options = {}) => {
         const imageData = await api.getImages(newIds, true);
         if (imageData?.images) {
           const newThumbnails = new Map();
-          const newLoaded = new Set(loadedImages);
 
           newIds.forEach((id) => {
             if (imageData.images[id]) {
               const thumbnailUrl = `data:image/jpeg;base64,${imageData.images[id]}`;
               newThumbnails.set(id, thumbnailUrl);
-              newLoaded.add(id);
-              // Clear any retry errors on success
               setLoadingErrors((prev) => {
                 const updated = new Map(prev);
                 updated.delete(id);
@@ -73,151 +76,107 @@ export const useLazyImageLoader = (imageIds = [], options = {}) => {
             }
           });
 
-          // Update Zustand store cache
           if (newThumbnails.size > 0) {
             setThumbnails(Array.from(newThumbnails.entries()));
           }
 
-          setLoadedImages(newLoaded);
+          // Functional update avoids capturing stale state
+          setLoadedImages((prev) => {
+            const next = new Set(prev);
+            newThumbnails.forEach((_, id) => next.add(id));
+            return next;
+          });
         }
       } catch (error) {
         console.error('Failed to load thumbnails:', error);
-        // Track failed loads and schedule retries
         newIds.forEach((id) => {
-          const retryCount = (loadingErrors.get(id) || 0) + 1;
+          const retryCount = (loadingErrorsRef.current.get(id) || 0) + 1;
           setLoadingErrors((prev) => new Map(prev).set(id, retryCount));
 
           if (retryCount < maxRetries) {
-            // Clear existing timeout for this ID
             const existingTimeout = retryTimeoutsRef.current.get(id);
-            if (existingTimeout) {
-              clearTimeout(existingTimeout);
-            }
+            if (existingTimeout) clearTimeout(existingTimeout);
 
-            // Schedule retry with exponential backoff
             const delay = INITIAL_RETRY_DELAY * retryCount;
             const timeoutId = setTimeout(() => {
               loadImageThumbnails([id]);
             }, delay);
-
             retryTimeoutsRef.current.set(id, timeoutId);
           }
         });
       }
     },
-    [loadedImages, loadingErrors, maxRetries, setThumbnails]
+    [maxRetries, setThumbnails] // stable - no dependency on loadedImages/loadingErrors
   );
 
-  // Setup intersection observer
+  // Keep a ref to the latest loadImageThumbnails so the observer callback
+  // can always call the current version without being recreated itself.
+  const loadImageThumbnailsRef = useRef(loadImageThumbnails);
+  useEffect(() => {
+    loadImageThumbnailsRef.current = loadImageThumbnails;
+  }, [loadImageThumbnails]);
+
+  // Create the IntersectionObserver ONCE (or when scroll options change).
+  // It uses refs for both the loaded-set check and the load callback so it
+  // never needs to be torn down and rebuilt when images finish loading.
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
       (entries) => {
         const intersectingIds = entries
           .filter((entry) => entry.isIntersecting)
           .map((entry) => parseInt(entry.target.dataset.imageId))
-          .filter((id) => id && !isNaN(id) && !loadedImages.has(id));
+          .filter((id) => id && !isNaN(id) && !loadedImagesRef.current.has(id));
 
         if (intersectingIds.length > 0) {
-          // Load images in batches
           for (let i = 0; i < intersectingIds.length; i += batchSize) {
             const batch = intersectingIds.slice(i, i + batchSize);
-            loadImageThumbnails(batch);
+            loadImageThumbnailsRef.current(batch);
           }
         }
       },
-      {
-        threshold,
-        rootMargin,
-      }
+      { threshold, rootMargin }
     );
 
-    // Trigger initial check for already-visible images after observer is created
-    const checkVisible = () => {
-      if (!observerRef.current) return;
-      const imageElements = document.querySelectorAll('[data-image-id]');
-      const visibleIds = [];
-      
-      imageElements.forEach((el) => {
-        const rect = el.getBoundingClientRect();
-        const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
-        if (isVisible) {
-          const id = parseInt(el.dataset.imageId);
-          if (id && !isNaN(id) && !loadedImages.has(id)) {
-            visibleIds.push(id);
-          }
-        }
-      });
-
-      if (visibleIds.length > 0) {
-        for (let i = 0; i < visibleIds.length; i += batchSize) {
-          const batch = visibleIds.slice(i, i + batchSize);
-          loadImageThumbnails(batch);
-        }
-      }
-    };
-
-    // Check after a short delay to ensure DOM is ready
-    const timeoutId = setTimeout(checkVisible, 50);
-
     return () => {
-      clearTimeout(timeoutId);
       if (observerRef.current) {
         observerRef.current.disconnect();
+        observerRef.current = null;
       }
-      // Clear all retry timeouts
-      retryTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      retryTimeoutsRef.current.forEach((id) => clearTimeout(id));
       retryTimeoutsRef.current.clear();
     };
-  }, [loadImageThumbnails, loadedImages, threshold, rootMargin, batchSize]);
+  }, [threshold, rootMargin, batchSize]); // stable - recreated only if scroll options change
 
-  // Observe image elements
+  // Observe all image elements whenever the image list changes.
+  // Because the observer above is stable, this correctly adds new elements
+  // to the same long-lived observer without losing previously observed ones.
   useEffect(() => {
-    // Use a small delay to ensure DOM is ready and observer is set up
     const timeoutId = setTimeout(() => {
+      if (!observerRef.current) return;
       const imageElements = document.querySelectorAll('[data-image-id]');
       imageElements.forEach((el) => {
-        if (observerRef.current) {
-          observerRef.current.observe(el);
-        }
+        observerRef.current.observe(el);
       });
     }, 100);
 
-    return () => {
-      clearTimeout(timeoutId);
-      if (observerRef.current) {
-        const imageElements = document.querySelectorAll('[data-image-id]');
-        imageElements.forEach((el) => {
-          observerRef.current.unobserve(el);
-        });
-      }
-    };
+    return () => clearTimeout(timeoutId);
   }, [imageIds]);
 
-  // Reset loaded images when imageIds change significantly
   const resetLoadedImages = useCallback(() => {
     setLoadedImages(new Set());
     setLoadingErrors(new Map());
-    retryTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+    retryTimeoutsRef.current.forEach((id) => clearTimeout(id));
     retryTimeoutsRef.current.clear();
-    // Note: We don't clear the Zustand cache on reset to preserve it across navigation
   }, []);
 
-  // Get thumbnails from Zustand cache (always up-to-date)
-  // Build thumbnails map from cache
   const imageThumbnails = useMemo(() => {
     const thumbnails = new Map();
     imageIds.forEach((id) => {
       const cached = thumbnailCache.get(id);
-      if (cached) {
-        thumbnails.set(id, cached);
-      }
+      if (cached) thumbnails.set(id, cached);
     });
     return thumbnails;
   }, [imageIds, thumbnailCache]);
 
-  return {
-    loadedImages,
-    imageThumbnails,
-    resetLoadedImages,
-  };
+  return { loadedImages, imageThumbnails, resetLoadedImages };
 };

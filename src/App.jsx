@@ -41,6 +41,22 @@ function App() {
               }
             />
             <Route
+              path="/dataset/:datasetId/datamanagement/images"
+              element={
+                <ProtectedRoute>
+                  <DatasetGalleryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/datamanagement/labels"
+              element={
+                <ProtectedRoute>
+                  <DatasetGalleryPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dataset/:datasetId/annotate"
               element={
                 <ProtectedRoute>
