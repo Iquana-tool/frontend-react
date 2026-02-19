@@ -8,6 +8,10 @@ export const initialState = {
     leftSidebarCollapsed: false,
     rightSidebarCollapsed: false,
     visibilityControlsExpanded: true,
+    /** When true, Services opens the semantic segmentation warning modal (e.g. from shortcut "3") */
+    semanticRunRequested: false,
+    /** True while the semantic segmentation warning modal is open (so shortcuts don't steal Enter) */
+    semanticWarningModalOpen: false,
   },
   
   // Canvas State (needed for canvas components)

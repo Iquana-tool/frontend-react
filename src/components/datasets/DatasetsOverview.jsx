@@ -24,6 +24,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     selectDataset,
     getAnnotationProgress,
     getSampleImages,
+    fetchDatasets,
   } = useDataset();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLabelsModal, setShowLabelsModal] = useState(false);
@@ -277,6 +278,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                   sampleImages={sampleImages}
                   onDelete={initiateDelete}
                   onOpenDataset={handleOpenDataset}
+                  onShareSuccess={fetchDatasets}
                 />
               );
             })}

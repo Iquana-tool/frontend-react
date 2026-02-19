@@ -26,10 +26,10 @@ export const ConnectionState = {
  * Default configuration
  */
 const DEFAULT_CONFIG = {
-  reconnectAttempts: 3,
+  reconnectAttempts: 5,
   reconnectDelay: 1000,
   maxReconnectDelay: 10000,
-  messageTimeout: 30000, // 30 seconds timeout for responses
+  messageTimeout: 180000, // 3 minutes — long enough for instance discovery inference
 };
 
 /**

@@ -49,6 +49,21 @@ export const deleteDataset = async (datasetId) => {
     }
 };
 
+export const shareDataset = async (datasetId, shareWithUsername) => {
+    try {
+        const url = buildUrl(API_BASE_URL, `/datasets/${datasetId}/share`, {
+            share_with_username: shareWithUsername,
+        });
+        const response = await fetch(url, {
+            method: "POST",
+            headers: getAuthHeaders(),
+        });
+        return handleApiError(response);
+    } catch (error) {
+        throw error;
+    }
+};
+
 export const getDataset = async (datasetId) => {
     try {
         const response = await fetch(

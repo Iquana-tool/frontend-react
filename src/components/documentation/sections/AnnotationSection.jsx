@@ -297,11 +297,26 @@ const AnnotationSection = () => {
         </div>
       </div>
 
+      {/* Keyboard Shortcuts */}
+      <div>
+        <h4 className="font-semibold text-gray-900 mb-4 text-lg">Keyboard Shortcuts</h4>
+        <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
+          <div className="space-y-2 text-sm text-gray-700">
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Enter</kbd> — Run / confirm (e.g. run AI segmentation when prompts are present)</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">1</kbd> — Run Prompted Segmentation</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">2</kbd> — Run Instance Discovery (with selected objects as seeds)</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">3</kbd> — Open Semantic Segmentation (warning modal)</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Delete</kbd> — Reject selected object(s), or remove last prompt in AI tool</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">←</kbd> <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">→</kbd> — Previous / next image</p>
+          </div>
+        </div>
+      </div>
 
       {/* Tips and Best Practices */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
         <h4 className="font-semibold text-yellow-900 mb-3">Tips & Best Practices</h4>
         <div className="space-y-2 text-sm text-yellow-800">
+          <p>• <strong>Use keyboard shortcuts</strong> (Enter, 1–3, Delete, arrow keys) for faster annotation</p>
           <p>• <strong>Labels are assigned after annotation</strong> - draw prompts and create objects first, then accept and assign labels</p>
           <p>• <strong>Use positive and negative point prompts</strong> (left-click for positive, right-click for negative) to guide the AI more accurately</p>
           <p>• <strong>Use box prompts</strong> (click and drag) for quick bounding box selection</p>

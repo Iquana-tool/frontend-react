@@ -74,7 +74,7 @@ class AnnotationSession {
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
-        reconnectAttempts: 3,
+        reconnectAttempts: 5,
         reconnectDelay: 1000,
       });
 
@@ -84,7 +84,7 @@ class AnnotationSession {
           unsubscribe();
           this._updateSessionState(SessionState.ERROR);
           reject(new Error('Session initialization timeout'));
-        }, 10000);
+        }, 20000);
 
         const unsubscribe = websocketService.on(
           SERVER_MESSAGE_TYPES.SESSION_INITIALIZED,
@@ -330,12 +330,16 @@ class AnnotationSession {
   /**
    * Delete an object
    * @param {number} contourId - Contour ID to delete
-   * @returns {Promise<Object>} Response message
+   * @returns {Promise<void>}
    */
   async deleteObject(contourId) {
     this._ensureReady();
     const message = MessageBuilders.deleteObject(contourId);
-    return websocketService.send(message, true);
+    // Fire-and-forget: the backend broadcasts OBJECT_REMOVED which is handled
+    // by the useWebSocketObjectHandler listener. Waiting for a correlated
+    // response here would always time out because OBJECT_REMOVED carries a
+    // different message ID than the one we sent.
+    return websocketService.send(message, false);
   }
 
   /**

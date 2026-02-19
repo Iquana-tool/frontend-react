@@ -19,7 +19,10 @@ import {
     useSemanticModel,
     useSetCompletionModel,
     useSetPromptedModel,
-    useSetSemanticModel
+    useSetSemanticModel,
+    useSemanticRunRequested,
+    useSetSemanticRunRequested,
+    useSetSemanticWarningModalOpen,
 } from "../../../stores/selectors/annotationSelectors";
 import annotationSession from '../../../services/annotationSession';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
@@ -43,7 +46,23 @@ const Services = () => {
 
     // Semantic segmentation warning modal
     const [showSemanticWarning, setShowSemanticWarning] = useState(false);
+    const semanticRunRequested = useSemanticRunRequested();
+    const setSemanticRunRequested = useSetSemanticRunRequested();
+    const setSemanticWarningModalOpen = useSetSemanticWarningModalOpen();
     const { runSemantic } = useSemanticSegmentation();
+
+    // Open semantic warning modal when requested (e.g. by shortcut "3")
+    useEffect(() => {
+        if (semanticRunRequested) {
+            setShowSemanticWarning(true);
+            setSemanticRunRequested(false);
+        }
+    }, [semanticRunRequested, setSemanticRunRequested]);
+
+    // Sync modal open state to store so shortcuts don't steal Enter
+    useEffect(() => {
+        setSemanticWarningModalOpen(showSemanticWarning);
+    }, [showSemanticWarning, setSemanticWarningModalOpen]);
 
     // Load models on component mount
     useEffect(() => {
@@ -64,6 +83,8 @@ const Services = () => {
 
     const handleSemanticConfirm = () => {
         setShowSemanticWarning(false);
+        setSemanticRunRequested(false);
+        setSemanticWarningModalOpen(false);
         runSemantic();
     };
 
@@ -130,7 +151,10 @@ const Services = () => {
             {/* Semantic Segmentation Warning Modal */}
             <SemanticWarningModal
                 isOpen={showSemanticWarning}
-                onClose={() => setShowSemanticWarning(false)}
+                onClose={() => {
+                    setShowSemanticWarning(false);
+                    setSemanticWarningModalOpen(false);
+                }}
                 onConfirm={handleSemanticConfirm}
             />
         </div>

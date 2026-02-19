@@ -3,8 +3,11 @@ import ImageHeader from './ImageHeader';
 import LeftSidebarWrapper from './LeftSidebarWrapper';
 import RightSidebarWrapper from './RightSidebarWrapper';
 import MainCanvas from '../canvas/MainCanvas';
+import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 
 const MainLayout = () => {
+  useAnnotationKeyboardShortcuts();
+
   return (
     <div>
       {/* Image Header */}

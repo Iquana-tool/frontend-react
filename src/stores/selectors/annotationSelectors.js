@@ -90,6 +90,10 @@ export const useSetZoomLevel = () => useAnnotationStore(state => state.setZoomLe
 export const useSetPanOffset = () => useAnnotationStore(state => state.setPanOffset);
 export const useResetImageState = () => useAnnotationStore(state => state.resetImageState);
 
+// UI selectors
+export const useSemanticRunRequested = () => useAnnotationStore(state => state.ui.semanticRunRequested);
+export const useSemanticWarningModalOpen = () => useAnnotationStore(state => state.ui.semanticWarningModalOpen);
+
 // Sidebar actions
 export const useSetLeftSidebarCollapsed = () => useAnnotationStore(state => state.setLeftSidebarCollapsed);
 export const useSetRightSidebarCollapsed = () => useAnnotationStore(state => state.setRightSidebarCollapsed);
@@ -99,6 +103,8 @@ export const useToggleRightSidebar = () => useAnnotationStore(state => state.tog
 // Annotation Overview actions
 export const useSetVisibilityControlsExpanded = () => useAnnotationStore(state => state.setVisibilityControlsExpanded);
 export const useToggleVisibilityControls = () => useAnnotationStore(state => state.toggleVisibilityControls);
+export const useSetSemanticRunRequested = () => useAnnotationStore(state => state.setSemanticRunRequested);
+export const useSetSemanticWarningModalOpen = () => useAnnotationStore(state => state.setSemanticWarningModalOpen);
 
 // AI Annotation selectors
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);

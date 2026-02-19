@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DatasetProvider } from "./contexts/DatasetContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Login from "./components/auth/Login";
 import LandingPage from "./pages/LandingPage";
@@ -15,6 +16,7 @@ import ModelZooPage from "./pages/ModelZooPage";
 function App() {
   return (
     <AuthProvider>
+      <ToastProvider>
       <DatasetProvider>
         <Router basename={process.env.PUBLIC_URL || ""}>
           <Routes>
@@ -75,6 +77,7 @@ function App() {
           </Routes>
         </Router>
       </DatasetProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
