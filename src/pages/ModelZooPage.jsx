@@ -1,13 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { BookOpen, User, Brain, Filter, ArrowLeft, Loader2 } from "lucide-react";
+import { BookOpen, User, Brain, Filter, ArrowLeft, Loader2, GraduationCap } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../contexts/ToastContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
 import ModelCard from "../components/models/ModelCard";
 import TrainingModal from "../components/models/TrainingModal";
+import TrainingJobCard from "../components/models/TrainingJobCard";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
-import { getAllModels, startSemanticTraining, startPromptedTraining, startCompletionTraining } from "../api/training";
+import {
+  getAllModels,
+  startSemanticTraining,
+  getSemanticTrainingStatus,
+  cancelSemanticTraining,
+} from "../api/training";
 
 // Helper to transform backend model to UI format
 const transformModel = (model) => ({
@@ -26,11 +33,14 @@ const transformModel = (model) => ({
   supportsInference: true, // All models support inference
 });
 
+const POLL_INTERVAL_MS = 4000;
+
 const ModelZooPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { datasetId } = useParams();
   const { isAuthenticated, user } = useAuth();
+  const { addToast } = useToast();
   const [selectedService, setSelectedService] = useState("All");
   const [modelsData, setModelsData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
@@ -43,9 +53,80 @@ const ModelZooPage = () => {
     actionType: null,
   });
 
+  // Training jobs started from this page (so we can show status before they appear in model list)
+  const [trainingJobs, setTrainingJobs] = useState([]);
+  const [cancellingTaskId, setCancellingTaskId] = useState(null);
+
+  const refetchModels = useCallback(async () => {
+    try {
+      const result = await getAllModels();
+      if (result.success && result.models) {
+        const groupedModels = result.models.reduce((acc, model) => {
+          const transformedModel = transformModel(model);
+          const service = transformedModel.service;
+          if (!acc[service]) acc[service] = [];
+          acc[service].push(transformedModel);
+          return acc;
+        }, {});
+        setModelsData(groupedModels);
+      }
+    } catch (_) {
+      // ignore
+    }
+  }, []);
+
   // Check if we came from a dataset management page
   const datasetIdFromState = location.state?.datasetId || datasetId;
   const isFromDatasetManagement = !!datasetIdFromState;
+
+  // Poll training job status for active jobs
+  useEffect(() => {
+    const active = trainingJobs.filter(
+      (j) => j.status === "PENDING" || j.status === "STARTED"
+    );
+    if (active.length === 0) return;
+
+    const poll = async () => {
+      for (const job of active) {
+        try {
+          const res = await getSemanticTrainingStatus(job.task_id);
+          const status = res?.result?.status?.toUpperCase?.() ?? job.status;
+          const progress = res?.result?.progress ?? res?.result?.info ?? null;
+          const isDone = status === "SUCCESS" || status === "FAILURE" || status === "REVOKED";
+
+          const failureMessage =
+            status === "FAILURE"
+              ? typeof progress === "string"
+                ? progress
+                : progress?.message ?? progress?.error ?? "Training failed."
+              : null;
+
+          setTrainingJobs((prev) =>
+            prev.map((j) =>
+              j.task_id !== job.task_id
+                ? j
+                : {
+                    ...j,
+                    status,
+                    progress: progress ?? j.progress,
+                    error: failureMessage ?? j.error,
+                  }
+            )
+          );
+
+          if (status === "SUCCESS") {
+            refetchModels();
+          }
+        } catch (_) {
+          // keep current state on poll error
+        }
+      }
+    };
+
+    const t = setInterval(poll, POLL_INTERVAL_MS);
+    poll();
+    return () => clearInterval(t);
+  }, [trainingJobs, refetchModels]);
 
   // Fetch models from backend
   useEffect(() => {
@@ -111,25 +192,55 @@ const ModelZooPage = () => {
 
   const handleTrainingSubmit = async (trainingParams) => {
     const { model } = trainingModal;
-    
+
+    if (model.service !== "Semantic Segmentation") {
+      throw new Error(
+        `Training is not supported for ${model.service} models. These models are for inference only.`
+      );
+    }
+
+    const response = await startSemanticTraining(trainingParams);
+    if (!response?.success) {
+      throw new Error(response?.message || "Training failed");
+    }
+
+    const taskId = response?.result?.task_id;
+    const initialState = (response?.result?.state || "PENDING").toUpperCase();
+    if (!taskId) {
+      throw new Error("Server did not return a task ID.");
+    }
+
+    setTrainingJobs((prev) => [
+      ...prev,
+      {
+        task_id: taskId,
+        model_key: model.identifier,
+        model_name: model.name,
+        dataset_id: trainingParams.dataset_id,
+        status: initialState === "PENDING" || initialState === "STARTED" ? initialState : "PENDING",
+        progress: response?.result?.data ?? null,
+        error: null,
+        startedAt: new Date().toISOString(),
+      },
+    ]);
+    addToast({
+      message: "Training started. Track progress in the “Training runs” section below.",
+      type: "success",
+    });
+  };
+
+  const handleCancelTraining = async (taskId) => {
+    setCancellingTaskId(taskId);
     try {
-      let response;
-      
-      // Only Semantic Segmentation models support training
-      if (model.service === 'Semantic Segmentation') {
-        response = await startSemanticTraining(trainingParams);
-        
-        if (response.success) {
-          alert(`Training started successfully! Task ID: ${response.task_id || 'N/A'}`);
-        } else {
-          throw new Error(response.message || 'Training failed');
-        }
-      } else {
-        // Prompted and Completion Segmentation don't support training
-        throw new Error(`Training is not supported for ${model.service} models. These models are for inference only.`);
-      }
-    } catch (error) {
-      throw error; // Re-throw to let modal handle the error
+      await cancelSemanticTraining(taskId);
+      setTrainingJobs((prev) =>
+        prev.map((j) => (j.task_id === taskId ? { ...j, status: "REVOKED" } : j))
+      );
+      addToast({ message: "Training cancelled.", type: "success" });
+    } catch (err) {
+      addToast({ message: err?.message || "Failed to cancel training", type: "error" });
+    } finally {
+      setCancellingTaskId(null);
     }
   };
 
@@ -236,6 +347,53 @@ const ModelZooPage = () => {
                 ))}
               </div>
             </div>
+
+            {/* Training runs – show jobs started from this page with status */}
+            {trainingJobs.length > 0 && (
+              <div className="mb-10">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full" />
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-teal-600" />
+                    Training runs
+                  </h3>
+                  <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20" />
+                </div>
+                <p className="text-sm text-gray-600 mb-4">
+                  Models you started training here. When a run finishes, the trained model will appear in the Semantic Segmentation list below.
+                </p>
+                <div className="space-y-3">
+                  {trainingJobs.map((job) => {
+                    const p = job.progress;
+                    const epochNum = p?.current_epoch ?? p?.epoch_count;
+                    const totalEpochs = p?.total_epochs ?? p?.num_epochs;
+                    const progressMessage =
+                      job.status === "STARTED" && p && typeof p === "object"
+                        ? [
+                            epochNum != null &&
+                              `Epoch ${epochNum}${totalEpochs != null ? ` / ${totalEpochs}` : ""}`,
+                            (p.loss ?? p.train_loss) != null &&
+                              `Loss ${Number(p.loss ?? p.train_loss).toFixed(4)}`,
+                            (p.val_dice ?? p.val_dice_coeff) != null &&
+                              `Val Dice ${Number(p.val_dice ?? p.val_dice_coeff).toFixed(4)}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "Training in progress…"
+                        : job.status === "PENDING"
+                          ? "Waiting in queue…"
+                          : null;
+                    return (
+                      <TrainingJobCard
+                        key={job.task_id}
+                        job={job}
+                        onCancel={handleCancelTraining}
+                        progressMessage={progressMessage}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Models Grid by Service */}
             {Object.keys(filteredModels).map((serviceName) => (
