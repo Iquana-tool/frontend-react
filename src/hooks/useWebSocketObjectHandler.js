@@ -6,6 +6,8 @@ import {
   useUpdateObject,
   useRemoveObject,
   useObjectsList,
+  useClearSelection,
+  useSelectObject,
 } from '../stores/selectors/annotationSelectors';
 
 const useWebSocketObjectHandler = () => {
@@ -13,6 +15,8 @@ const useWebSocketObjectHandler = () => {
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
   const objectsList = useObjectsList();
+  const clearSelection = useClearSelection();
+  const selectObject = useSelectObject();
 
   useEffect(() => {
     const unsubscribeAdded = websocketService.on(
@@ -51,6 +55,10 @@ const useWebSocketObjectHandler = () => {
           quantification: contourData.quantification || null,
           reviewed_by: contourData.reviewed_by || [],
         });
+
+        // Auto-select the new object so the user can immediately delete/edit it without accidentally targeting another
+        clearSelection();
+        selectObject(contourId);
       }
     );
 
@@ -128,7 +136,7 @@ const useWebSocketObjectHandler = () => {
       unsubscribeModified();
       unsubscribeRemoved();
     };
-  }, [addObject, updateObject, removeObject, objectsList]);
+  }, [addObject, updateObject, removeObject, objectsList, clearSelection, selectObject]);
 };
 
 export default useWebSocketObjectHandler;
