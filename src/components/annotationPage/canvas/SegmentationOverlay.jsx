@@ -80,47 +80,72 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     animationDuration: 300
   });
 
-  // Filter objects based on visibility settings
+  // Filter objects based on visibility settings and focus/refinement mode
   const visibleObjects = useMemo(() => {
-    if (visibility.showAll) {
-      return objectsList;
-    }
+    let filtered = objectsList;
 
-    return objectsList.filter(obj => {
-      const isRootLevel = !obj.parent_id || obj.parent_id === null;
+    // In focus or refinement mode, only show descendants of the active object
+    // This hides ancestors, siblings, and unrelated objects that would otherwise
+    // cover the focused area and block annotation placement
+    const activeObjectId = focusModeActive ? focusedObjectId
+      : (refinementModeActive ? refinementModeObjectId : null);
 
-      // Filter by root level only - show only objects with root-level labels
-      if (visibility.rootLevelOnly) {
-        // Check if object has a root-level label
-        if (obj.labelId !== undefined && obj.labelId !== null) {
-          const labelIdKey = String(obj.labelId);
-          const rootLabelIds = visibility.rootLabelIds || [];
-          const isRootLabel = rootLabelIds.includes(obj.labelId) || rootLabelIds.includes(labelIdKey);
-          if (!isRootLabel) return false;
-        } else {
-          // If object has no label, don't show it in root level only mode
-          return false;
+    if (activeObjectId != null) {
+      const descendantIds = new Set();
+      const queue = [activeObjectId];
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        for (const obj of objectsList) {
+          if (obj.parent_id === currentId && !descendantIds.has(obj.id)) {
+            descendantIds.add(obj.id);
+            queue.push(obj.id);
+          }
         }
       }
+      filtered = filtered.filter(obj =>
+        obj.id === activeObjectId || descendantIds.has(obj.id)
+      );
+    }
 
-      // Filter by root level labels visibility
-      if (visibility.showRootLabels === false) {
-        if (isRootLevel) return false;
-      }
+    if (!visibility.showAll || activeObjectId != null) {
+      filtered = filtered.filter(obj => {
+        const isRootLevel = !obj.parent_id || obj.parent_id === null;
 
-      // Filter by label visibility - applies to all modes except showAll
-      // In selectedLevelOnly mode, only selected labels are shown
-      if (obj.labelId !== undefined && obj.labelId !== null) {
-        const labelIdKey = String(obj.labelId);
-        const isLabelVisible = visibility.labels[labelIdKey] !== false; // Default to true if not set
-        if (!isLabelVisible) return false;
-      } else {
-        // If object has no labelId, ALWAYS show it 
-      }
+        // Filter by root level only - show only objects with root-level labels
+        if (visibility.rootLevelOnly) {
+          // Check if object has a root-level label
+          if (obj.labelId !== undefined && obj.labelId !== null) {
+            const labelIdKey = String(obj.labelId);
+            const rootLabelIds = visibility.rootLabelIds || [];
+            const isRootLabel = rootLabelIds.includes(obj.labelId) || rootLabelIds.includes(labelIdKey);
+            if (!isRootLabel) return false;
+          } else {
+            // If object has no label, don't show it in root level only mode
+            return false;
+          }
+        }
 
-      return true;
-    });
-  }, [objectsList, visibility, selectedObjects]);
+        // Filter by root level labels visibility
+        if (visibility.showRootLabels === false) {
+          if (isRootLevel) return false;
+        }
+
+        // Filter by label visibility - applies to all modes except showAll
+        // In selectedLevelOnly mode, only selected labels are shown
+        if (obj.labelId !== undefined && obj.labelId !== null) {
+          const labelIdKey = String(obj.labelId);
+          const isLabelVisible = visibility.labels[labelIdKey] !== false; // Default to true if not set
+          if (!isLabelVisible) return false;
+        } else {
+          // If object has no labelId, ALWAYS show it 
+        }
+
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [objectsList, visibility, selectedObjects, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
   // Track last click times for double-click detection using ref to avoid closure issues
   const lastClickTimesRef = useRef({});
