@@ -194,7 +194,15 @@ const useAppStore = create()(
         
         galleryActions: {
           // DatasetGallery actions
+          // When switching dataset, clear cached images/labels/stats 
           setCurrentDataset: (dataset) => set(state => {
+            const prevId = state.gallery.currentDataset?.id;
+            const nextId = dataset?.id;
+            if (prevId !== nextId) {
+              state.gallery.images = [];
+              state.gallery.labels = [];
+              state.gallery.stats = {};
+            }
             state.gallery.currentDataset = dataset;
           }),
           
