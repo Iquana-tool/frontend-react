@@ -18,6 +18,12 @@ export const createObjectsSlice = (set) => ({
     const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
       ? Number(rawContourId)
       : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
+
+    // Normalize parent_id to number to match the normalized id (Map keys must be same type)
+    const rawParentId = object.parent_id ?? null;
+    const normalizedParentId = rawParentId != null
+      ? (typeof rawParentId === 'string' && !isNaN(rawParentId) ? Number(rawParentId) : rawParentId)
+      : null;
     
     // Check if object with this contour_id already exists (prevent duplicates)
     if (contourId !== null && state.objects.list.some(obj => obj.contour_id === contourId)) {
@@ -36,9 +42,9 @@ export const createObjectsSlice = (set) => ({
       x: object.x || [],
       y: object.y || [],
       ...object,
-      // Override id and contour_id with normalized versions
       id: objectId,
       contour_id: contourId,
+      parent_id: normalizedParentId,
       // Use label-based color if labeled, otherwise use ID-based color for stability
       color: getObjectColor({ labelId: object.labelId, label: object.label }, objectId)
     };
@@ -56,34 +62,36 @@ export const createObjectsSlice = (set) => ({
     const labelIdToNameMap = labelsMap;
     
     if (hierarchy && Array.isArray(hierarchy.root_contours)) {
-      const queue = [...hierarchy.root_contours];
+      // Queue entries are { contour, parentId } so we preserve hierarchy when backend
+      // returns nested children without parent_id on each node (e.g. after page refresh)
+      const queue = hierarchy.root_contours.map(c => ({ contour: c, parentId: null }));
       let orderCounter = 0;
-      
+
       while (queue.length > 0) {
-        const c = queue.shift();
+        const { contour: c, parentId: queueParentId } = queue.shift();
         const rawId = c.id ?? Date.now() + Math.random();
-        
+
         // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)
-        const id = typeof rawId === 'string' && !isNaN(rawId) 
-          ? Number(rawId) 
+        const id = typeof rawId === 'string' && !isNaN(rawId)
+          ? Number(rawId)
           : (typeof rawId === 'number' ? rawId : rawId);
-        
+
         // Normalize contour_id as well
         const rawContourId = c.id ?? null;
         const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
           ? Number(rawContourId)
           : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
-        
+
         // Backend returns label_id
         const labelId = c.label_id ?? null;
-        
+
         // Look up label name from labelsMap using label_id
         let labelName = null;
         if (labelId && labelIdToNameMap) {
           const numericLabelId = Number(labelId);
           labelName = labelIdToNameMap.get(numericLabelId) ?? labelIdToNameMap.get(String(labelId)) ?? null;
         }
-        
+
         // If object has a valid label from backend, assign it an order
         // We'll use the order they appear in the hierarchy as the assignment order
         let labelAssignmentOrder = undefined;
@@ -91,7 +99,14 @@ export const createObjectsSlice = (set) => ({
           orderCounter += 1;
           labelAssignmentOrder = orderCounter;
         }
-        
+
+        // Use backend parent_id if present, else the parent we tracked from nesting (for refresh load)
+        // Normalize parent_id to number to match the normalized id (Map keys must be same type)
+        const rawParentId = c.parent_id ?? queueParentId ?? null;
+        const parentId = rawParentId != null
+          ? (typeof rawParentId === 'string' && !isNaN(rawParentId) ? Number(rawParentId) : rawParentId)
+          : null;
+
         const obj = {
           id, // Normalized ID format
           contour_id: contourId, // Normalized contour_id format
@@ -103,7 +118,7 @@ export const createObjectsSlice = (set) => ({
           path: c.path || null, // SVG path from backend
           added_by: c.added_by || null,
           reviewed_by: c.reviewed_by || [],
-          parent_id: c.parent_id ?? null,
+          parent_id: parentId,
           quantification: c.quantification || null,
           // Use label-based color if labeled, otherwise use ID-based color for stability
           color: getObjectColor({ labelId: labelId, label: labelName }, id),
@@ -112,7 +127,9 @@ export const createObjectsSlice = (set) => ({
         colors[obj.id] = obj.color;
         // Backend guarantees children is always an array (default=[])
         if (c.children?.length > 0) {
-          queue.push(...c.children);
+          for (const child of c.children) {
+            queue.push({ contour: child, parentId: id });
+          }
         }
       }
       

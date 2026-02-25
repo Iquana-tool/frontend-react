@@ -8,12 +8,64 @@ import { fetchLabels } from '../../../api/labels';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
 import { deleteObject } from '../../../utils/objectOperations';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
+import { buildHierarchicalTree } from '../../../utils/objectTreeUtils';
+
+/**
+ * Recursively renders a tree of temporary ObjectItems with AI badges and visual connectors.
+ * Ghost nodes (ancestors from the reviewed group) are skipped but their children are rendered.
+ */
+const renderTemporaryTree = (nodes, depth = 0) =>
+  nodes.map((node) => {
+    if (node._ghost) {
+      if (node.children.length === 0) return null;
+      return (
+        <React.Fragment key={node.id}>
+          {renderTemporaryTree(node.children, depth)}
+        </React.Fragment>
+      );
+    }
+    return (
+      <div key={node.id}>
+        <div className="relative">
+          <div className="absolute -top-1 -right-1 z-10">
+            <div className="bg-purple-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+              <Sparkles className="w-2.5 h-2.5" />
+              AI
+            </div>
+          </div>
+          <ObjectItem
+            object={node}
+            isTemporary={true}
+            variant="temporary"
+          />
+        </div>
+        {node.children.length > 0 && (
+          <div className="ml-4 mt-1.5 pl-2 border-l-2 border-purple-200 space-y-1.5">
+            {renderTemporaryTree(node.children, depth + 1)}
+          </div>
+        )}
+      </div>
+    );
+  });
+
+const TemporaryTreeView = React.memo(({ objects, allObjects }) => {
+  const objectIds = React.useMemo(() => new Set(objects.map(o => o.id)), [objects]);
+  const treeRoots = React.useMemo(
+    () => buildHierarchicalTree(allObjects, objectIds),
+    [allObjects, objectIds]
+  );
+  return (
+    <div className="space-y-2">
+      {renderTemporaryTree(treeRoots)}
+    </div>
+  );
+});
 
 /**
  * TemporaryObjectsList - Displays unreviewed objects that need user review
  * These objects haven't been reviewed yet (reviewed_by is empty)
  */
-const TemporaryObjectsList = ({ objects = [] }) => {
+const TemporaryObjectsList = ({ objects = [], allObjects = [] }) => {
   const removeObject = useRemoveObject();
   const updateObject = useUpdateObject();
   const { currentDataset } = useDataset();
@@ -125,23 +177,7 @@ const TemporaryObjectsList = ({ objects = [] }) => {
       {/* Objects List */}
       <div className="space-y-2 max-h-48 md:max-h-56 lg:max-h-64 overflow-y-auto overflow-x-hidden pr-1 scrollbar-thin scrollbar-thumb-purple-300 scrollbar-track-purple-50">
         {objects.length > 0 ? (
-          objects.map((object) => (
-            <div key={object.id} className="relative">
-              {/* AI Badge */}
-              <div className="absolute -top-1 -right-1 z-10">
-                <div className="bg-purple-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                  <Sparkles className="w-2.5 h-2.5" />
-                  AI
-                </div>
-              </div>
-              
-              <ObjectItem 
-                object={object} 
-                isTemporary={true}
-                variant="temporary"
-              />
-            </div>
-          ))
+          <TemporaryTreeView objects={objects} allObjects={allObjects} />
         ) : (
           <div className="text-center py-4 md:py-6 bg-purple-50 border border-purple-100 rounded-lg">
             <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-purple-400 mx-auto mb-2" />

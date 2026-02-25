@@ -4,10 +4,10 @@ import React from 'react';
  * Details section for an object (color, pixel count, label, quantification)
  * Displayed when the object is selected
  * 
- * @param {string} color - The object's color
- * @param {number} pixelCount - Number of pixels in the object
- * @param {string} label - The object's label (optional)
- * @param {Object} quantification - Quantification metrics (area, perimeter, circularity, max_diameter)
+ * @param {string} color 
+ * @param {number} pixelCount
+ * @param {string} label 
+ * @param {Object} quantification 
  */
 const ObjectDetails = ({ color, pixelCount, label, quantification }) => {
   // Format number with appropriate precision
@@ -30,7 +30,7 @@ const ObjectDetails = ({ color, pixelCount, label, quantification }) => {
   return (
     <div className="space-y-3 text-xs text-gray-600">
       {/* Basic Info */}
-      {(pixelCount && pixelCount > 0) && (
+      {pixelCount > 0 && (
         <div className="flex items-center space-x-2">
           <div 
             className="w-3 h-3 rounded border border-gray-300" 
@@ -40,11 +40,15 @@ const ObjectDetails = ({ color, pixelCount, label, quantification }) => {
         </div>
       )}
       
-      {label && (
-        <div className="bg-gray-100 px-2 py-1 rounded text-xs">
-          {label}
-        </div>
-      )}
+      {(() => {
+        const labelStr = label != null ? String(label).trim() : '';
+        if (!labelStr || labelStr === '0') return null;
+        return (
+          <div className="bg-gray-100 px-2 py-1 rounded text-xs">
+            {label}
+          </div>
+        );
+      })()}
 
       {/* Quantification Metrics */}
       {quantification && (() => {

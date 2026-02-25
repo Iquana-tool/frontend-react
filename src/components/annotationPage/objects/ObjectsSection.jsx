@@ -90,7 +90,7 @@ const ObjectsSection = () => {
         {/* Content */}
         {expandedSections.unreviewed && (
           <div className="p-2 md:p-3 border-t border-purple-100">
-            <TemporaryObjectsList objects={unreviewedObjects} />
+            <TemporaryObjectsList objects={unreviewedObjects} allObjects={allObjects} />
           </div>
         )}
       </div>
@@ -120,7 +120,7 @@ const ObjectsSection = () => {
         {/* Content */}
         {expandedSections.reviewed && (
           <div className="p-2 md:p-3 border-t border-teal-100">
-            <PermanentObjectsList objects={reviewedObjects} />
+            <PermanentObjectsList objects={reviewedObjects} allObjects={allObjects} />
           </div>
         )}
       </div>
