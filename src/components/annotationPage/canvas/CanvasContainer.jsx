@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
+import { Loader2 } from 'lucide-react';
 import PromptOverlay from './PromptOverlay';
 import SegmentationOverlay from './SegmentationOverlay';
 import AIPromptCanvas from './AIPromptCanvas';
@@ -173,6 +174,18 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
       {/* Context menu for object labeling */}
       <ObjectContextMenu />
+
+      {/* Instant mode: show processing indicator when prompt was placed and request is in flight */}
+      {currentTool === 'ai_annotation' && instantSegmentation && isSubmitting && (
+        <div
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-teal-600/95 text-white text-sm font-medium shadow-lg border border-teal-500/50"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+          <span>Processing segmentation…</span>
+        </div>
+      )}
 
       {/* AI tool overlays (keeps base image mounted to avoid reloading) */}
       {currentTool === 'ai_annotation' && (

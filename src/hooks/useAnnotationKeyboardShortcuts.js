@@ -15,6 +15,7 @@ import {
   useClearSelection,
   useSetSemanticRunRequested,
   useSemanticWarningModalOpen,
+  useRefinementModeActive,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import { useCompletionSegmentation } from './useCompletionSegmentation';
@@ -28,7 +29,7 @@ import { getContourId } from '../utils/objectUtils';
  * - 1: Run Prompted Segmentation
  * - 2: Run Instance Discovery (completion) with selected objects as seeds
  * - 3: Open Semantic Segmentation (warning modal)
- * - Delete: Reject selected objects, or remove last prompt when in AI tool with no selection
+ * - Delete/Backspace: In refinement mode with prompts, remove last prompt; otherwise reject selected objects, or remove last prompt when in AI tool with no selection
  * - Arrow Left/Right: Previous/next image
  */
 export default function useAnnotationKeyboardShortcuts() {
@@ -52,6 +53,7 @@ export default function useAnnotationKeyboardShortcuts() {
   const clearSelection = useClearSelection();
   const setSemanticRunRequested = useSetSemanticRunRequested();
   const semanticWarningModalOpen = useSemanticWarningModalOpen();
+  const refinementModeActive = useRefinementModeActive();
 
   const { runSegmentation } = useAISegmentation();
   const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation();
@@ -151,7 +153,15 @@ export default function useAnnotationKeyboardShortcuts() {
         }
         case 'Delete':
         case 'Backspace': {
-          if (selectedObjects.length > 0) {
+          // In refinement mode with prompts: erase last prompt (don't reject the contour being refined)
+          if (
+            currentTool === 'ai_annotation' &&
+            refinementModeActive &&
+            prompts.length > 0
+          ) {
+            e.preventDefault();
+            removeLastPrompt();
+          } else if (selectedObjects.length > 0) {
             e.preventDefault();
             handleRejectSelected();
           } else if (currentTool === 'ai_annotation') {
@@ -186,6 +196,8 @@ export default function useAnnotationKeyboardShortcuts() {
     runSemanticRequest,
     handleRejectSelected,
     currentTool,
+    refinementModeActive,
+    prompts.length,
     removeLastPrompt,
     goPrevImage,
     goNextImage,

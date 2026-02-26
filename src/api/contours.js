@@ -49,10 +49,10 @@ export const deleteContour = async (contourId) => {
     }
 };
 
-export const deleteAllContours = async (maskId) =>{
+export const deleteAllContours = async (maskId) => {
     try {
         const response = await fetch(
-            `${API_BASE_URL}/contours/delete_all_contours_of_mask/${maskId}`,
+            `${API_BASE_URL}/masks/${maskId}/contours`,
             {
                 method: "DELETE",
                 headers: getAuthHeaders(),
@@ -62,7 +62,7 @@ export const deleteAllContours = async (maskId) =>{
     } catch (error) {
         throw error;
     }
-}
+};
 
 // Mark a contour as reviewed
 export const markContourAsReviewed = async (contourId) => {
