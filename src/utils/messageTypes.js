@@ -51,11 +51,14 @@ export const CLIENT_MESSAGE_TYPES = {
 export const SERVER_MESSAGE_TYPES = {
   // Session
   SESSION_INITIALIZED: 'session_initialized',
-  
+
+  // Full object hierarchy
+  OBJECTS: 'objects',
+
   // Object Operations
   OBJECT_ADDED: 'object_added',
   OBJECT_MODIFIED: 'object_modified',
-  OBJECT_REMOVED: 'object_removed', 
+  OBJECT_REMOVED: 'object_removed',
   OBJECT_FINALISED: 'object_finalised',
   
   // AI Segmentation

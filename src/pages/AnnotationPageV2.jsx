@@ -12,6 +12,8 @@ import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 import { useDataset } from '../contexts/DatasetContext';
 import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
+import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
+import websocketService from '../services/websocket';
 import * as api from '../api';
 
 const AnnotationPageV2 = () => {
@@ -78,6 +80,20 @@ const AnnotationPageV2 = () => {
 
   // Listen for server-initiated WebSocket messages (object updates)
   useWebSocketObjectHandler();
+
+  // Listen for "objects" message: full hierarchy from backend
+  // Clear canvas and load the received hierarchy.
+  useEffect(() => {
+    const unsubscribe = websocketService.on(
+      SERVER_MESSAGE_TYPES.OBJECTS,
+      (message) => {
+        if (!message || !message.data) return;
+        clearObjects();
+        loadObjectsWithLabels(message.data, currentDataset);
+      }
+    );
+    return unsubscribe;
+  }, [currentDataset, clearObjects, loadObjectsWithLabels]);
 
   // Preload models into backend memory when session is ready
   useModelPreloader();
