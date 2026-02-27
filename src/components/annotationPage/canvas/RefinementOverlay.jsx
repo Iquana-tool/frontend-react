@@ -94,8 +94,9 @@ const RefinementOverlay = () => {
     return null;
   }
 
+  // z-index 70: above control-points overlay (65) so Exit Refinement / indicator receive clicks and don't add prompts
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 50 }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 70 }}>
       {/* Exit refinement mode button — top-right */}
       <div className="absolute top-4 right-4 pointer-events-auto">
         <button
