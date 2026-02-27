@@ -44,36 +44,42 @@ const useAISegmentation = () => {
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
-   * Handles object_added, object_modified, and success message formats with contour data
+   * Handles object_added, object_modified, and success message formats with contour data.
+   * Contour is valid if it has path OR (x and y arrays with points); overlay can build path from x,y.
    */
   const transformResponseToMask = useCallback((response) => {
     let contour = null;
-    
+
+    // Ignore hierarchy payload (backend sometimes sends full hierarchy in object_added)
+    if (response && response.data && Array.isArray(response.data.root_contours)) {
+      return null;
+    }
+
     // Handle: object_added, object_modified, or success message with contour data
     if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && response.data) {
       contour = response.data;
     }
     // Handle direct contour data
-    else if (response && response.path) {
+    else if (response && (response.path || (response.x && response.y))) {
       contour = response;
     }
-    
-    // Backend should always provide path - if missing, it's an error
-    if (!contour || !contour.path) {
+
+    const hasPath = contour && contour.path;
+    const hasCoords = contour && Array.isArray(contour.x) && Array.isArray(contour.y) && (contour.x.length > 0 || contour.y.length > 0);
+    if (!contour || (!hasPath && !hasCoords)) {
       return null;
     }
 
     const mask = {
-      id: contour.id || Date.now(),
-      path: contour.path, // Backend-computed SVG path
-      pixelCount: contour.quantification?.area || contour.pixel_count || 0,
+      id: contour.id ?? contour.contour_id ?? Date.now(),
+      path: contour.path || null, // Overlay builds path from x,y when path is null
+      pixelCount: contour.quantification?.area ?? contour.pixel_count ?? 0,
       label: contour.label || 'AI Generated',
       confidence: contour.confidence,
-      // Extract x and y coordinate arrays if available from backend
       x: contour.x || [],
       y: contour.y || [],
     };
-    
+
     return mask;
   }, []);
 
@@ -218,9 +224,13 @@ const useAISegmentation = () => {
         clearAllPrompts();
         // Note: Model status is handled by the backend, no need to update here
         return { success: true, mask };
-      } else {
-        throw new Error('No valid mask returned from server');
       }
+      // Backend may send object_added with full hierarchy; canvas is updated via WebSocket listener
+      if (response && response.type === 'object_added' && response.data && Array.isArray(response.data.root_contours)) {
+        clearAllPrompts();
+        return { success: true, mask: null };
+      }
+      throw new Error('No valid mask returned from server');
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);

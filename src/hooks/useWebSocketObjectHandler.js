@@ -8,6 +8,7 @@ import {
   useObjectsList,
   useClearSelection,
   useSelectObject,
+  useSetObjectsFromHierarchy,
 } from '../stores/selectors/annotationSelectors';
 
 const useWebSocketObjectHandler = () => {
@@ -17,6 +18,7 @@ const useWebSocketObjectHandler = () => {
   const objectsList = useObjectsList();
   const clearSelection = useClearSelection();
   const selectObject = useSelectObject();
+  const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
 
   useEffect(() => {
     const unsubscribeAdded = websocketService.on(
@@ -27,16 +29,33 @@ const useWebSocketObjectHandler = () => {
         }
 
         const data = message.data;
-        
+
         if (Array.isArray(data)) {
           return;
         }
-        
-        const contourData = data;
-        const rawId = contourData.contour_id || contourData.id;
-        const contourId = typeof rawId === 'string' && !isNaN(rawId) 
-          ? Number(rawId) 
+
+        // Backend sometimes sends full hierarchy
+        if (data.root_contours && Array.isArray(data.root_contours)) {
+          setObjectsFromHierarchy(data, null);
+          clearSelection();
+          return;
+        }
+
+        // Single contour (e.g. from AI segmentation add_object)
+        const rawId = data.contour_id ?? data.id;
+        const contourId = rawId != null && typeof rawId === 'string' && !isNaN(rawId)
+          ? Number(rawId)
           : rawId;
+
+        if (contourId == null) {
+          return;
+        }
+
+        const hasPath = data.path;
+        const hasCoords = Array.isArray(data.x) && Array.isArray(data.y) && (data.x.length > 0 || data.y.length > 0);
+        if (!hasPath && !hasCoords) {
+          return;
+        }
 
         if (objectsList.some(obj => obj.contour_id === contourId)) {
           return;
@@ -44,19 +63,18 @@ const useWebSocketObjectHandler = () => {
 
         addObject({
           contour_id: contourId,
-          x: contourData.x || [],
-          y: contourData.y || [],
-          path: contourData.path || null,
-          label: contourData.label || null,
-          labelId: contourData.label_id ?? null,
-          added_by: contourData.added_by || null,
-          parent_id: contourData.parent_id ?? null,
-          confidence: contourData.confidence ?? 1.0,
-          quantification: contourData.quantification || null,
-          reviewed_by: contourData.reviewed_by || [],
+          x: data.x || [],
+          y: data.y || [],
+          path: data.path || null,
+          label: data.label || null,
+          labelId: data.label_id ?? null,
+          added_by: data.added_by || null,
+          parent_id: data.parent_id ?? null,
+          confidence: data.confidence ?? 1.0,
+          quantification: data.quantification || null,
+          reviewed_by: data.reviewed_by || [],
         });
 
-        // Auto-select the new object so the user can immediately delete/edit it without accidentally targeting another
         clearSelection();
         selectObject(contourId);
       }
@@ -136,7 +154,7 @@ const useWebSocketObjectHandler = () => {
       unsubscribeModified();
       unsubscribeRemoved();
     };
-  }, [addObject, updateObject, removeObject, objectsList, clearSelection, selectObject]);
+  }, [addObject, updateObject, removeObject, objectsList, clearSelection, selectObject, setObjectsFromHierarchy]);
 };
 
 export default useWebSocketObjectHandler;
