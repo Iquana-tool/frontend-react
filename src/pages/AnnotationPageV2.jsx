@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import MainLayout from '../components/annotationPage/layout/MainLayout';
 import ResponsiveWrapper from '../components/annotationPage/layout/ResponsiveWrapper';

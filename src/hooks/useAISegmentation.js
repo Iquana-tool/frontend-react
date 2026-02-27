@@ -18,6 +18,18 @@ import {
 } from '../stores/selectors/annotationSelectors';
 
 /**
+ * Normalize contour data from the backend.
+ * Pydantic V2 serializes a Contour model as an array of [key, value] pairs when the
+ * ServerMessage.data field is typed Union[dict, list, None] and the model fails dict
+ * coercion. Convert it back to a plain object when detected.
+ */
+const normalizeContourData = (data) => {
+  if (!Array.isArray(data)) return data;
+  const looksLikeEntries = data.length > 0 && Array.isArray(data[0]) && data[0].length === 2 && typeof data[0][0] === 'string';
+  return looksLikeEntries ? Object.fromEntries(data) : data;
+};
+
+/**
  * Custom hook to handle AI segmentation via WebSocket
  * Converts prompts to API format and processes the response
  */
@@ -50,26 +62,33 @@ const useAISegmentation = () => {
   const transformResponseToMask = useCallback((response) => {
     let contour = null;
 
+    // Normalize data: Pydantic V2 may serialize a Contour as an array of [key, value] pairs
+    const rawData = response?.data;
+    const normalizedData = normalizeContourData(rawData);
+
     // Ignore hierarchy payload (backend sometimes sends full hierarchy in object_added)
-    if (response && response.data && Array.isArray(response.data.root_contours)) {
+    if (normalizedData && Array.isArray(normalizedData.root_contours)) {
       return null;
     }
 
     // Handle: object_added, object_modified, or success message with contour data
-    if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && response.data) {
-      contour = response.data;
+    if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && normalizedData) {
+      contour = normalizedData;
     }
     // Handle direct contour data
     else if (response && (response.path || (response.x && response.y))) {
       contour = response;
     }
 
+    if (!contour) {
+      return null;
+    }
     const path = contour.path ?? contour.svg_path ?? contour.path_d;
-    const hasPath = contour && path;
+    const hasPath = !!path;
     const x = contour.x ?? contour.X;
     const y = contour.y ?? contour.Y;
-    const hasCoords = contour && Array.isArray(x) && Array.isArray(y) && (x.length > 0 || y.length > 0);
-    if (!contour || (!hasPath && !hasCoords)) {
+    const hasCoords = Array.isArray(x) && Array.isArray(y) && (x.length > 0 || y.length > 0);
+    if (!hasPath && !hasCoords) {
       return null;
     }
 

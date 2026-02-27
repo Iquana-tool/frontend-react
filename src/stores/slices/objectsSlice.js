@@ -27,26 +27,21 @@ export const createObjectsSlice = (set) => ({
     
     // Check if object with this contour_id already exists (prevent duplicates)
     if (contourId !== null && state.objects.list.some(obj => obj.contour_id === contourId)) {
-      console.warn(`Object with contour_id ${contourId} already exists. Skipping duplicate addition.`);
       return;
     }
     
     const newObject = {
-      id: objectId, // Store ID (normalized format for consistent color calculation)
-      contour_id: contourId, // Backend contour ID for API calls (normalized format)
-      pixelCount: object.pixelCount || 0,
-      label: object.label || 'Object',
-      path: object.path || object.mask?.path || null, // Preserve path from backend
-      mask: object.mask,
-      // Include x and y coordinate arrays if provided
-      x: object.x || [],
-      y: object.y || [],
       ...object,
       id: objectId,
       contour_id: contourId,
       parent_id: normalizedParentId,
-      // Use label-based color if labeled, otherwise use ID-based color for stability
-      color: getObjectColor({ labelId: object.labelId, label: object.label }, objectId)
+      pixelCount: object.pixelCount || 0,
+      label: object.label || 'Object',
+      path: object.path || object.mask?.path || null,
+      mask: object.mask,
+      x: object.x || [],
+      y: object.y || [],
+      color: getObjectColor({ labelId: object.labelId, label: object.label }, objectId),
     };
     state.objects.list.push(newObject);
     state.objects.colors[newObject.id] = newObject.color;

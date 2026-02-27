@@ -160,7 +160,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
       const containerWidth = container.offsetWidth;
       const containerHeight = container.offsetHeight;
-      const imageAspect = imageObject.width / imageObject.height;
+      // Use naturalWidth/naturalHeight as fallback for detached Image objects (width may be 0)
+      const imgW = imageObject.width || imageObject.naturalWidth || 0;
+      const imgH = imageObject.height || imageObject.naturalHeight || 0;
+      const imageAspect = imgW / imgH;
       const containerAspect = containerWidth / containerHeight;
 
       let renderedWidth, renderedHeight, x, y;
@@ -443,9 +446,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   };
 
   // Get viewBox dimensions from loaded image
-  const viewBox = imageObject 
-    ? `0 0 ${imageObject.width} ${imageObject.height}`
-    : '0 0 800 600'; // Fallback dimensions
+  // Use naturalWidth/naturalHeight for detached Image objects (width/height may be 0)
+  const imgNatW = imageObject ? (imageObject.width || imageObject.naturalWidth || 800) : 800;
+  const imgNatH = imageObject ? (imageObject.height || imageObject.naturalHeight || 600) : 600;
+  const viewBox = `0 0 ${imgNatW} ${imgNatH}`;
 
   // use high z-index to ensure object interactions work
   // Object paths will only capture events on painted areas, allowing empty areas to pass through
@@ -566,7 +570,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         let maskPath = null;
         
         if (object.x && object.y && object.x.length > 0 && imageObject) {
-          maskPath = generatePathFromCoordinates(object.x, object.y, imageObject.width, imageObject.height);
+          const iw = imageObject.width || imageObject.naturalWidth || 0;
+          const ih = imageObject.height || imageObject.naturalHeight || 0;
+          maskPath = generatePathFromCoordinates(object.x, object.y, iw, ih);
         }
         
         // Fallback to backend path only if coordinate generation failed
