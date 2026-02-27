@@ -14,11 +14,24 @@ export const createImagesSlice = (set) => ({
       state.images.zoomLevel = 1;
       state.images.panOffset = { x: 0, y: 0 };
     }
-    
+
     // Clear focus mode when switching images
     state.focusMode.active = false;
     state.focusMode.objectId = null;
     state.focusMode.objectMask = null;
+
+    // Clear refinement and edit mode when switching images so blue control-point overlay doesn't persist on the new image
+    if (isImageChanging) {
+      state.aiAnnotation.refinementMode.active = false;
+      state.aiAnnotation.refinementMode.objectId = null;
+      state.aiAnnotation.refinementMode.contourId = null;
+      state.editMode.active = false;
+      state.editMode.objectId = null;
+      state.editMode.contourId = null;
+      state.editMode.originalCoordinates = null;
+      state.editMode.draftCoordinates = null;
+      state.editMode.isDirty = false;
+    }
   }),
   
   setImageList: (images) => set((state) => {
