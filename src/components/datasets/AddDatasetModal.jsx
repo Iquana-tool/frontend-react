@@ -85,7 +85,9 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
         total: files.length
       });
       console.log('Dataset created successfully:', response);
-      const datasetId = response.dataset_id;
+      // Backend may return dataset_id as object; ensure we use a scalar for upload
+      const rawId = response.dataset_id;
+      const datasetId = rawId != null && typeof rawId === 'object' ? rawId.id : rawId;
 
       if (files.length === 0) {
         await fetchDatasets();

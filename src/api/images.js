@@ -39,13 +39,23 @@ export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
     }
 }
 
+// Ensure dataset_id is a scalar (string/number) for query params; backend may return an object
+const toScalarDatasetId = (datasetId) => {
+    if (datasetId == null) return null;
+    if (typeof datasetId === 'object' && datasetId !== null && 'id' in datasetId) {
+        return datasetId.id;
+    }
+    return datasetId;
+};
+
 // Upload multiple images at once
 export const uploadImages = async (files, datasetId) => {
     const maxRetries = 2;
     let retryCount = 0;
     let lastError = null;
 
-    if (!datasetId) {
+    const scalarId = toScalarDatasetId(datasetId);
+    if (scalarId == null || scalarId === '') {
         throw new Error("Dataset ID is required");
     }
 
@@ -67,7 +77,7 @@ export const uploadImages = async (files, datasetId) => {
 
             try {
                 const url = buildUrl(API_BASE_URL, '/images/upload_multi', {
-                    dataset_id: datasetId
+                    dataset_id: scalarId
                 });
 
                 const response = await fetch(url, {
@@ -186,7 +196,8 @@ export const uploadImage = async (file, datasetId) => {
     let retryCount = 0;
     let lastError = null;
 
-    if (!datasetId) {
+    const scalarId = toScalarDatasetId(datasetId);
+    if (scalarId == null || scalarId === '') {
         throw new Error("Dataset ID is required");
     }
 
@@ -202,7 +213,7 @@ export const uploadImage = async (file, datasetId) => {
 
             try {
                 const url = buildUrl(API_BASE_URL, '/images/upload', {
-                    dataset_id: datasetId
+                    dataset_id: scalarId
                 });
 
                 const response = await fetch(url, {
