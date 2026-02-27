@@ -51,8 +51,11 @@ const useWebSocketObjectHandler = () => {
           return;
         }
 
-        const hasPath = data.path;
-        const hasCoords = Array.isArray(data.x) && Array.isArray(data.y) && (data.x.length > 0 || data.y.length > 0);
+        const path = data.path ?? data.svg_path ?? data.path_d;
+        const x = data.x ?? data.X ?? [];
+        const y = data.y ?? data.Y ?? [];
+        const hasPath = !!path;
+        const hasCoords = Array.isArray(x) && Array.isArray(y) && (x.length > 0 || y.length > 0);
         if (!hasPath && !hasCoords) {
           return;
         }
@@ -63,9 +66,9 @@ const useWebSocketObjectHandler = () => {
 
         addObject({
           contour_id: contourId,
-          x: data.x || [],
-          y: data.y || [],
-          path: data.path || null,
+          x: x,
+          y: y,
+          path: path || null,
           label: data.label || null,
           labelId: data.label_id ?? null,
           added_by: data.added_by || null,

@@ -64,20 +64,23 @@ const useAISegmentation = () => {
       contour = response;
     }
 
-    const hasPath = contour && contour.path;
-    const hasCoords = contour && Array.isArray(contour.x) && Array.isArray(contour.y) && (contour.x.length > 0 || contour.y.length > 0);
+    const path = contour.path ?? contour.svg_path ?? contour.path_d;
+    const hasPath = contour && path;
+    const x = contour.x ?? contour.X;
+    const y = contour.y ?? contour.Y;
+    const hasCoords = contour && Array.isArray(x) && Array.isArray(y) && (x.length > 0 || y.length > 0);
     if (!contour || (!hasPath && !hasCoords)) {
       return null;
     }
 
     const mask = {
       id: contour.id ?? contour.contour_id ?? Date.now(),
-      path: contour.path || null, // Overlay builds path from x,y when path is null
-      pixelCount: contour.quantification?.area ?? contour.pixel_count ?? 0,
+      path: path || null,
+      pixelCount: contour.quantification?.area ?? contour.pixel_count ?? contour.quantification?.pixel_count ?? 0,
       label: contour.label || 'AI Generated',
       confidence: contour.confidence,
-      x: contour.x || [],
-      y: contour.y || [],
+      x: x || [],
+      y: y || [],
     };
 
     return mask;
@@ -225,11 +228,26 @@ const useAISegmentation = () => {
         // Note: Model status is handled by the backend, no need to update here
         return { success: true, mask };
       }
-      // Backend may send object_added with full hierarchy; canvas is updated via WebSocket listener
-      if (response && response.type === 'object_added' && response.data && Array.isArray(response.data.root_contours)) {
+      // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
+      if (response && response.success !== false && response.type === 'object_added') {
+        clearAllPrompts();
+        if (refinementModeActive) {
+          try {
+            await annotationSession.unselectRefinementObject();
+            exitRefinementMode();
+          } catch (error) {
+            // Continue anyway
+          }
+        }
+        return { success: true, mask: null };
+      }
+
+      // Other success response we couldn't parse (e.g. hierarchy); treat as success
+      if (response && response.success !== false) {
         clearAllPrompts();
         return { success: true, mask: null };
       }
+
       throw new Error('No valid mask returned from server');
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
