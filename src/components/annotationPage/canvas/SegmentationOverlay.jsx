@@ -18,7 +18,11 @@ import {
   useSetCurrentTool,
   useExitFocusMode,
   useObjectsVisibility,
+  useEnterEditMode,
+  useExitEditMode,
+  useUpdateObject,
 } from '../../../stores/selectors/annotationSelectors';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
@@ -73,6 +77,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const exitFocusMode = useExitFocusMode();
   const visibility = useObjectsVisibility();
   
+  const enterEditMode = useEnterEditMode();
+  const exitEditMode = useExitEditMode();
+  const updateObject = useUpdateObject();
+
   const { zoomToObject } = useZoomToObject({
     marginPct: 0.25,
     maxZoom: 4,
@@ -147,6 +155,33 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return filtered;
   }, [objectsList, visibility, selectedObjects, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
+  /**
+   * Save the current edit-mode draft to backend and exit edit mode.
+   * Uses getState() so it always reads the freshest Zustand state,
+   * avoiding stale-closure issues inside async event handlers.
+   */
+  const saveAndExitEditMode = () => {
+    const { editMode, objects } = useAnnotationStore.getState();
+    if (!editMode.active) return;
+
+    if (editMode.isDirty && editMode.draftCoordinates && editMode.objectId) {
+      const editObj = objects.list.find(o => o.id === editMode.objectId);
+      if (editObj) {
+        // Optimistic local update
+        updateObject(editMode.objectId, {
+          x: [...editMode.draftCoordinates.x],
+          y: [...editMode.draftCoordinates.y],
+          path: null,
+        });
+        // Fire-and-forget backend save
+        annotationSession
+          .modifyObject(editMode.contourId, { x: editMode.draftCoordinates.x, y: editMode.draftCoordinates.y })
+          .catch(err => console.error('Auto-save on switch failed:', err));
+      }
+    }
+    exitEditMode();
+  };
+
   // Track last click times for double-click detection using ref to avoid closure issues
   const lastClickTimesRef = useRef({});
 
@@ -213,14 +248,16 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  // Handle double-click on objects (enter refinement mode)
+  // Handle double-click: enter refinement mode + edit mode + zoom
   const handleObjectDoubleClick = async (object) => {
     const contourId = object.contour_id || object.id;
     
     try {
+      // If already editing a (possibly different) object, save first
+      saveAndExitEditMode();
+
       // Exit focus mode if active (refinement mode replaces focus mode)
       if (focusModeActive) {
-        // Send unfocus message to backend
         if (annotationSession.isReady()) {
           await annotationSession.unfocusImage();
         }
@@ -232,6 +269,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       
       // Enter refinement mode in the store
       enterRefinementMode(object.id, contourId);
+
+      // Also enter edit mode so the user can drag control points immediately
+      if (object.x && object.y && object.x.length > 0 && object.contour_id != null) {
+        enterEditMode(object.id, object.contour_id, object.x, object.y);
+      }
       
       // Switch to AI annotation tool
       setCurrentTool('ai_annotation');
@@ -244,28 +286,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           const containerHeight = container.offsetHeight;
           
           if (containerWidth && containerHeight) {
-            const imageDims = {
-              width: imageObject.width,
-              height: imageObject.height
-            };
-            
-            const containerDims = {
-              width: containerWidth,
-              height: containerHeight
-            };
-            
-            const renderedImageDims = {
-              width: imageDimensions.width,
-              height: imageDimensions.height,
-              x: imageDimensions.x,
-              y: imageDimensions.y
-            };
-            
             zoomToObject(
               object,
-              imageDims,
-              containerDims,
-              renderedImageDims,
+              { width: imageObject.width, height: imageObject.height },
+              { width: containerWidth, height: containerHeight },
+              { width: imageDimensions.width, height: imageDimensions.height, x: imageDimensions.x, y: imageDimensions.y },
               { animateMs: 300, immediate: false }
             );
           }
@@ -283,7 +308,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     // Check if Shift key is held for multi-select
     const isShiftHeld = e.shiftKey;
     
-    // If Shift is held, toggle selection and skip focus mode behavior
+    // If Shift is held, toggle selection and skip single-object edit mode
     if (isShiftHeld) {
       const isAlreadySelected = selectedObjects.includes(object.id);
       if (isAlreadySelected) {
@@ -291,6 +316,8 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       } else {
         selectObject(object.id);
       }
+      // Multi-select: save and exit edit mode (edit mode only for single selection)
+      saveAndExitEditMode();
       return;
     }
     
@@ -324,45 +351,34 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     }, 250);
   };
 
-  // Handle single-click on objects (enter focus mode in both selection and AI annotation tools)
+  // Handle single-click: select object + enter focus mode + zoom (original behaviour)
   const handleSingleClick = async (object) => {
     // Disable focus mode when in refinement mode
     if (refinementModeActive) {
       return;
     }
-    
+
     // Clear previous selection and select only this object
     clearSelection();
     selectObject(object.id);
-    
-    // Enter focus mode for both selection and AI annotation tools
+
+    // Enter focus mode for selection and AI annotation tools
     if (currentTool === 'selection' || currentTool === 'ai_annotation') {
       if (!imageObject || !object.x || !object.y || object.x.length === 0) {
         return;
       }
 
-      // Create mask from x,y arrays if mask doesn't exist or doesn't have points
+      // Build mask from coordinate arrays if needed
       let mask = object.mask;
-      
-      // If mask doesn't exist or doesn't have points, create it from x,y arrays
       if (!mask || !mask.points) {
-        // Convert normalized x,y arrays to pixel coordinates and create points array
-        const points = object.x.map((x, i) => [
-          x * imageObject.width,
-          object.y[i] * imageObject.height
-        ]);
-        mask = { points: points };
+        const points = object.x.map((x, i) => [x * imageObject.width, object.y[i] * imageObject.height]);
+        mask = { points };
       }
-      
+
       if (mask && mask.points && mask.points.length > 0) {
-        // Get contour ID for WebSocket message
         const contourId = getContourId(object);
-        
         try {
-          // Send focus message to backend via WebSocket
           await annotationSession.focusImage(contourId);
-          
-          // Enter focus mode in the store
           enterFocusMode(object.id, mask);
         } catch (error) {
           console.error('Failed to enter focus mode:', error);
@@ -372,34 +388,15 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
       const container = containerRef.current;
       if (!container) return;
-
       const containerWidth = container.offsetWidth;
       const containerHeight = container.offsetHeight;
-
       if (!containerWidth || !containerHeight) return;
-
-      const imageDims = {
-        width: imageObject.width,
-        height: imageObject.height
-      };
-
-      const containerDims = {
-        width: containerWidth,
-        height: containerHeight
-      };
-
-      const renderedImageDims = {
-        width: imageDimensions.width,
-        height: imageDimensions.height,
-        x: imageDimensions.x,
-        y: imageDimensions.y
-      };
 
       zoomToObject(
         object,
-        imageDims,
-        containerDims,
-        renderedImageDims,
+        { width: imageObject.width, height: imageObject.height },
+        { width: containerWidth, height: containerHeight },
+        { width: imageDimensions.width, height: imageDimensions.height, x: imageDimensions.x, y: imageDimensions.y },
         { animateMs: 300, immediate: false }
       );
     }

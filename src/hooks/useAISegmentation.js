@@ -14,7 +14,9 @@ import {
   useRefinementModeActive,
   useRefinementModeObjectId,
   useExitRefinementMode,
-  useSetCurrentTool, useSetPromptedModel,
+  useSetCurrentTool,
+  useSetPromptedModel,
+  useSyncEditModeDraftFromRefinement,
 } from '../stores/selectors/annotationSelectors';
 
 /**
@@ -53,6 +55,7 @@ const useAISegmentation = () => {
   const refinementModeObjectId = useRefinementModeObjectId();
   const exitRefinementMode = useExitRefinementMode();
   const setCurrentTool = useSetCurrentTool();
+  const syncEditModeDraftFromRefinement = useSyncEditModeDraftFromRefinement();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -217,6 +220,8 @@ const useAISegmentation = () => {
           
           if (objectToUpdate) {
             // Update the existing object - completely replace mask and path to show only the refined version
+            const newX = mask.x || [];
+            const newY = mask.y || [];
             updateObject(objectToUpdate.id, {
               mask: mask,
               contour_id: normalizedId, // Update with the NEW contour_id from backend
@@ -224,27 +229,19 @@ const useAISegmentation = () => {
               // Preserve existing label if it exists, otherwise use the one from backend
               label: mask.label || objectToUpdate.label || `Object #${objectToUpdate.id}`,
               // Include x and y coordinate arrays if available from backend response
-              x: mask.x || [],
-              y: mask.y || [],
+              x: newX,
+              y: newY,
               // Ensure path is available for rendering - explicitly set from new refined object
               path: mask.path || null,
             });
+            // Sync edit mode draft so the blue control-point overlay shows the new refined contour
+            if (refinementModeActive && newX.length > 0 && newY.length > 0) {
+              syncEditModeDraftFromRefinement(newX, newY);
+            }
           }
         }
-        // The handler will receive the OBJECT_ADDED message and add it once
-        
-        // Exit refinement mode after successful segmentation so the object is clickable
-        if (refinementModeActive) {
-          try {
-            await annotationSession.unselectRefinementObject();
-            exitRefinementMode();
-          } catch (error) {
-           
-            // Continue anyway - the object was updated/added successfully
-          }
-        }
+        // For refinement (object_modified): stay in refinement mode so user can refine again or exit via "Exit Refinement"
         clearAllPrompts();
-        // Note: Model status is handled by the backend, no need to update here
         return { success: true, mask };
       }
       // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
@@ -291,6 +288,7 @@ const useAISegmentation = () => {
     refinementModeObjectId,
     exitRefinementMode,
     setCurrentTool,
+    syncEditModeDraftFromRefinement,
   ]);
 
   return {

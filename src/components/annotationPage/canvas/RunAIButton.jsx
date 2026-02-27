@@ -6,11 +6,13 @@ import {
   useAIPrompts,
   useIsSubmitting,
   useInstantSegmentation,
+  useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 
 /**
  * Run AI Button Component
- * Button to trigger AI segmentation
+ * Button to trigger AI segmentation (or "Refine object" in refinement mode).
+ * Uses z-[70] so it stays above the refinement control-points overlay (z-65) and remains clickable.
  */
 const RunAIButton = ({ onRunAI }) => {
   const currentTool = useCurrentTool();
@@ -18,14 +20,16 @@ const RunAIButton = ({ onRunAI }) => {
   const prompts = useAIPrompts();
   const isSubmitting = useIsSubmitting();
   const instantSegmentation = useInstantSegmentation();
+  const refinementModeActive = useRefinementModeActive();
 
   // Only show when AI annotation tool is active
   if (currentTool !== 'ai_annotation') {
     return null;
   }
 
-  // Hide button completely when instant segmentation is enabled (segmentation happens automatically)
-  if (instantSegmentation) {
+  // Hide button when instant segmentation is enabled (segmentation happens automatically)
+  // Exception: show in refinement mode so user can explicitly run "Refine object"
+  if (instantSegmentation && !refinementModeActive) {
     return null;
   }
 
@@ -37,8 +41,11 @@ const RunAIButton = ({ onRunAI }) => {
     }
   };
 
+  const buttonLabel = refinementModeActive ? 'Refine object' : 'Run AI Segmentation';
+  const titleAction = refinementModeActive ? 'Refine object' : 'Run AI segmentation';
+
   return (
-    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[70] pointer-events-auto">
       <button
         onClick={handleClick}
         disabled={!canSubmit}
@@ -57,7 +64,7 @@ const RunAIButton = ({ onRunAI }) => {
             ? 'Select a model first'
             : prompts.length === 0
             ? 'Add at least one prompt'
-            : 'Run AI segmentation'
+            : titleAction
         }
       >
         {isSubmitting ? (
@@ -68,7 +75,7 @@ const RunAIButton = ({ onRunAI }) => {
         ) : (
           <>
             <Sparkles className="w-5 h-5" />
-            <span>Run AI Segmentation</span>
+            <span>{buttonLabel}</span>
             {prompts.length > 0 && (
               <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs">
                 {prompts.length}

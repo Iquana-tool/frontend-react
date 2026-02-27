@@ -4,9 +4,9 @@ import {
   useEditModeActive,
   useEditModeDraftCoordinates,
   useImageObject,
+  useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 import { useContourEditing } from '../../../hooks/useContourEditing';
-import { Save, X, RotateCcw } from 'lucide-react';
 
 /**
  * EditableContourOverlay Component
@@ -17,15 +17,16 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
   const editModeActive = useEditModeActive();
   const draftCoordinates = useEditModeDraftCoordinates();
   const imageObject = useImageObject();
+  const refinementModeActive = useRefinementModeActive();
   
-  const { updatePoint, saveEditing, cancelEditing, resetChanges, isDirty } = useContourEditing();
+  const { updatePoint, saveEditing, cancelEditing, resetChanges, isDirty, scheduleAutoSave, cancelAutoSave } = useContourEditing();
   
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
-  const [isSaving, setIsSaving] = useState(false);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const containerRef = useRef(null);
+  const pointsWrapperRef = useRef(null);
   
-  // Intelligently reduce number of control points for cleaner UI (show max 30-35 points)
+  // Reduce control points to a manageable number (max ~30 handles)
   const decimationFactor = Math.max(1, Math.floor((draftCoordinates?.x?.length || 0) / 30));
 
   // Calculate rendered image dimensions
@@ -77,43 +78,101 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     };
   }, [canvasRef, imageObject]);
 
-  // Handle save action
-  const handleSave = useCallback(async () => {
-    setIsSaving(true);
-    try {
-      await saveEditing();
-    } catch (error) {
-      // Error handling is done in the hook
-    } finally {
-      setIsSaving(false);
-    }
-  }, [saveEditing]);
-
   // Handle keyboard shortcuts
   useEffect(() => {
     if (!editModeActive) return;
 
     const handleKeyDown = (e) => {
-      // Save: Enter or Ctrl/Cmd+S
-      if (e.key === 'Enter' || (e.key === 's' && (e.ctrlKey || e.metaKey))) {
+      // Escape: discard changes and exit — but only when NOT in refinement mode.
+      // In refinement mode, RefinementOverlay owns the Escape key (it saves + exits both modes).
+      if (e.key === 'Escape' && !refinementModeActive) {
         e.preventDefault();
-        handleSave();
-      }
-      // Cancel: Escape
-      else if (e.key === 'Escape') {
-        e.preventDefault();
+        cancelAutoSave();
         cancelEditing();
       }
       // Reset: Ctrl/Cmd+Z
       else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
+        cancelAutoSave();
         resetChanges();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editModeActive, handleSave, cancelEditing, resetChanges]);
+  }, [editModeActive, refinementModeActive, cancelEditing, resetChanges, cancelAutoSave]);
+
+  // --- Event forwarding for refinement mode ---
+  // In refinement mode the control-points Stage sits at z-65, above the AIPromptCanvas at z-62.
+  // A full-screen Konva canvas captures ALL pointer events, blocking prompt placement.
+  // Fix: when a mousedown lands on the Stage background (not a control point), temporarily
+  // disable pointer-events on this canvas and re-dispatch the native event to whatever element
+  // is actually below — i.e. the AIPromptCanvas Stage. Subsequent move/up events are forwarded
+  // as long as that mousedown was forwarded, so box-drawing preview continues to work.
+  const forwardedMouseDownRef = useRef(false);
+
+  const forwardNativeEvent = useCallback((nativeEvent) => {
+    const wrapper = pointsWrapperRef.current;
+    if (!wrapper) return;
+
+    // Temporarily hide the entire z-65 wrapper so elementFromPoint
+    // skips it and all its children (Konva Stage container, canvas, etc.)
+    wrapper.style.visibility = 'hidden';
+    const elementBelow = document.elementFromPoint(nativeEvent.clientX, nativeEvent.clientY);
+    wrapper.style.visibility = '';
+
+    if (!elementBelow) return;
+
+    elementBelow.dispatchEvent(new MouseEvent(nativeEvent.type, {
+      bubbles: true,
+      cancelable: true,
+      button: nativeEvent.button,
+      buttons: nativeEvent.buttons,
+      clientX: nativeEvent.clientX,
+      clientY: nativeEvent.clientY,
+      screenX: nativeEvent.screenX,
+      screenY: nativeEvent.screenY,
+      movementX: nativeEvent.movementX ?? 0,
+      movementY: nativeEvent.movementY ?? 0,
+      shiftKey: nativeEvent.shiftKey,
+      ctrlKey: nativeEvent.ctrlKey,
+      metaKey: nativeEvent.metaKey,
+      altKey: nativeEvent.altKey,
+    }));
+  }, []);
+
+  const handlePointsStageMouseDown = useCallback((e) => {
+    if (e.target === e.target.getStage()) {
+      // Background click — forward to AIPromptCanvas and track that we forwarded
+      forwardedMouseDownRef.current = true;
+      forwardNativeEvent(e.evt);
+    } else {
+      // Landed on a control point circle — normal drag, do not forward
+      forwardedMouseDownRef.current = false;
+    }
+  }, [forwardNativeEvent]);
+
+  const handlePointsStageMouseMove = useCallback((e) => {
+    if (forwardedMouseDownRef.current) {
+      forwardNativeEvent(e.evt);
+    }
+  }, [forwardNativeEvent]);
+
+  const handlePointsStageMouseUp = useCallback((e) => {
+    if (forwardedMouseDownRef.current) {
+      forwardNativeEvent(e.evt);
+      forwardedMouseDownRef.current = false;
+    }
+  }, [forwardNativeEvent]);
+
+  // Prevent browser context menu; forward right-click events so the AIPromptCanvas
+  // can synthesise its own Konva click (button=2) and add a negative prompt.
+  const handlePointsStageContextMenu = useCallback((e) => {
+    e.evt.preventDefault();
+    if (e.target === e.target.getStage()) {
+      forwardNativeEvent(e.evt);
+    }
+  }, [forwardNativeEvent]);
 
   if (!editModeActive || !draftCoordinates || !imageObject || imageDimensions.width === 0) {
     return null;
@@ -132,7 +191,15 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
   // Draw line with ALL points for accuracy (flat array: [x1, y1, x2, y2, ...])
   const linePoints = allPointsInPixels.flatMap(p => [p.x, p.y]);
 
-  // Handle point drag with smooth interpolation
+  // Scale point sizes so they stay visually consistent regardless of zoom level.
+  // The outer div has CSS transform scale(zoomLevel), so dividing by zoomLevel
+  // keeps the on-screen pixel size constant at the base values.
+  const safeZoom = zoomLevel > 0 ? zoomLevel : 1;
+  const visiblePointRadius = Math.max(2, 5 / safeZoom);
+  const hoveredPointRadius = Math.max(2.5, 6 / safeZoom);
+  const hitboxRadius = Math.max(8, 20 / safeZoom);
+
+  // Handle point drag with smooth interpolation and auto-save scheduling
   const handlePointDragMove = (index, e) => {
     const stage = e.target.getStage();
     const pointerPos = stage.getPointerPosition();
@@ -147,147 +214,127 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     
     // Pass decimation factor for smooth interpolation between control points
     updatePoint(index, clampedX, clampedY, decimationFactor);
+
+    // Schedule auto-save: resets the idle timer on every drag event.
+    // Editing is now fully auto-saved; there is no manual Save/Reset/Discard panel.
+    scheduleAutoSave();
   };
 
-  return (
-    <>
-      {/* Konva Stage for interactive editing */}
-      <div 
-        ref={containerRef}
-        className="absolute inset-0 pointer-events-none"
-        style={{ 
-          zIndex: 60,
-          transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-          transformOrigin: 'center center'
-        }}
-      >
-        <Stage
-          width={imageDimensions.width + imageDimensions.x * 2}
-          height={imageDimensions.height + imageDimensions.y * 2}
-          className="pointer-events-auto"
-        >
-          <Layer>
-            {/* Simple contour line */}
-            <Line
-              points={linePoints}
-              stroke="#3b82f6"
-              strokeWidth={2}
-              closed={true}
-              tension={0.4}
+  const transformStyle = {
+    transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
+    transformOrigin: 'center center',
+  };
+
+  const stageProps = {
+    width: imageDimensions.width + imageDimensions.x * 2,
+    height: imageDimensions.height + imageDimensions.y * 2,
+  };
+
+  const lineLayer = (
+    <Layer listening={false}>
+      <Line
+        points={linePoints}
+        stroke="#3b82f6"
+        strokeWidth={2}
+        closed={true}
+        tension={0.4}
+      />
+    </Layer>
+  );
+
+  const pointsLayer = (
+    <Layer>
+      {controlHandles.map((point) => {
+        const isHovered = hoveredPoint === point.index;
+        return (
+          <React.Fragment key={point.index}>
+            <Circle
+              x={point.x}
+              y={point.y}
+              radius={hitboxRadius}
+              fill="transparent"
+              draggable
+              onDragMove={(e) => handlePointDragMove(point.index, e)}
+              onMouseEnter={(e) => {
+                const container = e.target.getStage().container();
+                container.style.cursor = 'grab';
+                setHoveredPoint(point.index);
+              }}
+              onMouseLeave={(e) => {
+                const container = e.target.getStage().container();
+                container.style.cursor = 'default';
+                setHoveredPoint(null);
+              }}
+              onDragStart={(e) => {
+                const container = e.target.getStage().container();
+                container.style.cursor = 'grabbing';
+              }}
+              onDragEnd={(e) => {
+                const container = e.target.getStage().container();
+                container.style.cursor = 'grab';
+              }}
             />
+            <Circle
+              x={point.x}
+              y={point.y}
+              radius={isHovered ? hoveredPointRadius : visiblePointRadius}
+              fill="#3b82f6"
+              stroke="#ffffff"
+              strokeWidth={Math.max(1, 2 / safeZoom)}
+              listening={false}
+            />
+          </React.Fragment>
+        );
+      })}
+    </Layer>
+  );
 
-            {/* Clean, simple control handles (only for selected points) */}
-            {controlHandles.map((point) => {
-              const isHovered = hoveredPoint === point.index;
-              
-              return (
-                <React.Fragment key={point.index}>
-                  {/* Invisible hitbox for easier grabbing */}
-                  <Circle
-                    x={point.x}
-                    y={point.y}
-                    radius={20}
-                    fill="transparent"
-                    draggable
-                    onDragMove={(e) => handlePointDragMove(point.index, e)}
-                    onMouseEnter={(e) => {
-                      const container = e.target.getStage().container();
-                      container.style.cursor = 'grab';
-                      setHoveredPoint(point.index);
-                    }}
-                    onMouseLeave={(e) => {
-                      const container = e.target.getStage().container();
-                      container.style.cursor = 'default';
-                      setHoveredPoint(null);
-                    }}
-                    onDragStart={(e) => {
-                      const container = e.target.getStage().container();
-                      container.style.cursor = 'grabbing';
-                    }}
-                    onDragEnd={(e) => {
-                      const container = e.target.getStage().container();
-                      container.style.cursor = 'grab';
-                    }}
-                  />
-                  
-                  {/* Simple visible point */}
-                  <Circle
-                    x={point.x}
-                    y={point.y}
-                    radius={isHovered ? 6 : 5}
-                    fill="#3b82f6"
-                    stroke="#ffffff"
-                    strokeWidth={2}
-                    listening={false}
-                  />
-                </React.Fragment>
-              );
-            })}
-          </Layer>
-        </Stage>
-      </div>
-
-      {/* Editing controls panel */}
-      <div className="absolute top-4 right-4 pointer-events-auto" style={{ zIndex: 70 }}>
-        <div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200/80 overflow-hidden min-w-[200px]">
-          {/* Header */}
-          <div className="px-3 py-2 bg-gradient-to-br from-blue-50 to-blue-100/50 border-b border-blue-200/50">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              <span className="font-semibold text-blue-800 text-sm">Editing Contour</span>
-              {isDirty && (
-                <span className="ml-auto px-2 py-0.5 bg-blue-500/20 text-blue-700 text-xs font-medium rounded-full">
-                  Modified
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="p-3 space-y-2">
-            {/* Save button - primary */}
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-md text-sm font-medium shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]"
-            >
-              <Save className="w-4 h-4" />
-              <span>{isSaving ? 'Saving...' : 'Save'}</span>
-            </button>
-
-            {/* Secondary actions */}
-            <div className="flex gap-2">
-              <button
-                onClick={resetChanges}
-                disabled={!isDirty || isSaving}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed text-gray-700 rounded-md text-xs font-medium transition-all duration-150 active:scale-[0.98]"
-                title="Reset changes (Ctrl+Z)"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset</span>
-              </button>
-              
-              <button
-                onClick={cancelEditing}
-                disabled={isSaving}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 text-gray-700 rounded-md text-xs font-medium transition-all duration-150 active:scale-[0.98]"
-                title="Exit without saving (Esc)"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Exit</span>
-              </button>
-            </div>
-
-            {/* Hint text */}
-            <div className="pt-1 border-t border-gray-200/50">
-              <p className="text-xs text-gray-500 text-center leading-tight">
-                Drag points to edit contour
-              </p>
-            </div>
-          </div>
+  // In refinement mode: line below (z-55, non-interactive) so prompt canvas (z-62) can receive clicks; points above (z-65) so they remain draggable
+  if (refinementModeActive) {
+    return (
+      <>
+        <div
+          ref={containerRef}
+          className="absolute inset-0 pointer-events-none"
+          style={{ ...transformStyle, zIndex: 55 }}
+        >
+          <Stage {...stageProps} listening={false}>
+            {lineLayer}
+          </Stage>
         </div>
-      </div>
-    </>
+        <div
+          ref={pointsWrapperRef}
+          className="absolute inset-0 pointer-events-none"
+          style={{ ...transformStyle, zIndex: 65 }}
+        >
+          <Stage
+            {...stageProps}
+            className="pointer-events-auto"
+            onMouseDown={handlePointsStageMouseDown}
+            onMouseMove={handlePointsStageMouseMove}
+            onMouseUp={handlePointsStageMouseUp}
+            onMouseLeave={handlePointsStageMouseUp}
+            onContextMenu={handlePointsStageContextMenu}
+          >
+            {pointsLayer}
+          </Stage>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    // Single overlay when not in refinement mode
+    <div
+      ref={containerRef}
+      className="absolute inset-0 pointer-events-none"
+      style={{ ...transformStyle, zIndex: 60 }}
+    >
+      <Stage {...stageProps} className="pointer-events-auto">
+        {lineLayer}
+        {pointsLayer}
+      </Stage>
+    </div>
   );
 };
 

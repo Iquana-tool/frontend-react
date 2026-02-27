@@ -192,4 +192,5 @@ export const useEditModeIsDirty = () => useAnnotationStore(state => state.editMo
 export const useEnterEditMode = () => useAnnotationStore(state => state.enterEditMode);
 export const useUpdateDraftPoint = () => useAnnotationStore(state => state.updateDraftPoint);
 export const useResetDraft = () => useAnnotationStore(state => state.resetDraft);
+export const useSyncEditModeDraftFromRefinement = () => useAnnotationStore(state => state.syncEditModeDraftFromRefinement);
 export const useExitEditMode = () => useAnnotationStore(state => state.exitEditMode);

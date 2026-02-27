@@ -307,6 +307,12 @@ const ObjectContextMenu = () => {
 
     try {
       await enterRefinementModeForObject(targetObject);
+
+      // Also enter edit mode so control points are immediately available
+      if (targetObject.x && targetObject.y && targetObject.x.length > 0 && targetObject.contour_id != null) {
+        enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+      }
+
       hideContextMenu();
     } catch (error) {
       alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);
@@ -382,7 +388,6 @@ const ObjectContextMenu = () => {
 
     // Exit focus mode if active
     if (focusModeActive) {
-      // Send unfocus message to backend
       if (annotationSession.isReady()) {
         annotationSession.unfocusImage().catch(err => 
           console.error('Failed to send unfocus message:', err)
@@ -393,6 +398,25 @@ const ObjectContextMenu = () => {
 
     // Enter edit mode
     enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+
+    // Zoom into the contour (like refinement mode does)
+    if (imageObject && targetObject.x && targetObject.y && targetObject.x.length > 0) {
+      const container = menuRef.current?.parentElement;
+      if (container) {
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        if (containerWidth && containerHeight) {
+          const renderedImageDimensions = calculateRenderedImageDimensions(imageObject, containerWidth, containerHeight);
+          zoomToObject(
+            targetObject,
+            { width: imageObject.width, height: imageObject.height },
+            { width: containerWidth, height: containerHeight },
+            renderedImageDimensions,
+            { animateMs: 300, immediate: false }
+          );
+        }
+      }
+    }
     
     hideContextMenu();
   };

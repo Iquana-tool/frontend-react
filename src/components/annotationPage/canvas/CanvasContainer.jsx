@@ -187,24 +187,34 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
         </div>
       )}
 
-      {/* AI tool overlays (keeps base image mounted to avoid reloading) */}
+      {/* AI tool overlays — in refinement mode use z-62 so prompt canvas sits above contour line (55) and below control points (65) */}
       {currentTool === 'ai_annotation' && (
-        <>
-          <AIPromptCanvas 
-            width={containerRef.current?.offsetWidth || 800}
-            height={containerRef.current?.offsetHeight || 600}
-            renderBackground={false}
-          />
-          <ModelSelectionHint />
-          <RunAIButton onRunAI={handleRunAI} />
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: refinementModeActive ? 62 : undefined }}>
+          <div className="absolute inset-0 pointer-events-auto">
+            <AIPromptCanvas 
+              width={containerRef.current?.offsetWidth || 800}
+              height={containerRef.current?.offsetHeight || 600}
+              renderBackground={false}
+            />
+            <ModelSelectionHint />
+            {/* In refinement mode, button is rendered in a separate layer below so it can sit at z-70 and stay clickable above the control-points overlay (z-65) */}
+            {!refinementModeActive && <RunAIButton onRunAI={handleRunAI} />}
+          </div>
           {error && (
-            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50">
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
               <div className="bg-red-50 border-2 border-red-300 rounded-lg px-4 py-2 shadow-lg">
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             </div>
           )}
-        </>
+        </div>
+      )}
+
+      {/* Refinement mode: Run AI button in its own layer at z-70 so it stays above control points (z-65) and is clickable */}
+      {currentTool === 'ai_annotation' && refinementModeActive && (
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 70 }}>
+          <RunAIButton onRunAI={handleRunAI} />
+        </div>
       )}
     </div>
   );
