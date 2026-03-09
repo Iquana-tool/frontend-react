@@ -31,6 +31,7 @@ import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../u
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import ObjectActions from './ObjectActions';
 import ObjectDetails from './ObjectDetails';
 import LabelSelectionModal from './LabelSelectionModal';
@@ -66,6 +67,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const [labels, setLabels] = useState([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
   const [lastClickTime, setLastClickTime] = useState(0);
+  // When true, the label modal was opened because focus mode requires a label first
+  const [labelModalForFocusMode, setLabelModalForFocusMode] = useState(false);
   const singleClickTimeoutRef = useRef(null);
   
   const isSelected = selectedObjects.includes(object.id);
@@ -251,6 +254,15 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         // 3. Object has valid coordinates
         if (!refinementModeActive && currentTool === 'selection' && 
             imageObject && object.x && object.y && object.x.length > 0) {
+
+          // Block focus mode for unlabelled objects — prompt to label first
+          if (!hasValidLabel(object.label)) {
+            setLabelModalForFocusMode(true);
+            setShowLabelModal(true);
+            performPanZoom();
+            return;
+          }
+
           // Create mask from x,y arrays if mask doesn't exist or doesn't have points
           let mask = object.mask;
           
@@ -387,10 +399,37 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const handleLabelSelectWrapper = async (label) => {
     if (!label) return;
     await handleLabelSelect(object, label);
+
+    // If the label modal was opened because focus mode requires a label, enter focus mode now
+    if (labelModalForFocusMode) {
+      setLabelModalForFocusMode(false);
+      // Use the updated label name from the selection
+      const updatedLabelName = typeof label === 'object' ? label.name : label;
+      if (imageObject && object.x && object.y && object.x.length > 0) {
+        let mask = object.mask;
+        if (!mask || !mask.points) {
+          const points = object.x.map((x, i) => [
+            x * imageObject.width,
+            object.y[i] * imageObject.height,
+          ]);
+          mask = { points };
+        }
+        if (mask && mask.points && mask.points.length > 0) {
+          const contourId = getContourId(object);
+          try {
+            await annotationSession.focusImage(contourId);
+            enterFocusMode(object.id, mask);
+          } catch (error) {
+            console.error('Failed to enter focus mode after labelling:', error);
+          }
+        }
+      }
+    }
   };
 
   const handleCloseModal = () => {
     setShowLabelModal(false);
+    setLabelModalForFocusMode(false);
   };
 
   const handleReject = async (e) => {
@@ -491,6 +530,11 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         labels={labels}
         labelsLoading={labelsLoading}
         onLabelSelect={handleLabelSelectWrapper}
+        description={
+          labelModalForFocusMode
+            ? 'Focus Mode requires a label to ensure annotation hierarchy integrity. Please assign a label to this object first.'
+            : undefined
+        }
       />
     </div>
   );

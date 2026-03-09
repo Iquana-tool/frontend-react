@@ -15,7 +15,8 @@ const LabelSelectionModal = ({
   onClose, 
   labels, 
   labelsLoading, 
-  onLabelSelect 
+  onLabelSelect,
+  description,
 }) => {
   if (!isOpen) return null;
 
@@ -40,7 +41,7 @@ const LabelSelectionModal = ({
         </div>
         
         <p className="text-sm text-gray-600 mb-4">
-          Please select a label for this object before accepting it.
+          {description ?? 'Please select a label for this object before accepting it.'}
         </p>
 
         {labelsLoading ? (

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { 
   useCurrentMask, 
   useObjectsList, 
@@ -26,6 +27,7 @@ import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
+import { hasValidLabel } from '../../../stores/utils/labelValidation';
 
 /**
  * Helper function to generate SVG path from x, y coordinate arrays
@@ -80,6 +82,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const enterEditMode = useEnterEditMode();
   const exitEditMode = useExitEditMode();
   const updateObject = useUpdateObject();
+
+  // State for the "label required" prompt when clicking an unlabelled object
+  const [unlabelledPromptObject, setUnlabelledPromptObject] = useState(null);
 
   const { zoomToObject } = useZoomToObject({
     marginPct: 0.25,
@@ -365,6 +370,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     // Enter focus mode for selection and AI annotation tools
     if (currentTool === 'selection' || currentTool === 'ai_annotation') {
       if (!imageObject || !object.x || !object.y || object.x.length === 0) {
+        return;
+      }
+
+      // Block focus mode for unlabelled objects — prompt user to label first
+      if (!hasValidLabel(object.label)) {
+        setUnlabelledPromptObject(object);
         return;
       }
 
@@ -692,6 +703,47 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           </svg>
         );
       })}
+
+      {/* Unlabelled-object focus-mode prompt — portalled to document.body to escape the CSS transform */}
+      {unlabelledPromptObject && ReactDOM.createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black/50"
+          style={{ zIndex: 9999 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-amber-200 p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">Label required for Focus Mode</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  <strong>Object #{unlabelledPromptObject.id}</strong> does not have a label yet.
+                  Please assign a label before entering Focus Mode.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
