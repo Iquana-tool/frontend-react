@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
-import { editContourLabel } from '../api/masks';
 import { getContourId, extractLabelInfo } from '../utils/objectUtils';
 import annotationSession from '../services/annotationSession';
 
 /**
  * Shared hook for label selection logic
- * Handles updating object labels via the API and store
- * 
+ * Handles updating object labels via the WebSocket session (OBJECT_MODIFY message).
+ * The backend validates the label against the dataset hierarchy, adds the current
+ * user to reviewed_by automatically, and responds with OBJECT_MODIFIED.
+ *
  * @param {Function} updateObject - Function to update object in store
  * @param {Function} onSuccess - Optional callback on successful label assignment
  * @param {Function} onError - Optional callback on error
@@ -21,41 +22,27 @@ export function useLabelSelection(updateObject, onSuccess, onError) {
     const { id: labelId, name: labelName } = extractLabelInfo(label);
 
     try {
-      // Update label using REST API endpoint
-      // Backend automatically adds current user to reviewed_by when label is assigned
-      const response = await editContourLabel(contourId, labelId);
-
-      // Extract reviewed_by from response (it's inside the contour object)
-      const reviewedBy = response.contour?.reviewed_by || ['current_user'];
-
-      // Also notify WebSocket session of this change
-      // This ensures the session state is synchronized with the database
-      if (annotationSession.isReady()) {
-        try {
-          await annotationSession.modifyObject(contourId, {
-            label_id: labelId,
-            reviewed_by: reviewedBy,
-          });
-        } catch (wsError) {
-          // Continue anyway - the REST API call succeeded
-        }
-      }
-
-      // Update the object in the store
-      // The store will automatically assign labelAssignmentOrder when label is assigned
-      // Backend returns updated reviewed_by list inside contour object
-      updateObject(object.id, {
-        label: labelName, // Store label name for display
-        labelId: labelId, // Store label ID for future reference
-        reviewed_by: reviewedBy, // Update reviewed_by from response
+      // Send label update over WebSocket.
+      // Backend automatically adds the current user to reviewed_by when label_id is assigned.
+      const response = await annotationSession.modifyObject(contourId, {
+        label_id: labelId,
+        reviewed_by: ['current_user'], // resolved to actual user_id on the backend
       });
 
-      // Call success callback if provided
+      // Extract reviewed_by from the response (backend echoes fields_to_be_updated)
+      const reviewedBy = response?.data?.fields_to_be_updated?.reviewed_by || ['current_user'];
+
+      // Update the object in the store
+      updateObject(object.id, {
+        label: labelName,    // Store label name for display
+        labelId: labelId,    // Store label ID for future reference
+        reviewed_by: reviewedBy,
+      });
+
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
-      // Call error callback if provided, otherwise show alert
       if (onError) {
         onError(error);
       } else {
@@ -67,4 +54,3 @@ export function useLabelSelection(updateObject, onSuccess, onError) {
 
   return handleLabelSelect;
 }
-

@@ -152,6 +152,7 @@ export const useWebSocketIsConnected = () => useAnnotationStore(
 export const useWebSocketIsReady = () => useAnnotationStore(
   state => state.websocket.sessionState === 'ready' && state.websocket.connectionState === 'connected'
 );
+export const useCurrentMaskId = () => useAnnotationStore(state => state.websocket.currentMaskId);
 
 // WebSocket actions
 export const useSetWebSocketConnectionState = () => useAnnotationStore(state => state.setWebSocketConnectionState);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Trash2, Eye, CheckCircle2, XCircle } from 'lucide-react';
-import { useAnnotationStatus, useSetAnnotationStatus, useClearSelection, useLeftSidebarCollapsed, useCurrentImageId, useClearObjects } from '../../../stores/selectors/annotationSelectors';
+import { useAnnotationStatus, useSetAnnotationStatus, useClearSelection, useLeftSidebarCollapsed, useCurrentImageId, useClearObjects, useCurrentMaskId } from '../../../stores/selectors/annotationSelectors';
 import * as api from '../../../api';
 
 const StatusSection = () => {
@@ -10,6 +10,7 @@ const StatusSection = () => {
   const clearObjects = useClearObjects();
   const leftSidebarCollapsed = useLeftSidebarCollapsed();
   const currentImageId = useCurrentImageId();
+  const currentMaskId = useCurrentMaskId();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleRemoveAnnotations = async () => {
@@ -24,23 +25,14 @@ const StatusSection = () => {
 
     setIsProcessing(true);
     try {
-      // Get mask for this image
-      const maskResponse = await api.getFinalMask(currentImageId);
-      
-      if (maskResponse.success && maskResponse.mask) {
-        // Delete all contours
-        await api.deleteAllContours(maskResponse.mask.id);
-        
-        // Clear local state
-        clearObjects();
-        clearSelection();
-        setAnnotationStatus('not_started');
-      } else {
-        // No mask exists, just clear local state
-        clearObjects();
-        clearSelection();
-        setAnnotationStatus('not_started');
+      if (currentMaskId) {
+        // Delete all contours using stored mask ID (no need to fetch the mask)
+        await api.deleteAllContours(currentMaskId);
       }
+      // Clear local state
+      clearObjects();
+      clearSelection();
+      setAnnotationStatus('not_started');
     } catch (error) {
       console.error('Error removing annotations:', error);
       alert('Failed to remove annotations: ' + (error.message || 'Unknown error'));
@@ -50,33 +42,17 @@ const StatusSection = () => {
   };
 
   const handleMarkAsReviewable = async () => {
-    if (!currentImageId) {
-      console.error('No current image ID');
+    if (!currentMaskId) {
+      console.error('No current mask ID');
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Get or create mask for this image
-      let maskId;
-      const maskResponse = await api.getFinalMask(currentImageId);
-      
-      if (maskResponse.success && maskResponse.mask) {
-        maskId = maskResponse.mask.id;
-      } else {
-        // Create mask if it doesn't exist
-        const createResponse = await api.createFinalMask(currentImageId);
-        if (createResponse.success) {
-          maskId = createResponse.mask_id;
-        } else {
-          throw new Error('Failed to create mask');
-        }
-      }
-
       // Mark mask as fully annotated (making it reviewable)
-      await api.markMaskAsFinal(maskId);
-      
-      // Update local status (backend will determine actual status based on reviews)
+      await api.markMaskAsFinal(currentMaskId);
+
+      // Fetch updated status using the lightweight endpoint (no contours fetch)
       await updateMaskStatus();
     } catch (error) {
       console.error('Error marking as reviewable:', error);
@@ -87,23 +63,18 @@ const StatusSection = () => {
   };
 
   const handleUnmarkAsReviewable = async () => {
-    if (!currentImageId) {
-      console.error('No current image ID');
+    if (!currentMaskId) {
+      console.error('No current mask ID');
       return;
     }
 
     setIsProcessing(true);
     try {
-      // Get mask for this image
-      const maskResponse = await api.getFinalMask(currentImageId);
-      
-      if (maskResponse.success && maskResponse.mask) {
-        // Unmark mask as fully annotated
-        await api.markMaskAsUnfinished(maskResponse.mask.id);
-        
-        // Update local status
-        await updateMaskStatus();
-      }
+      // Unmark mask as fully annotated
+      await api.markMaskAsUnfinished(currentMaskId);
+
+      // Update local status
+      await updateMaskStatus();
     } catch (error) {
       console.error('Error unmarking as reviewable:', error);
       alert('Failed to unmark as reviewable: ' + (error.message || 'Unknown error'));
@@ -112,18 +83,14 @@ const StatusSection = () => {
     }
   };
 
+  // Lightweight status refresh — only calls GET /masks/{id}/status, never fetches contours
   const updateMaskStatus = async () => {
-    if (!currentImageId) return;
+    if (!currentMaskId) return;
 
     try {
-      const maskResponse = await api.getFinalMask(currentImageId);
-      
-      if (maskResponse.success && maskResponse.mask) {
-        const statusResponse = await api.getMaskAnnotationStatus(maskResponse.mask.id);
-        
-        if (statusResponse.success) {
-          setAnnotationStatus(statusResponse.status);
-        }
+      const statusResponse = await api.getMaskAnnotationStatus(currentMaskId);
+      if (statusResponse.success) {
+        setAnnotationStatus(statusResponse.status);
       }
     } catch (error) {
       console.error('Error updating mask status:', error);

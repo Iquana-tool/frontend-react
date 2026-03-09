@@ -110,7 +110,8 @@ export const useContourOperations = () => {
 
       if (response.success) {
         console.log(`Successfully added contours to final mask:`, response);
-        await fetchFinalMask(currentImage.id);
+        // Do NOT call fetchFinalMask here — the WebSocket OBJECT_ADDED message
+        // already updates the store via useWebSocketObjectHandler.
         setSelectedContours([]);
         return { success: true, message: "Selected contour added to Final Mask" };
       } else {
@@ -121,7 +122,7 @@ export const useContourOperations = () => {
       console.error("Error adding selected contours to final mask:", error);
       throw new Error(`Error adding contours to final mask: ${error.message}`);
     }
-  }, [fetchFinalMask]);
+  }, []);
 
   const handleDeleteSelectedContours = useCallback((selectedMask, selectedContours, setSelectedMask, setBestMask, setSegmentationMasks) => {
     if (!selectedMask || selectedContours.length === 0) return;
@@ -186,15 +187,6 @@ export const useContourOperations = () => {
           setSelectedFinalMaskContour(null);
         }
 
-        // Optionally refresh from server if currentImageId is provided
-        if (currentImageId) {
-          try {
-            await fetchFinalMask(currentImageId);
-          } catch (refreshError) {
-            console.warn("Failed to refresh final mask after deletion:", refreshError);
-          }
-        }
-
         return { success: true, message: "Contour removed from final mask successfully" };
       } else {
         throw new Error(`Failed to delete contour: ${response.message || "Unknown error"}`);
@@ -203,7 +195,7 @@ export const useContourOperations = () => {
       console.error("Error deleting contour:", error);
       throw new Error(`Error deleting contour: ${error.message}`);
     }
-  }, [selectedFinalMaskContour, fetchFinalMask]);
+  }, [selectedFinalMaskContour]);
 
   // New function specifically for handling deletion from quantification table
   const handleDeleteContourFromTable = useCallback(async (contourId) => {
@@ -285,7 +277,12 @@ export const useContourOperations = () => {
         }
       }
 
-      await fetchFinalMask(currentImage.id);
+      // Clear local state immediately — no need to re-fetch from the server
+      // since the WebSocket OBJECT_REMOVED messages already update the store.
+      setFinalMasks(prevMasks =>
+        prevMasks.map(mask => ({ ...mask, contours: [] }))
+      );
+      setFinalMask(prevMask => prevMask ? { ...prevMask, contours: [] } : prevMask);
       setSelectedFinalMaskContour(null);
 
       if (failCount === 0) {
@@ -305,7 +302,7 @@ export const useContourOperations = () => {
       console.error("Error clearing contours:", error);
       throw new Error(`Error clearing contours: ${error.message}`);
     }
-  }, [fetchFinalMask]);
+  }, []);
 
   const findMatchingContour = useCallback((targetContour, contours) => {
     if (!targetContour || !contours || contours.length === 0) return -1;

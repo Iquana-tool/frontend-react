@@ -14,6 +14,9 @@ export const createWebSocketSlice = (set) => ({
     state.websocket.runningServices = data.running || [];
     state.websocket.failedServices = data.failed || [];
     state.websocket.sessionState = 'ready';
+    if (data.maskId != null) {
+      state.websocket.currentMaskId = data.maskId;
+    }
   }),
   
   setWebSocketError: (error) => set((state) => {
@@ -37,6 +40,7 @@ export const createWebSocketSlice = (set) => ({
     state.websocket.connectionState = 'disconnected';
     state.websocket.sessionState = 'uninitialized';
     state.websocket.currentImageId = null;
+    state.websocket.currentMaskId = null;
     state.websocket.runningServices = [];
     state.websocket.failedServices = [];
     state.websocket.lastError = null;

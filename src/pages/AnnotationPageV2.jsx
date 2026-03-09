@@ -14,7 +14,6 @@ import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import websocketService from '../services/websocket';
-import * as api from '../api';
 
 const AnnotationPageV2 = () => {
   const { imageId: urlImageId } = useParams();
@@ -85,6 +84,12 @@ const AnnotationPageV2 = () => {
           // Clear if backend didn't return objects (just in case)
           clearObjects();
         }
+        // Set annotation status from session data (no extra REST call needed)
+        if (data && data.maskStatus != null) {
+          setAnnotationStatus(data.maskStatus);
+        } else {
+          setAnnotationStatus('not_started');
+        }
       },
       onSessionError: (error) => {
         console.error('[AnnotationPageV2] WebSocket session error:', error);
@@ -119,42 +124,6 @@ const AnnotationPageV2 = () => {
       loadObjectsWithLabels(hierarchyData, currentDataset);
     }
   }, [currentDataset, hierarchyData, loadObjectsWithLabels]);
-
-  // Fetch mask annotation status when image changes
-  useEffect(() => {
-    const fetchMaskStatus = async () => {
-      if (!imageId) {
-        setAnnotationStatus('not_started');
-        return;
-      }
-
-      try {
-        // Get masks for this image (lightweight — no contours fetch)
-        const maskResponse = await api.getMasksForImage(imageId);
-        
-        if (maskResponse.success && maskResponse.masks && maskResponse.masks.length > 0) {
-          const maskId = maskResponse.masks[0].id;
-          // Fetch the annotation status
-          const statusResponse = await api.getMaskAnnotationStatus(maskId);
-          
-          if (statusResponse.success) {
-            setAnnotationStatus(statusResponse.status);
-          } else {
-            setAnnotationStatus('not_started');
-          }
-        } else {
-          // No mask exists, so status is not_started
-          setAnnotationStatus('not_started');
-        }
-      } catch (error) {
-        console.error('[AnnotationPageV2] Error fetching mask status:', error);
-        // Default to not_started on error
-        setAnnotationStatus('not_started');
-      }
-    };
-
-    fetchMaskStatus();
-  }, [imageId, setAnnotationStatus]);
 
   return (
     <DatasetLoader>

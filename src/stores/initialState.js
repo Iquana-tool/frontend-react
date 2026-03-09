@@ -119,6 +119,7 @@ export const initialState = {
     connectionState: 'disconnected', // 'disconnected' | 'connecting' | 'connected' | 'reconnecting' | 'error'
     sessionState: 'uninitialized',   // 'uninitialized' | 'initializing' | 'ready' | 'error'
     currentImageId: null,
+    currentMaskId: null,             // Mask ID for the current image (set from SESSION_INITIALIZED)
     runningServices: [],
     failedServices: [],
     lastError: null,
