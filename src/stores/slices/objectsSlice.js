@@ -5,6 +5,17 @@ import { hasValidLabel } from '../utils/labelValidation';
  * Objects slice - manages annotation objects, selection, visibility, and colors
  */
 export const createObjectsSlice = (set) => ({
+  // Dataset labels cache – populated once per dataset, shared by all components
+  setDatasetLabels: (labelsArray, labelsMap) => set((state) => {
+    state.objects.datasetLabels = labelsArray;
+    state.objects.datasetLabelsMap = labelsMap;
+  }),
+
+  clearDatasetLabels: () => set((state) => {
+    state.objects.datasetLabels = [];
+    state.objects.datasetLabelsMap = null;
+  }),
+
   addObject: (object) => set((state) => {
     // Use contour_id from backend if available, otherwise generate a timestamp ID
     // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)

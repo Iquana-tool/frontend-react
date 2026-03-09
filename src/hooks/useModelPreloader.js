@@ -34,11 +34,6 @@ const useModelPreloader = () => {
     // Preload models when session becomes ready (only once per image session)
     if (isSessionReady && !hasPreloadedRef.current) {
       hasPreloadedRef.current = true;
-      
-      console.log('[useModelPreloader] Session ready, preloading models', {
-        promptedModel,
-        completionModel,
-      });
 
       // Preload models into backend memory
       annotationSession.preloadModels({

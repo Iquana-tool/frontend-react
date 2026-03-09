@@ -43,6 +43,10 @@ export const useObjectsList = () => useAnnotationStore(state => state.objects.li
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
 export const useObjectsVisibility = () => useAnnotationStore(state => state.objects.visibility);
 export const useObjectColors = () => useAnnotationStore(state => state.objects.colors);
+export const useDatasetLabels = () => useAnnotationStore(state => state.objects.datasetLabels);
+export const useDatasetLabelsMap = () => useAnnotationStore(state => state.objects.datasetLabelsMap);
+export const useSetDatasetLabels = () => useAnnotationStore(state => state.setDatasetLabels);
+export const useClearDatasetLabels = () => useAnnotationStore(state => state.clearDatasetLabels);
 
 // Action selectors
 export const useSetCurrentTool = () => useAnnotationStore(state => state.setCurrentTool);

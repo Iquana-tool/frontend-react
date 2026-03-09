@@ -35,6 +35,11 @@ const Services = () => {
     const fetchCompletionModels = useFetchAvailableCompletionModels();
     const fetchSemanticModels = useFetchAvailableSemanticModels();
     
+    // Get current model lists (to avoid refetching if already loaded)
+    const availablePromptedModels = useAvailablePromptedModels();
+    const availableCompletionModels = useAvailableCompletionModels();
+    const availableSemanticModels = useAvailableSemanticModels();
+
     // Get current model selections
     const promptedModel = usePromptedModel();
     const completionModel = useCompletionModel();
@@ -64,12 +69,12 @@ const Services = () => {
         setSemanticWarningModalOpen(showSemanticWarning);
     }, [showSemanticWarning, setSemanticWarningModalOpen]);
 
-    // Load models on component mount
+    // Load models on mount only if not already loaded
     useEffect(() => {
-        fetchPromptedModels();
-        fetchCompletionModels();
-        fetchSemanticModels();
-    }, [fetchPromptedModels, fetchCompletionModels, fetchSemanticModels]);
+        if (availablePromptedModels.length === 0) fetchPromptedModels();
+        if (availableCompletionModels.length === 0) fetchCompletionModels();
+        if (availableSemanticModels.length === 0) fetchSemanticModels();
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Preload models when they change
     useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
@@ -91,29 +96,29 @@ const Services = () => {
     const services = [
         {
             name: "Prompted Segmentation",
-            models: useAvailablePromptedModels(),
+            models: availablePromptedModels,
             isLoading: useIsLoadingPromptedModels(),
-            promptedModel: usePromptedModel(),
+            promptedModel: promptedModel,
             setPromptedModel: useSetPromptedModel(),
-            updateAvailableModels: useFetchAvailablePromptedModels(),
+            updateAvailableModels: fetchPromptedModels,
             isRunning: false,
         },
         {
             name: "Instance Discovery",
-            models: useAvailableCompletionModels(),
+            models: availableCompletionModels,
             isLoading: useIsLoadingCompletionModels(),
-            promptedModel: useCompletionModel(),
+            promptedModel: completionModel,
             setPromptedModel: useSetCompletionModel(),
-            updateAvailableModels: useFetchAvailableCompletionModels(),
+            updateAvailableModels: fetchCompletionModels,
             isRunning: isRunningCompletion,
         },
         {
             name: "Semantic Segmentation",
-            models: useAvailableSemanticModels(),
+            models: availableSemanticModels,
             isLoading: useIsLoadingSemanticModels(),
-            promptedModel: useSemanticModel(),
+            promptedModel: semanticModel,
             setPromptedModel: useSetSemanticModel(),
-            updateAvailableModels: useFetchAvailableSemanticModels(),
+            updateAvailableModels: fetchSemanticModels,
             isRunning: isRunningSemantic,
             onRun: handleSemanticRun,
         },

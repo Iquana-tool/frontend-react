@@ -100,6 +100,8 @@ export const initialState = {
   objects: {
     list: [],
     selected: [],
+    datasetLabels: [],       // Cached labels array for the current dataset (fetched once)
+    datasetLabelsMap: null,   // Map<labelId, labelName> for quick lookup (or null if not loaded)
     visibility: {
       showAll: true,
       rootLevelOnly: false,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { 
   useObjectsVisibility, 
@@ -6,11 +6,10 @@ import {
   useToggleVisibility,
   useVisibilityControlsExpanded,
   useToggleVisibilityControls,
-  useInitializeLabelVisibility
+  useInitializeLabelVisibility,
+  useDatasetLabels
 } from '../../../stores/selectors/annotationSelectors';
-import { useDataset } from '../../../contexts/DatasetContext';
-import { fetchLabels } from '../../../api/labels';
-import { extractLabelsFromResponse, buildLabelHierarchy } from '../../../utils/labelHierarchy';
+import { buildLabelHierarchy } from '../../../utils/labelHierarchy';
 
 const VisibilityControls = () => {
   const isExpanded = useVisibilityControlsExpanded();
@@ -19,38 +18,16 @@ const VisibilityControls = () => {
   const setVisibilityMode = useSetVisibilityMode();
   const toggleVisibility = useToggleVisibility();
   const initializeLabelVisibility = useInitializeLabelVisibility();
-  const { currentDataset } = useDataset();
-  const [labels, setLabels] = useState([]);
-  const [loading, setLoading] = useState(false);
+  
+  // Use cached labels from the store (populated by AnnotationPageV2)
+  const labels = useDatasetLabels();
 
-  // Fetch labels when dataset changes
+  // Initialize visibility state when cached labels arrive
   useEffect(() => {
-    const loadLabels = async () => {
-      if (!currentDataset) {
-        setLabels([]);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const labelsResponse = await fetchLabels(currentDataset.id);
-        const labelsArray = extractLabelsFromResponse(labelsResponse);
-        setLabels(labelsArray);
-        
-        // Initialize visibility state for all labels
-        if (labelsArray.length > 0) {
-          initializeLabelVisibility(labelsArray);
-        }
-      } catch (error) {
-        console.error('Failed to fetch labels for Annotation Overview:', error);
-        setLabels([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadLabels();
-  }, [currentDataset, initializeLabelVisibility]);
+    if (labels.length > 0) {
+      initializeLabelVisibility(labels);
+    }
+  }, [labels, initializeLabelVisibility]);
 
   // Build hierarchy to identify root labels
   const labelHierarchy = React.useMemo(() => {
@@ -196,8 +173,8 @@ const VisibilityControls = () => {
                 )}
               </div>
               
-              {loading ? (
-                <div className="text-xs text-gray-500 text-center py-3">Loading labels...</div>
+              {labels.length === 0 ? (
+                <div className="text-xs text-gray-500 text-center py-3">No labels available</div>
               ) : allLabels.length === 0 ? (
                 <div className="text-xs text-gray-500 text-center py-3">No labels available</div>
               ) : (
