@@ -79,7 +79,18 @@ export const createEditModeSlice = (set) => ({
       state.editMode.isDirty = false;
     }
   }),
-  
+
+  /**
+   * Sync edit mode draft and original coordinates to new contour (e.g. after "Refine object").
+   * Updates the blue control-point overlay to the new shape while staying in edit mode.
+   */
+  syncEditModeDraftFromRefinement: (newX, newY) => set((state) => {
+    if (!state.editMode.active || !Array.isArray(newX) || !Array.isArray(newY) || newX.length === 0 || newY.length === 0) return;
+    state.editMode.originalCoordinates = { x: [...newX], y: [...newY] };
+    state.editMode.draftCoordinates = { x: [...newX], y: [...newY] };
+    state.editMode.isDirty = false;
+  }),
+
   exitEditMode: () => set((state) => {
     state.editMode.active = false;
     state.editMode.objectId = null;

@@ -2,10 +2,11 @@ import annotationSession from '../services/annotationSession';
 import { getContourId } from './objectUtils';
 
 /**
- * Deletes an object from both backend and store
- * 
+ * Sends a delete request for an object to the backend. The canvas is updated only
+ * when the backend broadcasts OBJECT_REMOVED (handled by useWebSocketObjectHandler).
+ *
  * @param {Object} object - The object to delete
- * @param {Function} removeObject - Function to remove object from store
+ * @param {Function} removeObject - Unused; kept for API compatibility. Removal happens on object_removed.
  * @returns {Promise<void>}
  */
 export async function deleteObject(object, removeObject) {
@@ -15,10 +16,7 @@ export async function deleteObject(object, removeObject) {
 
   const contourId = getContourId(object);
 
-  // Delete from backend
+  // Delete on backend; store/canvas is updated when we receive object_removed
   await annotationSession.deleteObject(contourId);
-
-  // Remove from store
-  removeObject(object.id);
 }
 

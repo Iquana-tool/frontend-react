@@ -43,6 +43,10 @@ export const useObjectsList = () => useAnnotationStore(state => state.objects.li
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
 export const useObjectsVisibility = () => useAnnotationStore(state => state.objects.visibility);
 export const useObjectColors = () => useAnnotationStore(state => state.objects.colors);
+export const useDatasetLabels = () => useAnnotationStore(state => state.objects.datasetLabels);
+export const useDatasetLabelsMap = () => useAnnotationStore(state => state.objects.datasetLabelsMap);
+export const useSetDatasetLabels = () => useAnnotationStore(state => state.setDatasetLabels);
+export const useClearDatasetLabels = () => useAnnotationStore(state => state.clearDatasetLabels);
 
 // Action selectors
 export const useSetCurrentTool = () => useAnnotationStore(state => state.setCurrentTool);
@@ -148,6 +152,7 @@ export const useWebSocketIsConnected = () => useAnnotationStore(
 export const useWebSocketIsReady = () => useAnnotationStore(
   state => state.websocket.sessionState === 'ready' && state.websocket.connectionState === 'connected'
 );
+export const useCurrentMaskId = () => useAnnotationStore(state => state.websocket.currentMaskId);
 
 // WebSocket actions
 export const useSetWebSocketConnectionState = () => useAnnotationStore(state => state.setWebSocketConnectionState);
@@ -192,4 +197,5 @@ export const useEditModeIsDirty = () => useAnnotationStore(state => state.editMo
 export const useEnterEditMode = () => useAnnotationStore(state => state.enterEditMode);
 export const useUpdateDraftPoint = () => useAnnotationStore(state => state.updateDraftPoint);
 export const useResetDraft = () => useAnnotationStore(state => state.resetDraft);
+export const useSyncEditModeDraftFromRefinement = () => useAnnotationStore(state => state.syncEditModeDraftFromRefinement);
 export const useExitEditMode = () => useAnnotationStore(state => state.exitEditMode);

@@ -30,7 +30,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
   });
 
   const resetFormAfterDelay = (delay) => {
-    console.log("Resetting form after delay:", delay);
     setTimeout(() => {
       setFormData({ title: '', description: '', datasetType: 'image' });
       setFiles([]);
@@ -64,7 +63,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
-    console.log("Submitting dataset with data:", formData, "and files:", files);
     await setIsCreating(true);
     setUploadErrors([]);
 
@@ -84,7 +82,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
         description: formData.description,
         total: files.length
       });
-      console.log('Dataset created successfully:', response);
       // Backend may return dataset_id as object; ensure we use a scalar for upload
       const rawId = response.dataset_id;
       const datasetId = rawId != null && typeof rawId === 'object' ? rawId.id : rawId;
@@ -97,7 +94,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
 
       // 🔥 set progress early to trigger render
       setCurrentProgress(0);
-      console.log("Uploading total files:", files.length);
       // 🔥 small delay to let UI re-render before upload starts
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -116,7 +112,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
           console.error(`Error uploading ${file.name}:`, err);
         } finally {
           uploadedCount++;
-          console.log(`Uploaded ${uploadedCount}/${files.length} files`);
           setCurrentProgress(uploadedCount);
         }
       }
@@ -223,30 +218,6 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
                       disabled={isCreating}
                     />
                     <span className="ml-2 text-sm text-gray-700">Images</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="datasetType"
-                      value="scan"
-                      checked={formData.datasetType === 'scan'}
-                      onChange={() => handleDatasetTypeChange('scan')}
-                      className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
-                      disabled={isCreating}
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Scans</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="datasetType"
-                      value="DICOM"
-                      checked={formData.datasetType === 'DICOM'}
-                      onChange={() => handleDatasetTypeChange('DICOM')}
-                      className="w-4 h-4 text-teal-600 border-gray-300 focus:ring-teal-500"
-                      disabled={isCreating}
-                    />
-                    <span className="ml-2 text-sm text-gray-700">DICOM</span>
                   </label>
                 </div>
               </div>

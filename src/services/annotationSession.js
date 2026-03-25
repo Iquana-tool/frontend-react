@@ -20,19 +20,32 @@ export const SessionState = {
 };
 
 /**
- * Generates a temporary user ID
- * @returns {number} User ID
+ * Gets the authenticated username from the stored auth user.
+ * Falls back to a temporary timestamp-based ID if no auth user is available.
+ * @returns {string} The authenticated username or a temp ID
  */
 const getUserId = () => {
+  // Try to get the real authenticated username from localStorage
+  try {
+    const userStr = localStorage.getItem('auth_user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user && user.username) {
+        return user.username;
+      }
+    }
+  } catch (error) {
+    console.warn('[AnnotationSession] Failed to read auth user from localStorage:', error);
+  }
+
+  // Fallback: use a temporary timestamp-based ID
   let userId = sessionStorage.getItem('temp_user_id');
   if (!userId) {
-    // Generate a timestamp-based ID
     const numericId = Date.now();
     sessionStorage.setItem('temp_user_id', numericId.toString());
     return numericId;
   }
   const parsedId = parseInt(userId, 10);
-  // If parsing fails, generate a new ID
   if (isNaN(parsedId)) {
     const numericId = Date.now();
     sessionStorage.setItem('temp_user_id', numericId.toString());
@@ -110,6 +123,8 @@ class AnnotationSession {
               running: this.runningServices,
               failed: this.failedServices,
               objects: message.data?.objects || null,
+              maskId: message.data?.mask_id ?? null,
+              maskStatus: message.data?.mask_status ?? null,
             });
           }
         );

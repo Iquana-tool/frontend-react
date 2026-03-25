@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import {
   useEditModeActive,
   useEditModeContourId,
@@ -33,6 +33,23 @@ export const useContourEditing = () => {
   const resetDraft = useResetDraft();
   const exitEditMode = useExitEditMode();
   const updateObject = useUpdateObject();
+
+  // Auto-save infrastructure: keep a ref with the latest state so the timer
+  // callback always reads fresh values without stale closures.
+  const autoSaveTimerRef = useRef(null);
+  const stateRef = useRef({
+    isEditModeActive: false,
+    editingObjectId: null,
+    editingContourId: null,
+    draftCoordinates: null,
+    isDirty: false,
+    objects: [],
+  });
+
+  // Sync stateRef after every render (no deps = always current)
+  useEffect(() => {
+    stateRef.current = { isEditModeActive, editingObjectId, editingContourId, draftCoordinates, isDirty, objects };
+  });
 
   /**
    * Start editing a contour
@@ -154,9 +171,53 @@ export const useContourEditing = () => {
     exitEditMode,
   ]);
 
+  /**
+   * Schedule an automatic save after AUTO_SAVE_DELAY ms of inactivity.
+   * Resets the timer on each call so rapid edits only trigger one save.
+   */
+  const scheduleAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      autoSaveTimerRef.current = null;
+      const s = stateRef.current;
+      if (!s.isEditModeActive || !s.editingObjectId || !s.editingContourId || !s.draftCoordinates || !s.isDirty) return;
+
+      const currentObject = s.objects.find(obj => obj.id === s.editingObjectId);
+      if (!currentObject) return;
+
+      const originalCoordinates = { x: [...currentObject.x], y: [...currentObject.y], path: currentObject.path };
+
+      // Optimistic local update
+      updateObject(s.editingObjectId, { x: [...s.draftCoordinates.x], y: [...s.draftCoordinates.y], path: null });
+      exitEditMode();
+
+      try {
+        const response = await annotationSession.modifyObject(s.editingContourId, {
+          x: s.draftCoordinates.x,
+          y: s.draftCoordinates.y,
+        });
+        if (!response.success) {
+          updateObject(s.editingObjectId, originalCoordinates);
+        }
+      } catch {
+        updateObject(s.editingObjectId, originalCoordinates);
+      }
+    }, 10_000); // 10-second idle window
+  }, [updateObject, exitEditMode]); // Stable: Zustand actions don't change
+
+  /** Cancel any pending auto-save timer. */
+  const cancelAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, []);
+
   return {
     // State
     isEditModeActive,
+    editingObjectId: editingObjectId,
     editingContourId,
     draftCoordinates,
     isDirty,
@@ -167,5 +228,7 @@ export const useContourEditing = () => {
     cancelEditing,
     resetChanges,
     saveEditing,
+    scheduleAutoSave,
+    cancelAutoSave,
   };
 };

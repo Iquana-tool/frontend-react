@@ -54,27 +54,25 @@ const DatasetLoader = ({ children }) => {
     loadDataset();
   }, [datasets, datasetId, currentDataset, selectDataset, loading]);
 
-  // Handle imageId changes (when navigating between images)
+  // Handle imageId changes (when navigating between images within the same dataset)
   useEffect(() => {
-    const handleImageIdChange = async () => {
-      if (imageId && currentDataset) {
-        const imageIdNum = parseInt(imageId);
-        if (!isNaN(imageIdNum)) {
-          // Get current image list from store
-          const currentState = useAnnotationStore.getState();
-          const currentImageList = currentState.images.imageList;
+    if (imageId && currentDataset) {
+      const imageIdNum = parseInt(imageId);
+      if (!isNaN(imageIdNum)) {
+        // Get current image list and current image from store
+        const currentState = useAnnotationStore.getState();
+        const currentImageList = currentState.images.imageList;
+        const currentImg = currentState.images.currentImage;
 
-          if (currentImageList.length > 0) {
-            const targetImage = currentImageList.find(img => img.id === imageIdNum);
-            if (targetImage) {
-              setCurrentImage(targetImage);
-            }
+        // Only update if the target image is different from the current one
+        if (currentImageList.length > 0 && (!currentImg || currentImg.id !== imageIdNum)) {
+          const targetImage = currentImageList.find(img => img.id === imageIdNum);
+          if (targetImage) {
+            setCurrentImage(targetImage);
           }
         }
       }
-    };
-
-    handleImageIdChange();
+    }
   }, [imageId, currentDataset, setCurrentImage]);
 
   // Load images for the dataset

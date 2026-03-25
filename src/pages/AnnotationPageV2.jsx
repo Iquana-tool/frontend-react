@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import MainLayout from '../components/annotationPage/layout/MainLayout';
 import ResponsiveWrapper from '../components/annotationPage/layout/ResponsiveWrapper';
@@ -7,14 +7,13 @@ import DatasetNavigation from '../components/annotationPage/layout/DatasetNaviga
 import useAnnotationSession from '../hooks/useAnnotationSession';
 import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
 import useModelPreloader from '../hooks/useModelPreloader';
-import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useObjectsList } from '../stores/selectors/annotationSelectors';
+import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 import { useDataset } from '../contexts/DatasetContext';
 import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import websocketService from '../services/websocket';
-import * as api from '../api';
 
 const AnnotationPageV2 = () => {
   const { imageId: urlImageId } = useParams();
@@ -27,35 +26,50 @@ const AnnotationPageV2 = () => {
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const clearObjects = useClearObjects();
   const setAnnotationStatus = useSetAnnotationStatus();
-  const objectsList = useObjectsList();
+  const setDatasetLabels = useSetDatasetLabels();
+  const cachedLabelsMap = useDatasetLabelsMap();
+  const cachedLabels = useDatasetLabels();
   const { currentDataset } = useDataset();
   const [hierarchyData, setHierarchyData] = React.useState(null); // Use state instead of ref to trigger re-renders
 
+  // Helper: ensure labels are loaded (uses cache, fetches only once per dataset)
+  const ensureLabelsLoaded = React.useCallback(async (dataset) => {
+    // If labels are already cached for this dataset, return them
+    if (cachedLabels.length > 0 && cachedLabelsMap) {
+      return { labelsArray: cachedLabels, labelsMap: cachedLabelsMap };
+    }
+
+    if (!dataset) return { labelsArray: [], labelsMap: null };
+
+    try {
+      const labelsData = await fetchLabels(dataset.id);
+      const labelsArray = extractLabelsFromResponse(labelsData);
+
+      // Create a map from label ID to label name
+      const labelsMap = new Map();
+      labelsArray.forEach(label => {
+        if (label && label.id && label.name) {
+          const labelIdNum = Number(label.id);
+          labelsMap.set(labelIdNum, label.name);
+          labelsMap.set(String(label.id), label.name);
+        }
+      });
+
+      // Cache in the store so VisibilityControls and other components can reuse
+      setDatasetLabels(labelsArray, labelsMap);
+
+      return { labelsArray, labelsMap };
+    } catch (error) {
+      console.error('[AnnotationPageV2] Failed to fetch labels:', error);
+      return { labelsArray: [], labelsMap: null };
+    }
+  }, [cachedLabels, cachedLabelsMap, setDatasetLabels]);
+
   // Function to load objects with label names
   const loadObjectsWithLabels = React.useCallback(async (hierarchy, dataset) => {
-    let labelsMap = null;
-    if (dataset) {
-      try {
-        const labelsData = await fetchLabels(dataset.id);
-        const labelsArray = extractLabelsFromResponse(labelsData);
-        
-        // Create a map from label ID to label name
-        labelsMap = new Map();
-        labelsArray.forEach(label => {
-          if (label && label.id && label.name) {
-            const labelIdNum = Number(label.id);
-            labelsMap.set(labelIdNum, label.name);
-            // Also add string version for lookup flexibility
-            labelsMap.set(String(label.id), label.name);
-          }
-        });
-      } catch (error) {
-        console.error('[AnnotationPageV2] Failed to fetch labels:', error);
-      }
-    }
-    
+    const { labelsMap } = await ensureLabelsLoaded(dataset);
     setObjectsFromHierarchy(hierarchy, labelsMap);
-  }, [setObjectsFromHierarchy]);
+  }, [setObjectsFromHierarchy, ensureLabelsLoaded]);
 
   // Initialize WebSocket session for the current image
   const { isReady, sessionState, runningServices, failedServices } = useAnnotationSession(
@@ -69,6 +83,12 @@ const AnnotationPageV2 = () => {
         } else {
           // Clear if backend didn't return objects (just in case)
           clearObjects();
+        }
+        // Set annotation status from session data (no extra REST call needed)
+        if (data && data.maskStatus != null) {
+          setAnnotationStatus(data.maskStatus);
+        } else {
+          setAnnotationStatus('not_started');
         }
       },
       onSessionError: (error) => {
@@ -104,67 +124,6 @@ const AnnotationPageV2 = () => {
       loadObjectsWithLabels(hierarchyData, currentDataset);
     }
   }, [currentDataset, hierarchyData, loadObjectsWithLabels]);
-
-  // Fetch mask annotation status when image changes
-  useEffect(() => {
-    const fetchMaskStatus = async () => {
-      if (!imageId) {
-        setAnnotationStatus('not_started');
-        return;
-      }
-
-      try {
-        // Get mask for this image
-        const maskResponse = await api.getFinalMask(imageId);
-        
-        if (maskResponse.success && maskResponse.mask) {
-          // Fetch the annotation status
-          const statusResponse = await api.getMaskAnnotationStatus(maskResponse.mask.id);
-          
-          if (statusResponse.success) {
-            console.log('[AnnotationPageV2] Mask status:', statusResponse.status);
-            setAnnotationStatus(statusResponse.status);
-          } else {
-            console.warn('[AnnotationPageV2] Status response not successful:', statusResponse);
-            setAnnotationStatus('not_started');
-          }
-        } else {
-          // No mask exists, so status is not_started
-          console.log('[AnnotationPageV2] No mask found for image:', imageId);
-          setAnnotationStatus('not_started');
-        }
-      } catch (error) {
-        console.error('[AnnotationPageV2] Error fetching mask status:', error);
-        // Default to not_started on error
-        setAnnotationStatus('not_started');
-      }
-    };
-
-    fetchMaskStatus();
-  }, [imageId, setAnnotationStatus]);
-
-  // Refresh mask status when objects change (objects added/removed/labeled)
-  useEffect(() => {
-    const refreshStatus = async () => {
-      if (!imageId) return;
-
-      try {
-        const maskResponse = await api.getFinalMask(imageId);
-        if (maskResponse.success && maskResponse.mask) {
-          const statusResponse = await api.getMaskAnnotationStatus(maskResponse.mask.id);
-          if (statusResponse.success) {
-            setAnnotationStatus(statusResponse.status);
-          }
-        }
-      } catch (error) {
-        console.error('[AnnotationPageV2] Error refreshing mask status:', error);
-      }
-    };
-
-    // Debounce status refresh to avoid too many API calls
-    const timeoutId = setTimeout(refreshStatus, 500);
-    return () => clearTimeout(timeoutId);
-  }, [objectsList.length, imageId, setAnnotationStatus]);
 
   return (
     <DatasetLoader>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { 
   useCurrentMask, 
   useObjectsList, 
@@ -18,10 +19,15 @@ import {
   useSetCurrentTool,
   useExitFocusMode,
   useObjectsVisibility,
+  useEnterEditMode,
+  useExitEditMode,
+  useUpdateObject,
 } from '../../../stores/selectors/annotationSelectors';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
+import { hasValidLabel } from '../../../stores/utils/labelValidation';
 
 /**
  * Helper function to generate SVG path from x, y coordinate arrays
@@ -73,6 +79,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const exitFocusMode = useExitFocusMode();
   const visibility = useObjectsVisibility();
   
+  const enterEditMode = useEnterEditMode();
+  const exitEditMode = useExitEditMode();
+  const updateObject = useUpdateObject();
+
+  // State for the "label required" prompt when clicking an unlabelled object
+  const [unlabelledPromptObject, setUnlabelledPromptObject] = useState(null);
+
   const { zoomToObject } = useZoomToObject({
     marginPct: 0.25,
     maxZoom: 4,
@@ -147,6 +160,33 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return filtered;
   }, [objectsList, visibility, selectedObjects, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
+  /**
+   * Save the current edit-mode draft to backend and exit edit mode.
+   * Uses getState() so it always reads the freshest Zustand state,
+   * avoiding stale-closure issues inside async event handlers.
+   */
+  const saveAndExitEditMode = () => {
+    const { editMode, objects } = useAnnotationStore.getState();
+    if (!editMode.active) return;
+
+    if (editMode.isDirty && editMode.draftCoordinates && editMode.objectId) {
+      const editObj = objects.list.find(o => o.id === editMode.objectId);
+      if (editObj) {
+        // Optimistic local update
+        updateObject(editMode.objectId, {
+          x: [...editMode.draftCoordinates.x],
+          y: [...editMode.draftCoordinates.y],
+          path: null,
+        });
+        // Fire-and-forget backend save
+        annotationSession
+          .modifyObject(editMode.contourId, { x: editMode.draftCoordinates.x, y: editMode.draftCoordinates.y })
+          .catch(err => console.error('Auto-save on switch failed:', err));
+      }
+    }
+    exitEditMode();
+  };
+
   // Track last click times for double-click detection using ref to avoid closure issues
   const lastClickTimesRef = useRef({});
 
@@ -160,7 +200,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
       const containerWidth = container.offsetWidth;
       const containerHeight = container.offsetHeight;
-      const imageAspect = imageObject.width / imageObject.height;
+      // Use naturalWidth/naturalHeight as fallback for detached Image objects (width may be 0)
+      const imgW = imageObject.width || imageObject.naturalWidth || 0;
+      const imgH = imageObject.height || imageObject.naturalHeight || 0;
+      const imageAspect = imgW / imgH;
       const containerAspect = containerWidth / containerHeight;
 
       let renderedWidth, renderedHeight, x, y;
@@ -210,14 +253,16 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  // Handle double-click on objects (enter refinement mode)
+  // Handle double-click: enter refinement mode + edit mode + zoom
   const handleObjectDoubleClick = async (object) => {
     const contourId = object.contour_id || object.id;
     
     try {
+      // If already editing a (possibly different) object, save first
+      saveAndExitEditMode();
+
       // Exit focus mode if active (refinement mode replaces focus mode)
       if (focusModeActive) {
-        // Send unfocus message to backend
         if (annotationSession.isReady()) {
           await annotationSession.unfocusImage();
         }
@@ -229,6 +274,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       
       // Enter refinement mode in the store
       enterRefinementMode(object.id, contourId);
+
+      // Also enter edit mode so the user can drag control points immediately
+      if (object.x && object.y && object.x.length > 0 && object.contour_id != null) {
+        enterEditMode(object.id, object.contour_id, object.x, object.y);
+      }
       
       // Switch to AI annotation tool
       setCurrentTool('ai_annotation');
@@ -241,28 +291,11 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           const containerHeight = container.offsetHeight;
           
           if (containerWidth && containerHeight) {
-            const imageDims = {
-              width: imageObject.width,
-              height: imageObject.height
-            };
-            
-            const containerDims = {
-              width: containerWidth,
-              height: containerHeight
-            };
-            
-            const renderedImageDims = {
-              width: imageDimensions.width,
-              height: imageDimensions.height,
-              x: imageDimensions.x,
-              y: imageDimensions.y
-            };
-            
             zoomToObject(
               object,
-              imageDims,
-              containerDims,
-              renderedImageDims,
+              { width: imageObject.width, height: imageObject.height },
+              { width: containerWidth, height: containerHeight },
+              { width: imageDimensions.width, height: imageDimensions.height, x: imageDimensions.x, y: imageDimensions.y },
               { animateMs: 300, immediate: false }
             );
           }
@@ -280,7 +313,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     // Check if Shift key is held for multi-select
     const isShiftHeld = e.shiftKey;
     
-    // If Shift is held, toggle selection and skip focus mode behavior
+    // If Shift is held, toggle selection and skip single-object edit mode
     if (isShiftHeld) {
       const isAlreadySelected = selectedObjects.includes(object.id);
       if (isAlreadySelected) {
@@ -288,6 +321,8 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       } else {
         selectObject(object.id);
       }
+      // Multi-select: save and exit edit mode (edit mode only for single selection)
+      saveAndExitEditMode();
       return;
     }
     
@@ -321,45 +356,40 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     }, 250);
   };
 
-  // Handle single-click on objects (enter focus mode in both selection and AI annotation tools)
+  // Handle single-click: select object + enter focus mode + zoom (original behaviour)
   const handleSingleClick = async (object) => {
     // Disable focus mode when in refinement mode
     if (refinementModeActive) {
       return;
     }
-    
+
     // Clear previous selection and select only this object
     clearSelection();
     selectObject(object.id);
-    
-    // Enter focus mode for both selection and AI annotation tools
+
+    // Enter focus mode for selection and AI annotation tools
     if (currentTool === 'selection' || currentTool === 'ai_annotation') {
       if (!imageObject || !object.x || !object.y || object.x.length === 0) {
         return;
       }
 
-      // Create mask from x,y arrays if mask doesn't exist or doesn't have points
-      let mask = object.mask;
-      
-      // If mask doesn't exist or doesn't have points, create it from x,y arrays
-      if (!mask || !mask.points) {
-        // Convert normalized x,y arrays to pixel coordinates and create points array
-        const points = object.x.map((x, i) => [
-          x * imageObject.width,
-          object.y[i] * imageObject.height
-        ]);
-        mask = { points: points };
+      // Block focus mode for unlabelled objects — prompt user to label first
+      if (!hasValidLabel(object.label)) {
+        setUnlabelledPromptObject(object);
+        return;
       }
-      
+
+      // Build mask from coordinate arrays if needed
+      let mask = object.mask;
+      if (!mask || !mask.points) {
+        const points = object.x.map((x, i) => [x * imageObject.width, object.y[i] * imageObject.height]);
+        mask = { points };
+      }
+
       if (mask && mask.points && mask.points.length > 0) {
-        // Get contour ID for WebSocket message
         const contourId = getContourId(object);
-        
         try {
-          // Send focus message to backend via WebSocket
           await annotationSession.focusImage(contourId);
-          
-          // Enter focus mode in the store
           enterFocusMode(object.id, mask);
         } catch (error) {
           console.error('Failed to enter focus mode:', error);
@@ -369,34 +399,15 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
       const container = containerRef.current;
       if (!container) return;
-
       const containerWidth = container.offsetWidth;
       const containerHeight = container.offsetHeight;
-
       if (!containerWidth || !containerHeight) return;
-
-      const imageDims = {
-        width: imageObject.width,
-        height: imageObject.height
-      };
-
-      const containerDims = {
-        width: containerWidth,
-        height: containerHeight
-      };
-
-      const renderedImageDims = {
-        width: imageDimensions.width,
-        height: imageDimensions.height,
-        x: imageDimensions.x,
-        y: imageDimensions.y
-      };
 
       zoomToObject(
         object,
-        imageDims,
-        containerDims,
-        renderedImageDims,
+        { width: imageObject.width, height: imageObject.height },
+        { width: containerWidth, height: containerHeight },
+        { width: imageDimensions.width, height: imageDimensions.height, x: imageDimensions.x, y: imageDimensions.y },
         { animateMs: 300, immediate: false }
       );
     }
@@ -443,9 +454,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   };
 
   // Get viewBox dimensions from loaded image
-  const viewBox = imageObject 
-    ? `0 0 ${imageObject.width} ${imageObject.height}`
-    : '0 0 800 600'; // Fallback dimensions
+  // Use naturalWidth/naturalHeight for detached Image objects (width/height may be 0)
+  const imgNatW = imageObject ? (imageObject.width || imageObject.naturalWidth || 800) : 800;
+  const imgNatH = imageObject ? (imageObject.height || imageObject.naturalHeight || 600) : 600;
+  const viewBox = `0 0 ${imgNatW} ${imgNatH}`;
 
   // use high z-index to ensure object interactions work
   // Object paths will only capture events on painted areas, allowing empty areas to pass through
@@ -566,7 +578,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         let maskPath = null;
         
         if (object.x && object.y && object.x.length > 0 && imageObject) {
-          maskPath = generatePathFromCoordinates(object.x, object.y, imageObject.width, imageObject.height);
+          const iw = imageObject.width || imageObject.naturalWidth || 0;
+          const ih = imageObject.height || imageObject.naturalHeight || 0;
+          maskPath = generatePathFromCoordinates(object.x, object.y, iw, ih);
         }
         
         // Fallback to backend path only if coordinate generation failed
@@ -689,6 +703,47 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           </svg>
         );
       })}
+
+      {/* Unlabelled-object focus-mode prompt — portalled to document.body to escape the CSS transform */}
+      {unlabelledPromptObject && ReactDOM.createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black/50"
+          style={{ zIndex: 9999 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl border border-amber-200 p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-800">Label required for Focus Mode</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  <strong>Object #{unlabelledPromptObject.id}</strong> does not have a label yet.
+                  Please assign a label before entering Focus Mode.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

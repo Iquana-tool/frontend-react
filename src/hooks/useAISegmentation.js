@@ -14,8 +14,22 @@ import {
   useRefinementModeActive,
   useRefinementModeObjectId,
   useExitRefinementMode,
-  useSetCurrentTool, useSetPromptedModel,
+  useSetCurrentTool,
+  useSetPromptedModel,
+  useSyncEditModeDraftFromRefinement,
 } from '../stores/selectors/annotationSelectors';
+
+/**
+ * Normalize contour data from the backend.
+ * Pydantic V2 serializes a Contour model as an array of [key, value] pairs when the
+ * ServerMessage.data field is typed Union[dict, list, None] and the model fails dict
+ * coercion. Convert it back to a plain object when detected.
+ */
+const normalizeContourData = (data) => {
+  if (!Array.isArray(data)) return data;
+  const looksLikeEntries = data.length > 0 && Array.isArray(data[0]) && data[0].length === 2 && typeof data[0][0] === 'string';
+  return looksLikeEntries ? Object.fromEntries(data) : data;
+};
 
 /**
  * Custom hook to handle AI segmentation via WebSocket
@@ -41,39 +55,56 @@ const useAISegmentation = () => {
   const refinementModeObjectId = useRefinementModeObjectId();
   const exitRefinementMode = useExitRefinementMode();
   const setCurrentTool = useSetCurrentTool();
+  const syncEditModeDraftFromRefinement = useSyncEditModeDraftFromRefinement();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
-   * Handles object_added, object_modified, and success message formats with contour data
+   * Handles object_added, object_modified, and success message formats with contour data.
+   * Contour is valid if it has path OR (x and y arrays with points); overlay can build path from x,y.
    */
   const transformResponseToMask = useCallback((response) => {
     let contour = null;
-    
+
+    // Normalize data: Pydantic V2 may serialize a Contour as an array of [key, value] pairs
+    const rawData = response?.data;
+    const normalizedData = normalizeContourData(rawData);
+
+    // Ignore hierarchy payload (backend sometimes sends full hierarchy in object_added)
+    if (normalizedData && Array.isArray(normalizedData.root_contours)) {
+      return null;
+    }
+
     // Handle: object_added, object_modified, or success message with contour data
-    if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && response.data) {
-      contour = response.data;
+    if (response && (response.type === 'object_added' || response.type === 'object_modified' || response.type === 'success') && normalizedData) {
+      contour = normalizedData;
     }
     // Handle direct contour data
-    else if (response && response.path) {
+    else if (response && (response.path || (response.x && response.y))) {
       contour = response;
     }
-    
-    // Backend should always provide path - if missing, it's an error
-    if (!contour || !contour.path) {
+
+    if (!contour) {
+      return null;
+    }
+    const path = contour.path ?? contour.svg_path ?? contour.path_d;
+    const hasPath = !!path;
+    const x = contour.x ?? contour.X;
+    const y = contour.y ?? contour.Y;
+    const hasCoords = Array.isArray(x) && Array.isArray(y) && (x.length > 0 || y.length > 0);
+    if (!hasPath && !hasCoords) {
       return null;
     }
 
     const mask = {
-      id: contour.id || Date.now(),
-      path: contour.path, // Backend-computed SVG path
-      pixelCount: contour.quantification?.area || contour.pixel_count || 0,
+      id: contour.id ?? contour.contour_id ?? Date.now(),
+      path: path || null,
+      pixelCount: contour.quantification?.area ?? contour.pixel_count ?? contour.quantification?.pixel_count ?? 0,
       label: contour.label || 'AI Generated',
       confidence: contour.confidence,
-      // Extract x and y coordinate arrays if available from backend
-      x: contour.x || [],
-      y: contour.y || [],
+      x: x || [],
+      y: y || [],
     };
-    
+
     return mask;
   }, []);
 
@@ -189,6 +220,8 @@ const useAISegmentation = () => {
           
           if (objectToUpdate) {
             // Update the existing object - completely replace mask and path to show only the refined version
+            const newX = mask.x || [];
+            const newY = mask.y || [];
             updateObject(objectToUpdate.id, {
               mask: mask,
               contour_id: normalizedId, // Update with the NEW contour_id from backend
@@ -196,31 +229,42 @@ const useAISegmentation = () => {
               // Preserve existing label if it exists, otherwise use the one from backend
               label: mask.label || objectToUpdate.label || `Object #${objectToUpdate.id}`,
               // Include x and y coordinate arrays if available from backend response
-              x: mask.x || [],
-              y: mask.y || [],
+              x: newX,
+              y: newY,
               // Ensure path is available for rendering - explicitly set from new refined object
               path: mask.path || null,
             });
+            // Sync edit mode draft so the blue control-point overlay shows the new refined contour
+            if (refinementModeActive && newX.length > 0 && newY.length > 0) {
+              syncEditModeDraftFromRefinement(newX, newY);
+            }
           }
         }
-        // The handler will receive the OBJECT_ADDED message and add it once
-        
-        // Exit refinement mode after successful segmentation so the object is clickable
+        // For refinement (object_modified): stay in refinement mode so user can refine again or exit via "Exit Refinement"
+        clearAllPrompts();
+        return { success: true, mask };
+      }
+      // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
+      if (response && response.success !== false && response.type === 'object_added') {
+        clearAllPrompts();
         if (refinementModeActive) {
           try {
             await annotationSession.unselectRefinementObject();
             exitRefinementMode();
           } catch (error) {
-           
-            // Continue anyway - the object was updated/added successfully
+            // Continue anyway
           }
         }
-        clearAllPrompts();
-        // Note: Model status is handled by the backend, no need to update here
-        return { success: true, mask };
-      } else {
-        throw new Error('No valid mask returned from server');
+        return { success: true, mask: null };
       }
+
+      // Other success response we couldn't parse (e.g. hierarchy); treat as success
+      if (response && response.success !== false) {
+        clearAllPrompts();
+        return { success: true, mask: null };
+      }
+
+      throw new Error('No valid mask returned from server');
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
@@ -244,6 +288,7 @@ const useAISegmentation = () => {
     refinementModeObjectId,
     exitRefinementMode,
     setCurrentTool,
+    syncEditModeDraftFromRefinement,
   ]);
 
   return {

@@ -28,6 +28,7 @@ import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentat
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
 import ContextMenuItem from './ContextMenuItem';
@@ -71,6 +72,13 @@ const ObjectContextMenu = () => {
   }, [objectsList, selectedObjects]);
   
   const isMultiSelect = targetObjects.length > 1;
+
+  // Check if the single target object is unlabelled (focus mode requires a label)
+  const targetObjectIsUnlabelled = React.useMemo(() => {
+    if (isMultiSelect) return false;
+    const target = objectsList.find(obj => obj.id === targetObjectId);
+    return target ? !hasValidLabel(target.label) : false;
+  }, [isMultiSelect, objectsList, targetObjectId]);
   
   // Use labels hierarchy hook
   const { labelHierarchy, labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
@@ -186,6 +194,12 @@ const ObjectContextMenu = () => {
     // Find the target object
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
     if (!targetObject || !targetObject.x || !targetObject.y || targetObject.x.length === 0) {
+      hideContextMenu();
+      return;
+    }
+
+    // Block focus mode for unlabelled objects
+    if (!hasValidLabel(targetObject.label)) {
       hideContextMenu();
       return;
     }
@@ -307,6 +321,12 @@ const ObjectContextMenu = () => {
 
     try {
       await enterRefinementModeForObject(targetObject);
+
+      // Also enter edit mode so control points are immediately available
+      if (targetObject.x && targetObject.y && targetObject.x.length > 0 && targetObject.contour_id != null) {
+        enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+      }
+
       hideContextMenu();
     } catch (error) {
       alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);
@@ -382,7 +402,6 @@ const ObjectContextMenu = () => {
 
     // Exit focus mode if active
     if (focusModeActive) {
-      // Send unfocus message to backend
       if (annotationSession.isReady()) {
         annotationSession.unfocusImage().catch(err => 
           console.error('Failed to send unfocus message:', err)
@@ -393,6 +412,25 @@ const ObjectContextMenu = () => {
 
     // Enter edit mode
     enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+
+    // Zoom into the contour (like refinement mode does)
+    if (imageObject && targetObject.x && targetObject.y && targetObject.x.length > 0) {
+      const container = menuRef.current?.parentElement;
+      if (container) {
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        if (containerWidth && containerHeight) {
+          const renderedImageDimensions = calculateRenderedImageDimensions(imageObject, containerWidth, containerHeight);
+          zoomToObject(
+            targetObject,
+            { width: imageObject.width, height: imageObject.height },
+            { width: containerWidth, height: containerHeight },
+            renderedImageDimensions,
+            { animateMs: 300, immediate: false }
+          );
+        }
+      }
+    }
     
     hideContextMenu();
   };
@@ -427,15 +465,17 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Focus Mode Option - Disabled in refinement mode or multi-select */}
+      {/* Focus Mode Option - Disabled in refinement mode, multi-select, or for unlabelled objects */}
       <ContextMenuItem
         onClick={handleFocusMode}
-        disabled={refinementModeActive || isMultiSelect}
+        disabled={refinementModeActive || isMultiSelect || targetObjectIsUnlabelled}
         title={
           isMultiSelect 
             ? 'Focus mode is disabled for multiple selections' 
             : refinementModeActive 
-              ? 'Focus mode is disabled during refinement' 
+              ? 'Focus mode is disabled during refinement'
+            : targetObjectIsUnlabelled
+              ? 'Assign a label to this object before entering Focus Mode'
               : 'Enter focus mode'
         }
         label="Focus Mode"
