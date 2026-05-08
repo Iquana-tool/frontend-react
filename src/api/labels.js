@@ -1,7 +1,6 @@
 import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
-const API_BASE_URL =
-    process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
+import { API_BASE_URL } from "./config";
 
 // Fetch all available labels
 export const fetchLabels = async (datasetId) => {

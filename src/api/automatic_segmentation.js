@@ -1,7 +1,6 @@
 import { handleApiError, getAuthHeaders } from "../api/util";
 
-const API_BASE_URL =
-    process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
+import { API_BASE_URL } from "./config";
 
 /* Get the trainable base models for automatic segmentation. These models are not trained yet and cannot be used, unless
 * they are pretrained. */

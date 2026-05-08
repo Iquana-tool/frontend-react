@@ -1,8 +1,7 @@
 import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 import { getImageById } from "./images"; // Import the image fetching function
 
-const API_BASE_URL =
-    process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
+import { API_BASE_URL } from "./config";
 
 // Dataset API functions
 export const fetchDatasets = async () => {

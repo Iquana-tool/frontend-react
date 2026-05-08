@@ -54,24 +54,26 @@ const getUserId = () => {
   return parsedId;
 };
 
+const appendApiSuffix = (url) => (url.endsWith('/api') ? url : `${url}/api`);
+
 const getWsBaseUrl = () => {
   const wsEnv = process.env.REACT_APP_WS_URL;
   if (wsEnv && wsEnv.trim()) {
-    return wsEnv.trim().replace(/\/$/, '');
+    return appendApiSuffix(wsEnv.trim().replace(/\/$/, ''));
   }
 
   const apiEnv = process.env.REACT_APP_API_BASE_URL;
   if (apiEnv && apiEnv.trim()) {
     const apiBase = apiEnv.trim().replace(/\/$/, '');
     if (apiBase.startsWith('https://')) {
-      return apiBase.replace(/^https:\/\//, 'wss://');
+      return appendApiSuffix(apiBase.replace(/^https:\/\//, 'wss://'));
     }
     if (apiBase.startsWith('http://')) {
-      return apiBase.replace(/^http:\/\//, 'ws://');
+      return appendApiSuffix(apiBase.replace(/^http:\/\//, 'ws://'));
     }
   }
 
-  return 'ws://localhost:8000';
+  return 'ws://localhost:8000/api';
 };
 
 /**
