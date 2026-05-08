@@ -54,26 +54,24 @@ const getUserId = () => {
   return parsedId;
 };
 
-const appendApiSuffix = (url) => (url.endsWith('/api') ? url : `${url}/api`);
-
 const getWsBaseUrl = () => {
   const wsEnv = process.env.REACT_APP_WS_URL;
   if (wsEnv && wsEnv.trim()) {
-    return appendApiSuffix(wsEnv.trim().replace(/\/$/, ''));
+    return wsEnv.trim().replace(/\/$/, '');
   }
 
   const apiEnv = process.env.REACT_APP_API_BASE_URL;
   if (apiEnv && apiEnv.trim()) {
     const apiBase = apiEnv.trim().replace(/\/$/, '');
     if (apiBase.startsWith('https://')) {
-      return appendApiSuffix(apiBase.replace(/^https:\/\//, 'wss://'));
+      return apiBase.replace(/^https:\/\//, 'wss://');
     }
     if (apiBase.startsWith('http://')) {
-      return appendApiSuffix(apiBase.replace(/^http:\/\//, 'ws://'));
+      return apiBase.replace(/^http:\/\//, 'ws://');
     }
   }
 
-  return 'ws://localhost:8000/api';
+  return 'ws://localhost:8000';
 };
 
 /**
@@ -105,7 +103,7 @@ class AnnotationSession {
       this._updateSessionState(SessionState.INITIALIZING);
 
       // Construct WebSocket URL
-      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/user=${this.currentUserId}&image=${this.currentImageId}`;
+      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}/${this.currentImageId}`;
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
