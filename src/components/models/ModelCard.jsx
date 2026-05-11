@@ -28,7 +28,7 @@ const ModelCard = ({ model, onAction }) => {
       <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white">
         <h3 className="text-xl font-bold mb-2">{model.name}</h3>
         <div className="flex flex-wrap gap-2">
-          {model.tags && model.tags.map((tag, index) => (
+          {Array.isArray(model.tags) && model.tags.map((tag, index) => (
             <span
               key={index}
               className="inline-flex items-center space-x-1 px-2 py-1 bg-white/20 rounded-full text-xs font-medium"

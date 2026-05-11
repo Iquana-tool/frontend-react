@@ -29,6 +29,11 @@ import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 import { useSemanticSegmentation } from '../../../hooks/useSemanticSegmentation';
 import SemanticWarningModal from '../modals/SemanticWarningModal';
 
+const getFirstModelId = (models) => {
+    const first = (models || []).find((m) => m?.id || m?.registry_key || m?.identifier);
+    return first?.id || first?.registry_key || first?.identifier || null;
+};
+
 const Services = () => {
     // Fetch models functions
     const fetchPromptedModels = useFetchAvailablePromptedModels();
@@ -44,6 +49,9 @@ const Services = () => {
     const promptedModel = usePromptedModel();
     const completionModel = useCompletionModel();
     const semanticModel = useSemanticModel();
+    const setPromptedModel = useSetPromptedModel();
+    const setCompletionModel = useSetCompletionModel();
+    const setSemanticModel = useSetSemanticModel();
     
     // Get running states
     const isRunningCompletion = useIsRunningCompletion();
@@ -76,6 +84,28 @@ const Services = () => {
         if (availableSemanticModels.length === 0) fetchSemanticModels();
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Enforce deterministic default selections once model lists are available.
+    useEffect(() => {
+        if (!promptedModel) {
+            const firstPromptedId = getFirstModelId(availablePromptedModels);
+            if (firstPromptedId) setPromptedModel(firstPromptedId);
+        }
+    }, [promptedModel, availablePromptedModels, setPromptedModel]);
+
+    useEffect(() => {
+        if (!completionModel) {
+            const firstCompletionId = getFirstModelId(availableCompletionModels);
+            if (firstCompletionId) setCompletionModel(firstCompletionId);
+        }
+    }, [completionModel, availableCompletionModels, setCompletionModel]);
+
+    useEffect(() => {
+        if (!semanticModel) {
+            const firstSemanticId = getFirstModelId(availableSemanticModels);
+            if (firstSemanticId) setSemanticModel(firstSemanticId);
+        }
+    }, [semanticModel, availableSemanticModels, setSemanticModel]);
+
     // Preload models when they change
     useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
     useModelSwitchPreloader(completionModel, annotationSession.selectCompletionModel.bind(annotationSession), 'completion');
@@ -99,7 +129,7 @@ const Services = () => {
             models: availablePromptedModels,
             isLoading: useIsLoadingPromptedModels(),
             promptedModel: promptedModel,
-            setPromptedModel: useSetPromptedModel(),
+            setPromptedModel: setPromptedModel,
             updateAvailableModels: fetchPromptedModels,
             isRunning: false,
         },
@@ -108,7 +138,7 @@ const Services = () => {
             models: availableCompletionModels,
             isLoading: useIsLoadingCompletionModels(),
             promptedModel: completionModel,
-            setPromptedModel: useSetCompletionModel(),
+            setPromptedModel: setCompletionModel,
             updateAvailableModels: fetchCompletionModels,
             isRunning: isRunningCompletion,
         },
@@ -117,7 +147,7 @@ const Services = () => {
             models: availableSemanticModels,
             isLoading: useIsLoadingSemanticModels(),
             promptedModel: semanticModel,
-            setPromptedModel: useSetSemanticModel(),
+            setPromptedModel: setSemanticModel,
             updateAvailableModels: fetchSemanticModels,
             isRunning: isRunningSemantic,
             onRun: handleSemanticRun,

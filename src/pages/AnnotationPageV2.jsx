@@ -7,7 +7,7 @@ import DatasetNavigation from '../components/annotationPage/layout/DatasetNaviga
 import useAnnotationSession from '../hooks/useAnnotationSession';
 import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
 import useModelPreloader from '../hooks/useModelPreloader';
-import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels } from '../stores/selectors/annotationSelectors';
+import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels, useFetchAvailablePromptedModels, useAvailablePromptedModels } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 import { useDataset } from '../contexts/DatasetContext';
 import { fetchLabels } from '../api/labels';
@@ -22,6 +22,16 @@ const AnnotationPageV2 = () => {
   
   // Use URL imageId if available, otherwise use store imageId
   const imageId = urlImageId ? parseInt(urlImageId) : storeImageId;
+
+  // Fetch prompted models immediately on page mount (before DatasetLoader finishes),
+  // so a default is auto-selected by the time the canvas is visible.
+  const fetchAvailablePromptedModels = useFetchAvailablePromptedModels();
+  const availablePromptedModels = useAvailablePromptedModels();
+  useEffect(() => {
+    if (availablePromptedModels.length === 0) {
+      fetchAvailablePromptedModels();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const clearObjects = useClearObjects();

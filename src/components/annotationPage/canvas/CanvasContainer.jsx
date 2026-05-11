@@ -19,6 +19,9 @@ import {
   useAIPrompts,
   usePromptedModel,
   useIsSubmitting,
+  useAvailablePromptedModels,
+  useIsLoadingPromptedModels,
+  useFetchAvailablePromptedModels,
   useRefinementModeActive, useSetPromptedModel,
 } from '../../../stores/selectors/annotationSelectors';
 
@@ -29,6 +32,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   const instantSegmentation = useInstantSegmentation();
   const prompts = useAIPrompts();
   const promptedModel = usePromptedModel();
+  const availablePromptedModels = useAvailablePromptedModels();
+  const isLoadingPromptedModels = useIsLoadingPromptedModels();
+  const fetchAvailablePromptedModels = useFetchAvailablePromptedModels();
   const setPromptedModel = useSetPromptedModel();
   const isSubmitting = useIsSubmitting();
   const refinementModeActive = useRefinementModeActive();
@@ -69,6 +75,31 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
       }
     }
   }, [refinementModeActive]);
+
+  // Ensure prompted models are fetched and a default model is selected in AI mode,
+  // even if the sidebar wasn't interacted with.
+  useEffect(() => {
+    if (currentTool !== 'ai_annotation') {
+      return;
+    }
+
+    if (!isLoadingPromptedModels && availablePromptedModels.length === 0) {
+      fetchAvailablePromptedModels();
+      return;
+    }
+
+    if (!promptedModel && availablePromptedModels.length > 0) {
+      const firstModelId = availablePromptedModels.find((m) => m?.id)?.id;
+      if (firstModelId) setPromptedModel(firstModelId);
+    }
+  }, [
+    currentTool,
+    promptedModel,
+    availablePromptedModels,
+    isLoadingPromptedModels,
+    fetchAvailablePromptedModels,
+    setPromptedModel,
+  ]);
 
   // Auto-trigger segmentation when instant segmentation is enabled and a prompt is added
   useEffect(() => {

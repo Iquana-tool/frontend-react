@@ -3,6 +3,14 @@ import { getPromptedModels, getCompletionModels, getSemanticModels } from '../..
 /**
  * Models slice - manages AI model selection and available models
  */
+const getModelId = (model) =>
+  model?.id ?? model?.registry_key ?? model?.identifier ?? null;
+
+const getFirstModelId = (models) => {
+  const first = (models || []).find((m) => getModelId(m));
+  return first ? getModelId(first) : null;
+};
+
 export const createModelsSlice = (set) => ({
   setPromptedModel: (model) => set((state) => {
     state.models.promptedModel = model;
@@ -34,12 +42,12 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.registry_key,
+          id: getModelId(model),
           name: model.name,
           description: model.description,
           tags: model.tags,
           supports_refinement: model.refinement_supported,
-          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
+          model_status: model.model_status || 'ready', // Default to 'ready' if models are available
         }));
 
         set((state) => {
@@ -47,13 +55,9 @@ export const createModelsSlice = (set) => ({
           state.models.isLoadingCompletionModels = false;
 
           // Set default model if none is selected and models are available
-          // Prefer SAM3, otherwise use first model
           if (!state.models.completionModel && transformedModels.length > 0) {
-            const sam3Model = transformedModels.find(m => 
-              m.name?.toLowerCase().includes('sam3') || 
-              m.id?.toLowerCase().includes('sam3')
-            );
-            state.models.completionModel = sam3Model?.id || transformedModels[0].id;
+            const firstModelId = getFirstModelId(transformedModels);
+            if (firstModelId) state.models.completionModel = firstModelId;
           }
         });
       } else {
@@ -84,12 +88,12 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.registry_key,
+          id: getModelId(model),
           name: model.name,
           description: model.description,
           tags: model.tags,
           supports_refinement: model.refinement_supported,
-          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
+          model_status: model.model_status || 'ready', // Default to 'ready' if models are available
         }));
 
         set((state) => {
@@ -97,13 +101,9 @@ export const createModelsSlice = (set) => ({
           state.models.isLoadingCompletionModels = false;
           
           // Set default model if none is selected and models are available
-          // Prefer SAM3, otherwise use first model
           if (!state.models.completionModel && transformedModels.length > 0) {
-            const sam3Model = transformedModels.find(m => 
-              m.name?.toLowerCase().includes('sam3') || 
-              m.id?.toLowerCase().includes('sam3')
-            );
-            state.models.completionModel = sam3Model?.id || transformedModels[0].id;
+            const firstModelId = getFirstModelId(transformedModels);
+            if (firstModelId) state.models.completionModel = firstModelId;
           }
         });
       } else {
@@ -134,13 +134,13 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.registry_key,
+          id: getModelId(model),
           name: model.name,
           description: model.description,
           tags: model.tags,
           supported_prompt_types: model.prompt_types_supported,
           supports_refinement: model.refinement_supported,
-          model_status: model.model_status || 'ready' // Default to 'ready' if models are available
+          model_status: model.model_status || 'ready', // Default to 'ready' if models are available
         }));
 
         set((state) => {
@@ -149,7 +149,8 @@ export const createModelsSlice = (set) => ({
           
           // Set default model if none is selected and models are available
           if (!state.models.promptedModel && transformedModels.length > 0) {
-            state.models.promptedModel = transformedModels[0].id;
+            const firstModelId = getFirstModelId(transformedModels);
+            if (firstModelId) state.models.promptedModel = firstModelId;
           }
         });
       } else {
@@ -180,11 +181,11 @@ export const createModelsSlice = (set) => ({
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
-          id: model.registry_key,
+          id: getModelId(model),
           name: model.name,
           description: model.description,
           tags: model.tags,
-          model_status: model.model_status || 'ready'
+          model_status: model.model_status || 'ready',
         }));
 
         set((state) => {
@@ -193,7 +194,8 @@ export const createModelsSlice = (set) => ({
           
           // Set default model if none is selected and models are available
           if (!state.models.semanticModel && transformedModels.length > 0) {
-            state.models.semanticModel = transformedModels[0].id;
+            const firstModelId = getFirstModelId(transformedModels);
+            if (firstModelId) state.models.semanticModel = firstModelId;
           }
         });
       } else {
