@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, EyeOff, Edit3, Trash2, CheckCircle, XCircle, UserCheck } from 'lucide-react';
+import { Eye, EyeOff, Edit3, Trash2, CheckCircle, XCircle } from 'lucide-react';
 
 /**
  * Action buttons for an object (Accept/Reject/Review/Edit/Delete/Visibility)
@@ -13,7 +13,6 @@ import { Eye, EyeOff, Edit3, Trash2, CheckCircle, XCircle, UserCheck } from 'luc
  * @param {Function} onEdit - Callback when edit is clicked
  * @param {Function} onDelete - Callback when delete is clicked
  * @param {Function} onToggleVisibility - Callback when visibility is toggled
- * @param {Array} reviewedBy - List of reviewers (for tooltip)
  */
 const ObjectActions = ({
   isReviewed,
@@ -25,7 +24,6 @@ const ObjectActions = ({
   onEdit,
   onDelete,
   onToggleVisibility,
-  reviewedBy = []
 }) => {
   const isUnreviewed = !isReviewed;
 
@@ -62,13 +60,6 @@ const ObjectActions = ({
       ) : (
         // Reviewed object actions (Visibility/Review/Edit/Delete)
         <>
-          {/* Show reviewed badge for reviewed objects */}
-          {isReviewed && (
-            <div className="p-1" title={`Reviewed by: ${reviewedBy.join(', ')}`}>
-              <UserCheck className="w-4 h-4 text-green-600" />
-            </div>
-          )}
-          
           <button
             onClick={onToggleVisibility}
             className="p-1 hover:bg-gray-200 rounded transition-colors"

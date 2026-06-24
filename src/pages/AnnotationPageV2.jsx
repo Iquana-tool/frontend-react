@@ -6,6 +6,8 @@ import DatasetLoader from '../components/annotationPage/layout/DatasetLoader';
 import DatasetNavigation from '../components/annotationPage/layout/DatasetNavigation';
 import useAnnotationSession from '../hooks/useAnnotationSession';
 import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
+import useWebSocketStatusToasts from '../hooks/useWebSocketStatusToasts';
+import useWebSocketErrorToasts from '../hooks/useWebSocketErrorToasts';
 import useModelPreloader from '../hooks/useModelPreloader';
 import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels, useFetchAvailablePromptedModels, useAvailablePromptedModels } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
@@ -110,6 +112,12 @@ const AnnotationPageV2 = () => {
 
   // Listen for server-initiated WebSocket messages (object updates)
   useWebSocketObjectHandler();
+
+  // Surface connection drops to the user (the WebSocket can fail silently)
+  useWebSocketStatusToasts();
+
+  // Surface backend-reported errors (the connection stays open; the action just failed)
+  useWebSocketErrorToasts();
 
   // Listen for "objects" message: full hierarchy from backend
   // Clear canvas and load the received hierarchy.

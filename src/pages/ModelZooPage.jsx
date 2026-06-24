@@ -16,10 +16,25 @@ import {
   cancelSemanticTraining,
 } from "../api/training";
 
-const normalizeTags = (tags) => {
-  if (Array.isArray(tags)) return tags;
+// The toolbox serves `tags` as a dict (e.g. { task: "instance-segmentation",
+// domain: "general" }), but older payloads may use an array or comma string.
+// Normalize all three into [{ key?, value }] so the card can render them.
+const normalizeTagEntries = (tags) => {
+  if (!tags) return [];
+  if (Array.isArray(tags)) {
+    return tags.map((t) => ({ value: String(t) })).filter((t) => t.value);
+  }
   if (typeof tags === "string") {
-    return tags.split(",").map((t) => t.trim()).filter(Boolean);
+    return tags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .map((value) => ({ value }));
+  }
+  if (typeof tags === "object") {
+    return Object.entries(tags)
+      .filter(([, value]) => value != null && String(value) !== "")
+      .map(([key, value]) => ({ key, value: String(value) }));
   }
   return [];
 };
@@ -29,8 +44,19 @@ const transformModel = (model) => ({
   identifier: model.identifier || model.registry_key,
   name: model.name,
   description: model.description,
-  tags: normalizeTags(model.tags),
+  tags: normalizeTagEntries(model.tags),
   service: model.service,
+  // Rich model info from the toolbox ModelInfo schema
+  badges: Array.isArray(model.badges) ? model.badges : [],
+  usageTip: model.usage_tip,
+  infoUrl: model.info_url,
+  status: model.status, // "ready" | "not_ready"
+  // Task-specific fields (prompted / instance segmentation)
+  promptTypesSupported: Array.isArray(model.prompt_types_supported)
+    ? model.prompt_types_supported
+    : [],
+  refinementSupported: model.refinement_supported === true,
+  labelId: model.label_id,
   // Backend fields
   trainable: model.trainable !== false, // Default to true unless explicitly false
   finetunable: model.finetunable !== false, // Default to true unless explicitly false
@@ -186,7 +212,23 @@ const ModelZooPage = () => {
 
   const handleModelAction = (model, actionType) => {
     if (actionType === 'training' || actionType === 'finetuning') {
-      // Open training modal
+      // Instance segmentation training is dataset-scoped (needs class/label
+      // selection), so it lives on its own page rather than the generic modal.
+      if (model.service === 'Instance Segmentation') {
+        if (datasetIdFromState) {
+          navigate(`/dataset/${datasetIdFromState}/training`, {
+            state: { modelKey: model.identifier },
+          });
+        } else {
+          addToast({
+            message: 'Open the Model Zoo from a dataset to train instance segmentation models.',
+            type: 'info',
+          });
+        }
+        return;
+      }
+
+      // Open training modal (semantic segmentation)
       setTrainingModal({
         isOpen: true,
         model: model,
@@ -336,24 +378,21 @@ const ModelZooPage = () => {
             )}
 
             {/* Service Filter */}
-            <div className={`flex items-center space-x-3 bg-white p-4 rounded-lg shadow-sm border border-gray-200 ${isFromDatasetManagement ? 'mb-8' : 'mb-8'}`}>
-              <Filter className="w-5 h-5 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700">Filter by service:</span>
-              <div className="flex flex-wrap gap-2">
-                {services.map((service) => (
-                  <button
-                    key={service}
-                    onClick={() => setSelectedService(service)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      selectedService === service
-                        ? "bg-teal-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {service}
-                  </button>
-                ))}
-              </div>
+            <div className="flex items-center flex-wrap gap-2 mb-8">
+              <Filter className="w-4 h-4 text-gray-400 mr-1" />
+              {services.map((service) => (
+                <button
+                  key={service}
+                  onClick={() => setSelectedService(service)}
+                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+                    selectedService === service
+                      ? "bg-teal-600 text-white border-teal-600"
+                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900"
+                  }`}
+                >
+                  {service}
+                </button>
+              ))}
             </div>
 
             {/* Training runs – show jobs started from this page with status */}
@@ -405,14 +444,16 @@ const ModelZooPage = () => {
 
             {/* Models Grid by Service */}
             {Object.keys(filteredModels).map((serviceName) => (
-              <div key={serviceName} className="mb-12">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full"></div>
-                  <h3 className="text-2xl font-bold text-gray-900">{serviceName}</h3>
-                  <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20"></div>
+              <div key={serviceName} className="mb-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <h3 className="text-lg font-semibold text-gray-900">{serviceName}</h3>
+                  <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
+                    {filteredModels[serviceName].length}
+                  </span>
+                  <div className="h-px flex-1 bg-gray-200" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {filteredModels[serviceName].map((model) => (
                     <ModelCard
                       key={model.identifier}

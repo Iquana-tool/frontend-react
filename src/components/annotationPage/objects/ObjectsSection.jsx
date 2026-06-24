@@ -1,132 +1,210 @@
-import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import TemporaryObjectsList from './TemporaryObjectsList';
-import PermanentObjectsList from './PermanentObjectsList';
-import { useObjectsList } from '../../../stores/selectors/annotationSelectors';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Layers, CheckCircle, XCircle } from 'lucide-react';
+import ObjectItem from './ObjectItem';
+import LabelSelectionModal from './LabelSelectionModal';
+import {
+  useObjectsList,
+  useRemoveObject,
+  useUpdateObject,
+} from '../../../stores/selectors/annotationSelectors';
+import { useDataset } from '../../../contexts/DatasetContext';
+import { fetchLabels } from '../../../api/labels';
+import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
+import { deleteObject } from '../../../utils/objectOperations';
+import { useLabelSelection } from '../../../hooks/useLabelSelection';
+import { buildHierarchicalTree } from '../../../utils/objectTreeUtils';
+
+const isReviewedObject = (obj) => obj.reviewed_by && obj.reviewed_by.length > 0;
 
 /**
- * ObjectsSection - Container component that manages both temporary and permanent objects
- * Provides collapsible sections for better organization
+ * ObjectsSection - A single hierarchical list of all objects on the image.
+ * Reviewed objects carry a verified tick; unreviewed ones don't. Children are
+ * nested under their parents and parents can be collapsed/expanded.
  */
 const ObjectsSection = () => {
-  const [expandedSections, setExpandedSections] = useState({
-    unreviewed: true,
-    reviewed: true,
-  });
-
-  // Get all objects from store
   const allObjects = useObjectsList();
+  const removeObject = useRemoveObject();
+  const updateObject = useUpdateObject();
+  const { currentDataset } = useDataset();
 
-  // Helper function to check if an object has a valid label
-  const hasValidLabel = (obj) => {
-    if (!obj.label) return false;
-    // Convert to string and trim
-    const labelStr = String(obj.label || '').trim();
-    if (!labelStr || labelStr === 'Object') return false;
-    // Check if label is just a number (like "2") - these are not valid labels
-    if (/^\d+$/.test(labelStr)) return false;
-    return true;
-  };
+  // Collapsed parent ids (expanded by default).
+  const [collapsed, setCollapsed] = useState(() => new Set());
 
-  // Filter objects by review status
-  const { unreviewedObjects, reviewedObjects } = useMemo(() => {
-    // Unreviewed: objects with empty or missing reviewed_by list
-    const unreviewed = allObjects.filter(obj => !obj.reviewed_by || obj.reviewed_by.length === 0);
-    // Reviewed: objects with at least one reviewer
-    const reviewed = allObjects.filter(obj => obj.reviewed_by && obj.reviewed_by.length > 0);
-    
-    // Sort reviewed objects: labeled first (by ID), then unlabeled (by ID)
-    const sortedReviewed = [...reviewed].sort((a, b) => {
-      const aHasLabel = hasValidLabel(a);
-      const bHasLabel = hasValidLabel(b);
-      
-      // If one has label and other doesn't, labeled comes first
-      if (aHasLabel && !bHasLabel) return -1;
-      if (!aHasLabel && bHasLabel) return 1;
-      
-      // Both have same label status - sort by ID
-      const idA = typeof a.id === 'number' ? a.id : parseInt(a.id) || 0;
-      const idB = typeof b.id === 'number' ? b.id : parseInt(b.id) || 0;
-      return idA - idB;
+  // Bulk-accept label modal state
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [labels, setLabels] = useState([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
+
+  const unreviewedObjects = useMemo(
+    () => allObjects.filter((o) => !isReviewedObject(o)),
+    [allObjects]
+  );
+
+  // Build one tree from every object (no ghosts — all ids are visible here).
+  const allIds = useMemo(() => new Set(allObjects.map((o) => o.id)), [allObjects]);
+  const treeRoots = useMemo(
+    () => buildHierarchicalTree(allObjects, allIds),
+    [allObjects, allIds]
+  );
+
+  const toggleCollapsed = (id) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-    
-    return {
-      unreviewedObjects: unreviewed,
-      reviewedObjects: sortedReviewed
-    };
-  }, [allObjects]);
 
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  // Fetch labels when the bulk-accept modal opens
+  useEffect(() => {
+    if (!showLabelModal || !currentDataset) return;
+
+    const loadLabels = async () => {
+      setLabelsLoading(true);
+      try {
+        const labelsData = await fetchLabels(currentDataset.id);
+        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly
+        setLabels(labelsArray);
+      } catch (error) {
+        setLabels([]);
+      } finally {
+        setLabelsLoading(false);
+      }
+    };
+
+    loadLabels();
+  }, [showLabelModal, currentDataset]);
+
+  const handleLabelSelect = useLabelSelection(
+    updateObject,
+    null,
+    (error) => alert(`Failed to accept objects: ${error.message || 'Unknown error'}`)
+  );
+
+  const handleAcceptAll = () => {
+    if (unreviewedObjects.length === 0) return;
+    if (!currentDataset) {
+      alert('Please select a dataset first');
+      return;
+    }
+    setShowLabelModal(true);
   };
+
+  const handleLabelSelectWrapper = async (label) => {
+    if (!label || unreviewedObjects.length === 0) {
+      setShowLabelModal(false);
+      return;
+    }
+    try {
+      for (const object of unreviewedObjects) {
+        await handleLabelSelect(object, label);
+      }
+      setShowLabelModal(false);
+    } catch (error) {
+      alert(`Failed to accept all objects: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    if (unreviewedObjects.length === 0) return;
+    try {
+      for (const object of unreviewedObjects) {
+        await deleteObject(object, removeObject);
+      }
+    } catch (error) {
+      alert(`Failed to reject all objects: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  // Recursively render the object tree. Ghost nodes (shouldn't occur here, but
+  // guarded for safety) are skipped while still rendering their children.
+  const renderTree = (nodes, depth = 0) =>
+    nodes.map((node) => {
+      if (node._ghost) {
+        return node.children.length > 0 ? (
+          <React.Fragment key={node.id}>{renderTree(node.children, depth)}</React.Fragment>
+        ) : null;
+      }
+
+      const hasChildren = node.children.length > 0;
+      const isExpanded = !collapsed.has(node.id);
+
+      return (
+        <div key={node.id}>
+          <ObjectItem
+            object={node}
+            hasChildren={hasChildren}
+            isExpanded={isExpanded}
+            onToggleExpand={() => toggleCollapsed(node.id)}
+          />
+          {hasChildren && isExpanded && (
+            <div className="ml-3 pl-2 border-l border-gray-200 mt-1 space-y-1">
+              {renderTree(node.children, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
 
   return (
-    <div className="space-y-4">
-      {/* Unreviewed Objects Section */}
-      <div className="border border-purple-200 rounded-lg overflow-hidden bg-white">
-        {/* Collapsible Header */}
-        <button
-          onClick={() => toggleSection('unreviewed')}
-          className="w-full flex items-center justify-between p-2 md:p-3 bg-purple-50 hover:bg-purple-100 transition-colors"
-        >
-          <div className="flex items-center space-x-1.5 md:space-x-2">
-            <span className="text-xs md:text-sm font-semibold text-purple-900">
-            Unreviewed Objects
-            </span>
-            <span className="text-[10px] md:text-xs bg-purple-200 text-purple-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-              {unreviewedObjects.length}
-            </span>
-          </div>
-          {expandedSections.unreviewed ? (
-            <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-700" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-700" />
-          )}
-        </button>
+    <div>
+      {/* Section header with total count and bulk actions for unreviewed objects */}
+      <div className="flex items-center justify-between pb-2 border-b-2 border-gray-200">
+        <div className="flex items-center gap-2">
+          <span className="w-1 h-4 bg-teal-500 rounded-full" />
+          <span className="text-sm font-semibold text-gray-900">Objects</span>
+          <span className="text-[10px] bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
+            {allObjects.length}
+          </span>
+        </div>
 
-        {/* Content */}
-        {expandedSections.unreviewed && (
-          <div className="p-2 md:p-3 border-t border-purple-100">
-            <TemporaryObjectsList objects={unreviewedObjects} allObjects={allObjects} />
+        {unreviewedObjects.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleAcceptAll}
+              title="Assign a label to all unreviewed objects"
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-green-700 hover:bg-green-50 rounded-md border border-green-200 transition-colors"
+            >
+              <CheckCircle className="w-3 h-3" />
+              Accept all ({unreviewedObjects.length})
+            </button>
+            <button
+              onClick={handleRejectAll}
+              title="Delete all unreviewed objects"
+              className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-red-700 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
+            >
+              <XCircle className="w-3 h-3" />
+              Reject all
+            </button>
           </div>
         )}
       </div>
 
-      {/* Reviewed Objects Section */}
-      <div className="border border-teal-200 rounded-lg overflow-hidden bg-white">
-        {/* Collapsible Header */}
-        <button
-          onClick={() => toggleSection('reviewed')}
-          className="w-full flex items-center justify-between p-2 md:p-3 bg-teal-50 hover:bg-teal-100 transition-colors"
-        >
-          <div className="flex items-center space-x-1.5 md:space-x-2">
-            <span className="text-xs md:text-sm font-semibold text-teal-900">
-            Reviewed Objects
-            </span>
-            <span className="text-[10px] md:text-xs bg-teal-200 text-teal-800 px-1.5 md:px-2 py-0.5 rounded-full font-medium">
-              {reviewedObjects.length}
-            </span>
-          </div>
-          {expandedSections.reviewed ? (
-            <ChevronUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-teal-700" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 md:w-4 md:h-4 text-teal-700" />
-          )}
-        </button>
-
-        {/* Content */}
-        {expandedSections.reviewed && (
-          <div className="p-2 md:p-3 border-t border-teal-100">
-            <PermanentObjectsList objects={reviewedObjects} allObjects={allObjects} />
+      {/* Unified object tree */}
+      <div className="pt-3 space-y-1">
+        {treeRoots.length > 0 ? (
+          renderTree(treeRoots)
+        ) : (
+          <div className="text-center py-8 bg-gray-50 border border-gray-200 rounded-lg">
+            <Layers className="w-7 h-7 text-gray-400 mx-auto mb-2" />
+            <div className="text-sm text-gray-600 font-medium">No objects yet</div>
+            <div className="text-xs text-gray-500 mt-1">
+              Run AI annotation or add objects manually
+            </div>
           </div>
         )}
       </div>
+
+      {/* Bulk-accept label selection modal */}
+      <LabelSelectionModal
+        isOpen={showLabelModal}
+        onClose={() => setShowLabelModal(false)}
+        labels={labels}
+        labelsLoading={labelsLoading}
+        onLabelSelect={handleLabelSelectWrapper}
+      />
     </div>
   );
 };
 
 export default ObjectsSection;
-

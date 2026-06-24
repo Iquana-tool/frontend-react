@@ -1,7 +1,20 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
-import { CheckCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, X, Info } from 'lucide-react';
 
 const ToastContext = createContext(null);
+
+// Visual treatment per toast type.
+const TOAST_STYLES = {
+  success: 'bg-teal-50 border-teal-200 text-teal-800',
+  error: 'bg-red-50 border-red-200 text-red-800',
+  info: 'bg-blue-50 border-blue-200 text-blue-800',
+};
+
+const TOAST_ICONS = {
+  success: <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />,
+  error: <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />,
+  info: <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />,
+};
 
 let toastId = 0;
 
@@ -29,16 +42,9 @@ export const ToastProvider = ({ children }) => {
           <div
             key={toast.id}
             className={`animate-slide-up pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm w-full
-              ${toast.type === 'success'
-                ? 'bg-teal-50 border-teal-200 text-teal-800'
-                : 'bg-red-50 border-red-200 text-red-800'
-              }`}
+              ${TOAST_STYLES[toast.type] || TOAST_STYLES.success}`}
           >
-            {toast.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />
-            ) : (
-              <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-            )}
+            {TOAST_ICONS[toast.type] || TOAST_ICONS.success}
             <p className="text-sm font-medium flex-1">{toast.message}</p>
             <button
               onClick={() => removeToast(toast.id)}

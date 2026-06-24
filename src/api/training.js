@@ -8,14 +8,17 @@ import { API_BASE_URL } from "./config";
 export const getAllModels = async () => {
     try {
         // Fetch models from different services
-        const [promptedRes, completionRes, semanticRes] = await Promise.allSettled([
+        const [promptedRes, suggestionRes, semanticRes, instanceRes] = await Promise.allSettled([
             fetch(`${API_BASE_URL}/prompted_segmentation/models`, {
                 headers: getAuthHeaders(),
             }),
-            fetch(`${API_BASE_URL}/completion_segmentation/models`, {
+            fetch(`${API_BASE_URL}/suggestion_segmentation/models`, {
                 headers: getAuthHeaders(),
             }),
             fetch(`${API_BASE_URL}/semantic_segmentation/models`, {
+                headers: getAuthHeaders(),
+            }),
+            fetch(`${API_BASE_URL}/instance_segmentation/models`, {
                 headers: getAuthHeaders(),
             }),
         ]);
@@ -47,20 +50,20 @@ export const getAllModels = async () => {
             }
         }
 
-        // Process completion segmentation models
-        if (completionRes.status === 'fulfilled') {
+        // Process suggestion segmentation models
+        if (suggestionRes.status === 'fulfilled') {
             try {
-                const data = await handleApiError(completionRes.value);
+                const data = await handleApiError(suggestionRes.value);
                 const modelsList = parseModelsResponse(data);
                 if (modelsList.length > 0) {
-                    const completionModels = modelsList.map(model => ({
+                    const suggestionModels = modelsList.map(model => ({
                         ...model,
-                        service: 'Completion Segmentation',
+                        service: 'Suggestion Segmentation',
                         identifier: model.registry_key || model.identifier,
                         trainable: false,
                         finetunable: false,
                     }));
-                    models.push(...completionModels);
+                    models.push(...suggestionModels);
                 }
             } catch (err) {
                 // Silently handle error
@@ -81,6 +84,26 @@ export const getAllModels = async () => {
                         finetunable: model.finetunable === true,
                     }));
                     models.push(...semanticModels);
+                }
+            } catch (err) {
+                // Silently handle error
+            }
+        }
+
+        // Process instance segmentation models
+        if (instanceRes.status === 'fulfilled') {
+            try {
+                const data = await handleApiError(instanceRes.value);
+                const modelsList = parseModelsResponse(data);
+                if (modelsList.length > 0) {
+                    const instanceModels = modelsList.map(model => ({
+                        ...model,
+                        service: 'Instance Segmentation',
+                        identifier: model.registry_key || model.identifier,
+                        trainable: model.trainable === true,
+                        finetunable: model.finetunable === true,
+                    }));
+                    models.push(...instanceModels);
                 }
             } catch (err) {
                 // Silently handle error
@@ -182,10 +205,10 @@ export const startPromptedTraining = async (params) => {
 };
 
 /**
- * Start training for completion segmentation
+ * Start training for suggestion segmentation
  * NOTE: Currently NOT SUPPORTED by the backend API
  * This function is a placeholder for future implementation
  */
-export const startCompletionTraining = async (params) => {
-    throw new Error('Training is not supported for Completion Segmentation models. These models are for inference only.');
+export const startSuggestionTraining = async (params) => {
+    throw new Error('Training is not supported for Suggestion Segmentation models. These models are for inference only.');
 };

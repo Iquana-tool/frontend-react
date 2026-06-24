@@ -29,7 +29,7 @@ const DEFAULT_CONFIG = {
   reconnectAttempts: 5,
   reconnectDelay: 1000,
   maxReconnectDelay: 10000,
-  messageTimeout: 180000, // 3 minutes — long enough for instance discovery inference
+  messageTimeout: 180000, // 3 minutes — long enough for instance suggestion inference
 };
 
 /**

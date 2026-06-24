@@ -1,4 +1,5 @@
-import { getPromptedModels, getCompletionModels, getSemanticModels } from '../../api/models';
+import { getPromptedModels, getSuggestionModels } from '../../api/models';
+import { getInstanceModels } from '../../api/instance_segmentation';
 
 /**
  * Models slice - manages AI model selection and available models
@@ -16,20 +17,20 @@ export const createModelsSlice = (set) => ({
     state.models.promptedModel = model;
   }),
   
-  setCompletionModel: (model) => set((state) => {
-    state.models.completionModel = model;
+  setSuggestionModel: (model) => set((state) => {
+    state.models.suggestionModel = model;
   }),
   
-  setSemanticModel: (model) => set((state) => {
-    state.models.semanticModel = model;
+  setInstanceModel: (model) => set((state) => {
+    state.models.instanceModel = model;
   }),
-  
-  setIsRunningCompletion: (isRunning) => set((state) => {
-    state.models.isRunningCompletion = isRunning;
+
+  setIsRunningSuggestion: (isRunning) => set((state) => {
+    state.models.isRunningSuggestion = isRunning;
   }),
-  
-  setIsRunningSemantic: (isRunning) => set((state) => {
-    state.models.isRunningSemantic = isRunning;
+
+  setIsRunningInstance: (isRunning) => set((state) => {
+    state.models.isRunningInstance = isRunning;
   }),
 
   loadPromptedModel: async (model) => {
@@ -38,7 +39,7 @@ export const createModelsSlice = (set) => ({
     });
 
     try {
-      const result = await getCompletionModels();
+      const result = await getSuggestionModels();
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
@@ -51,40 +52,40 @@ export const createModelsSlice = (set) => ({
         }));
 
         set((state) => {
-          state.models.availableCompletionModels = transformedModels;
-          state.models.isLoadingCompletionModels = false;
+          state.models.availableSuggestionModels = transformedModels;
+          state.models.isLoadingSuggestionModels = false;
 
           // Set default model if none is selected and models are available
-          if (!state.models.completionModel && transformedModels.length > 0) {
+          if (!state.models.suggestionModel && transformedModels.length > 0) {
             const firstModelId = getFirstModelId(transformedModels);
-            if (firstModelId) state.models.completionModel = firstModelId;
+            if (firstModelId) state.models.suggestionModel = firstModelId;
           }
         });
       } else {
         // No models returned from backend - show empty list
-        console.warn('No completion models returned from backend in loadPromptedModel');
+        console.warn('No suggestion models returned from backend in loadPromptedModel');
         set((state) => {
-          state.models.availableCompletionModels = [];
-          state.models.isLoadingCompletionModels = false;
+          state.models.availableSuggestionModels = [];
+          state.models.isLoadingSuggestionModels = false;
         });
       }
     } catch (error) {
-      console.error('Error fetching completion models:', error);
+      console.error('Error fetching suggestion models:', error);
       // Don't use fallback - show empty list on error
       set((state) => {
-        state.models.availableCompletionModels = [];
-        state.models.isLoadingCompletionModels = false;
+        state.models.availableSuggestionModels = [];
+        state.models.isLoadingSuggestionModels = false;
       });
     }
   },
 
-  fetchAvailableCompletionModels: async () => {
+  fetchAvailableSuggestionModels: async () => {
     set((state) => {
-      state.models.isLoadingCompletionModels = true;
+      state.models.isLoadingSuggestionModels = true;
     });
 
     try {
-      const result = await getCompletionModels();
+      const result = await getSuggestionModels();
       if (result.success && result.models && result.models.length > 0) {
         // Transform backend models to frontend format
         const transformedModels = result.models.map(model => ({
@@ -97,29 +98,29 @@ export const createModelsSlice = (set) => ({
         }));
 
         set((state) => {
-          state.models.availableCompletionModels = transformedModels;
-          state.models.isLoadingCompletionModels = false;
+          state.models.availableSuggestionModels = transformedModels;
+          state.models.isLoadingSuggestionModels = false;
           
           // Set default model if none is selected and models are available
-          if (!state.models.completionModel && transformedModels.length > 0) {
+          if (!state.models.suggestionModel && transformedModels.length > 0) {
             const firstModelId = getFirstModelId(transformedModels);
-            if (firstModelId) state.models.completionModel = firstModelId;
+            if (firstModelId) state.models.suggestionModel = firstModelId;
           }
         });
       } else {
         // No models returned from backend - show empty list
-        console.warn('No completion models returned from backend');
+        console.warn('No suggestion models returned from backend');
         set((state) => {
-          state.models.availableCompletionModels = [];
-          state.models.isLoadingCompletionModels = false;
+          state.models.availableSuggestionModels = [];
+          state.models.isLoadingSuggestionModels = false;
         });
       }
     } catch (error) {
-      console.error('Error fetching completion models:', error);
+      console.error('Error fetching suggestion models:', error);
       //show empty list on error
       set((state) => {
-        state.models.availableCompletionModels = [];
-        state.models.isLoadingCompletionModels = false;
+        state.models.availableSuggestionModels = [];
+        state.models.isLoadingSuggestionModels = false;
       });
     }
   },
@@ -171,16 +172,17 @@ export const createModelsSlice = (set) => ({
     }
   },
 
-  fetchAvailableSemanticModels: async () => {
+  fetchAvailableInstanceModels: async () => {
     set((state) => {
-      state.models.isLoadingSemanticModels = true;
+      state.models.isLoadingInstanceModels = true;
     });
 
     try {
-      const result = await getSemanticModels();
-      if (result.success && result.models && result.models.length > 0) {
+      const result = await getInstanceModels();
+      const modelsList = Array.isArray(result?.result) ? result.result : [];
+      if (result?.success && modelsList.length > 0) {
         // Transform backend models to frontend format
-        const transformedModels = result.models.map(model => ({
+        const transformedModels = modelsList.map(model => ({
           id: getModelId(model),
           name: model.name,
           description: model.description,
@@ -189,29 +191,29 @@ export const createModelsSlice = (set) => ({
         }));
 
         set((state) => {
-          state.models.availableSemanticModels = transformedModels;
-          state.models.isLoadingSemanticModels = false;
-          
+          state.models.availableInstanceModels = transformedModels;
+          state.models.isLoadingInstanceModels = false;
+
           // Set default model if none is selected and models are available
-          if (!state.models.semanticModel && transformedModels.length > 0) {
+          if (!state.models.instanceModel && transformedModels.length > 0) {
             const firstModelId = getFirstModelId(transformedModels);
-            if (firstModelId) state.models.semanticModel = firstModelId;
+            if (firstModelId) state.models.instanceModel = firstModelId;
           }
         });
       } else {
         // No models returned from backend - show empty list
-        console.warn('No semantic models returned from backend');
+        console.warn('No instance models returned from backend');
         set((state) => {
-          state.models.availableSemanticModels = [];
-          state.models.isLoadingSemanticModels = false;
+          state.models.availableInstanceModels = [];
+          state.models.isLoadingInstanceModels = false;
         });
       }
     } catch (error) {
-      console.error('Error fetching semantic models:', error);
+      console.error('Error fetching instance models:', error);
       // show empty list on error
       set((state) => {
-        state.models.availableSemanticModels = [];
-        state.models.isLoadingSemanticModels = false;
+        state.models.availableInstanceModels = [];
+        state.models.isLoadingInstanceModels = false;
       });
     }
   },

@@ -9,7 +9,7 @@ const AnnotationSection = () => {
         <p className="text-gray-700 mb-4">
           The IQuana annotation interface provides a comprehensive set of features for marking, 
           segmenting, and analyzing coral regions in your images. The sidebar allows you to select 
-          models for prompted segmentation and completion segmentation. You can use point and box 
+          models for prompted segmentation and suggestion segmentation. You can use point and box 
           prompts to guide AI segmentation, manage objects with a review workflow, and use advanced 
           features like focus mode and refinement mode for precise annotation.
         </p>
@@ -32,9 +32,9 @@ const AnnotationSection = () => {
               </p>
             </div>
             <div className="bg-white p-4 rounded-lg">
-              <h5 className="font-medium text-gray-900 mb-2">Completion Model</h5>
+              <h5 className="font-medium text-gray-900 mb-2">Suggestion Model</h5>
               <p className="text-sm text-gray-700">
-                Select a model for completion segmentation. This model automatically detects new objects based on existing annotations.
+                Select a model for suggestion segmentation. This model automatically detects new objects based on existing annotations.
               </p>
             </div>
           </div>
@@ -53,7 +53,7 @@ const AnnotationSection = () => {
               <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 mt-0.5">1</div>
               <div>
                 <p className="text-blue-800 font-medium">Select Model</p>
-                <p className="text-blue-700 text-sm">Choose the desired AI Segmentation Model from the sidebar dropdown for prompted segmentation, or select a Completion Model for completion segmentation.</p>
+                <p className="text-blue-700 text-sm">Choose the desired AI Segmentation Model from the sidebar dropdown for prompted segmentation, or select a Suggestion Model for suggestion segmentation.</p>
               </div>
             </div>
             
@@ -304,8 +304,8 @@ const AnnotationSection = () => {
           <div className="space-y-2 text-sm text-gray-700">
             <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Enter</kbd> — Run / confirm (e.g. run AI segmentation when prompts are present)</p>
             <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">1</kbd> — Run Prompted Segmentation</p>
-            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">2</kbd> — Run Instance Discovery (with selected objects as seeds)</p>
-            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">3</kbd> — Open Semantic Segmentation (warning modal)</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">2</kbd> — Run Instance Suggestion (with selected objects as seeds)</p>
+            <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">3</kbd> — Open Instance Segmentation (warning modal)</p>
             <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">Delete</kbd> — Reject selected object(s), or remove last prompt in AI tool</p>
             <p><kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">←</kbd> <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-xs font-mono">→</kbd> — Previous / next image</p>
           </div>

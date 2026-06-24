@@ -7,7 +7,7 @@ import React from 'react';
  * @param {boolean} labelsLoading - Whether labels are currently loading
  * @param {Function} onLabelSelect - Callback when a label is selected
  */
-const HierarchicalLabelList = ({ labelHierarchy, labelsLoading, onLabelSelect }) => {
+const HierarchicalLabelList = ({ labelHierarchy, labelsLoading, onLabelSelect, emptyMessage = 'No labels available' }) => {
   // Recursive function to render a label and its children
   const renderLabel = (label, depth = 0) => {
     const indent = depth * 16; // 16px indent per level
@@ -41,7 +41,7 @@ const HierarchicalLabelList = ({ labelHierarchy, labelsLoading, onLabelSelect })
   if (labelHierarchy.length === 0) {
     return (
       <div className="px-3 py-2 text-xs text-gray-500 text-center">
-        No labels available
+        {emptyMessage}
       </div>
     );
   }

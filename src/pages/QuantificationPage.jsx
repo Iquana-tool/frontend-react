@@ -10,7 +10,6 @@ import DatasetManagementLayout from "../components/datasets/gallery/DatasetManag
 import {
   createLabelIdToNameMap,
   prepareComparisonData,
-  getLabelsWithMetrics,
   collectAllLabelIds,
   getLabelsToAutoExpand,
 } from "../utils/quantificationUtils";
@@ -131,7 +130,6 @@ const QuantificationPage = () => {
     );
   }
 
-  const labelsWithMetrics = getLabelsWithMetrics(data.metrics_per_label_id);
   const labelIdToName = createLabelIdToNameMap(data.labels);
   const comparisonData = prepareComparisonData(data.metrics_per_label_id, labelIdToName);
 
@@ -187,7 +185,7 @@ const QuantificationPage = () => {
         {/* Main Content */}
         <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
         {/* Summary Cards */}
-        <SummaryCards data={data} labelsWithMetrics={labelsWithMetrics} />
+        <SummaryCards data={data} labelIdToName={labelIdToName} />
 
         {/* Comparison Charts */}
         <ComparisonCharts comparisonData={comparisonData} />

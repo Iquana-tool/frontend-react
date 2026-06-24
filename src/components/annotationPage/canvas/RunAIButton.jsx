@@ -45,7 +45,7 @@ const RunAIButton = ({ onRunAI }) => {
   const titleAction = refinementModeActive ? 'Refine object' : 'Run AI segmentation';
 
   return (
-    <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[70] pointer-events-auto">
+    <div className="relative pointer-events-auto">
       <button
         onClick={handleClick}
         disabled={!canSubmit}
@@ -90,7 +90,8 @@ const RunAIButton = ({ onRunAI }) => {
         <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
           <div className="bg-gray-800 text-white text-xs px-3 py-1.5 rounded shadow-lg">
             {prompts.filter((p) => p.type === 'point').length} point(s),{' '}
-            {prompts.filter((p) => p.type === 'box').length} box(es)
+            {prompts.filter((p) => p.type === 'box').length} box(es),{' '}
+            {prompts.filter((p) => p.type === 'polygon').length} shape(s)
           </div>
         </div>
       )}

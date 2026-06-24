@@ -1,9 +1,10 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useDataset } from "../../contexts/DatasetContext";
 import DataManagementView from "./gallery/DataManagementView";
 import LabelManagementView from "./gallery/LabelManagementView";
 import ManagementCardsView from "./gallery/ManagementCardsView";
+import CocoExportModal from "./gallery/CocoExportModal";
 import DatasetManagementLayout from "./gallery/DatasetManagementLayout";
 import * as api from "../../api";
 import { normalizeImage } from "../../hooks/useDatasetGalleryData";
@@ -23,6 +24,8 @@ const DatasetGallery = () => {
   const images = useGalleryImages();
   const labels = useGalleryLabels();
   const galleryActions = useGalleryActions();
+
+  const [showCocoModal, setShowCocoModal] = useState(false);
   
   // Derive current view from URL path so refresh preserves the view
   const pathname = location.pathname;
@@ -97,6 +100,10 @@ const DatasetGallery = () => {
     navigate(`/dataset/${datasetId}/datamanagement/labels`);
   };
 
+  const handleModelTrainingClick = () => {
+    navigate(`/dataset/${datasetId}/training`);
+  };
+
   return (
     <DatasetManagementLayout>
       <div className="h-full overflow-hidden">
@@ -107,6 +114,8 @@ const DatasetGallery = () => {
             onQuantificationsClick={handleQuantificationsClick}
             onStartAnnotation={handleStartAnnotation}
             onLabelManagementClick={handleLabelManagementClick}
+            onExportCocoClick={() => setShowCocoModal(true)}
+            onModelTrainingClick={handleModelTrainingClick}
           />
         ) : currentView === "dataManagement" ? (
           <DataManagementView
@@ -125,6 +134,12 @@ const DatasetGallery = () => {
           />
         ) : null}
       </div>
+
+      <CocoExportModal
+        isOpen={showCocoModal}
+        onClose={() => setShowCocoModal(false)}
+        dataset={dataset}
+      />
     </DatasetManagementLayout>
   );
 };

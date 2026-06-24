@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { 
   useSelectedObjects, 
   useSelectObject, 
@@ -18,6 +18,8 @@ import {
   useRefinementModeActive,
   useAnnotationStatus,
   useEnterEditMode,
+  useObjectsList,
+  useFocusModeObjectId,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
@@ -25,7 +27,7 @@ import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useMarkAsReviewed } from '../../../hooks/useMarkAsReviewed';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { fetchLabels } from '../../../api/labels';
-import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
+import { extractLabelsFromResponse, getChildLabels, resolveParentLabelId } from '../../../utils/labelHierarchy';
 import { hexToRgba } from '../../../utils/labelColors';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
 import annotationSession from '../../../services/annotationSession';
@@ -33,10 +35,11 @@ import { getContourId } from '../../../utils/objectUtils';
 import { deleteObject } from '../../../utils/objectOperations';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import ObjectActions from './ObjectActions';
-import ObjectDetails from './ObjectDetails';
+import ObjectStatsPopover from './ObjectStatsPopover';
+import ReviewedByBadge from './ReviewedByBadge';
 import LabelSelectionModal from './LabelSelectionModal';
 
-const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
+const ObjectItem = ({ object, hasChildren = false, isExpanded = true, onToggleExpand }) => {
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
@@ -55,6 +58,20 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
   const imageObject = useImageObject();
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
+  const objectsList = useObjectsList();
+  const focusModeObjectId = useFocusModeObjectId();
+
+  // The labels selectable for this object are dictated by its level in the
+  // hierarchy: root labels at the top level, or the children of the parent
+  // contour's label when this object lives inside another contour.
+  const parentLabelId = React.useMemo(
+    () =>
+      resolveParentLabelId(object, objectsList, {
+        active: focusModeActive,
+        objectId: focusModeObjectId,
+      }),
+    [object, objectsList, focusModeActive, focusModeObjectId]
+  );
   
   // Use the modular zoom hook
   const { zoomToObject: zoomToObjectFn } = useZoomToObject({
@@ -98,14 +115,6 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     // For unlabeled objects or unreviewed objects, show default format
     return `Object #${object.id}`;
   }, [object, isReviewed]);
-
-  const handleToggleSelection = () => {
-    if (isSelected) {
-      deselectObject(object.id);
-    } else {
-      selectObject(object.id);
-    }
-  };
 
   const performPanZoom = () => {
     if (!imageObject || !object.x || !object.y || object.x.length === 0) {
@@ -351,8 +360,9 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
       setLabelsLoading(true);
       try {
         const labelsData = await fetchLabels(currentDataset.id);
-        const labelsArray = extractLabelsFromResponse(labelsData, true); // rootOnly = true
-        setLabels(labelsArray);
+        const allLabels = extractLabelsFromResponse(labelsData, false);
+        // Only offer the labels available at this object's hierarchy level.
+        setLabels(getChildLabels(allLabels, parentLabelId));
       } catch (error) {
         setLabels([]);
       } finally {
@@ -361,7 +371,7 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     };
 
     loadLabels();
-  }, [showLabelModal, currentDataset]);
+  }, [showLabelModal, currentDataset, parentLabelId]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -457,8 +467,8 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
     : hexToRgba(objectColor, 0.08); // Subtle background
 
   return (
-    <div 
-      className="border rounded-lg p-3 transition-all cursor-pointer hover:shadow-sm"
+    <div
+      className="group rounded-md border transition-colors cursor-pointer"
       style={{
         borderColor: borderColorStyle,
         backgroundColor: bgColorStyle,
@@ -474,54 +484,61 @@ const ObjectItem = ({ object, isTemporary = false, variant = 'permanent' }) => {
         }
       }}
       onClick={handleItemClick}
+      title="Click to select and zoom to object"
     >
-      {/* Object Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center space-x-2">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        {/* Expand/collapse children, or aligning spacer for leaf objects */}
+        {hasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleToggleSelection();
-              // Don't pan/zoom when clicking chevron - only expand/collapse
+              onToggleExpand?.();
             }}
-            className="p-1 hover:bg-gray-200 rounded transition-colors"
+            className="p-0.5 text-gray-400 hover:text-gray-700 rounded shrink-0"
+            title={isExpanded ? 'Collapse children' : 'Expand children'}
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${
-              isSelected ? 'rotate-0' : '-rotate-90'
-            }`} />
+            {isExpanded ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5" />
+            )}
           </button>
-          <span 
-            className="font-medium text-sm text-gray-800"
-            title="Click to select and zoom to object"
-          >
-            {displayName}
-          </span>
+        ) : (
+          <span className="w-[18px] shrink-0" aria-hidden="true" />
+        )}
+
+        {/* Color dot */}
+        <span
+          className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-white"
+          style={{ backgroundColor: objectColor }}
+        />
+
+        {/* Name */}
+        <span className="flex-1 min-w-0 truncate text-xs font-medium text-gray-800">
+          {displayName}
+        </span>
+
+        {/* Reviewed status tick (unreviewed objects have none) */}
+        {isReviewed && <ReviewedByBadge reviewedBy={object.reviewed_by} />}
+
+        {/* Hoverable stats */}
+        <ObjectStatsPopover object={object} />
+
+        {/* Actions — revealed on hover/focus to keep rows compact */}
+        <div className="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <ObjectActions
+            isReviewed={isReviewed}
+            isReviewable={isReviewable}
+            isVisible={isVisible}
+            onAccept={handleAccept}
+            onReject={handleReject}
+            onMarkAsReviewed={handleMarkAsReviewed}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggleVisibility={() => {/* TODO: Toggle visibility */}}
+          />
         </div>
-        
-        {/* Action Buttons */}
-        <ObjectActions
-          isReviewed={isReviewed}
-          isReviewable={isReviewable}
-          isVisible={isVisible}
-          onAccept={handleAccept}
-          onReject={handleReject}
-          onMarkAsReviewed={handleMarkAsReviewed}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onToggleVisibility={() => {/* TODO: Toggle visibility */}}
-          reviewedBy={object.reviewed_by || []}
-        />
       </div>
-      
-      {/* Object Details (shown when selected) */}
-      {isSelected && (
-        <ObjectDetails
-          color={object.color}
-          pixelCount={object.pixelCount}
-          label={object.label}
-          quantification={object.quantification}
-        />
-      )}
 
       {/* Label Selection Modal */}
       <LabelSelectionModal

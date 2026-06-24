@@ -8,10 +8,10 @@ export const initialState = {
     leftSidebarCollapsed: false,
     rightSidebarCollapsed: false,
     visibilityControlsExpanded: true,
-    /** When true, Services opens the semantic segmentation warning modal (e.g. from shortcut "3") */
-    semanticRunRequested: false,
-    /** True while the semantic segmentation warning modal is open (so shortcuts don't steal Enter) */
-    semanticWarningModalOpen: false,
+    /** When true, Services opens the instance segmentation warning modal (e.g. from shortcut "3") */
+    instanceRunRequested: false,
+    /** True while the instance segmentation warning modal is open (so shortcuts don't steal Enter) */
+    instanceWarningModalOpen: false,
   },
   
   // Canvas State (needed for canvas components)
@@ -26,6 +26,10 @@ export const initialState = {
     activePreview: null,
     isSubmitting: false,
     instantSegmentation: false, // Auto-trigger segmentation when prompt is added
+    // Active drawing mode for prompts: 'point' | 'box' | 'polygon' | 'freehand'
+    promptMode: 'point',
+    // Active drawing mode for the manual-drawing tool: 'polygon' | 'freehand'
+    manualDrawMode: 'polygon',
     undoStack: [],
     redoStack: [],
     // Refinement mode
@@ -84,16 +88,16 @@ export const initialState = {
   // Model State
   models: {
     promptedModel: null, // Store model ID as string, not object
-    completionModel: null, // Store model ID as string, not object
-    semanticModel: null, // Store model ID as string, not object
+    suggestionModel: null, // Store model ID as string, not object
+    instanceModel: null, // Store model ID as string, not object
     availablePromptedModels: [], // List of available AI models from backend
-    availableCompletionModels: [], // List of available completion models from backend
-    availableSemanticModels: [], // List of available semantic segmentation models from backend
+    availableSuggestionModels: [], // List of available suggestion models from backend
+    availableInstanceModels: [], // List of available instance segmentation models from backend
     isLoadingModels: false,
-    isLoadingCompletionModels: false,
-    isLoadingSemanticModels: false,
-    isRunningCompletion: false, // Track when completion segmentation (suggest similar) is running
-    isRunningSemantic: false, // Track when semantic segmentation is running
+    isLoadingSuggestionModels: false,
+    isLoadingInstanceModels: false,
+    isRunningSuggestion: false, // Track when suggestion segmentation (suggest similar) is running
+    isRunningInstance: false, // Track when instance segmentation is running
   },
   
   // Objects State

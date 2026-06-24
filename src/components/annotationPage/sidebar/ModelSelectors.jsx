@@ -2,16 +2,16 @@ import React, { useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { 
   usePromptedModel,
-  useCompletionModel, 
+  useSuggestionModel, 
   useSetPromptedModel,
-  useSetCompletionModel, 
+  useSetSuggestionModel, 
   useCurrentTool,
   useAvailablePromptedModels,
-  useAvailableCompletionModels,
+  useAvailableSuggestionModels,
   useIsLoadingPromptedModels,
-  useIsLoadingCompletionModels,
+  useIsLoadingSuggestionModels,
   useFetchAvailablePromptedModels,
-  useFetchAvailableCompletionModels
+  useFetchAvailableSuggestionModels
 } from '../../../stores/selectors/annotationSelectors';
 import ModelDescription from './ModelDescription';
 import annotationSession from '../../../services/annotationSession';
@@ -20,19 +20,19 @@ import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 const ModelSelectors = () => {
   const currentTool = useCurrentTool();
   const promptedModel = usePromptedModel();
-  const completionModel = useCompletionModel();
+  const suggestionModel = useSuggestionModel();
   const setPromptedModel = useSetPromptedModel();
-  const setCompletionModel = useSetCompletionModel();
+  const setSuggestionModel = useSetSuggestionModel();
   const availableModels = useAvailablePromptedModels();
-  const availableCompletionModels = useAvailableCompletionModels();
+  const availableSuggestionModels = useAvailableSuggestionModels();
   const isLoadingModels = useIsLoadingPromptedModels();
-  const isLoadingCompletionModels = useIsLoadingCompletionModels();
+  const isLoadingSuggestionModels = useIsLoadingSuggestionModels();
   const fetchAvailableModels = useFetchAvailablePromptedModels();
-  const fetchAvailableCompletionModels = useFetchAvailableCompletionModels();
+  const fetchAvailableSuggestionModels = useFetchAvailableSuggestionModels();
 
   const showAIAnnotationSelector = currentTool === 'ai_annotation';
-  // Show completion selector when in completion tool OR ai_annotation tool (for "Suggest Similar" context menu feature)
-  const showCompletionSelector = currentTool === 'completion' || currentTool === 'ai_annotation';
+  // Show suggestion selector when in suggestion tool OR ai_annotation tool (for "Suggest Similar" context menu feature)
+  const showSuggestionSelector = currentTool === 'suggestion' || currentTool === 'ai_annotation';
 
   // Fetch AI models from backend when AI annotation tool is selected
   useEffect(() => {
@@ -41,16 +41,16 @@ const ModelSelectors = () => {
     }
   }, [showAIAnnotationSelector, availableModels.length, isLoadingModels, fetchAvailableModels]);
 
-  // Fetch completion models from backend when completion tool is selected
+  // Fetch suggestion models from backend when suggestion tool is selected
   useEffect(() => {
-    if (showCompletionSelector && availableCompletionModels.length === 0 && !isLoadingCompletionModels) {
-      fetchAvailableCompletionModels();
+    if (showSuggestionSelector && availableSuggestionModels.length === 0 && !isLoadingSuggestionModels) {
+      fetchAvailableSuggestionModels();
     }
-  }, [showCompletionSelector, availableCompletionModels.length, isLoadingCompletionModels, fetchAvailableCompletionModels]);
+  }, [showSuggestionSelector, availableSuggestionModels.length, isLoadingSuggestionModels, fetchAvailableSuggestionModels]);
 
   // Preload models when they change
   useModelSwitchPreloader(promptedModel, annotationSession.selectPromptedModel.bind(annotationSession), 'prompted');
-  useModelSwitchPreloader(completionModel, annotationSession.selectCompletionModel.bind(annotationSession), 'completion');
+  useModelSwitchPreloader(suggestionModel, annotationSession.selectSuggestionModel.bind(annotationSession), 'suggestion');
 
   return (
     <div className="space-y-3">
@@ -89,23 +89,23 @@ const ModelSelectors = () => {
         </div>
       )}
 
-      {/* Completion Model Selector */}
-      {showCompletionSelector && (
+      {/* Suggestion Model Selector */}
+      {showSuggestionSelector && (
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1.5">
-            Completion Model
+            Suggestion Model
           </label>
           <div className="relative">
             <select
-              value={completionModel || ''}
-              onChange={(e) => setCompletionModel(e.target.value)}
-              disabled={isLoadingCompletionModels}
+              value={suggestionModel || ''}
+              onChange={(e) => setSuggestionModel(e.target.value)}
+              disabled={isLoadingSuggestionModels}
               className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 text-xs appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              {isLoadingCompletionModels ? (
+              {isLoadingSuggestionModels ? (
                 <option value="">Loading models...</option>
-              ) : availableCompletionModels.length > 0 ? (
-                availableCompletionModels.map((model) => (
+              ) : availableSuggestionModels.length > 0 ? (
+                availableSuggestionModels.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}
                   </option>
@@ -119,7 +119,7 @@ const ModelSelectors = () => {
           
           {/* Model Description */}
           <div className="mt-1.5">
-            <ModelDescription model={completionModel} modelType="completion" />
+            <ModelDescription model={suggestionModel} modelType="suggestion" />
           </div>
         </div>
       )}

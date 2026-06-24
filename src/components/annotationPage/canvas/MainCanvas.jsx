@@ -36,8 +36,8 @@ const MainCanvas = forwardRef((props, ref) => {
         return 'cursor-crosshair'; // Crosshair for drawing
       case 'ai_annotation':
         return 'cursor-crosshair'; // Crosshair for AI annotation
-      case 'completion':
-        return 'cursor-pointer'; // Hand pointer for completion
+      case 'suggestion':
+        return 'cursor-pointer'; // Hand pointer for suggestion
       default:
         return 'cursor-default';
     }

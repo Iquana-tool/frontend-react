@@ -112,6 +112,94 @@ export const getLabelsToAutoExpand = (metricsPerLabelId, childCountsPerLabelId) 
   return labelsToExpand;
 };
 
+// Compute structural insights about the label space (hierarchy shape).
+// Derived purely from the label hierarchy the backend already returns, so this
+// needs no extra backend data.
+export const computeLabelSpaceInsights = (labelsData) => {
+  const roots = labelsData?.root_level_labels || [];
+
+  let totalLabels = 0;
+  let parentLabels = 0; // labels that have at least one sublabel
+  let totalDirectChildren = 0; // == number of non-root labels
+  let maxDepth = 0;
+
+  const visit = (label, depth) => {
+    totalLabels += 1;
+    maxDepth = Math.max(maxDepth, depth);
+    const children = label.children || [];
+    if (children.length > 0) {
+      parentLabels += 1;
+      totalDirectChildren += children.length;
+    }
+    children.forEach((child) => visit(child, depth + 1));
+  };
+  roots.forEach((root) => visit(root, 1));
+
+  const rootLabels = roots.length;
+  const leafLabels = totalLabels - parentLabels;
+
+  return {
+    totalLabels,
+    rootLabels,
+    parentLabels,
+    leafLabels,
+    maxDepth,
+    // The headline researcher metric: how many sublabels a parent has on average.
+    avgSublabelsPerParent: parentLabels > 0 ? totalDirectChildren / parentLabels : 0,
+    // Averaged over every label (leaves included) — a branching factor.
+    avgChildrenPerLabel: totalLabels > 0 ? totalDirectChildren / totalLabels : 0,
+  };
+};
+
+// Compute annotation-coverage and class-balance insights from the aggregated
+// per-label metrics. Object counts use the `area` array length as the number
+// of measured objects for a label.
+export const computeAnnotationInsights = (metricsPerLabelId, labelIdToName = {}, totalLabels = 0) => {
+  const entries = Object.entries(metricsPerLabelId || {});
+
+  let totalObjects = 0;
+  let unlabeledObjects = 0;
+  const perLabelCounts = [];
+
+  entries.forEach(([labelId, metrics]) => {
+    const count = metrics?.area?.length || 0;
+    if (labelId === "null") {
+      unlabeledObjects += count;
+      return;
+    }
+    totalObjects += count;
+    if (count > 0) {
+      perLabelCounts.push({
+        labelId,
+        name: labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`,
+        count,
+      });
+    }
+  });
+
+  const annotatedLabels = perLabelCounts.length;
+
+  let mostCommon = null;
+  let leastCommon = null;
+  perLabelCounts.forEach((entry) => {
+    if (!mostCommon || entry.count > mostCommon.count) mostCommon = entry;
+    if (!leastCommon || entry.count < leastCommon.count) leastCommon = entry;
+  });
+
+  return {
+    totalObjects,
+    unlabeledObjects,
+    annotatedLabels,
+    avgObjectsPerLabel: annotatedLabels > 0 ? totalObjects / annotatedLabels : 0,
+    mostCommon,
+    leastCommon,
+    // Class imbalance: how many times more frequent the largest class is than the smallest.
+    imbalanceRatio:
+      leastCommon && leastCommon.count > 0 ? mostCommon.count / leastCommon.count : null,
+    coverage: totalLabels > 0 ? annotatedLabels / totalLabels : 0,
+  };
+};
+
 // Transform flat contour data to hierarchical aggregated format
 export const transformFlatDataToHierarchical = (flatDataResponse) => {
   if (!flatDataResponse || !flatDataResponse.data) {

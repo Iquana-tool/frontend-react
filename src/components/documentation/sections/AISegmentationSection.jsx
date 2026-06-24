@@ -20,7 +20,7 @@ const AISegmentationSection = () => {
             </div>
             <div>
               <h5 className="font-medium text-gray-900 text-base">Select Model</h5>
-              <p className="text-gray-600 text-base">Choose the desired AI Segmentation Model from the sidebar dropdown for prompted segmentation, or select a Completion Model for completion segmentation</p>
+              <p className="text-gray-600 text-base">Choose the desired AI Segmentation Model from the sidebar dropdown for prompted segmentation, or select a Suggestion Model for suggestion segmentation</p>
             </div>
           </div>
           <div className="flex items-start space-x-4">

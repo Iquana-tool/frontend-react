@@ -13,12 +13,12 @@ import {
   useRemoveObject,
   useRemoveLastPrompt,
   useClearSelection,
-  useSetSemanticRunRequested,
-  useSemanticWarningModalOpen,
+  useSetInstanceRunRequested,
+  useInstanceWarningModalOpen,
   useRefinementModeActive,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
-import { useCompletionSegmentation } from './useCompletionSegmentation';
+import { useSuggestionSegmentation } from './useSuggestionSegmentation';
 import { deleteObject } from '../utils/objectOperations';
 import { getContourId } from '../utils/objectUtils';
 
@@ -27,8 +27,8 @@ import { getContourId } from '../utils/objectUtils';
  *
  * - Enter: Run primary action (AI segmentation when in AI tool with prompts)
  * - 1: Run Prompted Segmentation
- * - 2: Run Instance Discovery (completion) with selected objects as seeds
- * - 3: Open Semantic Segmentation (warning modal)
+ * - 2: Run Instance Suggestion (suggestion) with selected objects as seeds
+ * - 3: Open Instance Segmentation (warning modal)
  * - Delete/Backspace: In refinement mode with prompts, remove last prompt; otherwise reject selected objects, or remove last prompt when in AI tool with no selection
  * - Arrow Left/Right: Previous/next image
  */
@@ -51,20 +51,20 @@ export default function useAnnotationKeyboardShortcuts() {
   const removeObject = useRemoveObject();
   const removeLastPrompt = useRemoveLastPrompt();
   const clearSelection = useClearSelection();
-  const setSemanticRunRequested = useSetSemanticRunRequested();
-  const semanticWarningModalOpen = useSemanticWarningModalOpen();
+  const setInstanceRunRequested = useSetInstanceRunRequested();
+  const instanceWarningModalOpen = useInstanceWarningModalOpen();
   const refinementModeActive = useRefinementModeActive();
 
   const { runSegmentation } = useAISegmentation();
-  const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation();
-  const runSemanticRequest = setSemanticRunRequested;
+  const { runSuggestion, isRunning: isRunningSuggestion } = useSuggestionSegmentation();
+  const runInstanceRequest = setInstanceRunRequested;
 
   const canRunPrompted =
     currentTool === 'ai_annotation' &&
     promptedModel &&
     !isSubmitting &&
     prompts.length > 0 &&
-    !semanticWarningModalOpen;
+    !instanceWarningModalOpen;
 
   const goNextImage = useCallback(() => {
     const currentIndex = imageList.findIndex((img) => img.id === currentImageId);
@@ -132,12 +132,12 @@ export default function useAnnotationKeyboardShortcuts() {
         case '2': {
           if (isModifier) break;
           if (selectedObjects.length === 0) break;
-          if (isRunningCompletion) break;
+          if (isRunningSuggestion) break;
           e.preventDefault();
           const contourIds = selectedObjects.map((o) => getContourId(o)).filter(Boolean);
           const labelId = selectedObjects[0]?.labelId ?? null;
           if (contourIds.length > 0) {
-            runCompletion(
+            runSuggestion(
               contourIds.length === 1 ? contourIds[0] : contourIds,
               labelId
             );
@@ -147,7 +147,7 @@ export default function useAnnotationKeyboardShortcuts() {
         case '3': {
           if (!isModifier) {
             e.preventDefault();
-            runSemanticRequest(true);
+            runInstanceRequest(true);
           }
           break;
         }
@@ -191,9 +191,9 @@ export default function useAnnotationKeyboardShortcuts() {
     canRunPrompted,
     runSegmentation,
     selectedObjects,
-    runCompletion,
-    isRunningCompletion,
-    runSemanticRequest,
+    runSuggestion,
+    isRunningSuggestion,
+    runInstanceRequest,
     handleRejectSelected,
     currentTool,
     refinementModeActive,
