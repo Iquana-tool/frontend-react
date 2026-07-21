@@ -4,10 +4,11 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { 
-  usePromptedModel, 
-  useCompletionModel,
-  useWebSocketIsReady 
+import {
+  usePromptedModel,
+  useSuggestionModel,
+  useInstanceModel,
+  useWebSocketIsReady
 } from '../stores/selectors/annotationSelectors';
 import annotationSession from '../services/annotationSession';
 
@@ -17,7 +18,8 @@ import annotationSession from '../services/annotationSession';
  */
 const useModelPreloader = () => {
   const promptedModel = usePromptedModel();
-  const completionModel = useCompletionModel();
+  const suggestionModel = useSuggestionModel();
+  const instanceModel = useInstanceModel();
   const isSessionReady = useWebSocketIsReady();
   const hasPreloadedRef = useRef(false);
   const currentImageIdRef = useRef(null);
@@ -38,12 +40,13 @@ const useModelPreloader = () => {
       // Preload models into backend memory
       annotationSession.preloadModels({
         promptedModel,
-        completionModel,
+        suggestionModel,
+        instanceModel,
       }).catch(err => {
         console.warn('[useModelPreloader] Failed to preload models:', err);
       });
     }
-  }, [isSessionReady, promptedModel, completionModel]);
+  }, [isSessionReady, promptedModel, suggestionModel, instanceModel]);
 };
 
 export default useModelPreloader;

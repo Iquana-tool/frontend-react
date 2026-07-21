@@ -223,49 +223,49 @@ class AnnotationSession {
   }
 
   /**
-   * Select model for completion segmentation
-   * @param {string} modelIdentifier - Completion model identifier
+   * Select model for suggestion segmentation
+   * @param {string} modelIdentifier - Suggestion model identifier
    * @returns {Promise<Object>} Response message
    */
-  async selectCompletionModel(modelIdentifier) {
+  async selectSuggestionModel(modelIdentifier) {
     this._ensureReady();
     if (!modelIdentifier) {
       return Promise.resolve({ success: true, message: 'No model to select' });
     }
     
-    // Only send message if completion service is available
-    if (!this.isServiceAvailable('completion_segmentation')) {
+    // Only send message if suggestion service is available
+    if (!this.isServiceAvailable('suggestion_segmentation')) {
       return Promise.resolve({ success: false, message: 'Service not available' });
     }
     
-    const message = MessageBuilders.selectCompletionModel(modelIdentifier);
+    const message = MessageBuilders.selectSuggestionModel(modelIdentifier);
     return websocketService.send(message, true);
   }
 
   /**
-   * Select model for semantic segmentation
-   * @param {string} modelName - Semantic model identifier
+   * Select model for instance segmentation
+   * @param {string} modelName - Instance model identifier
    * @returns {Promise<Object>} Response message
    */
-  async selectSemanticModel(modelName) {
+  async selectInstanceModel(modelName) {
     this._ensureReady();
     if (!modelName) {
       return Promise.resolve({ success: true, message: 'No model to select' });
     }
-    
-    // Only send message if semantic service is available
-    if (!this.isServiceAvailable('semantic_segmentation')) {
+
+    // Only send message if instance service is available
+    if (!this.isServiceAvailable('instance_segmentation')) {
       return Promise.resolve({ success: false, message: 'Service not available' });
     }
-    
-    const message = MessageBuilders.selectSemanticModel(modelName);
+
+    const message = MessageBuilders.selectInstanceModel(modelName);
     return websocketService.send(message, true);
   }
 
   /**
    * Preload models into backend memory after session initialization
    * This sends select_model messages to preload the currently selected models
-   * @param {Object} selectedModels - Object with promptedModel, completionModel, semanticModel
+   * @param {Object} selectedModels - Object with promptedModel, suggestionModel, instanceModel
    * @returns {Promise<void>}
    */
   async preloadModels(selectedModels = {}) {
@@ -273,12 +273,12 @@ class AnnotationSession {
       return;
     }
 
-    const { promptedModel, completionModel, semanticModel } = selectedModels;
+    const { promptedModel, suggestionModel, instanceModel } = selectedModels;
 
     // Extract model IDs (handle both string IDs and model objects)
     const promptedModelId = typeof promptedModel === 'string' ? promptedModel : promptedModel?.id;
-    const completionModelId = typeof completionModel === 'string' ? completionModel : completionModel?.id;
-    const semanticModelId = typeof semanticModel === 'string' ? semanticModel : semanticModel?.id;
+    const suggestionModelId = typeof suggestionModel === 'string' ? suggestionModel : suggestionModel?.id;
+    const instanceModelId = typeof instanceModel === 'string' ? instanceModel : instanceModel?.id;
 
     // Send model selection messages to preload models into memory
     // These calls won't throw errors if services aren't available
@@ -292,17 +292,17 @@ class AnnotationSession {
       );
     }
 
-    if (completionModelId && this.isServiceAvailable('completion_segmentation')) {
+    if (suggestionModelId && this.isServiceAvailable('suggestion_segmentation')) {
       promises.push(
-        this.selectCompletionModel(completionModelId).catch(() => {
+        this.selectSuggestionModel(suggestionModelId).catch(() => {
           // Error handled silently
         })
       );
     }
 
-    if (semanticModelId && this.isServiceAvailable('semantic_segmentation')) {
+    if (instanceModelId && this.isServiceAvailable('instance_segmentation')) {
       promises.push(
-        this.selectSemanticModel(semanticModelId).catch(() => {
+        this.selectInstanceModel(instanceModelId).catch(() => {
           // Error handled silently
         })
       );
@@ -435,54 +435,54 @@ class AnnotationSession {
     return websocketService.send(message, true);
   }
 
-  // ==================== COMPLETION SEGMENTATION ====================
+  // ==================== SUGGESTION SEGMENTATION ====================
 
   /**
-   * Run completion segmentation to find similar instances
+   * Run suggestion segmentation to find similar instances
    * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
    * @param {number|null} labelId - Optional label ID to assign to found instances
    * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
    */
-  async runCompletion(seedContourIds, modelKey, labelId = null) {
+  async runSuggestion(seedContourIds, modelKey, labelId = null) {
     this._ensureReady();
     
-    // Check if completion service is available
-    if (!this.isServiceAvailable('completion_segmentation')) {
-      throw new Error('Completion segmentation service is not available. Please check your connection.');
+    // Check if suggestion service is available
+    if (!this.isServiceAvailable('suggestion_segmentation')) {
+      throw new Error('Suggestion segmentation service is not available. Please check your connection.');
     }
     
-    const message = MessageBuilders.runCompletion(seedContourIds, modelKey, labelId);
+    const message = MessageBuilders.runSuggestion(seedContourIds, modelKey, labelId);
     return websocketService.send(message, true);
   }
 
-  // ==================== SEMANTIC SEGMENTATION ====================
+  // ==================== INSTANCE SEGMENTATION ====================
 
   /**
-   * Run semantic segmentation inference
-   * @param {string} modelKey - Semantic model key
+   * Run instance segmentation inference
+   * @param {string} modelKey - Instance model key
    * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
    */
-  async runSemantic(modelKey) {
+  async runInstance(modelKey) {
     this._ensureReady();
-    
-    // Check if semantic service is available
-    if (!this.isServiceAvailable('semantic_segmentation')) {
-      throw new Error('Semantic segmentation service is not available. Please check your connection.');
+
+    // Check if instance service is available
+    if (!this.isServiceAvailable('instance_segmentation')) {
+      throw new Error('Instance segmentation service is not available. Please check your connection.');
     }
-    
-    const message = MessageBuilders.runSemantic(modelKey);
+
+    const message = MessageBuilders.runInstance(modelKey);
     return websocketService.send(message, true);
   }
 
   // ==================== SESSION MANAGEMENT ====================
 
   /**
-   * Enable completion mode
+   * Enable suggestion mode
    * @returns {Promise<void>}
    */
-  async enableCompletion() {
+  async enableSuggestion() {
     this._ensureReady();
-    const message = MessageBuilders.enableCompletion();
+    const message = MessageBuilders.enableSuggestion();
     return websocketService.send(message);
   }
 

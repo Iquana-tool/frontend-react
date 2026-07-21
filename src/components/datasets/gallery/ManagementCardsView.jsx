@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, BarChart3, Tag, Play } from 'lucide-react';
+import { Database, Brain, BarChart3, Tag, Play, Download, GraduationCap } from 'lucide-react';
 import ManagementCard from './ManagementCard';
 
 const ManagementCardsView = ({
@@ -8,6 +8,8 @@ const ManagementCardsView = ({
   onQuantificationsClick,
   onStartAnnotation,
   onLabelManagementClick,
+  onExportCocoClick,
+  onModelTrainingClick,
 }) => {
   const cards = [
     {
@@ -29,6 +31,16 @@ const ManagementCardsView = ({
       iconBgColor: 'bg-purple-100',
       iconHoverBgColor: 'group-hover:bg-purple-200',
       iconColor: 'text-purple-600',
+    },
+    {
+      id: 'model-training',
+      icon: GraduationCap,
+      title: 'Model Training',
+      description: 'Train an instance segmentation model on this dataset and watch progress live',
+      onClick: onModelTrainingClick,
+      iconBgColor: 'bg-indigo-100',
+      iconHoverBgColor: 'group-hover:bg-indigo-200',
+      iconColor: 'text-indigo-600',
     },
     {
       id: 'quantifications',
@@ -58,6 +70,16 @@ const ManagementCardsView = ({
       iconBgColor: 'bg-pink-100',
       iconHoverBgColor: 'group-hover:bg-pink-200',
       iconColor: 'text-pink-600',
+    },
+    {
+      id: 'export-coco',
+      icon: Download,
+      title: 'Export to COCO',
+      description: 'Download the dataset in COCO format (with images or annotations only) for ML tasks',
+      onClick: onExportCocoClick,
+      iconBgColor: 'bg-amber-100',
+      iconHoverBgColor: 'group-hover:bg-amber-200',
+      iconColor: 'text-amber-600',
     },
   ];
 

@@ -1,4 +1,4 @@
-# Completion Segmentation Service Environment Variables
+# Suggestion Segmentation Service Environment Variables
 # Copy this file to .env for local development
 
 # Hugging Face Access Token (required for SAM3 model downloads)

@@ -5,11 +5,12 @@ import { useImageUpload } from "../../../hooks/useImageUpload";
 import ImageThumbnail from "./ImageThumbnail";
 import UploadModal from "./UploadModal";
 import GalleryHeader from "./GalleryHeader";
-import { 
-  useSearchTerm, 
-  useFilterStatus, 
+import { getImageStatus, getImageStatusCounts } from "../../../utils/imageStatus";
+import {
+  useSearchTerm,
+  useFilterStatus,
   useShowUploadModal,
-  useGalleryActions 
+  useGalleryActions
 } from "../../../stores/selectors";
 
 const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated }) => {
@@ -19,17 +20,22 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
   const showUploadModal = useShowUploadModal();
   const galleryActions = useGalleryActions();
 
-  // Filter images based on search and status
+  // Count images per status (across all images, so the filter chips are accurate)
+  const statusCounts = useMemo(() => getImageStatusCounts(images), [images]);
+
+  // Filter images based on search and annotation status
   const filteredImages = useMemo(() => {
     return images.filter((image) => {
       const matchesSearch =
         image.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         image.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
+      // "all" (or any unknown legacy value) shows everything; otherwise match
+      // the image's annotation status.
       const matchesFilter =
         filterStatus === "all" ||
-        (filterStatus === "annotated" && image.finished) ||
-        (filterStatus === "missing" && !image.finished && !image.generated);
+        !["not_started", "in_progress", "reviewable", "finished"].includes(filterStatus) ||
+        getImageStatus(image).key === filterStatus;
 
       return matchesSearch && matchesFilter;
     });
@@ -93,6 +99,8 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
     <div className="h-full flex flex-col bg-white">
       <GalleryHeader
         imageCount={filteredImages.length}
+        totalCount={images.length}
+        statusCounts={statusCounts}
         searchTerm={searchTerm}
         filterStatus={filterStatus}
         onSearchChange={handleSearchChange}

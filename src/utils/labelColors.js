@@ -53,9 +53,11 @@ export const LABEL_COLORS_DARK = [
  * @returns {string} Hex color code
  */
 export const getLabelColor = (labelId, variant = 'default') => {
-  const index = typeof labelId === 'string' ? parseInt(labelId) : labelId;
-  const colorIndex = (index - 1) % LABEL_COLORS.length;
-  
+  const parsed = typeof labelId === 'string' ? parseInt(labelId, 10) : labelId;
+  // Guard against NaN / negative / out-of-range ids so we never return undefined.
+  const base = Number.isFinite(parsed) ? parsed : 1;
+  const colorIndex = (((base - 1) % LABEL_COLORS.length) + LABEL_COLORS.length) % LABEL_COLORS.length;
+
   switch (variant) {
     case 'light':
       return LABEL_COLORS_LIGHT[colorIndex];

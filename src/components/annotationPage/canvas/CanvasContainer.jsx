@@ -3,8 +3,11 @@ import { Loader2 } from 'lucide-react';
 import PromptOverlay from './PromptOverlay';
 import SegmentationOverlay from './SegmentationOverlay';
 import AIPromptCanvas from './AIPromptCanvas';
+import ManualDrawCanvas from './ManualDrawCanvas';
 import ModelSelectionHint from './ModelSelectionHint';
 import RunAIButton from './RunAIButton';
+import SuggestSimilarButton from './SuggestSimilarButton';
+import AddAsObjectButton from './AddAsObjectButton';
 import ObjectContextMenu from './ObjectContextMenu';
 import FocusOverlay from './FocusOverlay';
 import RefinementOverlay from './RefinementOverlay';
@@ -23,6 +26,7 @@ import {
   useIsLoadingPromptedModels,
   useFetchAvailablePromptedModels,
   useRefinementModeActive, useSetPromptedModel,
+  useFocusModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 
 const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDragging }) => {
@@ -38,6 +42,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
   const setPromptedModel = useSetPromptedModel();
   const isSubmitting = useIsSubmitting();
   const refinementModeActive = useRefinementModeActive();
+  const focusModeActive = useFocusModeActive();
   const previousPromptsLengthRef = useRef(0);
   const previousRefinementModeRef = useRef(false);
   const refinementModeEnteredTimeRef = useRef(0);
@@ -152,8 +157,8 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
         return 'cursor-pointer'; // Hand pointer for selection
       case 'manual_drawing':
         return 'cursor-crosshair'; // Crosshair for drawing
-      case 'completion':
-        return 'cursor-pointer'; // Hand pointer for completion
+      case 'suggestion':
+        return 'cursor-pointer'; // Hand pointer for suggestion
       default:
         return 'cursor-default';
     }
@@ -206,6 +211,19 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
       {/* Context menu for object labeling */}
       <ObjectContextMenu />
 
+      {/* Bottom-center action row.
+          - Run AI Segmentation: shown only in the AI annotation tool (handles its
+            own visibility, including refinement mode).
+          - Suggest Similar (Instance Suggestion): always visible so users discover
+            it; lights up when a homogeneous selection (same class, or all
+            unlabelled) is selected.
+          Rendered side by side at z-70 so both stay above the control-points
+          overlay (z-65) and remain clickable. */}
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[70] flex items-end gap-3 pointer-events-none">
+        <RunAIButton onRunAI={handleRunAI} />
+        <SuggestSimilarButton />
+      </div>
+
       {/* Instant mode: show processing indicator when prompt was placed and request is in flight */}
       {currentTool === 'ai_annotation' && instantSegmentation && isSubmitting && (
         <div
@@ -220,7 +238,14 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
 
       {/* AI tool overlays — in refinement mode use z-62 so prompt canvas sits above contour line (55) and below control points (65) */}
       {currentTool === 'ai_annotation' && (
-        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: refinementModeActive ? 62 : undefined }}>
+        <div
+          className="absolute inset-0 pointer-events-none"
+          /* In focus mode lift the prompt canvas (and its toolbar) above the
+             FocusOverlay dim (z40), but keep it below the overlay's buttons (z50)
+             so "Exit Focus" stays clickable. Refinement uses z62 so the
+             control-points overlay (z65) can still sit above the prompt canvas. */
+          style={{ zIndex: refinementModeActive ? 62 : (focusModeActive ? 45 : undefined) }}
+        >
           <div className="absolute inset-0 pointer-events-auto">
             <AIPromptCanvas 
               width={containerRef.current?.offsetWidth || 800}
@@ -228,8 +253,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
               renderBackground={false}
             />
             <ModelSelectionHint />
-            {/* In refinement mode, button is rendered in a separate layer below so it can sit at z-70 and stay clickable above the control-points overlay (z-65) */}
-            {!refinementModeActive && <RunAIButton onRunAI={handleRunAI} />}
+            {/* Run AI button lives in the shared bottom-center row below. */}
+            {/* Save drawn shapes (box/polygon/freehand) directly as objects, no model */}
+            {!refinementModeActive && <AddAsObjectButton />}
           </div>
           {error && (
             <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
@@ -241,10 +267,10 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset, isDr
         </div>
       )}
 
-      {/* Refinement mode: Run AI button in its own layer at z-70 so it stays above control points (z-65) and is clickable */}
-      {currentTool === 'ai_annotation' && refinementModeActive && (
-        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 70 }}>
-          <RunAIButton onRunAI={handleRunAI} />
+      {/* Manual drawing tool: draw polygon / freehand object outlines by hand */}
+      {currentTool === 'manual_drawing' && (
+        <div className="absolute inset-0 pointer-events-auto">
+          <ManualDrawCanvas />
         </div>
       )}
     </div>

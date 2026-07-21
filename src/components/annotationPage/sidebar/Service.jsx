@@ -1,61 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Loader2, Circle, Play } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Play } from 'lucide-react';
 import {
   useInstantSegmentation,
   useToggleInstantSegmentation,
 } from '../../../stores/selectors/annotationSelectors';
+import PromptHints from './PromptHints';
+import UsageHint from './UsageHint';
+
+const STATUS_CONFIG = {
+  busy: { core: 'bg-blue-500', halo: 'bg-blue-500/30', tooltip: 'Model is busy', animate: true },
+  ready: { core: 'bg-emerald-500', halo: 'bg-emerald-500/25', tooltip: 'Model is ready', animate: false },
+  error: { core: 'bg-red-500', halo: 'bg-red-500/20', tooltip: 'Model not available', animate: false },
+  unknown: { core: 'bg-gray-400', halo: 'bg-gray-400/20', tooltip: 'Unknown status', animate: false },
+};
+
+/** Small tooltip shown beneath an indicator on hover. */
+const HoverTip = ({ children }) => (
+  <div className="absolute right-0 top-6 z-50 hidden group-hover:block">
+    <div className="relative bg-gray-900 text-white text-[11px] font-medium rounded-md py-1 px-2 whitespace-nowrap shadow-lg">
+      {children}
+      <div className="absolute -top-1 right-1.5 w-2 h-2 bg-gray-900 rotate-45"></div>
+    </div>
+  </div>
+);
 
 const StatusIndicator = ({ status }) => {
-  const getStatusConfig = () => {
-    switch (status) {
-      case 'busy':
-        return {
-          icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />,
-          bgColor: 'bg-blue-100',
-          color: 'text-blue-600',
-          tooltip: 'Model is busy',
-          ring: 'ring-blue-200'
-        };
-      case 'error':
-        return {
-          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
-          bgColor: 'bg-red-100',
-          color: 'text-red-600',
-          tooltip: 'Model not available',
-          ring: 'ring-red-200'
-        };
-      case 'ready':
-        return {
-          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
-          bgColor: 'bg-emerald-100',
-          color: 'text-emerald-600',
-          tooltip: 'Model is ready',
-          ring: 'ring-emerald-200'
-        };
-      default:
-        return {
-          icon: <Circle className="w-3.5 h-3.5 fill-current" />,
-          bgColor: 'bg-gray-100',
-          color: 'text-gray-500',
-          tooltip: 'Unknown status',
-          ring: 'ring-gray-200'
-        };
-    }
-  };
-
-  const config = getStatusConfig();
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.unknown;
 
   return (
     <div className="relative group flex items-center">
-      <div className={`${config.bgColor} ${config.color} p-1.5 rounded-lg ring-2 ${config.ring} flex items-center shadow-sm`}>
-        {config.icon}
-      </div>
-      <div className="absolute right-0 top-8 z-50 hidden group-hover:block animate-in fade-in slide-in-from-top-1 duration-200">
-        <div className="bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap shadow-lg">
-          {config.tooltip}
-          <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
-        </div>
-      </div>
+      <span className="relative flex items-center justify-center w-3.5 h-3.5">
+        <span
+          className={`absolute inline-flex w-3.5 h-3.5 rounded-full ${config.halo} ${
+            config.animate ? 'animate-ping' : ''
+          }`}
+        />
+        <span className={`relative inline-flex w-2 h-2 rounded-full ${config.core}`} />
+      </span>
+      <HoverTip>{config.tooltip}</HoverTip>
     </div>
   );
 };
@@ -65,16 +47,16 @@ const ModelInfo = ({ description, tags, isExpanded }) => {
   return (
     <div className="mt-2 mb-2">
       {description && (
-        <p className="text-xs text-gray-600 leading-relaxed mb-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+        <p className="text-xs text-gray-600 leading-relaxed mb-2">
           {description}
         </p>
       )}
       {tags && Array.isArray(tags) && tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {tags.map((tag) => (
-            <span 
-              key={tag} 
-              className="inline-block px-2.5 py-1 bg-gradient-to-r from-teal-50 to-cyan-50 text-teal-700 text-xs font-medium rounded-full border border-teal-100 shadow-sm"
+            <span
+              key={tag}
+              className="inline-block px-2.5 py-1 bg-teal-50 text-teal-700 text-xs font-medium rounded-full border border-teal-100"
             >
               {tag}
             </span>
@@ -93,8 +75,9 @@ const ServiceCard = ({
   setSelectedModel,
   onModelSwitch,
   icon: Icon,
-  isRunning = false, // Track when a service operation is running 
-  onRun = null, // Optional callback to run the service (for semantic segmentation)
+  isRunning = false, // Track when a service operation is running
+  onRun = null, // Optional callback to run the service (for instance segmentation)
+  usageHint = null, // Optional one-line usage hint for single-workflow services
 }) => {
   const [expanded, setExpanded] = useState(false);
   const firstModelId = models?.find((m) => m?.id)?.id || '';
@@ -127,7 +110,7 @@ const ServiceCard = ({
 
   if (isLoading) {
     return (
-      <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-4 shadow-sm animate-pulse">
+      <div className="bg-white border border-gray-200 rounded-lg p-3 animate-pulse">
         <div className="h-4 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-2/3 mb-3"></div>
         <div className="h-10 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-full mb-3"></div>
         <div className="h-6 bg-gradient-to-r from-gray-200 to-gray-100 rounded-lg w-full mb-2"></div>
@@ -138,12 +121,13 @@ const ServiceCard = ({
 
   if (!models || models.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-white to-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div className="bg-white border border-gray-200 rounded-lg p-3">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <h4 className="text-xs font-bold text-gray-900">{serviceName}</h4>
-            <StatusIndicator status={selectedModelObj?.model_status || "error"} />
-          </div>
+          <span className="flex items-center text-xs font-bold text-gray-900">
+            <span className="w-1 h-4 bg-gradient-to-b from-teal-500 to-cyan-500 rounded-full mr-2"></span>
+            {serviceName}
+          </span>
+          <StatusIndicator status="error" />
         </div>
         <p className="text-xs text-gray-500 mb-3 bg-red-50 border border-red-100 rounded-lg p-2">
           No models available.
@@ -161,51 +145,52 @@ const ServiceCard = ({
   }
 
   return (
-    <div className="group/card bg-gradient-to-br from-white to-gray-50/50 border border-gray-200 rounded-xl p-4 hover:border-teal-200 hover:shadow-md transition-all duration-300">
+    <div className="group/card bg-white border border-gray-200 rounded-lg p-3 hover:border-teal-300 transition-colors">
       {/* Service Header with Model Selection */}
       <div className="mb-3">
-        <label className="block text-xs font-bold text-gray-900 mb-2 flex items-center">
-          <div className="w-1 h-4 bg-gradient-to-b from-teal-500 to-cyan-500 rounded-full mr-2"></div>
-          {serviceName} Model
-        </label>
-        <div className="relative flex items-center space-x-2">
-          <div className="flex-1 relative">
-            <select
-              value={selectedModel || firstModelId}
-              onChange={handleModelChange}
-              className="w-full px-3 py-2.5 text-xs font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all duration-200"
-            >
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover/card:text-teal-500 transition-colors" />
-          </div>
-          <div className="flex items-center space-x-2">
+        <div className="flex items-center justify-between mb-2">
+          <span className="flex items-center text-xs font-bold text-gray-900">
+            <span className="w-1 h-4 bg-gradient-to-b from-teal-500 to-cyan-500 rounded-full mr-2"></span>
+            {serviceName}
+          </span>
+          <div className="flex items-center gap-2">
             {isRunning && (
               <div className="relative group flex items-center">
-                <div className="bg-blue-100 text-blue-600 p-1.5 rounded-lg ring-2 ring-blue-200 flex items-center shadow-sm">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                </div>
-                <div className="absolute right-0 top-8 z-50 hidden group-hover:block animate-in fade-in slide-in-from-top-1 duration-200">
-                  <div className="bg-gray-900 text-white text-xs rounded-lg py-1.5 px-2.5 whitespace-nowrap shadow-lg">
-                    Finding similar instances...
-                    <div className="absolute -top-1 right-2 w-2 h-2 bg-gray-900 transform rotate-45"></div>
-                  </div>
-                </div>
+                <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                <HoverTip>Finding similar instances…</HoverTip>
               </div>
             )}
             <StatusIndicator status={selectedModelObj?.model_status || "error"} />
           </div>
         </div>
+        <div className="relative">
+          <select
+            value={selectedModel || firstModelId}
+            onChange={handleModelChange}
+            className="w-full pl-3 pr-9 py-2.5 text-xs font-medium text-gray-800 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer hover:border-teal-300 transition-colors"
+          >
+            {models.map((model) => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none group-hover/card:text-teal-500 transition-colors" />
+        </div>
       </div>
 
       {selectedModelObj && (
         <>
+          {/* Available prompt types for this model (with usage hints on hover) */}
+          {isPromptedSegmentation && selectedModelObj.supported_prompt_types?.length > 0 && (
+            <PromptHints promptTypes={selectedModelObj.supported_prompt_types} />
+          )}
+
+          {/* Single-workflow usage hint (e.g. instance suggestion) */}
+          {usageHint && <UsageHint>{usageHint}</UsageHint>}
+
           {/* Instant Mode Toggle and Description Button */}
-          <div className="flex items-center justify-between mb-2 bg-white/50 rounded-lg p-2 border border-gray-100">
+          <div className="flex items-center justify-between mb-1">
             {onRun ? (
               <button
                 onClick={onRun}

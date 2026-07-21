@@ -142,10 +142,23 @@ const useAISegmentation = () => {
       const wsPrompts = {
         point_prompts: [],
         box_prompt: null,
+        polygon_prompt: null,
       };
 
       prompts.forEach((prompt) => {
-        if (prompt.type === 'point') {
+        if (prompt.type === 'polygon') {
+          // Polygon (and freehand) prompts: convert each vertex to normalized
+          // [x, y] pairs. The backend expects at least 3 vertices; if multiple
+          // polygons were drawn we keep the last one (same as box_prompt).
+          const vertices = (prompt.coords.points || [])
+            .map((pt) => {
+              const n = pixelToNormalized(pt.x, pt.y, imageObject.width, imageObject.height);
+              return [n.x, n.y];
+            });
+          if (vertices.length >= 3) {
+            wsPrompts.polygon_prompt = { vertices };
+          }
+        } else if (prompt.type === 'point') {
           // Convert pixel coordinates to normalized
           const normalized = pixelToNormalized(
             prompt.coords.x, 

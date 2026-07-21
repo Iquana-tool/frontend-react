@@ -92,38 +92,10 @@ export const get3DModels = async () => {
     }
 };
 
-// Get available completion segmentation models from backend
-export const getCompletionModels = async () => {
+// Get available suggestion segmentation models from backend
+export const getSuggestionModels = async () => {
     try {
-        const response = await fetch(`${API_BASE_URL}/completion_segmentation/models`, {
-            headers: getAuthHeaders(),
-        });
-        const data = await handleApiError(response);
-
-        if (data.success && Array.isArray(data.result)) {
-            return {
-                success: true,
-                models: data.result,
-            };
-        }
-
-        return {
-            success: true,
-            models: [],
-        };
-    } catch (error) {
-        return {
-            success: false,
-            models: [],
-            error: error.message,
-        };
-    }
-};
-
-// Get available semantic segmentation models from backend
-export const getSemanticModels = async () => {
-    try {
-        const response = await fetch(`${API_BASE_URL}/semantic_segmentation/models`, {
+        const response = await fetch(`${API_BASE_URL}/suggestion_segmentation/models`, {
             headers: getAuthHeaders(),
         });
         const data = await handleApiError(response);

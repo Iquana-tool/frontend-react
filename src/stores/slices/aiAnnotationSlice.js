@@ -20,6 +20,40 @@ export const createAIAnnotationSlice = (set) => ({
     });
   }),
   
+  addPolygonPrompt: (points, options = {}) => set((state) => {
+    // points: array of { x, y } in image pixel coordinates.
+    // Used for both polygon (clicked vertices) and freehand (traced path)
+    // prompts; `freehand` distinguishes them for rendering/labelling only.
+    if (!Array.isArray(points) || points.length < 3) {
+      return;
+    }
+
+    // Save current state for undo
+    const currentPrompts = [...state.aiAnnotation.prompts];
+    state.aiAnnotation.undoStack = state.aiAnnotation.undoStack || [];
+    state.aiAnnotation.undoStack.push(currentPrompts);
+
+    // Clear redo stack (new action invalidates redo)
+    state.aiAnnotation.redoStack = [];
+
+    state.aiAnnotation.prompts.push({
+      id: `${Date.now()}-${Math.random()}`,
+      type: 'polygon',
+      freehand: !!options.freehand,
+      coords: {
+        points: points.map((p) => ({ x: p.x, y: p.y })),
+      },
+    });
+  }),
+
+  setPromptMode: (mode) => set((state) => {
+    state.aiAnnotation.promptMode = mode;
+  }),
+
+  setManualDrawMode: (mode) => set((state) => {
+    state.aiAnnotation.manualDrawMode = mode;
+  }),
+
   addBoxPrompt: (x1, y1, x2, y2) => set((state) => {
     // Save current state for undo
     const currentPrompts = [...state.aiAnnotation.prompts];

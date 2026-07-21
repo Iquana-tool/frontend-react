@@ -1,33 +1,14 @@
 import React from 'react';
 import { Image as ImageIcon, Trash2 } from 'lucide-react';
+import { getImageStatus } from '../../../utils/imageStatus';
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
-
-const getStatusBadge = (image) => {
-  if (image.finished) {
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-        Manual
-      </span>
-    );
-  } else if (image.generated) {
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-        Auto
-      </span>
-    );
-  } else {
-    return (
-      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600">
-        Pending
-      </span>
-    );
-  }
-};
 
 const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteImage }) => {
   const imageSrc = thumbnailUrl || image.thumbnail || PLACEHOLDER_SVG;
   const isLoading = !thumbnailUrl && !image.thumbnail && !isLoaded;
+  const status = getImageStatus(image);
+  const StatusIcon = status.icon;
 
   return (
     <div
@@ -48,9 +29,19 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
         )}
       </div>
 
-      <div className="absolute top-2 right-2 flex items-center space-x-2">
-        {getStatusBadge(image)}
-        {onDeleteImage && (
+      {/* Status badge */}
+      <div className="absolute top-2 left-2">
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold shadow-sm ring-1 ring-black/5 ${status.badge}`}
+        >
+          <StatusIcon className="w-3 h-3" />
+          {status.label}
+        </span>
+      </div>
+
+      {/* Delete action */}
+      {onDeleteImage && (
+        <div className="absolute top-2 right-2">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -61,12 +52,11 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
           >
             <Trash2 size={14} />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-        {/* Reserved for future use */}
-      </div>
+      {/* Status accent strip for at-a-glance scanning */}
+      <div className={`h-1 w-full ${status.dot}`} />
     </div>
   );
 };

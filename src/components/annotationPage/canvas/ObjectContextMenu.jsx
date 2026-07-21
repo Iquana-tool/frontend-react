@@ -15,8 +15,9 @@ import {
   useSetCurrentTool,
   useRefinementModeActive,
   useFocusModeActive,
+  useFocusModeObjectId,
   useExitFocusMode,
-  useCompletionModel,
+  useSuggestionModel,
   useWebSocketIsReady,
   useEnterEditMode,
 } from '../../../stores/selectors/annotationSelectors';
@@ -24,7 +25,8 @@ import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
-import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentation';
+import { getChildLabels, resolveParentLabelId } from '../../../utils/labelHierarchy';
+import { useSuggestionSegmentation } from '../../../hooks/useSuggestionSegmentation';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
@@ -50,8 +52,9 @@ const ObjectContextMenu = () => {
   const setCurrentTool = useSetCurrentTool();
   const refinementModeActive = useRefinementModeActive();
   const focusModeActive = useFocusModeActive();
+  const focusModeObjectId = useFocusModeObjectId();
   const exitFocusMode = useExitFocusMode();
-  const completionModel = useCompletionModel();
+  const suggestionModel = useSuggestionModel();
   
   // Use the same zoom hook as refinement mode
   const { zoomToObject } = useZoomToObject({
@@ -81,10 +84,49 @@ const ObjectContextMenu = () => {
   }, [isMultiSelect, objectsList, targetObjectId]);
   
   // Use labels hierarchy hook
-  const { labelHierarchy, labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
+  const { labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
+
+  // Restrict the selectable labels to the current hierarchy level: root labels
+  // when annotating at the top level, or the children of the parent contour's
+  // label when annotating inside another contour.
+  const flatLabels = React.useMemo(() => Array.from(labelMap.values()), [labelMap]);
+
+  const primaryTarget = React.useMemo(
+    () => objectsList.find((obj) => obj.id === targetObjectId) || targetObjects[0] || null,
+    [objectsList, targetObjectId, targetObjects]
+  );
+
+  const parentLabelId = React.useMemo(
+    () =>
+      resolveParentLabelId(primaryTarget, objectsList, {
+        active: focusModeActive,
+        objectId: focusModeObjectId,
+      }),
+    [primaryTarget, objectsList, focusModeActive, focusModeObjectId]
+  );
+
+  const parentLabelName = React.useMemo(() => {
+    if (parentLabelId === null || parentLabelId === undefined) return null;
+    const parent =
+      labelMap.get(parentLabelId) ||
+      labelMap.get(Number(parentLabelId)) ||
+      labelMap.get(String(parentLabelId));
+    return parent?.name ?? null;
+  }, [labelMap, parentLabelId]);
+
+  // Strip nested children so only the single current level is rendered.
+  const currentLevelLabels = React.useMemo(
+    () =>
+      getChildLabels(flatLabels, parentLabelId).map((label) => ({
+        id: label.id,
+        name: label.name,
+        parent_id: label.parent_id,
+      })),
+    [flatLabels, parentLabelId]
+  );
   
-  // Use completion segmentation hook
-  const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation(
+  // Use suggestion segmentation hook
+  const { runSuggestion, isRunning: isRunningSuggestion } = useSuggestionSegmentation(
     null, // onSuccess: objects are automatically added via WebSocket
     (error) => alert(`Failed to suggest similar instances: ${error.message || 'Unknown error'}`)
   );
@@ -360,12 +402,12 @@ const ObjectContextMenu = () => {
 
     hideContextMenu();
     
-    // Use the completion hook with all selected contour IDs as seeds
+    // Use the suggestion hook with all selected contour IDs as seeds
     // For multiple seeds, we'll use the first object's labelId as the default
     const labelId = targetObjects[0]?.labelId;
     
     // Pass contour IDs (hook handles both single and array)
-    await runCompletion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
+    await runSuggestion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
   };
 
   const handleEditContour = () => {
@@ -517,18 +559,18 @@ const ObjectContextMenu = () => {
       {/* Suggest Similar Instances Option */}
       <ContextMenuItem
         onClick={handleSuggestSimilar}
-        disabled={isRunningCompletion || !completionModel || !wsIsReady}
+        disabled={isRunningSuggestion || !suggestionModel || !wsIsReady}
         className="hover:bg-green-50 hover:text-green-700"
         title={
-          !completionModel 
-            ? 'Select a completion model first' 
+          !suggestionModel 
+            ? 'Select a suggestion model first' 
             : !wsIsReady 
               ? 'WebSocket not ready' 
               : isMultiSelect
-                ? `Use ${targetObjects.length} objects as seeds for completion segmentation`
-                : 'Find similar instances using completion segmentation'
+                ? `Use ${targetObjects.length} objects as seeds for suggestion segmentation`
+                : 'Find similar instances using suggestion segmentation'
         }
-        label={isRunningCompletion ? 'Finding similar...' : 'Suggest Similar Instances'}
+        label={isRunningSuggestion ? 'Finding similar...' : 'Suggest Similar Instances'}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -537,15 +579,25 @@ const ObjectContextMenu = () => {
       />
 
       {/* Label section header */}
-      <div className="px-3 py-1 text-xs font-medium text-gray-600 border-b border-gray-100">
-        {isMultiSelect ? `Assign label to ${targetObjects.length} objects` : 'Label'}
+      <div className="px-3 py-1 border-b border-gray-100">
+        <div className="text-xs font-medium text-gray-600">
+          {isMultiSelect ? `Assign label to ${targetObjects.length} objects` : 'Label'}
+        </div>
+        <div className="text-[10px] font-normal text-gray-400">
+          {parentLabelName ? `Sub-labels of ${parentLabelName}` : 'Root level'}
+        </div>
       </div>
-      
-      {/* Hierarchical label list */}
+
+      {/* Current-level label list (root labels, or children of the parent contour's label) */}
       <HierarchicalLabelList
-        labelHierarchy={labelHierarchy}
+        labelHierarchy={currentLevelLabels}
         labelsLoading={labelsLoading}
         onLabelSelect={handleLabelSelect}
+        emptyMessage={
+          parentLabelName
+            ? `No sub-labels under "${parentLabelName}"`
+            : 'No labels available'
+        }
       />
     </div>
   );

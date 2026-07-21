@@ -5,10 +5,13 @@ import {
   useActivePreview,
   useAddPointPrompt,
   useAddBoxPrompt,
+  useAddPolygonPrompt,
+  usePromptMode,
+  useSetPromptMode,
   useSetActivePreview,
   useCurrentTool,
   usePromptedModel,
-  useCurrentImage,
+  useAvailablePromptedModels,
   useImageObject,
   useImageLoading,
   useImageError,
@@ -23,30 +26,31 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
+import useCanvasViewport from '../../../hooks/useCanvasViewport';
+import usePromptDrawing from '../../../hooks/usePromptDrawing';
 import PointPromptMarker from './prompts/PointPromptMarker';
 import BoxPromptMarker from './prompts/BoxPromptMarker';
 import LiveBoxPreview from './prompts/LiveBoxPreview';
+import PolygonPromptMarker from './prompts/PolygonPromptMarker';
+import PromptModeToolbar from './prompts/PromptModeToolbar';
+import DrawingPreview from './prompts/DrawingPreview';
 
 /**
  * AI Prompt Canvas Component
- * Handles interactive prompt creation (points and boxes) using Konva
- * Only active when currentTool is 'ai_annotation'
+ * Handles interactive prompt creation (points, boxes, polygons, freehand) using
+ * Konva. Only active when currentTool is 'ai_annotation'.
  */
 const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const stageRef = useRef(null);
-  const containerRef = useRef(null);
   const [dragStart, setDragStart] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState(null);
-  const [isPanMode, setIsPanMode] = useState(false);
-  const [containerSize, setContainerSize] = useState({ width, height });
   const [focusModeWarning, setFocusModeWarning] = useState(null);
 
   // Store state
   const currentTool = useCurrentTool();
   const selectedModel = usePromptedModel();
-  const currentImage = useCurrentImage();
+  const availablePromptedModels = useAvailablePromptedModels();
+  const promptMode = usePromptMode();
   const prompts = useAIPrompts();
   const activePreview = useActivePreview();
   const imageObject = useImageObject();
@@ -58,129 +62,110 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const focusedObjectMask = useFocusModeObjectMask();
   const refinementModeActive = useRefinementModeActive();
   const exitRefinementMode = useExitRefinementMode();
-
-  // Show focus mode warning
-  const showFocusModeWarning = useCallback((message) => {
-    setFocusModeWarning(message);
-    setTimeout(() => setFocusModeWarning(null), 3000); // Clear after 3 seconds
-  }, []);
+  // Focus/refinement overlays put an indicator at top-left; move our toolbar down
+  // so it stays visible instead of being covered by that indicator.
+  const overlayActive = focusModeActive || refinementModeActive;
 
   // Store actions
   const addPointPrompt = useAddPointPrompt();
   const addBoxPrompt = useAddBoxPrompt();
+  const addPolygonPrompt = useAddPolygonPrompt();
+  const setPromptMode = useSetPromptMode();
   const setActivePreview = useSetActivePreview();
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
 
-  const [imageDimensions, setImageDimensions] = useState({ 
-    width: 0, 
-    height: 0, 
-    x: 0, 
-    y: 0, 
-    baseScale: 1,
-    displayWidth: 0,
-    displayHeight: 0,
-    displayX: 0,
-    displayY: 0
-  });
+  const active = currentTool === 'ai_annotation';
 
-  useEffect(() => {
-    if (imageObject && containerSize.width && containerSize.height) {
-      const imageAspect = imageObject.width / imageObject.height;
-      const containerAspect = containerSize.width / containerSize.height;
+  // Shared viewport (sizing, transform math, pan/zoom, coordinate mapping)
+  const {
+    containerRef,
+    containerSize,
+    imageDimensions,
+    isPanning,
+    isPanMode,
+    stageToImageCoords,
+    handlePanStart,
+    handlePanMove,
+    handlePanEnd,
+    handleWheel,
+  } = useCanvasViewport({ imageObject, zoomLevel, panOffset, setZoomLevel, setPanOffset, active });
 
-      let baseScale, imageWidth, imageHeight, x, y;
-
-      if (imageAspect > containerAspect) {
-        // Image is wider than container
-        baseScale = containerSize.width / imageObject.width;
-        imageWidth = containerSize.width;
-        imageHeight = imageObject.height * baseScale;
-        x = 0;
-        y = (containerSize.height - imageHeight) / 2;
-      } else {
-        // Image is taller than container
-        baseScale = containerSize.height / imageObject.height;
-        imageWidth = imageObject.width * baseScale;
-        imageHeight = containerSize.height;
-        x = (containerSize.width - imageWidth) / 2;
-        y = 0;
-      }
-
-      // Apply zoom and pan 
-      // CSS transform applies translate in the SCALED coordinate system
-      // we need to multiply panOffset by zoomLevel to get the actual pixel offset
-      const zoomedWidth = imageWidth * zoomLevel;
-      const zoomedHeight = imageHeight * zoomLevel;
-      const baseCenterX = x + imageWidth / 2;
-      const baseCenterY = y + imageHeight / 2;
-      const zoomedX = baseCenterX - zoomedWidth / 2;
-      const zoomedY = baseCenterY - zoomedHeight / 2;
-      // Apply panOffset in scaled coordinate system (matching CSS transform behavior)
-      const finalX = zoomedX + (panOffset.x * zoomLevel);
-      const finalY = zoomedY + (panOffset.y * zoomLevel);
-
-      setImageDimensions({ 
-        width: imageWidth, 
-        height: imageHeight, 
-        x: x, 
-        y: y,
-        baseScale: baseScale,
-        displayWidth: zoomedWidth, 
-        displayHeight: zoomedHeight, 
-        displayX: finalX, 
-        displayY: finalY
-      });
-    }
-  }, [imageObject, containerSize, zoomLevel, panOffset]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        setContainerSize({ width, height });
-      }
-    });
-
-    resizeObserver.observe(containerRef.current);
-    return () => resizeObserver.disconnect();
+  // Show focus mode warning
+  const showFocusModeWarning = useCallback((message) => {
+    setFocusModeWarning(message);
+    setTimeout(() => setFocusModeWarning(null), 3000);
   }, []);
 
-  const stageToImageCoords = useCallback((stageX, stageY) => {
-    if (!imageObject || !imageDimensions.baseScale) return null;
+  // Prompt types advertised by the active model (drives which modes the toolbar offers)
+  const selectedModelObj = (availablePromptedModels || []).find((m) => m.id === selectedModel);
+  const supportedPromptTypes = selectedModelObj?.supported_prompt_types;
+  const polygonSupported =
+    !Array.isArray(supportedPromptTypes) ||
+    supportedPromptTypes.length === 0 ||
+    supportedPromptTypes.some((t) => String(t || '').trim().toLowerCase().replace(/s$/, '') === 'polygon');
 
-    const relativeX = stageX - imageDimensions.displayX;
-    const relativeY = stageY - imageDimensions.displayY;
+  const getScale = useCallback(
+    () => imageDimensions.baseScale * zoomLevel,
+    [imageDimensions.baseScale, zoomLevel]
+  );
+  const toStage = useCallback(
+    (pt) => {
+      const finalScale = imageDimensions.baseScale * zoomLevel;
+      return [
+        pt.x * finalScale + imageDimensions.displayX,
+        pt.y * finalScale + imageDimensions.displayY,
+      ];
+    },
+    [imageDimensions, zoomLevel]
+  );
 
-    if (
-      relativeX < 0 ||
-      relativeY < 0 ||
-      relativeX > imageDimensions.displayWidth ||
-      relativeY > imageDimensions.displayHeight
-    ) {
-      return null;
+  // Polygon / freehand completion: validate against focus mode, then add a prompt
+  const handleDrawFinalize = useCallback((points, { freehand }) => {
+    const cx = points.reduce((sum, p) => sum + p.x, 0) / points.length;
+    const cy = points.reduce((sum, p) => sum + p.y, 0) / points.length;
+    if (!isPointInFocusedObject(cx, cy, focusedObjectMask)) {
+      showFocusModeWarning(
+        `${freehand ? 'Freehand' : 'Polygon'} annotation is outside the focused object boundary`
+      );
+      return;
     }
+    addPolygonPrompt(points, { freehand });
+  }, [focusedObjectMask, showFocusModeWarning, addPolygonPrompt]);
 
-    const finalScale = imageDimensions.baseScale * zoomLevel;
-    const imageX = Math.round(relativeX / finalScale);
-    const imageY = Math.round(relativeY / finalScale);
-    
-    // Clamp to image bounds
-    const clampedImageX = Math.max(0, Math.min(imageObject.width - 1, imageX));
-    const clampedImageY = Math.max(0, Math.min(imageObject.height - 1, imageY));
+  const {
+    isDrawMode,
+    polygonPoints,
+    cursorImagePt,
+    handleMouseDown: drawMouseDown,
+    handleMouseMove: drawMouseMove,
+    handleMouseUp: drawMouseUp,
+    handleDblClick: drawDblClick,
+    handleKeyDown: drawKeyDown,
+  } = usePromptDrawing({
+    mode: promptMode,
+    stageToImageCoords,
+    getScale,
+    onFinalize: handleDrawFinalize,
+  });
 
-    return { 
-      imageX: clampedImageX, 
-      imageY: clampedImageY, 
-      stageX: relativeX + imageDimensions.displayX, 
-      stageY: relativeY + imageDimensions.displayY 
-    };
-  }, [imageObject, imageDimensions, zoomLevel, panOffset]);
+  // If the active model declares supported prompt types and polygon isn't among
+  // them, fall back to point mode so the user isn't stuck drawing unusable prompts.
+  useEffect(() => {
+    if (!isDrawMode) return;
+    if (!Array.isArray(supportedPromptTypes) || supportedPromptTypes.length === 0) return;
+    const supportsPolygon = supportedPromptTypes.some((t) =>
+      String(t || '').trim().toLowerCase().replace(/s$/, '') === 'polygon'
+    );
+    if (!supportsPolygon) {
+      setPromptMode('point');
+    }
+  }, [isDrawMode, supportedPromptTypes, setPromptMode]);
 
   const handleStageClick = useCallback((e) => {
-    if (currentTool !== 'ai_annotation' || !selectedModel || isDragging) return;
+    if (!active || !selectedModel || isDragging) return;
+    // Negative-point shortcut (right-click) only applies in point mode
+    if (promptMode !== 'point') return;
     if (e.evt.button !== 2) return;
 
     const stage = e.target.getStage();
@@ -194,39 +179,24 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     }
 
     addPointPrompt(coords.imageX, coords.imageY, 'negative');
-  }, [currentTool, selectedModel, isDragging, stageToImageCoords, addPointPrompt, focusedObjectMask, showFocusModeWarning]);
+  }, [active, selectedModel, isDragging, promptMode, stageToImageCoords, addPointPrompt, focusedObjectMask, showFocusModeWarning]);
 
-  const handlePanStart = useCallback((e) => {
-    if (e.evt.button === 1 || (e.evt.button === 0 && isPanMode)) {
-      setIsPanning(true);
-      setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
-    }
-  }, [isPanMode]);
-
-  const handlePanMove = useCallback((e) => {
-    if (!isPanning || !panStart) return;
-    
-    const deltaX = e.evt.clientX - panStart.x;
-    const deltaY = e.evt.clientY - panStart.y;
-    
-    setPanOffset({
-      x: panOffset.x + deltaX,
-      y: panOffset.y + deltaY
-    });
-    
-    setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
-  }, [isPanning, panStart, panOffset, setPanOffset]);
-
-  const handlePanEnd = useCallback(() => {
-    setIsPanning(false);
-    setPanStart(null);
-  }, []);
+  const handleStageDblClick = useCallback((e) => {
+    if (isDrawMode) drawDblClick(e);
+  }, [isDrawMode, drawDblClick]);
 
   const handleMouseDown = useCallback((e) => {
-    if (currentTool !== 'ai_annotation' || !selectedModel) return;
+    if (!active || !selectedModel) return;
 
+    // Panning takes priority (middle mouse, or Space-held left drag)
     if (e.evt.button === 1 || (e.evt.button === 0 && isPanMode)) {
       handlePanStart(e);
+      return;
+    }
+
+    // Polygon / freehand drawing modes have their own gesture handling
+    if (isDrawMode) {
+      drawMouseDown(e);
       return;
     }
 
@@ -234,12 +204,11 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
-    
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return;
 
     setDragStart({ imageX: coords.imageX, imageY: coords.imageY, stageX: coords.stageX, stageY: coords.stageY });
-  }, [currentTool, selectedModel, isPanMode, stageToImageCoords, handlePanStart]);
+  }, [active, selectedModel, isPanMode, isDrawMode, drawMouseDown, stageToImageCoords, handlePanStart]);
 
   const handleMouseMove = useCallback((e) => {
     if (isPanning) {
@@ -247,17 +216,24 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       return;
     }
 
+    if (isDrawMode) {
+      drawMouseMove(e);
+      return;
+    }
+
     if (!dragStart) return;
+
+    // Box preview only matters in box mode
+    if (promptMode !== 'box') return;
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
-    
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return;
 
     if (!isDragging) {
       const distance = Math.sqrt(
-        Math.pow(pointerPosition.x - dragStart.stageX, 2) + 
+        Math.pow(pointerPosition.x - dragStart.stageX, 2) +
         Math.pow(pointerPosition.y - dragStart.stageY, 2)
       );
       if (distance > 5) {
@@ -271,7 +247,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       x2: coords.stageX,
       y2: coords.stageY,
     });
-  }, [isPanning, handlePanMove, isDragging, dragStart, stageToImageCoords, setActivePreview]);
+  }, [isPanning, handlePanMove, isDrawMode, drawMouseMove, dragStart, promptMode, isDragging, stageToImageCoords, setActivePreview]);
 
   const handleMouseUp = useCallback((e) => {
     if (isPanning) {
@@ -279,26 +255,25 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       return;
     }
 
-    if (isDragging && dragStart) {
+    if (isDrawMode) {
+      drawMouseUp(e);
+      return;
+    }
+
+    if (promptMode === 'box' && isDragging && dragStart) {
       const stage = e.target.getStage();
       const pointerPosition = stage.getPointerPosition();
-      
       const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
-      
-      if (coords) {
-        const width = Math.abs(coords.imageX - dragStart.imageX);
-        const height = Math.abs(coords.imageY - dragStart.imageY);
 
-        if (width >= 3 && height >= 3) {
+      if (coords) {
+        const w = Math.abs(coords.imageX - dragStart.imageX);
+        const h = Math.abs(coords.imageY - dragStart.imageY);
+
+        if (w >= 3 && h >= 3) {
           if (!isBoxInFocusedObject(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY, focusedObjectMask)) {
             showFocusModeWarning('Box annotation is outside the focused object boundary');
           } else {
-            addBoxPrompt(
-              dragStart.imageX,
-              dragStart.imageY,
-              coords.imageX,
-              coords.imageY
-            );
+            addBoxPrompt(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY);
           }
         }
       }
@@ -306,156 +281,74 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       setDragStart(null);
       setIsDragging(false);
       setActivePreview(null);
-    } else if (dragStart && currentTool === 'ai_annotation' && selectedModel && e.evt.button === 0) {
+    } else if (promptMode === 'point' && dragStart && active && selectedModel && e.evt.button === 0) {
       const stage = e.target.getStage();
       const pointerPosition = stage.getPointerPosition();
       const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
-      if (!coords) return;
 
-      if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
-        showFocusModeWarning('Point annotation is outside the focused object boundary');
-        setDragStart(null);
-        setIsDragging(false);
-        setActivePreview(null);
-        return;
+      if (coords) {
+        if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
+          showFocusModeWarning('Point annotation is outside the focused object boundary');
+        } else {
+          addPointPrompt(coords.imageX, coords.imageY, 'positive');
+        }
       }
 
-      addPointPrompt(coords.imageX, coords.imageY, 'positive');
+      setDragStart(null);
+      setIsDragging(false);
+      setActivePreview(null);
+    } else {
+      // No actionable gesture (e.g. plain click in box mode) — clear transient state
       setDragStart(null);
       setIsDragging(false);
       setActivePreview(null);
     }
-  }, [isPanning, handlePanEnd, isDragging, dragStart, currentTool, selectedModel, stageToImageCoords, addBoxPrompt, addPointPrompt, setActivePreview, focusedObjectMask, showFocusModeWarning]);
+  }, [isPanning, handlePanEnd, isDrawMode, drawMouseUp, promptMode, isDragging, dragStart, active, selectedModel, stageToImageCoords, addBoxPrompt, addPointPrompt, focusedObjectMask, showFocusModeWarning, setActivePreview]);
 
-  const handleWheel = useCallback((e) => {
-    e.evt.preventDefault();
-    
-    if (!imageObject || !containerSize.width || !containerSize.height) return;
-    
-    const stage = e.target.getStage();
-    const pointerPosition = stage.getPointerPosition();
-    const scaleBy = 1.1;
-    const newScale = e.evt.deltaY > 0 ? zoomLevel / scaleBy : zoomLevel * scaleBy;
-    const clampedScale = Math.max(0.1, Math.min(10, newScale));
-    const imageAspect = imageObject.width / imageObject.height;
-    const containerAspect = containerSize.width / containerSize.height;
-    
-    let baseScale, imageWidth, imageHeight, x, y;
-    
-    if (imageAspect > containerAspect) {
-      baseScale = containerSize.width / imageObject.width;
-      imageWidth = containerSize.width;
-      imageHeight = imageObject.height * baseScale;
-      x = 0;
-      y = (containerSize.height - imageHeight) / 2;
-    } else {
-      baseScale = containerSize.height / imageObject.height;
-      imageWidth = imageObject.width * baseScale;
-      imageHeight = containerSize.height;
-      x = (containerSize.width - imageWidth) / 2;
-      y = 0;
-    }
-    
-    const baseCenterX = x + imageWidth / 2;
-    const baseCenterY = y + imageHeight / 2;
-    const currentZoomedWidth = imageWidth * zoomLevel;
-    const currentZoomedHeight = imageHeight * zoomLevel;
-    const currentZoomedX = baseCenterX - currentZoomedWidth / 2;
-    const currentZoomedY = baseCenterY - currentZoomedHeight / 2;
-    const currentImageX = currentZoomedX + panOffset.x;
-    const currentImageY = currentZoomedY + panOffset.y;
-    const relativeX = pointerPosition.x - currentImageX;
-    const relativeY = pointerPosition.y - currentImageY;
-    const imagePixelX = relativeX / (baseScale * zoomLevel);
-    const imagePixelY = relativeY / (baseScale * zoomLevel);
-    const newZoomedWidth = imageWidth * clampedScale;
-    const newZoomedHeight = imageHeight * clampedScale;
-    const newZoomedX = baseCenterX - newZoomedWidth / 2;
-    const newZoomedY = baseCenterY - newZoomedHeight / 2;
-    const newPanX = pointerPosition.x - newZoomedX - (imagePixelX * baseScale * clampedScale);
-    const newPanY = pointerPosition.y - newZoomedY - (imagePixelY * baseScale * clampedScale);
-    
-    setZoomLevel(clampedScale);
-    setPanOffset({ x: newPanX, y: newPanY });
-  }, [zoomLevel, panOffset, setZoomLevel, setPanOffset, imageObject, containerSize]);
-
+  // Keyboard: drawing shortcuts (Enter/Esc) take priority, then refinement Escape
   useEffect(() => {
-    let spacebarPressed = false;
-    
+    if (!active) return undefined;
+
     const handleKeyDown = async (e) => {
-      if (currentTool !== 'ai_annotation') return;
-      
-      // Handle ESC key for exiting refinement mode
+      if (drawKeyDown(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Single-key mode switching (ignore while typing or with modifiers)
+      const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
+      if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'p') { e.preventDefault(); setPromptMode('point'); return; }
+        if (key === 'b') { e.preventDefault(); setPromptMode('box'); return; }
+        if (key === 'g' && polygonSupported) { e.preventDefault(); setPromptMode('polygon'); return; }
+        if (key === 'f' && polygonSupported) { e.preventDefault(); setPromptMode('freehand'); return; }
+      }
+
       if (e.code === 'Escape' && refinementModeActive) {
         e.preventDefault();
         e.stopPropagation();
         try {
-          // Send unselect message to backend
           await annotationSession.unselectRefinementObject();
-          
-          // Reset zoom and pan before exiting
           setZoomLevel(1);
           setPanOffset({ x: 0, y: 0 });
-          
-          // Exit refinement mode in store
           exitRefinementMode();
-          
-          console.log('Exited refinement mode via ESC key');
         } catch (error) {
           console.error('Failed to exit refinement mode:', error);
         }
-        return;
-      }
-      
-      // Handle Space key for pan mode
-      if (e.code === 'Space' && !spacebarPressed) {
-        e.preventDefault();
-        e.stopPropagation();
-        spacebarPressed = true;
-        setIsPanMode(true);
-      }
-    };
-
-    const handleKeyUp = (e) => {
-      if (currentTool !== 'ai_annotation') return;
-      if (e.code === 'Space' && spacebarPressed) {
-        e.preventDefault();
-        e.stopPropagation();
-        spacebarPressed = false;
-        setIsPanMode(false);
-      }
-    };
-
-    const handleBlur = () => {
-      spacebarPressed = false;
-      setIsPanMode(false);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        spacebarPressed = false;
-        setIsPanMode(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [currentTool, refinementModeActive, exitRefinementMode, setZoomLevel, setPanOffset]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [active, drawKeyDown, refinementModeActive, exitRefinementMode, setZoomLevel, setPanOffset, setPromptMode, polygonSupported]);
 
   const handleContextMenu = useCallback((e) => {
     e.evt.preventDefault();
   }, []);
 
-  if (currentTool !== 'ai_annotation') return null;
+  if (!active) return null;
 
   if (imageLoading) {
     return (
@@ -481,18 +374,16 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
     );
   }
 
-  const cursor = !selectedModel 
-    ? 'not-allowed' 
-    : isPanning 
-      ? 'grabbing' 
-      : isPanMode 
-        ? 'grab' 
-        : isDragging 
-          ? 'crosshair' 
-          : 'crosshair';
+  const cursor = !selectedModel
+    ? 'not-allowed'
+    : isPanning
+      ? 'grabbing'
+      : isPanMode
+        ? 'grab'
+        : 'crosshair';
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="absolute inset-0 z-10"
       style={{ cursor }}
@@ -503,11 +394,25 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
           Pan Mode - Hold Space + Drag
         </div>
       )}
+
+      {/* Prompt drawing-mode selector (points / box / polygon / freehand) */}
+      <PromptModeToolbar supportedTypes={supportedPromptTypes} shiftDown={overlayActive} />
+
+      {/* Drawing instructions for polygon / freehand modes */}
+      {isDrawMode && selectedModel && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none">
+          {promptMode === 'polygon'
+            ? 'Click to add points · double-click or Enter to close · right-click undoes a point · Esc cancels'
+            : 'Press and drag to trace an outline · release to close'}
+        </div>
+      )}
+
       <Stage
         ref={stageRef}
         width={containerSize.width}
         height={containerSize.height}
         onClick={handleStageClick}
+        onDblClick={handleStageDblClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -557,9 +462,36 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
               };
               return <PointPromptMarker key={prompt.id} prompt={stagePrompt} />;
             })}
+
+          {/* Finalized polygon / freehand prompts */}
+          {prompts
+            .filter((p) => p.type === 'polygon')
+            .map((prompt) => {
+              const stagePoints = [];
+              (prompt.coords.points || []).forEach((pt) => {
+                const [sx, sy] = toStage(pt);
+                stagePoints.push(sx, sy);
+              });
+              return (
+                <PolygonPromptMarker
+                  key={prompt.id}
+                  prompt={{ ...prompt, coords: { stagePoints } }}
+                />
+              );
+            })}
+
+          {/* In-progress polygon / freehand outline */}
+          {isDrawMode && (
+            <DrawingPreview
+              mode={promptMode}
+              polygonPoints={polygonPoints}
+              cursorImagePt={cursorImagePt}
+              toStage={toStage}
+            />
+          )}
         </Layer>
       </Stage>
-      
+
       {focusModeWarning && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
@@ -575,4 +507,3 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 };
 
 export default AIPromptCanvas;
-

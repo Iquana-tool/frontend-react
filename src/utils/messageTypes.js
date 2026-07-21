@@ -24,12 +24,12 @@ export const CLIENT_MESSAGE_TYPES = {
   PROMPTED_SELECT_MODEL: 'prompted_select_model',
   PROMPTED_SEGMENTATION: 'prompted_inference',
   
-  // Completion Segmentation
-  COMPLETION_SELECT_MODEL: 'completion_select_model',
-  
-  // Semantic Segmentation
-  SEMANTIC_SELECT_MODEL: 'semantic_select_model',
-  
+  // Suggestion Segmentation
+  SUGGESTION_SELECT_MODEL: 'suggestion_select_model',
+
+  // Instance Segmentation
+  INSTANCE_SELECT_MODEL: 'instance_select_model',
+
   // Object Management
   OBJECT_ADD_MANUAL: 'object_add_manual',
   OBJECT_FINALISE: 'object_finalise',
@@ -37,9 +37,9 @@ export const CLIENT_MESSAGE_TYPES = {
   OBJECT_MODIFY: 'object_modify',
   
   // Session Management
-  COMPLETION_ENABLE: 'completion_enable',
-  COMPLETION_INFERENCE: 'completion_inference',
-  SEMANTIC_INFERENCE: 'semantic_inference',
+  SUGGESTION_ENABLE: 'suggestion_enable',
+  SUGGESTION_INFERENCE: 'suggestion_inference',
+  INSTANCE_INFERENCE: 'instance_inference',
   FINISH_ANNOTATION: 'finish_annotation',
 };
 
@@ -146,20 +146,20 @@ export const MessageBuilders = {
   ),
 
   /**
-   * Select model for completion segmentation
-   * @param {string} modelIdentifier - Completion model identifier
+   * Select model for suggestion segmentation
+   * @param {string} modelIdentifier - Suggestion model identifier
    */
-  selectCompletionModel: (modelIdentifier) => createMessage(
-    CLIENT_MESSAGE_TYPES.COMPLETION_SELECT_MODEL,
+  selectSuggestionModel: (modelIdentifier) => createMessage(
+    CLIENT_MESSAGE_TYPES.SUGGESTION_SELECT_MODEL,
     { model_identifier: modelIdentifier }
   ),
 
   /**
-   * Select model for semantic segmentation
-   * @param {string} modelName - Semantic model identifier
+   * Select model for instance segmentation
+   * @param {string} modelName - Instance model identifier
    */
-  selectSemanticModel: (modelName) => createMessage(
-    CLIENT_MESSAGE_TYPES.SEMANTIC_SELECT_MODEL,
+  selectInstanceModel: (modelName) => createMessage(
+    CLIENT_MESSAGE_TYPES.INSTANCE_SELECT_MODEL,
     { selected_model: modelName }
   ),
 
@@ -169,7 +169,9 @@ export const MessageBuilders = {
    * @param {Object} prompts - Prompts object containing points and box
    * @param {Array} prompts.point_prompts - Array of point prompts {x: float, y: float, label: boolean}
    * @param {Object} prompts.box_prompt - Single box prompt {min_x, min_y, max_x, max_y} or null
-   */  
+   * @param {Object} prompts.polygon_prompt - Single polygon prompt {vertices: [[x, y], ...]} or null
+   * @param {Object} prompts.circle_prompt - Single circle prompt {center_x, center_y, radius} or null
+   */
   runSegmentation: (modelIdentifier, prompts) => createMessage(
     CLIENT_MESSAGE_TYPES.PROMPTED_SEGMENTATION,
     {
@@ -178,6 +180,8 @@ export const MessageBuilders = {
       prompts: {
         point_prompts: prompts.point_prompts || [],
         box_prompt: prompts.box_prompt || null,
+        polygon_prompt: prompts.polygon_prompt || null,
+        circle_prompt: prompts.circle_prompt || null,
       },
     }
   ),
@@ -233,21 +237,21 @@ export const MessageBuilders = {
   ),
 
   /**
-   * Enable completion mode
+   * Enable suggestion mode
    */
-  enableCompletion: () => createMessage(
-    CLIENT_MESSAGE_TYPES.COMPLETION_ENABLE,
+  enableSuggestion: () => createMessage(
+    CLIENT_MESSAGE_TYPES.SUGGESTION_ENABLE,
     {}
   ),
 
   /**
-   * Request completion inference to find similar instances
+   * Request suggestion inference to find similar instances
    * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
-   * @param {string} modelKey - Completion model key (e.g., 'DINOv3')
+   * @param {string} modelKey - Suggestion model key (e.g., 'DINOv3')
    * @param {number|null} labelId - Optional label ID to assign to found instances
    */
-  runCompletion: (seedContourIds, modelKey, labelId = null) => createMessage(
-    CLIENT_MESSAGE_TYPES.COMPLETION_INFERENCE,
+  runSuggestion: (seedContourIds, modelKey, labelId = null) => createMessage(
+    CLIENT_MESSAGE_TYPES.SUGGESTION_INFERENCE,
     {
       seed_contour_ids: seedContourIds,
       model_key: modelKey,
@@ -256,11 +260,11 @@ export const MessageBuilders = {
   ),
 
   /**
-   * Request semantic segmentation inference
-   * @param {string} modelKey - Semantic model key
+   * Request instance segmentation inference
+   * @param {string} modelKey - Instance model key
    */
-  runSemantic: (modelKey) => createMessage(
-    CLIENT_MESSAGE_TYPES.SEMANTIC_INFERENCE,
+  runInstance: (modelKey) => createMessage(
+    CLIENT_MESSAGE_TYPES.INSTANCE_INFERENCE,
     {
       model_registry_key: modelKey,
     }

@@ -28,16 +28,16 @@ export const useZoomLevel = () => useAnnotationStore(state => state.images.zoomL
 export const usePanOffset = () => useAnnotationStore(state => state.images.panOffset);
 
 export const usePromptedModel = () => useAnnotationStore(state => state.models.promptedModel);
-export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
-export const useSemanticModel = () => useAnnotationStore(state => state.models.semanticModel);
+export const useSuggestionModel = () => useAnnotationStore(state => state.models.suggestionModel);
+export const useInstanceModel = () => useAnnotationStore(state => state.models.instanceModel);
 export const useAvailablePromptedModels = () => useAnnotationStore(state => state.models.availablePromptedModels);
-export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
-export const useAvailableSemanticModels = () => useAnnotationStore(state => state.models.availableSemanticModels);
+export const useAvailableSuggestionModels = () => useAnnotationStore(state => state.models.availableSuggestionModels);
+export const useAvailableInstanceModels = () => useAnnotationStore(state => state.models.availableInstanceModels);
 export const useIsLoadingPromptedModels = () => useAnnotationStore(state => state.models.isLoadingModels);
-export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
-export const useIsLoadingSemanticModels = () => useAnnotationStore(state => state.models.isLoadingSemanticModels);
-export const useIsRunningCompletion = () => useAnnotationStore(state => state.models.isRunningCompletion);
-export const useIsRunningSemantic = () => useAnnotationStore(state => state.models.isRunningSemantic);
+export const useIsLoadingSuggestionModels = () => useAnnotationStore(state => state.models.isLoadingSuggestionModels);
+export const useIsLoadingInstanceModels = () => useAnnotationStore(state => state.models.isLoadingInstanceModels);
+export const useIsRunningSuggestion = () => useAnnotationStore(state => state.models.isRunningSuggestion);
+export const useIsRunningInstance = () => useAnnotationStore(state => state.models.isRunningInstance);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
@@ -70,13 +70,13 @@ export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => stat
 export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
 
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
-export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
-export const useSetSemanticModel = () => useAnnotationStore(state => state.setSemanticModel);
-export const useSetIsRunningCompletion = () => useAnnotationStore(state => state.setIsRunningCompletion);
-export const useSetIsRunningSemantic = () => useAnnotationStore(state => state.setIsRunningSemantic);
+export const useSetSuggestionModel = () => useAnnotationStore(state => state.setSuggestionModel);
+export const useSetInstanceModel = () => useAnnotationStore(state => state.setInstanceModel);
+export const useSetIsRunningSuggestion = () => useAnnotationStore(state => state.setIsRunningSuggestion);
+export const useSetIsRunningInstance = () => useAnnotationStore(state => state.setIsRunningInstance);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
-export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
-export const useFetchAvailableSemanticModels = () => useAnnotationStore(state => state.fetchAvailableSemanticModels);
+export const useFetchAvailableSuggestionModels = () => useAnnotationStore(state => state.fetchAvailableSuggestionModels);
+export const useFetchAvailableInstanceModels = () => useAnnotationStore(state => state.fetchAvailableInstanceModels);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
 export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);
@@ -95,8 +95,8 @@ export const useSetPanOffset = () => useAnnotationStore(state => state.setPanOff
 export const useResetImageState = () => useAnnotationStore(state => state.resetImageState);
 
 // UI selectors
-export const useSemanticRunRequested = () => useAnnotationStore(state => state.ui.semanticRunRequested);
-export const useSemanticWarningModalOpen = () => useAnnotationStore(state => state.ui.semanticWarningModalOpen);
+export const useInstanceRunRequested = () => useAnnotationStore(state => state.ui.instanceRunRequested);
+export const useInstanceWarningModalOpen = () => useAnnotationStore(state => state.ui.instanceWarningModalOpen);
 
 // Sidebar actions
 export const useSetLeftSidebarCollapsed = () => useAnnotationStore(state => state.setLeftSidebarCollapsed);
@@ -107,14 +107,16 @@ export const useToggleRightSidebar = () => useAnnotationStore(state => state.tog
 // Annotation Overview actions
 export const useSetVisibilityControlsExpanded = () => useAnnotationStore(state => state.setVisibilityControlsExpanded);
 export const useToggleVisibilityControls = () => useAnnotationStore(state => state.toggleVisibilityControls);
-export const useSetSemanticRunRequested = () => useAnnotationStore(state => state.setSemanticRunRequested);
-export const useSetSemanticWarningModalOpen = () => useAnnotationStore(state => state.setSemanticWarningModalOpen);
+export const useSetInstanceRunRequested = () => useAnnotationStore(state => state.setInstanceRunRequested);
+export const useSetInstanceWarningModalOpen = () => useAnnotationStore(state => state.setInstanceWarningModalOpen);
 
 // AI Annotation selectors
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
 export const useInstantSegmentation = () => useAnnotationStore(state => state.aiAnnotation.instantSegmentation);
+export const usePromptMode = () => useAnnotationStore(state => state.aiAnnotation.promptMode);
+export const useManualDrawMode = () => useAnnotationStore(state => state.aiAnnotation.manualDrawMode);
 
 // Refinement mode selectors
 export const useRefinementModeActive = () => useAnnotationStore(state => state.aiAnnotation.refinementMode.active);
@@ -124,6 +126,9 @@ export const useRefinementModeContourId = () => useAnnotationStore(state => stat
 // AI Annotation actions
 export const useAddPointPrompt = () => useAnnotationStore(state => state.addPointPrompt);
 export const useAddBoxPrompt = () => useAnnotationStore(state => state.addBoxPrompt);
+export const useAddPolygonPrompt = () => useAnnotationStore(state => state.addPolygonPrompt);
+export const useSetPromptMode = () => useAnnotationStore(state => state.setPromptMode);
+export const useSetManualDrawMode = () => useAnnotationStore(state => state.setManualDrawMode);
 export const useRemoveLastPrompt = () => useAnnotationStore(state => state.removeLastPrompt);
 export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
@@ -178,6 +183,15 @@ export const useHideContextMenu = () => useAnnotationStore(state => state.hideCo
 export const useFocusModeActive = () => useAnnotationStore(state => state.focusMode.active);
 export const useFocusModeObjectId = () => useAnnotationStore(state => state.focusMode.objectId);
 export const useFocusModeObjectMask = () => useAnnotationStore(state => state.focusMode.objectMask);
+
+// Contour id of the focused object (for nesting manual annotations), or null
+export const useFocusedParentContourId = () => useAnnotationStore((state) => {
+  if (!state.focusMode.active) return null;
+  const focusedId = state.focusMode.objectId;
+  const obj = state.objects.list.find((o) => o.id === focusedId);
+  if (!obj) return null;
+  return obj.contour_id ?? obj.id ?? null;
+});
 
 // Focus Mode actions
 export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFocusMode);

@@ -245,11 +245,14 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     };
   }, [imageObject]);
 
-  // Helper function to convert hex color to rgba
+  // Helper function to convert hex color to rgba.
+  // Falls back to a default color when an object is missing a valid hex color so
+  // one bad object can't crash the whole overlay (and therefore the page).
   const hexToRgba = (hex, alpha) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
+    const safeHex = typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#3b82f6';
+    const r = parseInt(safeHex.slice(1, 3), 16);
+    const g = parseInt(safeHex.slice(3, 5), 16);
+    const b = parseInt(safeHex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
