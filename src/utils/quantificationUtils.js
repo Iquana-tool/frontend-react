@@ -200,6 +200,160 @@ export const computeAnnotationInsights = (metricsPerLabelId, labelIdToName = {},
   };
 };
 
+// --- Step 5: helpers for the pre-aggregated /summary shape -------------------
+// The summary endpoint returns metrics[labelId][metricKey] =
+//   { unit, components: [{ count, mean, std, min, max }, ...] }
+// so no JS-side aggregation over raw arrays is needed anymore.
+
+// Build a lookup: metric_key -> catalog entry (name, unit_kind, value_dim, components...).
+export const buildMetricCatalogMap = (catalog) => {
+  const map = {};
+  (catalog || []).forEach((m) => {
+    map[m.key] = m;
+  });
+  return map;
+};
+
+// Auto-expand labels that have aggregated metrics or child counts (new summary shape).
+export const getLabelsToAutoExpandFromSummary = (metricsByLabelId, childCountsPerLabelId) => {
+  const labelsToExpand = new Set();
+  const addKeys = (obj) => {
+    if (!obj) return;
+    Object.keys(obj).forEach((key) => {
+      if (key === "null") return;
+      const num = Number(key);
+      labelsToExpand.add(isNaN(num) ? key : num);
+    });
+  };
+  addKeys(metricsByLabelId);
+  addKeys(childCountsPerLabelId);
+  return labelsToExpand;
+};
+
+// Prepare comparison-chart rows generically from the aggregated summary. For each label,
+// emits one field per single-component (value_dim 1) metric holding its mean, plus a
+// `${key}_count`. Multi-component metrics (e.g. color) are skipped in the bar charts.
+export const prepareComparisonDataFromSummary = (metricsByLabelId, labelIdToName, catalogMap = {}) => {
+  if (!metricsByLabelId) return [];
+  const chartData = [];
+  Object.entries(metricsByLabelId).forEach(([labelId, labelMetrics]) => {
+    if (labelId === "null") return;
+    const labelName =
+      labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`;
+    const row = { label: labelName, labelId };
+    Object.entries(labelMetrics).forEach(([metricKey, metric]) => {
+      const catalog = catalogMap[metricKey];
+      const valueDim = catalog?.value_dim ?? metric.components?.length ?? 1;
+      if (valueDim !== 1) return; // charts are for scalar metrics only
+      const comp = metric.components?.[0];
+      if (comp && typeof comp.mean === "number") {
+        row[metricKey] = comp.mean;
+        row[`${metricKey}_count`] = comp.count;
+      }
+    });
+    if (Object.keys(row).length > 2) chartData.push(row);
+  });
+  return chartData;
+};
+
+// Which scalar metric keys are present anywhere in the summary (for generic chart series).
+export const collectScalarMetricKeys = (metricsByLabelId, catalogMap = {}) => {
+  const keys = new Set();
+  Object.values(metricsByLabelId || {}).forEach((labelMetrics) => {
+    Object.entries(labelMetrics).forEach(([metricKey, metric]) => {
+      const valueDim = catalogMap[metricKey]?.value_dim ?? metric.components?.length ?? 1;
+      if (valueDim === 1) keys.add(metricKey);
+    });
+  });
+  return Array.from(keys);
+};
+
+// Annotation insights from the aggregated summary. Object count per label uses the count
+// of the first present metric's first component (all geometry metrics share the same
+// contour set, so any of them gives the object count).
+export const computeAnnotationInsightsFromSummary = (
+  metricsByLabelId,
+  labelIdToName = {},
+  totalLabels = 0
+) => {
+  const entries = Object.entries(metricsByLabelId || {});
+  let totalObjects = 0;
+  let unlabeledObjects = 0;
+  const perLabelCounts = [];
+
+  const objectCountFor = (labelMetrics) => {
+    const first = Object.values(labelMetrics || {})[0];
+    return first?.components?.[0]?.count || 0;
+  };
+
+  entries.forEach(([labelId, labelMetrics]) => {
+    const count = objectCountFor(labelMetrics);
+    if (labelId === "null") {
+      unlabeledObjects += count;
+      return;
+    }
+    totalObjects += count;
+    if (count > 0) {
+      perLabelCounts.push({
+        labelId,
+        name: labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`,
+        count,
+      });
+    }
+  });
+
+  const annotatedLabels = perLabelCounts.length;
+  let mostCommon = null;
+  let leastCommon = null;
+  perLabelCounts.forEach((entry) => {
+    if (!mostCommon || entry.count > mostCommon.count) mostCommon = entry;
+    if (!leastCommon || entry.count < leastCommon.count) leastCommon = entry;
+  });
+
+  return {
+    totalObjects,
+    unlabeledObjects,
+    annotatedLabels,
+    avgObjectsPerLabel: annotatedLabels > 0 ? totalObjects / annotatedLabels : 0,
+    mostCommon,
+    leastCommon,
+    imbalanceRatio:
+      leastCommon && leastCommon.count > 0 ? mostCommon.count / leastCommon.count : null,
+    coverage: totalLabels > 0 ? annotatedLabels / totalLabels : 0,
+  };
+};
+
+// Convert an opencv-8bit LAB triple (all channels 0-255) to a CSS sRGB string for a
+// swatch. Kept dependency-free: opencv scales L:0-255->0-100 and a,b:0-255->-128..127,
+// then standard CIELAB->XYZ (D65)->linear sRGB->gamma. Only used for display.
+export const opencvLabToRgbCss = ([L8, a8, b8]) => {
+  const L = (L8 / 255) * 100;
+  const a = a8 - 128;
+  const b = b8 - 128;
+
+  const fy = (L + 16) / 116;
+  const fx = fy + a / 500;
+  const fz = fy - b / 200;
+  const delta = 6 / 29;
+  const finv = (t) => (t > delta ? t * t * t : 3 * delta * delta * (t - 4 / 29));
+
+  // D65 reference white.
+  const Xn = 95.047, Yn = 100.0, Zn = 108.883;
+  const X = Xn * finv(fx) / 100;
+  const Y = Yn * finv(fy) / 100;
+  const Z = Zn * finv(fz) / 100;
+
+  let r = X * 3.2406 - Y * 1.5372 - Z * 0.4986;
+  let g = -X * 0.9689 + Y * 1.8758 + Z * 0.0415;
+  let bl = X * 0.0557 - Y * 0.204 + Z * 1.057;
+
+  const gamma = (c) => {
+    const v = c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    return Math.max(0, Math.min(255, Math.round(v * 255)));
+  };
+  return `rgb(${gamma(r)}, ${gamma(g)}, ${gamma(bl)})`;
+};
+
 // Transform flat contour data to hierarchical aggregated format
 export const transformFlatDataToHierarchical = (flatDataResponse) => {
   if (!flatDataResponse || !flatDataResponse.data) {

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import {
   computeLabelSpaceInsights,
-  computeAnnotationInsights,
+  computeAnnotationInsightsFromSummary,
 } from "../../utils/quantificationUtils";
 
 const ACCENTS = {
@@ -48,8 +48,8 @@ const formatNum = (value, decimals = 1) => {
 
 const SummaryCards = ({ data, labelIdToName = {} }) => {
   const structure = computeLabelSpaceInsights(data.labels);
-  const annotation = computeAnnotationInsights(
-    data.metrics_per_label_id,
+  const annotation = computeAnnotationInsightsFromSummary(
+    data.metrics,
     labelIdToName,
     structure.totalLabels
   );
