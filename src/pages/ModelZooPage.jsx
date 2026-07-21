@@ -16,12 +16,20 @@ import {
   cancelSemanticTraining,
 } from "../api/training";
 
+const normalizeTags = (tags) => {
+  if (Array.isArray(tags)) return tags;
+  if (typeof tags === "string") {
+    return tags.split(",").map((t) => t.trim()).filter(Boolean);
+  }
+  return [];
+};
+
 // Helper to transform backend model to UI format
 const transformModel = (model) => ({
   identifier: model.identifier || model.registry_key,
   name: model.name,
   description: model.description,
-  tags: model.tags || [],
+  tags: normalizeTags(model.tags),
   service: model.service,
   // Backend fields
   trainable: model.trainable !== false, // Default to true unless explicitly false

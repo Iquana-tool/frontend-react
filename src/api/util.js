@@ -37,8 +37,11 @@ export const buildUrl = (baseUrl, path, params = {}) => {
     const isAbsolute = cleanBase.startsWith('http://') || cleanBase.startsWith('https://');
     
     if (isAbsolute) {
-        // Use URL API for absolute URLs
-        const url = new URL(cleanPath, cleanBase);
+        // Use URL API for absolute URLs.
+        // Ensure base ends with "/" so path-style base segments like "/api"
+        // are preserved (otherwise URL() treats last segment as a file).
+        const absoluteBase = cleanBase.endsWith('/') ? cleanBase : `${cleanBase}/`;
+        const url = new URL(cleanPath, absoluteBase);
         Object.entries(params).forEach(([key, value]) => {
             if (value !== null && value !== undefined) {
                 url.searchParams.append(key, String(value));

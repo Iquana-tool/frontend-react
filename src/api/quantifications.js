@@ -1,8 +1,7 @@
 import { handleApiError, getAuthHeaders } from "../api/util";
 import { transformFlatDataToHierarchical } from "../utils/quantificationUtils";
 
-const API_BASE_URL =
-    process.env.REACT_APP_API_BASE_URL || "https://coral.ni.dfki.de/api";
+import { API_BASE_URL } from "./config";
 
 // Get quantification data for a given mask_id
 export const getQuantification = async (maskId) => {

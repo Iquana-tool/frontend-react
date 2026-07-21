@@ -1,11 +1,10 @@
 /**
- * Hook to preload models when they are switched by the user
- * This is to ensure newly selected models are loaded into backend memory
- * Only sends message when model CHANGES, not on initial mount
+ * Hook to preload selected models once the WS session is ready.
+ * Sends on initial default selection and whenever the selection changes.
  */
 
 import { useEffect, useRef } from 'react';
-import annotationSession from '../services/annotationSession';
+import { useWebSocketIsReady } from '../stores/selectors/annotationSelectors';
 
 /**
  * Preload a model when it changes
@@ -14,30 +13,26 @@ import annotationSession from '../services/annotationSession';
  * @param {string} modelType - Type of model for logging (e.g., 'prompted', 'completion')
  */
 const useModelSwitchPreloader = (model, preloadFn, modelType) => {
-  const previousModel = useRef(null);
-  const isFirstRender = useRef(true);
+  const wsIsReady = useWebSocketIsReady();
+  const lastSentModel = useRef(null);
 
   useEffect(() => {
-    // Skip on first render (initial mount)
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      previousModel.current = model;
+    if (!wsIsReady || !model) {
       return;
     }
 
-    // Only send if model actually changed AND session is ready
-    if (model && model !== previousModel.current && annotationSession.isReady()) {
-      // Extract model ID (handle both string IDs and model objects)
-      const modelId = typeof model === 'string' ? model : model?.id;
-      if (modelId) {
-        console.log(`[useModelSwitchPreloader] ${modelType} model changed to:`, modelId);
-        preloadFn(modelId).catch((err) => {
-          console.warn(`[useModelSwitchPreloader] Failed to preload ${modelType} model:`, err);
-        });
-      }
-      previousModel.current = model;
+    // Extract model ID (handle both string IDs and model objects)
+    const modelId = typeof model === 'string' ? model : model?.id;
+    if (!modelId || modelId === lastSentModel.current) {
+      return;
     }
-  }, [model, preloadFn, modelType]);
+
+    console.log(`[useModelSwitchPreloader] ${modelType} model selected:`, modelId);
+    preloadFn(modelId).catch((err) => {
+      console.warn(`[useModelSwitchPreloader] Failed to preload ${modelType} model:`, err);
+    });
+    lastSentModel.current = modelId;
+  }, [model, preloadFn, modelType, wsIsReady]);
 };
 
 export default useModelSwitchPreloader;

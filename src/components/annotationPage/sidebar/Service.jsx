@@ -97,7 +97,7 @@ const ServiceCard = ({
   onRun = null, // Optional callback to run the service (for semantic segmentation)
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const [selectedId, setSelectedId] = useState();
+  const firstModelId = models?.find((m) => m?.id)?.id || '';
   
   // Connect Instant Mode to store (only for Prompted Segmentation service)
   const instantSegmentation = useInstantSegmentation();
@@ -109,21 +109,15 @@ const ServiceCard = ({
   const selectedModelObj = models.find(m => m.id === selectedModel) || models[0];
 
   const handleModelChange = (event) => {
-    setSelectedId(event.target.value);
+    setSelectedModel(event.target.value);
   };
 
   useEffect(() => {
-    if (!selectedId || !models) {
-      setSelectedId(models[0]?.id);
+    // Ensure a default selection exists as soon as models arrive.
+    if (!selectedModel && Array.isArray(models) && models.length > 0 && firstModelId) {
+      setSelectedModel(firstModelId);
     }
-    // Collect all logic for model id switch here!
-    // Store only the model ID (string), not the whole object
-    if (selectedId) {
-      setSelectedModel(selectedId);
-    }
-    // Run dependent scripts like model loading here:
-
-  }, [selectedId, setSelectedModel, models]);
+  }, [selectedModel, models, setSelectedModel, firstModelId]);
 
   const handleInstantModeToggle = () => {
     if (isPromptedSegmentation) {
@@ -177,7 +171,7 @@ const ServiceCard = ({
         <div className="relative flex items-center space-x-2">
           <div className="flex-1 relative">
             <select
-              value={selectedModel || models[0]?.id || ''}
+              value={selectedModel || firstModelId}
               onChange={handleModelChange}
               className="w-full px-3 py-2.5 text-xs font-medium bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent appearance-none cursor-pointer hover:border-teal-300 hover:shadow-sm transition-all duration-200"
             >
