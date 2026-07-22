@@ -13,6 +13,8 @@ import DocumentationPage from "./pages/DocumentationPage";
 import QuantificationPage from "./pages/QuantificationPage";
 import ModelZooPage from "./pages/ModelZooPage";
 import ModelTrainingPage from "./pages/ModelTrainingPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
+import AdminUsersPage from "./pages/AdminUsersPage";
 
 function App() {
   return (
@@ -30,6 +32,17 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DatasetsPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Dataset invite links land here. The page itself bounces to
+                /login?next=... when the invitee is not signed in yet. */}
+            <Route path="/invites/:token" element={<AcceptInvitePage />} />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <AdminUsersPage />
                 </ProtectedRoute>
               }
             />

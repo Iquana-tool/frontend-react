@@ -109,6 +109,7 @@ const DatasetGallery = () => {
       <div className="h-full overflow-hidden">
         {currentView === "cards" ? (
           <ManagementCardsView
+            dataset={dataset}
             onDataManagementClick={handleDataManagementClick}
             onModelZooClick={handleModelZooClick}
             onQuantificationsClick={handleQuantificationsClick}

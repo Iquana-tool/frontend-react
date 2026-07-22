@@ -1,10 +1,11 @@
-import { Circle, Clock, Eye, CheckCircle2 } from 'lucide-react';
+import { Circle, Clock, Eye, CheckCircle2, RotateCcw } from 'lucide-react';
 
 /**
  * The annotation statuses an image's mask can have, with the colors/icons used
  * to present them. Order matches the natural annotation lifecycle.
  *
- * Single source of truth for the gallery badge and the status filters.
+ * Single source of truth for the gallery badge, the status filters and the
+ * dataset progress chart.
  */
 export const IMAGE_STATUSES = [
   {
@@ -14,6 +15,7 @@ export const IMAGE_STATUSES = [
     dot: 'bg-gray-400',
     badge: 'bg-gray-100 text-gray-700',
     ring: 'ring-gray-300',
+    chart: '#DC2626',
   },
   {
     key: 'in_progress',
@@ -22,6 +24,18 @@ export const IMAGE_STATUSES = [
     dot: 'bg-amber-500',
     badge: 'bg-amber-100 text-amber-800',
     ring: 'ring-amber-300',
+    chart: '#F59E0B',
+  },
+  {
+    // A reviewer sent this mask back. It belongs to the annotator again until
+    // every rejection on it is resolved.
+    key: 'rejected',
+    label: 'Sent back',
+    icon: RotateCcw,
+    dot: 'bg-rose-500',
+    badge: 'bg-rose-100 text-rose-800',
+    ring: 'ring-rose-300',
+    chart: '#F43F5E',
   },
   {
     key: 'reviewable',
@@ -30,6 +44,7 @@ export const IMAGE_STATUSES = [
     dot: 'bg-purple-500',
     badge: 'bg-purple-100 text-purple-800',
     ring: 'ring-purple-300',
+    chart: '#3B82F6',
   },
   {
     key: 'finished',
@@ -38,6 +53,7 @@ export const IMAGE_STATUSES = [
     dot: 'bg-emerald-500',
     badge: 'bg-emerald-100 text-emerald-800',
     ring: 'ring-emerald-300',
+    chart: '#059669',
   },
 ];
 
@@ -62,9 +78,13 @@ export const getImageStatus = (image) => {
   return IMAGE_STATUS_MAP.not_started;
 };
 
+/** An all-zero count object keyed by every known status. */
+export const emptyStatusCounts = () =>
+  Object.fromEntries(IMAGE_STATUSES.map((s) => [s.key, 0]));
+
 /** Count images per status key. */
 export const getImageStatusCounts = (images = []) => {
-  const counts = { not_started: 0, in_progress: 0, reviewable: 0, finished: 0 };
+  const counts = emptyStatusCounts();
   for (const image of images) {
     const key = getImageStatus(image).key;
     counts[key] = (counts[key] || 0) + 1;

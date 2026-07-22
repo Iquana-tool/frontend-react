@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as api from '../api';
+import { emptyStatusCounts } from '../utils/imageStatus';
 import { useAuth } from './AuthContext';
 
 const DatasetContext = createContext();
@@ -30,6 +31,12 @@ export const DatasetProvider = ({ children }) => {
         // If no current dataset is selected and datasets exist, select the first one
         if (!currentDataset && response.datasets.length > 0) {
           setCurrentDataset(response.datasets[0]);
+        } else if (currentDataset) {
+          // Re-sync the selected dataset from the fresh list so `my_role` and
+          // `my_permissions` reflect the latest grant rather than whatever they
+          // were when it was first opened.
+          const refreshed = response.datasets.find((d) => d.id === currentDataset.id);
+          if (refreshed) setCurrentDataset(refreshed);
         }
         return response.datasets;
       }
@@ -45,27 +52,23 @@ export const DatasetProvider = ({ children }) => {
 
   // Get annotation progress for a dataset
   const getAnnotationProgress = async (datasetId) => {
+    // Spreading the backend's counts over a zeroed template keeps this working
+    // when a status is added server-side (as `rejected` was) without listing
+    // each key by hand here.
+    const empty = { ...emptyStatusCounts(), total: 0 };
     try {
       const response = await api.getAnnotationProgress(datasetId);
       if (response.success) {
-        const statusCounts = response.num_masks_with_status || {};
-        const notStarted = statusCounts.not_started || 0;
-        const inProgress = statusCounts.in_progress || 0;
-        const reviewable = statusCounts.reviewable || 0;
-        const finished = statusCounts.finished || 0;
-        
         return {
-          not_started: notStarted,
-          in_progress: inProgress,
-          reviewable: reviewable,
-          finished: finished,
-          total: response.total_images || 0
+          ...empty,
+          ...(response.num_masks_with_status || {}),
+          total: response.total_images || 0,
         };
       }
-      return { not_started: 0, in_progress: 0, reviewable: 0, finished: 0, total: 0 };
+      return empty;
     } catch (err) {
       console.error('Error fetching annotation progress:', err);
-      return { not_started: 0, in_progress: 0, reviewable: 0, finished: 0, total: 0 };
+      return empty;
     }
   };
 

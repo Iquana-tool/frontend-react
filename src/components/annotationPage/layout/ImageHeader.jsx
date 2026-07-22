@@ -30,6 +30,10 @@ const ImageHeader = () => {
         return { text: 'Not started', color: 'bg-gray-100 text-gray-800' };
       case 'in_progress':
         return { text: 'In progress', color: 'bg-blue-100 text-blue-800' };
+      case 'rejected':
+        // A reviewer sent this back; it is the annotator's again until the open
+        // feedback on it is resolved.
+        return { text: 'Sent back', color: 'bg-rose-100 text-rose-800' };
       case 'reviewable':
         return { text: 'Reviewable', color: 'bg-yellow-100 text-yellow-800' };
       case 'finished':
