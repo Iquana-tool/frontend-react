@@ -83,6 +83,15 @@ export const initialState = {
     // Zoom and pan state
     zoomLevel: 1,
     panOffset: { x: 0, y: 0 },
+    // Physical scale calibration for the current image
+    scale: {
+      scaleX: 1,
+      scaleY: 1,
+      unit: 'px',          // 'px' means no real-world scale has been set yet
+      isCalibrating: false, // true while user is drawing a calibration line
+      // { p1: {x, y}, p2: {x, y} } in image-pixel coordinates, or null
+      calibrationPoints: null,
+    },
   },
   
   // Model State
