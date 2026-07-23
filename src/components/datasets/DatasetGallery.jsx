@@ -104,6 +104,14 @@ const DatasetGallery = () => {
     navigate(`/dataset/${datasetId}/training`);
   };
 
+  const handleBrowseAnnotations = () => {
+    navigate(`/dataset/${datasetId}/view`);
+  };
+
+  const handleManageAccessClick = () => {
+    navigate(`/dataset/${datasetId}/access`);
+  };
+
   return (
     <DatasetManagementLayout>
       <div className="h-full overflow-hidden">
@@ -117,6 +125,8 @@ const DatasetGallery = () => {
             onLabelManagementClick={handleLabelManagementClick}
             onExportCocoClick={() => setShowCocoModal(true)}
             onModelTrainingClick={handleModelTrainingClick}
+            onBrowseAnnotations={handleBrowseAnnotations}
+            onManageAccessClick={handleManageAccessClick}
           />
         ) : currentView === "dataManagement" ? (
           <DataManagementView

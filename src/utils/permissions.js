@@ -150,6 +150,102 @@ export const DATASET_ROLE_BADGE_CLASSES = {
 };
 
 /**
+ * Plain-language name for each permission, grouped for the reference table.
+ *
+ * Only presentation — the role catalog itself comes from the backend, so a
+ * permission missing from this map still shows up in the table (falling back to
+ * its raw key) rather than disappearing from it.
+ */
+export const PERMISSION_GROUPS = [
+    {
+        id: 'dataset',
+        title: 'Dataset',
+        permissions: [
+            [Permission.DATASET_READ, 'See the dataset and its progress'],
+            [Permission.DATASET_UPDATE, 'Edit the name, description and review policy'],
+            [Permission.DATASET_DELETE, 'Delete the dataset and everything in it'],
+            [Permission.DATASET_TRANSFER_OWNERSHIP, 'Hand ownership to someone else'],
+        ],
+    },
+    {
+        id: 'members',
+        title: 'People',
+        permissions: [
+            [Permission.MEMBER_LIST, 'See who has access'],
+            [Permission.MEMBER_GRANT, 'Add collaborators and change their roles'],
+            [Permission.MEMBER_REVOKE, 'Remove someone’s access'],
+            [Permission.INVITE_CREATE, 'Create invite links'],
+            [Permission.INVITE_REVOKE, 'Revoke invite links'],
+        ],
+    },
+    {
+        id: 'images',
+        title: 'Images',
+        permissions: [
+            [Permission.IMAGE_READ, 'View images and thumbnails'],
+            [Permission.IMAGE_UPLOAD, 'Upload new images'],
+            [Permission.IMAGE_DELETE, 'Delete images'],
+            [Permission.PIXEL_SCALE_SET, 'Set the pixel scale (rescales every measurement)'],
+        ],
+    },
+    {
+        id: 'labels',
+        title: 'Labels',
+        permissions: [
+            [Permission.LABEL_READ, 'See the label hierarchy'],
+            [Permission.LABEL_MANAGE, 'Create, edit and delete labels (deleting removes them from annotations)'],
+        ],
+    },
+    {
+        id: 'annotation',
+        title: 'Annotation',
+        permissions: [
+            [Permission.ANNOTATION_READ, 'View annotations'],
+            [Permission.ANNOTATION_CREATE, 'Draw new annotations'],
+            [Permission.ANNOTATION_EDIT_OWN, 'Edit your own annotations'],
+            [Permission.ANNOTATION_DELETE_OWN, 'Delete your own annotations'],
+            [Permission.ANNOTATION_EDIT_ANY, 'Edit and delete anyone’s annotations'],
+            [Permission.MASK_SUBMIT, 'Mark an image as fully annotated (submit for review)'],
+            [Permission.MASK_REOPEN, 'Reopen a submitted image for editing'],
+            [Permission.MASK_DELETE, 'Delete an image’s whole annotation set'],
+        ],
+    },
+    {
+        id: 'review',
+        title: 'Review',
+        permissions: [
+            [Permission.REVIEW_APPROVE, 'Approve annotations'],
+            [Permission.REVIEW_REJECT, 'Send work back with a reason'],
+            [Permission.REVIEW_REVOKE, 'Withdraw approvals given by others'],
+            [Permission.REVIEW_PURGE_UNREVIEWED, 'Bulk-delete every unapproved annotation on an image'],
+        ],
+    },
+    {
+        id: 'ai',
+        title: 'AI assistance',
+        permissions: [
+            [Permission.AI_INTERACTIVE, 'Use click-to-segment while annotating'],
+            [Permission.AI_BATCH_INFER, 'Run a model across the dataset'],
+            [Permission.AI_TRAIN, 'Train a model on the dataset'],
+        ],
+    },
+    {
+        id: 'export',
+        title: 'Download',
+        permissions: [
+            [Permission.EXPORT_ANNOTATIONS, 'Download annotations (COCO JSON)'],
+            [Permission.EXPORT_IMAGES, 'Download the raw images'],
+            [Permission.EXPORT_QUANTIFICATION, 'Download measurements and statistics'],
+        ],
+    },
+];
+
+/** Flat permission -> description lookup, derived from the groups above. */
+export const PERMISSION_LABELS = Object.fromEntries(
+    PERMISSION_GROUPS.flatMap((group) => group.permissions)
+);
+
+/**
  * Whether a role ranks at or above a minimum.
  * @param {string} role
  * @param {string} minimum

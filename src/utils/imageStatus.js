@@ -78,6 +78,60 @@ export const getImageStatus = (image) => {
   return IMAGE_STATUS_MAP.not_started;
 };
 
+/**
+ * The three-state view of the same lifecycle, for the annotation page.
+ *
+ * While annotating, the review sub-states are noise: whether a mask is awaiting
+ * review or has been sent back, the annotator's own question is only "is this
+ * image done?". The dataset manager keeps the full five-way breakdown, which is
+ * where the review pipeline is actually managed from.
+ */
+export const COARSE_STATUSES = [
+  {
+    key: 'not_started',
+    label: 'Not started',
+    badge: 'bg-gray-100 text-gray-800',
+  },
+  {
+    key: 'in_progress',
+    label: 'In progress',
+    badge: 'bg-blue-100 text-blue-800',
+  },
+  {
+    key: 'finished',
+    label: 'Finished',
+    badge: 'bg-green-100 text-green-800',
+  },
+];
+
+export const COARSE_STATUS_MAP = Object.fromEntries(
+  COARSE_STATUSES.map((s) => [s.key, s])
+);
+
+/**
+ * Collapse a detailed status onto one of the three coarse states.
+ *
+ * `reviewable` and `rejected` both fold into `in_progress`: the work exists but
+ * is not signed off, which is all the annotation page needs to say.
+ */
+const COARSE_BY_DETAILED = {
+  not_started: 'not_started',
+  in_progress: 'in_progress',
+  rejected: 'in_progress',
+  reviewable: 'in_progress',
+  finished: 'finished',
+};
+
+/**
+ * Resolve any status string to its coarse descriptor.
+ * @param {string} status - A detailed status key, alias, or unknown value.
+ */
+export const getCoarseStatus = (status) => {
+  const canonical = STATUS_ALIASES[status] || status;
+  const key = COARSE_BY_DETAILED[canonical] || 'not_started';
+  return COARSE_STATUS_MAP[key];
+};
+
 /** An all-zero count object keyed by every known status. */
 export const emptyStatusCounts = () =>
   Object.fromEntries(IMAGE_STATUSES.map((s) => [s.key, 0]));

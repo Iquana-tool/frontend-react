@@ -1,5 +1,5 @@
 import React from 'react';
-import { Database, Brain, BarChart3, Tag, Play, Download, GraduationCap } from 'lucide-react';
+import { Database, Brain, BarChart3, Tag, Play, Download, Eye, GraduationCap, Users2 } from 'lucide-react';
 import ManagementCard from './ManagementCard';
 import RoleBadge from '../RoleBadge';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -21,6 +21,8 @@ const ManagementCardsView = ({
   onLabelManagementClick,
   onExportCocoClick,
   onModelTrainingClick,
+  onBrowseAnnotations,
+  onManageAccessClick,
   dataset,
 }) => {
   const { can, canAny, role } = usePermissions(dataset);
@@ -83,6 +85,19 @@ const ManagementCardsView = ({
       gradientClasses: 'from-teal-500 to-teal-600',
     },
     {
+      // The read-only counterpart for anyone who can see annotations but not make
+      // them. Annotators and above reach the same view from inside the editor, so
+      // this card only earns its space when the editor is unavailable.
+      id: 'browse-annotations',
+      icon: Eye,
+      title: 'Browse Annotations',
+      description: 'Look through the images and their annotations without editing anything',
+      onClick: onBrowseAnnotations,
+      permitted: can(Permission.ANNOTATION_READ) && !can(Permission.ANNOTATION_CREATE),
+      isGradient: true,
+      gradientClasses: 'from-teal-500 to-teal-600',
+    },
+    {
       id: 'label-management',
       icon: Tag,
       title: 'Label Management',
@@ -92,6 +107,19 @@ const ManagementCardsView = ({
       iconBgColor: 'bg-pink-100',
       iconHoverBgColor: 'group-hover:bg-pink-200',
       iconColor: 'text-pink-600',
+    },
+    {
+      id: 'manage-access',
+      icon: Users2,
+      title: 'Manage Access',
+      description: 'Control who can see, annotate and review this dataset, and how work is reviewed',
+      onClick: onManageAccessClick,
+      // Curators can see and invite; only owners can change roles. Either is
+      // enough to make the page worth opening.
+      permitted: canAny([Permission.MEMBER_LIST, Permission.MEMBER_GRANT, Permission.INVITE_CREATE]),
+      iconBgColor: 'bg-teal-100',
+      iconHoverBgColor: 'group-hover:bg-teal-200',
+      iconColor: 'text-teal-600',
     },
     {
       id: 'export-coco',
