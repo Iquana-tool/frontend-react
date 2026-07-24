@@ -30,7 +30,13 @@ export const createImagesSlice = (set) => ({
       state.editMode.contourId = null;
       state.editMode.originalCoordinates = null;
       state.editMode.draftCoordinates = null;
+      state.editMode.vertices = null;
+      state.editMode.initialVertices = null;
       state.editMode.isDirty = false;
+      state.lineEdit.active = false;
+      state.lineEdit.objectId = null;
+      state.lineEdit.contourId = null;
+      state.lineEdit.original = null;
     }
   }),
   

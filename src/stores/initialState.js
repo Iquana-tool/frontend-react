@@ -65,9 +65,21 @@ export const initialState = {
     active: false,
     objectId: null,
     contourId: null,
-    originalCoordinates: null, // { x: [], y: [] }
-    draftCoordinates: null, // { x: [], y: [] }
+    originalCoordinates: null, // { x: [], y: [] } — the dense outline as it was on entry
+    draftCoordinates: null, // { x: [], y: [] } — dense outline resampled from `vertices` (displayed + saved)
+    vertices: null, // { x: [], y: [] } — the few control handles the user drags
+    initialVertices: null, // { x: [], y: [] } — vertices at entry, for Reset
     isDirty: false, // Track if changes have been made
+  },
+
+  // Line-edit Mode State (draw an open line near the boundary; it is merged into
+  // the contour, replacing the nearest boundary arc — cutting a region off or
+  // adding one). An alternative to dragging the outline's control points.
+  lineEdit: {
+    active: false,
+    objectId: null, // store object id being reshaped
+    contourId: null, // backend contour id for the modify call
+    original: null, // { x: [], y: [] } normalized — the contour being reshaped
   },
   
   // Image State

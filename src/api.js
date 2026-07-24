@@ -13,4 +13,5 @@ export * from "./api/automatic_segmentation";
 export * from "./api/instance_segmentation";
 export * from "./api/members";
 export * from "./api/reviews";
+export * from "./api/annotation_queue";
 export * from "./api/admin";

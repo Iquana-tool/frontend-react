@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider } from "./contexts/AuthContext";
 import { DatasetProvider } from "./contexts/DatasetContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Login from "./components/auth/Login";
 import LandingPage from "./pages/LandingPage";
@@ -17,6 +18,8 @@ import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import ReviewPage from "./pages/ReviewPage";
+import CorrectionPage from "./pages/CorrectionPage";
 
 function App() {
   return (
@@ -24,6 +27,7 @@ function App() {
       <ToastProvider>
       <DatasetProvider>
         <Router basename={process.env.PUBLIC_URL || ""}>
+          <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<LandingPage />} />
@@ -115,6 +119,26 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Review queue: pick a granularity, then work through the pending
+                annotations item by item. */}
+            <Route
+              path="/dataset/:datasetId/review"
+              element={
+                <ProtectedRoute>
+                  <ReviewPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Correction queue: launch a session that walks the annotator through
+                every sent-back instance in the editor, one at a time. */}
+            <Route
+              path="/dataset/:datasetId/correct"
+              element={
+                <ProtectedRoute>
+                  <CorrectionPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dataset/:datasetId/quantifications"
               element={
@@ -142,6 +166,7 @@ function App() {
             {/* Catch-all route - redirect unknown routes to landing page */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </CorrectionProvider>
         </Router>
       </DatasetProvider>
       </ToastProvider>

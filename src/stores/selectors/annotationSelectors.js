@@ -205,11 +205,24 @@ export const useEditModeObjectId = () => useAnnotationStore(state => state.editM
 export const useEditModeContourId = () => useAnnotationStore(state => state.editMode.contourId);
 export const useEditModeOriginalCoordinates = () => useAnnotationStore(state => state.editMode.originalCoordinates);
 export const useEditModeDraftCoordinates = () => useAnnotationStore(state => state.editMode.draftCoordinates);
+export const useEditModeVertices = () => useAnnotationStore(state => state.editMode.vertices);
 export const useEditModeIsDirty = () => useAnnotationStore(state => state.editMode.isDirty);
 
 // Edit Mode actions
 export const useEnterEditMode = () => useAnnotationStore(state => state.enterEditMode);
-export const useUpdateDraftPoint = () => useAnnotationStore(state => state.updateDraftPoint);
+export const useMoveVertex = () => useAnnotationStore(state => state.moveVertex);
+export const useInsertVertex = () => useAnnotationStore(state => state.insertVertex);
+export const useDeleteVertex = () => useAnnotationStore(state => state.deleteVertex);
 export const useResetDraft = () => useAnnotationStore(state => state.resetDraft);
 export const useSyncEditModeDraftFromRefinement = () => useAnnotationStore(state => state.syncEditModeDraftFromRefinement);
 export const useExitEditMode = () => useAnnotationStore(state => state.exitEditMode);
+
+// Line-edit Mode selectors
+export const useLineEditActive = () => useAnnotationStore(state => state.lineEdit.active);
+export const useLineEditObjectId = () => useAnnotationStore(state => state.lineEdit.objectId);
+export const useLineEditContourId = () => useAnnotationStore(state => state.lineEdit.contourId);
+export const useLineEditOriginal = () => useAnnotationStore(state => state.lineEdit.original);
+
+// Line-edit Mode actions
+export const useStartLineEdit = () => useAnnotationStore(state => state.startLineEdit);
+export const useStopLineEdit = () => useAnnotationStore(state => state.stopLineEdit);
