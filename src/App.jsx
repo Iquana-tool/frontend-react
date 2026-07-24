@@ -13,6 +13,10 @@ import DocumentationPage from "./pages/DocumentationPage";
 import QuantificationPage from "./pages/QuantificationPage";
 import ModelZooPage from "./pages/ModelZooPage";
 import ModelTrainingPage from "./pages/ModelTrainingPage";
+import AcceptInvitePage from "./pages/AcceptInvitePage";
+import AnnotationViewerPage from "./pages/AnnotationViewerPage";
+import DatasetAccessPage from "./pages/DatasetAccessPage";
+import AdminUsersPage from "./pages/AdminUsersPage";
 
 function App() {
   return (
@@ -30,6 +34,17 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DatasetsPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Dataset invite links land here. The page itself bounces to
+                /login?next=... when the invitee is not signed in yet. */}
+            <Route path="/invites/:token" element={<AcceptInvitePage />} />
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute>
+                  <AdminUsersPage />
                 </ProtectedRoute>
               }
             />
@@ -70,6 +85,33 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AnnotationPageV2 />
+                </ProtectedRoute>
+              }
+            />
+            {/* Read-only annotation browser. Viewers cannot open an annotation
+                session (the WebSocket needs annotation.create), so they are sent
+                here instead of to a page that would show them nothing. */}
+            <Route
+              path="/dataset/:datasetId/view"
+              element={
+                <ProtectedRoute>
+                  <AnnotationViewerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/view/:imageId"
+              element={
+                <ProtectedRoute>
+                  <AnnotationViewerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/access"
+              element={
+                <ProtectedRoute>
+                  <DatasetAccessPage />
                 </ProtectedRoute>
               }
             />
