@@ -30,7 +30,13 @@ export const createImagesSlice = (set) => ({
       state.editMode.contourId = null;
       state.editMode.originalCoordinates = null;
       state.editMode.draftCoordinates = null;
+      state.editMode.vertices = null;
+      state.editMode.initialVertices = null;
       state.editMode.isDirty = false;
+      state.lineEdit.active = false;
+      state.lineEdit.objectId = null;
+      state.lineEdit.contourId = null;
+      state.lineEdit.original = null;
 
       // Reset calibration/tool state for the new image so the scale button
       // shows "Set Scale" instead of "Cancel Calibration".
@@ -76,7 +82,7 @@ export const createImagesSlice = (set) => ({
     state.images.zoomLevel = 1;
     state.images.panOffset = { x: 0, y: 0 };
     state.images.scale = { scaleX: 1, scaleY: 1, unit: 'px', isCalibrating: false, calibrationPoints: null };
-    
+
     // Clear focus mode when resetting image state
     state.focusMode.active = false;
     state.focusMode.objectId = null;
