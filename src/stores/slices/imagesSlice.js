@@ -31,6 +31,11 @@ export const createImagesSlice = (set) => ({
       state.editMode.originalCoordinates = null;
       state.editMode.draftCoordinates = null;
       state.editMode.isDirty = false;
+
+      // Reset calibration/tool state for the new image so the scale button
+      // shows "Set Scale" instead of "Cancel Calibration".
+      state.images.scale = { scaleX: 1, scaleY: 1, unit: 'px', isCalibrating: false, calibrationPoints: null };
+      state.ui.currentTool = 'ai_annotation';
     }
   }),
   

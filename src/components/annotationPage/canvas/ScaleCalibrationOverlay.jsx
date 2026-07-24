@@ -8,6 +8,7 @@ import {
   useImageObject,
   useIsCalibrating,
   useSetCalibrationPoint,
+  useSetCurrentTool,
   useSetImageScale,
 } from '../../../stores/selectors/annotationSelectors';
 import ScaleInputModal from '../modals/ScaleInputModal';
@@ -31,6 +32,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
   const calibrationPoints = useCalibrationPoints();
   const setCalibrationPoint = useSetCalibrationPoint();
   const cancelCalibration = useCancelCalibration();
+  const setCurrentTool = useSetCurrentTool();
   const setImageScale = useSetImageScale();
   const imageObject = useImageObject();
   const currentImageId = useCurrentImageId();
@@ -126,10 +128,11 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape' && isCalibrating) {
       cancelCalibration();
+      setCurrentTool('ai_annotation');
       setShowModal(false);
       setMousePos(null);
     }
-  }, [isCalibrating, cancelCalibration]);
+  }, [isCalibrating, cancelCalibration, setCurrentTool]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -150,6 +153,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
       setImageScale(result.scale_x, result.scale_y, result.unit);
       setShowModal(false);
       cancelCalibration();
+      setCurrentTool('ai_annotation');
     } catch (err) {
       console.error('Failed to set scale:', err);
     } finally {
@@ -160,6 +164,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
   const handleModalCancel = () => {
     setShowModal(false);
     cancelCalibration();
+    setCurrentTool('ai_annotation');
     setMousePos(null);
   };
 
