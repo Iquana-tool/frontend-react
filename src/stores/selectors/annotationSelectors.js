@@ -226,3 +226,14 @@ export const useLineEditOriginal = () => useAnnotationStore(state => state.lineE
 // Line-edit Mode actions
 export const useStartLineEdit = () => useAnnotationStore(state => state.startLineEdit);
 export const useStopLineEdit = () => useAnnotationStore(state => state.stopLineEdit);
+
+// Scale selectors
+export const useImageScale = () => useAnnotationStore(state => state.images.scale);
+export const useIsCalibrating = () => useAnnotationStore(state => state.images.scale.isCalibrating);
+export const useCalibrationPoints = () => useAnnotationStore(state => state.images.scale.calibrationPoints);
+
+// Scale action selectors
+export const useSetImageScale = () => useAnnotationStore(state => state.setImageScale);
+export const useStartCalibration = () => useAnnotationStore(state => state.startCalibration);
+export const useSetCalibrationPoint = () => useAnnotationStore(state => state.setCalibrationPoint);
+export const useCancelCalibration = () => useAnnotationStore(state => state.cancelCalibration);

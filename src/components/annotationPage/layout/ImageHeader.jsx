@@ -10,6 +10,7 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import ZoomControls from '../canvas/ZoomControls';
 import { getCoarseStatus } from '../../../utils/imageStatus';
+import ScaleControl from '../canvas/ScaleControl';
 
 const ImageHeader = () => {
   const navigate = useNavigate();
@@ -68,7 +69,10 @@ const ImageHeader = () => {
               </span>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-3">
+            {/* Pixel Scale Calibration Control */}
+            <ScaleControl />
+
             {/* Zoom Controls */}
             <ZoomControls />
             
