@@ -78,6 +78,11 @@ export const getQuantificationSummary = async (
         includeContextual = true,
         includeRelational = true,
         includeDistribution = false,
+        // Whether to drop not-fully-annotated masks / unreviewed contours from the
+        // aggregation. Default true (finalized-only) matches the endpoint defaults; the
+        // quantification page flips these via its include toggles to surface in-progress work.
+        excludeNotFullyAnnotated = true,
+        excludeUnreviewed = true,
     } = {}
 ) => {
     const params = new URLSearchParams();
@@ -87,6 +92,8 @@ export const getQuantificationSummary = async (
     // Distribution (box/violin) stats are heavier (per-contour values reduced server-side),
     // so only requested when a distribution plot is actually shown; the bar view omits it.
     params.append("include_distribution", includeDistribution);
+    params.append("exclude_not_fully_annotated", excludeNotFullyAnnotated);
+    params.append("exclude_unreviewed", excludeUnreviewed);
     if (profileId !== null && profileId !== undefined) {
         params.append("profile_id", profileId);
     }
@@ -137,9 +144,15 @@ export const deleteQuantificationProfile = async (datasetId, profileId) => {
 };
 
 // Build the download URL for the quantification export, optionally scoped to a profile.
-export const buildQuantificationDownloadUrl = (datasetId, { profileId = null, fileFormat = "csv" } = {}) => {
+// The exclude_* flags mirror the summary so the export matches whatever the page shows.
+export const buildQuantificationDownloadUrl = (
+    datasetId,
+    { profileId = null, fileFormat = "csv", excludeNotFullyAnnotated = true, excludeUnreviewed = true } = {}
+) => {
     const params = new URLSearchParams();
     params.append("file_format", fileFormat);
+    params.append("exclude_not_fully_annotated", excludeNotFullyAnnotated);
+    params.append("exclude_unreviewed", excludeUnreviewed);
     if (profileId !== null && profileId !== undefined) {
         params.append("profile_id", profileId);
     }

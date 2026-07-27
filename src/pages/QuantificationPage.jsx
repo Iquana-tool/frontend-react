@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
-import { Download } from "lucide-react";
+import { Download, AlertTriangle, Info } from "lucide-react";
 import {
   getQuantificationSummary,
   getMetricsCatalog,
@@ -23,6 +23,26 @@ import {
   buildMetricCatalogMap,
 } from "../utils/quantificationUtils";
 
+// Warning shown when a dataset's images do not share one scale, so quantifications fall
+// back to pixel units. Nothing is rendered when the scale is consistent (all images use the
+// same unit - whether pixels or a single real-world unit), which is the normal case.
+const ScaleWarningBanner = ({ scaleStatus }) => {
+  if (!scaleStatus || scaleStatus.consistent) return null;
+
+  const { images_scaled = 0, images_unscaled = 0, distinct_units = [] } = scaleStatus;
+  const hasUnscaled = images_unscaled > 0 && images_scaled > 0;
+  const message = hasUnscaled
+    ? "Not all images have a scale, showing pixel units. To see quantifications in real-world units, add a scale to all images."
+    : `Images use different scale units (${distinct_units.join(", ")}), showing pixel units. Use a single unit across all images to see real-world quantifications.`;
+
+  return (
+    <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+      <p className="text-sm text-amber-800">{message}</p>
+    </div>
+  );
+};
+
 const QuantificationPage = () => {
   const { datasetId } = useParams();
   const [data, setData] = useState(null);
@@ -36,6 +56,11 @@ const QuantificationPage = () => {
   // distribution stats (fetched only when active); Bar uses the cheap mean-only summary.
   const [plotType, setPlotType] = useState("box");
   const [distributionLoading, setDistributionLoading] = useState(false);
+  // Inclusion toggles. Off by default => finalized-only (fully-annotated masks + reviewed
+  // contours), matching the endpoint defaults. Turning one on stops sending the matching
+  // exclude_* filter, so in-progress annotation work shows up in the quantifications.
+  const [includeInProgress, setIncludeInProgress] = useState(false);
+  const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
 
   const catalogMap = buildMetricCatalogMap(catalog);
 
@@ -77,6 +102,8 @@ const QuantificationPage = () => {
         const response = await getQuantificationSummary(parseInt(datasetId), {
           profileId: activeProfileId,
           includeDistribution: needsDistribution,
+          excludeNotFullyAnnotated: !includeInProgress,
+          excludeUnreviewed: !includeUnreviewed,
         });
         setData(response);
         const labelsToExpand = getLabelsToAutoExpandFromSummary(
@@ -93,7 +120,7 @@ const QuantificationPage = () => {
       }
     };
     loadData();
-  }, [datasetId, activeProfileId, plotType]);
+  }, [datasetId, activeProfileId, plotType, includeInProgress, includeUnreviewed]);
 
   const reloadProfiles = useCallback(
     async (selectId = null) => {
@@ -131,6 +158,8 @@ const QuantificationPage = () => {
       const url = buildQuantificationDownloadUrl(parseInt(datasetId), {
         profileId: activeProfileId,
         fileFormat: "csv",
+        excludeNotFullyAnnotated: !includeInProgress,
+        excludeUnreviewed: !includeUnreviewed,
       });
       const res = await fetch(url, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error(`Export failed: ${res.status}`);
@@ -190,6 +219,17 @@ const QuantificationPage = () => {
   const scalarMetricKeys = collectScalarMetricKeys(data.metrics, catalogMap);
   const unlabeledMetrics = data.metrics?.null;
 
+  // The metric aggregation drops not-fully-annotated / unreviewed work by default, but the
+  // object census below is unfiltered. When the census has objects yet no metrics survive
+  // the filters, the page would otherwise look empty for no obvious reason - so surface why
+  // and point at the toggles rather than leaving a bare "0 objects".
+  const hasMetrics = data.metrics && Object.keys(data.metrics).length > 0;
+  const totalCensus = Object.values(data.object_counts_per_label_id || {}).reduce(
+    (sum, counts) => sum + (counts?.total || 0),
+    0
+  );
+  const allFilteredOut = !hasMetrics && totalCensus > 0;
+
   return (
     <DatasetManagementLayout>
       <div className="h-full flex flex-col bg-white overflow-y-auto">
@@ -226,19 +266,43 @@ const QuantificationPage = () => {
                 onSelect={setActiveProfileId}
                 onProfilesChanged={reloadProfiles}
               />
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={handleExpandAll}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Expand All
-                </button>
-                <button
-                  onClick={handleCollapseAll}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-                >
-                  Collapse All
-                </button>
+              <div className="flex items-center gap-4">
+                {/* Inclusion toggles: by default only finalized work (fully-annotated masks
+                    + reviewed objects) is quantified; these surface in-progress work. */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeInProgress}
+                      onChange={(e) => setIncludeInProgress(e.target.checked)}
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span>Include in-progress masks</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={includeUnreviewed}
+                      onChange={(e) => setIncludeUnreviewed(e.target.checked)}
+                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    />
+                    <span>Include unreviewed objects</span>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleExpandAll}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    onClick={handleCollapseAll}
+                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Collapse All
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -246,6 +310,22 @@ const QuantificationPage = () => {
 
         {/* Main Content */}
         <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+          <ScaleWarningBanner scaleStatus={data.scale_status} />
+
+          {allFilteredOut && (
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3">
+              <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+              <p className="text-sm text-blue-800">
+                This dataset has {totalCensus.toLocaleString()} annotated{" "}
+                {totalCensus === 1 ? "object" : "objects"}, but they are hidden because their
+                masks are not marked fully-annotated and/or the objects are unreviewed. Enable{" "}
+                <span className="font-medium">Include in-progress masks</span> or{" "}
+                <span className="font-medium">Include unreviewed objects</span> above to
+                include them.
+              </p>
+            </div>
+          )}
+
           <SummaryCards data={data} labelIdToName={labelIdToName} />
 
           <ComparisonCharts
