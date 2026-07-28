@@ -7,119 +7,62 @@ import { API_BASE_URL } from "./config";
  */
 export const getAllModels = async () => {
     try {
-        // Fetch models from different services
-        const [promptedRes, suggestionRes, semanticRes, instanceRes] = await Promise.allSettled([
-            fetch(`${API_BASE_URL}/prompted_segmentation/models`, {
-                headers: getAuthHeaders(),
-            }),
-            fetch(`${API_BASE_URL}/suggestion_segmentation/models`, {
-                headers: getAuthHeaders(),
-            }),
-            fetch(`${API_BASE_URL}/semantic_segmentation/models`, {
-                headers: getAuthHeaders(),
-            }),
-            fetch(`${API_BASE_URL}/instance_segmentation/models`, {
-                headers: getAuthHeaders(),
-            }),
-        ]);
+        // One list endpoint per task surface. A model can appear under several of
+        // them (SAM 3 is both prompted + suggestion); the merge below collapses
+        // those into one entry with a `tasks` array. Semantic segmentation is
+        // retired and no longer fetched.
+        const taskEndpoints = [
+            { task: "prompted-segmentation", url: "prompted_segmentation" },
+            { task: "instance-suggestion", url: "suggestion_segmentation" },
+            { task: "instance-segmentation", url: "instance_segmentation" },
+        ];
 
-        const models = [];
+        const responses = await Promise.allSettled(
+            taskEndpoints.map(({ url }) =>
+                fetch(`${API_BASE_URL}/${url}/models`, { headers: getAuthHeaders() })
+            )
+        );
 
-        const parseModelsResponse = (data) => {
-            if (!data?.success || !Array.isArray(data.result)) return [];
-            return data.result;
-        };
+        const parseModelsResponse = (data) =>
+            data?.success && Array.isArray(data.result) ? data.result : [];
 
-        // Process prompted segmentation models
-        if (promptedRes.status === 'fulfilled') {
+        // Merge across endpoints into one entry per model (registry_key), tracking
+        // every task it serves. This is what makes the zoo model-centric: a
+        // multi-task model renders as a single card with several capability chips
+        // instead of duplicate cards in several sections.
+        const byKey = new Map();
+        for (let i = 0; i < responses.length; i += 1) {
+            const res = responses[i];
+            const { task } = taskEndpoints[i];
+            if (res.status !== "fulfilled") continue;
+
+            let data;
             try {
-                const data = await handleApiError(promptedRes.value);
-                const modelsList = parseModelsResponse(data);
-                if (modelsList.length > 0) {
-                    const promptedModels = modelsList.map(model => ({
-                        ...model,
-                        service: 'Prompted Segmentation',
-                        identifier: model.registry_key || model.identifier,
-                        trainable: false,
-                        finetunable: false,
-                    }));
-                    models.push(...promptedModels);
+                data = await handleApiError(res.value);
+            } catch {
+                continue;
+            }
+
+            for (const model of parseModelsResponse(data)) {
+                const key = model.registry_key || model.identifier;
+                if (!key) continue;
+
+                const existing = byKey.get(key);
+                if (existing) {
+                    if (!existing.tasks.includes(task)) existing.tasks.push(task);
+                    // Fill any field this endpoint carries but the first one didn't.
+                    for (const [k, v] of Object.entries(model)) {
+                        if (existing[k] == null && v != null) existing[k] = v;
+                    }
+                } else {
+                    byKey.set(key, { ...model, identifier: key, tasks: [task] });
                 }
-            } catch (err) {
-                // Silently handle error
             }
         }
 
-        // Process suggestion segmentation models
-        if (suggestionRes.status === 'fulfilled') {
-            try {
-                const data = await handleApiError(suggestionRes.value);
-                const modelsList = parseModelsResponse(data);
-                if (modelsList.length > 0) {
-                    const suggestionModels = modelsList.map(model => ({
-                        ...model,
-                        service: 'Suggestion Segmentation',
-                        identifier: model.registry_key || model.identifier,
-                        trainable: false,
-                        finetunable: false,
-                    }));
-                    models.push(...suggestionModels);
-                }
-            } catch (err) {
-                // Silently handle error
-            }
-        }
-
-        // Process semantic segmentation models
-        if (semanticRes.status === 'fulfilled') {
-            try {
-                const data = await handleApiError(semanticRes.value);
-                const modelsList = parseModelsResponse(data);
-                if (modelsList.length > 0) {
-                    const semanticModels = modelsList.map(model => ({
-                        ...model,
-                        service: 'Semantic Segmentation',
-                        identifier: model.registry_key || model.identifier,
-                        trainable: model.trainable === true,
-                        finetunable: model.finetunable === true,
-                    }));
-                    models.push(...semanticModels);
-                }
-            } catch (err) {
-                // Silently handle error
-            }
-        }
-
-        // Process instance segmentation models
-        if (instanceRes.status === 'fulfilled') {
-            try {
-                const data = await handleApiError(instanceRes.value);
-                const modelsList = parseModelsResponse(data);
-                if (modelsList.length > 0) {
-                    const instanceModels = modelsList.map(model => ({
-                        ...model,
-                        service: 'Instance Segmentation',
-                        identifier: model.registry_key || model.identifier,
-                        trainable: model.trainable === true,
-                        finetunable: model.finetunable === true,
-                    }));
-                    models.push(...instanceModels);
-                }
-            } catch (err) {
-                // Silently handle error
-            }
-        }
-
-        return {
-            success: true,
-            models,
-        };
+        return { success: true, models: [...byKey.values()] };
     } catch (error) {
-        return {
-            success: false,
-            models: [],
-            error: error.message,
-        };
+        return { success: false, models: [], error: error.message };
     }
 };
 

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { BookOpen, User, Brain, Filter, ArrowLeft, Loader2, GraduationCap } from "lucide-react";
+import { BookOpen, User, Brain, Search, Star, ArrowLeft, Loader2, GraduationCap, ArrowUpDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
-import ModelCard from "../components/models/ModelCard";
+import ModelChip from "../components/models/ModelChip";
+import ModelDetailPanel from "../components/models/ModelDetailPanel";
+import { SORT_STRATEGIES, DEFAULT_SORT, hasAnyPerfStats } from "../components/models/modelStats";
 import TrainingModal from "../components/models/TrainingModal";
 import TrainingJobCard from "../components/models/TrainingJobCard";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
@@ -15,10 +17,12 @@ import {
   getSemanticTrainingStatus,
   cancelSemanticTraining,
 } from "../api/training";
+import { getModelFavorites, setModelFavorite, clearModelFavorite } from "../api/models";
+import { TASK_ORDER, getTaskMeta } from "../constants/tasks";
 
-// The toolbox serves `tags` as a dict (e.g. { task: "instance-segmentation",
-// domain: "general" }), but older payloads may use an array or comma string.
-// Normalize all three into [{ key?, value }] so the card can render them.
+// The toolbox serves `tags` as a dict (e.g. { domain: "general" }), but older
+// payloads may use an array or comma string. Normalize all three into
+// [{ key?, value }] so the card can render them.
 const normalizeTagEntries = (tags) => {
   if (!tags) return [];
   if (Array.isArray(tags)) {
@@ -39,32 +43,34 @@ const normalizeTagEntries = (tags) => {
   return [];
 };
 
-// Helper to transform backend model to UI format
+// Transform a merged backend model into the card's UI shape. `tasks` is the
+// array of task keys the model serves (already merged in getAllModels).
 const transformModel = (model) => ({
   identifier: model.identifier || model.registry_key,
   name: model.name,
   description: model.description,
   tags: normalizeTagEntries(model.tags),
-  service: model.service,
-  // Rich model info from the toolbox ModelInfo schema
+  tasks: Array.isArray(model.tasks) ? model.tasks : [],
   badges: Array.isArray(model.badges) ? model.badges : [],
   usageTip: model.usage_tip,
   infoUrl: model.info_url,
-  status: model.status, // "ready" | "not_ready"
-  // Task-specific fields (prompted / instance segmentation)
+  status: model.status,
   promptTypesSupported: Array.isArray(model.prompt_types_supported)
     ? model.prompt_types_supported
     : [],
   refinementSupported: model.refinement_supported === true,
   labelId: model.label_id,
-  // Backend fields
-  trainable: model.trainable !== false, // Default to true unless explicitly false
-  finetunable: model.finetunable !== false, // Default to true unless explicitly false
-  pretrained: model.pretrained !== false, // Default to true unless explicitly false
-  // UI compatibility
-  supportsTraining: model.trainable !== false,
-  supportsFinetuning: model.finetunable !== false,
-  supportsInference: true, // All models support inference
+  labelIds: Array.isArray(model.label_ids)
+    ? model.label_ids
+    : model.label_id != null
+    ? [model.label_id]
+    : [],
+  trainable: model.trainable === true,
+  pretrained: model.pretrained !== false,
+  architecture: model.architecture || null,
+  license: model.license || null,
+  inputResolution: Array.isArray(model.input_resolution) ? model.input_resolution : null,
+  performance: model.performance && typeof model.performance === "object" ? model.performance : null,
 });
 
 const POLL_INTERVAL_MS = 4000;
@@ -75,49 +81,64 @@ const ModelZooPage = () => {
   const { datasetId } = useParams();
   const { isAuthenticated, user } = useAuth();
   const { addToast } = useToast();
-  const [selectedService, setSelectedService] = useState("All");
-  const [modelsData, setModelsData] = useState({});
+
+  const [models, setModels] = useState([]);
+  const [favorites, setFavorites] = useState({}); // { task: registry_key }
+  const [selectedTask, setSelectedTask] = useState("all"); // "all" | task key
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState(DEFAULT_SORT);
+  const [selectedModelId, setSelectedModelId] = useState(null); // detail-panel selection
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Training modal state
-  const [trainingModal, setTrainingModal] = useState({
-    isOpen: false,
-    model: null,
-    actionType: null,
-  });
-
-  // Training jobs started from this page (so we can show status before they appear in model list)
+  // Training modal state (semantic segmentation; instance seg has its own page)
+  const [trainingModal, setTrainingModal] = useState({ isOpen: false, model: null, actionType: null });
   const [trainingJobs, setTrainingJobs] = useState([]);
   const [cancellingTaskId, setCancellingTaskId] = useState(null);
+
+  const datasetIdFromState = location.state?.datasetId || datasetId;
+  const isFromDatasetManagement = !!datasetIdFromState;
 
   const refetchModels = useCallback(async () => {
     try {
       const result = await getAllModels();
       if (result.success && result.models) {
-        const groupedModels = result.models.reduce((acc, model) => {
-          const transformedModel = transformModel(model);
-          const service = transformedModel.service;
-          if (!acc[service]) acc[service] = [];
-          acc[service].push(transformedModel);
-          return acc;
-        }, {});
-        setModelsData(groupedModels);
+        setModels(result.models.map(transformModel));
       }
     } catch (_) {
       // ignore
     }
   }, []);
 
-  // Check if we came from a dataset management page
-  const datasetIdFromState = location.state?.datasetId || datasetId;
-  const isFromDatasetManagement = !!datasetIdFromState;
+  // Initial load: models + favorites in parallel.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const [modelsResult, favResult] = await Promise.all([getAllModels(), getModelFavorites()]);
+        if (cancelled) return;
+        if (modelsResult.success && modelsResult.models) {
+          setModels(modelsResult.models.map(transformModel));
+        } else {
+          setError(modelsResult.error || "Failed to load models from backend");
+        }
+        setFavorites(favResult.favorites || {});
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load models");
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   // Poll training job status for active jobs
   useEffect(() => {
-    const active = trainingJobs.filter(
-      (j) => j.status === "PENDING" || j.status === "STARTED"
-    );
+    const active = trainingJobs.filter((j) => j.status === "PENDING" || j.status === "STARTED");
     if (active.length === 0) return;
 
     const poll = async () => {
@@ -126,8 +147,6 @@ const ModelZooPage = () => {
           const res = await getSemanticTrainingStatus(job.task_id);
           const status = res?.result?.status?.toUpperCase?.() ?? job.status;
           const progress = res?.result?.progress ?? res?.result?.info ?? null;
-          const isDone = status === "SUCCESS" || status === "FAILURE" || status === "REVOKED";
-
           const failureMessage =
             status === "FAILURE"
               ? typeof progress === "string"
@@ -139,18 +158,10 @@ const ModelZooPage = () => {
             prev.map((j) =>
               j.task_id !== job.task_id
                 ? j
-                : {
-                    ...j,
-                    status,
-                    progress: progress ?? j.progress,
-                    error: failureMessage ?? j.error,
-                  }
+                : { ...j, status, progress: progress ?? j.progress, error: failureMessage ?? j.error }
             )
           );
-
-          if (status === "SUCCESS") {
-            refetchModels();
-          }
+          if (status === "SUCCESS") refetchModels();
         } catch (_) {
           // keep current state on poll error
         }
@@ -162,130 +173,95 @@ const ModelZooPage = () => {
     return () => clearInterval(t);
   }, [trainingJobs, refetchModels]);
 
-  // Fetch models from backend
-  useEffect(() => {
-    const fetchModels = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await getAllModels();
-        
-        if (result.success && result.models) {
-          // Group models by service
-          const groupedModels = result.models.reduce((acc, model) => {
-            const transformedModel = transformModel(model);
-            const service = transformedModel.service;
-            if (!acc[service]) {
-              acc[service] = [];
-            }
-            acc[service].push(transformedModel);
-            return acc;
-          }, {});
-          
-          setModelsData(groupedModels);
-        } else {
-          setError(result.error || 'Failed to load models from backend');
+  const isFavorite = useCallback(
+    (model) => (model.tasks || []).some((task) => favorites[task] === model.identifier),
+    [favorites]
+  );
+
+  // Star toggles the model as favorite for *each* task it serves. Optimistic:
+  // update local state first, then persist per task.
+  const handleToggleFavorite = useCallback(
+    async (model) => {
+      const id = model.identifier;
+      const tasks = model.tasks || [];
+      const wasFavorite = tasks.some((task) => favorites[task] === id);
+
+      setFavorites((prev) => {
+        const next = { ...prev };
+        for (const task of tasks) {
+          if (wasFavorite) {
+            if (next[task] === id) delete next[task];
+          } else {
+            next[task] = id;
+          }
         }
-      } catch (err) {
-        setError(err.message || 'Failed to load models');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+        return next;
+      });
 
-    fetchModels();
-  }, []);
-
-  // Check if we came from a dataset management page
-  const handleBack = () => {
-    if (datasetIdFromState) {
-      navigate(`/dataset/${datasetIdFromState}/datamanagement`);
-    } else {
-      // Try to go back in history, or navigate to datasets
-      if (window.history.length > 1) {
-        navigate(-1);
-      } else {
-        navigate("/datasets");
+      const ops = tasks
+        .map((task) => {
+          if (wasFavorite) return favorites[task] === id ? clearModelFavorite(task) : null;
+          return setModelFavorite(task, id);
+        })
+        .filter(Boolean);
+      const results = await Promise.allSettled(ops);
+      if (results.some((r) => r.status === "rejected" || r.value?.success === false)) {
+        // Re-sync from the server on any failure.
+        const fresh = await getModelFavorites();
+        setFavorites(fresh.favorites || {});
+        addToast({ message: "Couldn't update favorites. Try again.", type: "error" });
       }
-    }
-  };
+    },
+    [favorites, addToast]
+  );
 
   const handleModelAction = (model, actionType) => {
-    if (actionType === 'training' || actionType === 'finetuning') {
-      // Instance segmentation training is dataset-scoped (needs class/label
-      // selection), so it lives on its own page rather than the generic modal.
-      if (model.service === 'Instance Segmentation') {
-        if (datasetIdFromState) {
-          navigate(`/dataset/${datasetIdFromState}/training`, {
-            state: { modelKey: model.identifier },
-          });
-        } else {
-          addToast({
-            message: 'Open the Model Zoo from a dataset to train instance segmentation models.',
-            type: 'info',
-          });
-        }
-        return;
-      }
+    if (actionType !== "finetuning" && actionType !== "training") return;
 
-      // Open training modal (semantic segmentation)
-      setTrainingModal({
-        isOpen: true,
-        model: model,
-        actionType: actionType,
-      });
-    } else if (actionType === 'inference') {
-      // Navigate to inference page (implement if needed)
-      // TODO: Implement inference navigation
+    // Instance-segmentation training is dataset-scoped (needs class/label
+    // selection), so it lives on its own page.
+    if ((model.tasks || []).includes("instance-segmentation")) {
+      if (datasetIdFromState) {
+        navigate(`/dataset/${datasetIdFromState}/training`, { state: { modelKey: model.identifier } });
+      } else {
+        addToast({
+          message: "Open the Model Zoo from a dataset to fine-tune instance segmentation models.",
+          type: "info",
+        });
+      }
+      return;
     }
+
+    addToast({ message: `${model.name} is not fine-tunable here.`, type: "info" });
   };
 
   const handleTrainingSubmit = async (trainingParams) => {
-    const { model } = trainingModal;
-
-    if (model.service !== "Semantic Segmentation") {
-      throw new Error(
-        `Training is not supported for ${model.service} models. These models are for inference only.`
-      );
-    }
-
     const response = await startSemanticTraining(trainingParams);
-    if (!response?.success) {
-      throw new Error(response?.message || "Training failed");
-    }
-
+    if (!response?.success) throw new Error(response?.message || "Training failed");
     const taskId = response?.result?.task_id;
+    if (!taskId) throw new Error("Server did not return a task ID.");
     const initialState = (response?.result?.state || "PENDING").toUpperCase();
-    if (!taskId) {
-      throw new Error("Server did not return a task ID.");
-    }
-
     setTrainingJobs((prev) => [
       ...prev,
       {
         task_id: taskId,
-        model_key: model.identifier,
-        model_name: model.name,
+        model_key: trainingModal.model?.identifier,
+        model_name: trainingModal.model?.name,
         dataset_id: trainingParams.dataset_id,
-        status: initialState === "PENDING" || initialState === "STARTED" ? initialState : "PENDING",
+        status: initialState === "STARTED" ? "STARTED" : "PENDING",
         progress: response?.result?.data ?? null,
         error: null,
         startedAt: new Date().toISOString(),
       },
     ]);
-    addToast({
-      message: "Training started. Track progress in the “Training runs” section below.",
-      type: "success",
-    });
+    addToast({ message: "Training started. Track progress in the “Training runs” section below.", type: "success" });
   };
 
   const handleCancelTraining = async (taskId) => {
     setCancellingTaskId(taskId);
     try {
       await cancelSemanticTraining(taskId);
-      setTrainingJobs((prev) =>
-        prev.map((j) => (j.task_id === taskId ? { ...j, status: "REVOKED" } : j))
-      );
+      setTrainingJobs((prev) => prev.map((j) => (j.task_id === taskId ? { ...j, status: "REVOKED" } : j)));
       addToast({ message: "Training cancelled.", type: "success" });
     } catch (err) {
       addToast({ message: err?.message || "Failed to cancel training", type: "error" });
@@ -294,74 +270,120 @@ const ModelZooPage = () => {
     }
   };
 
-  // Get all services
-  const services = ["All", ...Object.keys(modelsData)];
-
-  // Filter models based on selected service
-  const getFilteredModels = () => {
-    if (selectedService === "All") {
-      return modelsData;
-    }
-    return { [selectedService]: modelsData[selectedService] || [] };
+  const handleBack = () => {
+    if (datasetIdFromState) navigate(`/dataset/${datasetIdFromState}/datamanagement`);
+    else if (window.history.length > 1) navigate(-1);
+    else navigate("/datasets");
   };
 
-  const filteredModels = getFilteredModels();
+  // Task facets that actually have models, in canonical order.
+  const presentTasks = useMemo(
+    () => TASK_ORDER.filter((t) => models.some((m) => (m.tasks || []).includes(t))),
+    [models]
+  );
 
-  // Content component that can be wrapped or standalone
-  const ModelZooContent = () => {
-    const handleBackToOverview = () => {
-      if (datasetIdFromState) {
-        navigate(`/dataset/${datasetIdFromState}/datamanagement`);
+  const filteredModels = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return models.filter((m) => {
+      if (favoritesOnly && !isFavorite(m)) return false;
+      if (selectedTask !== "all" && !(m.tasks || []).includes(selectedTask)) return false;
+      if (q) {
+        const haystack = `${m.name || ""} ${m.identifier || ""} ${m.description || ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
       }
-    };
+      return true;
+    });
+  }, [models, favoritesOnly, selectedTask, search, isFavorite]);
 
-    return (
-      <div className="h-full flex flex-col bg-white">
-        {/* Header with Back Button (when accessed from dataset management) */}
-        {isFromDatasetManagement && datasetIdFromState && (
-          <div className="p-3 sm:p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
-            <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
-              <button
-                onClick={handleBackToOverview}
-                className="flex items-center space-x-1.5 sm:space-x-2 text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base"
-              >
-                <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Back to Overview</span>
-                <span className="sm:hidden">Back</span>
-              </button>
-              <div className="h-5 sm:h-6 w-px bg-gray-300"></div>
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                Model Zoo
-              </h2>
-            </div>
+  // Sorting is client-side: the zoo already fetches every model, so ordering by
+  // name / inference time / params / GFLOPs is a pure re-sort of the filtered set.
+  const showPerfSort = useMemo(() => hasAnyPerfStats(models), [models]);
+  const sortOptions = useMemo(
+    () => (showPerfSort ? Object.keys(SORT_STRATEGIES) : ["name"]),
+    [showPerfSort]
+  );
+  const sortedModels = useMemo(() => {
+    const strategy = SORT_STRATEGIES[sortBy] || SORT_STRATEGIES[DEFAULT_SORT];
+    return [...filteredModels].sort(strategy.compare);
+  }, [filteredModels, sortBy]);
+
+  const favoriteCount = useMemo(() => models.filter(isFavorite).length, [models, isFavorite]);
+
+  // Keep a valid model selected for the detail panel as filters/sorting change.
+  useEffect(() => {
+    if (sortedModels.length === 0) {
+      if (selectedModelId !== null) setSelectedModelId(null);
+      return;
+    }
+    if (!sortedModels.some((m) => m.identifier === selectedModelId)) {
+      setSelectedModelId(sortedModels[0].identifier);
+    }
+  }, [sortedModels, selectedModelId]);
+
+  const selectedModel = useMemo(
+    () => sortedModels.find((m) => m.identifier === selectedModelId) || null,
+    [sortedModels, selectedModelId]
+  );
+
+  // If perf stats disappear (e.g. only unsorted models remain), fall back to name.
+  useEffect(() => {
+    if (!sortOptions.includes(sortBy)) setSortBy(DEFAULT_SORT);
+  }, [sortOptions, sortBy]);
+
+  const FacetButton = ({ active, onClick, icon: Icon, children }) => (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+        active
+          ? "bg-teal-600 text-white border-teal-600"
+          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900"
+      }`}
+    >
+      {Icon && <Icon className="w-4 h-4" />}
+      {children}
+    </button>
+  );
+
+  const ModelZooContent = () => (
+    <div className="h-full flex flex-col bg-white">
+      {isFromDatasetManagement && datasetIdFromState && (
+        <div className="p-3 sm:p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+          <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
+            <button
+              onClick={() => navigate(`/dataset/${datasetIdFromState}/datamanagement`)}
+              className="flex items-center space-x-1.5 sm:space-x-2 text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base"
+            >
+              <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Back to Overview</span>
+              <span className="sm:hidden">Back</span>
+            </button>
+            <div className="h-5 sm:h-6 w-px bg-gray-300"></div>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Model Zoo</h2>
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="h-full overflow-y-auto bg-gray-50">
-          <div className="max-w-[98%] mx-auto px-4 py-8">
-            {/* Loading State */}
-            {isLoading && (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
-                <p className="text-gray-600">Loading models...</p>
-              </div>
-            )}
+      <div className="flex-1 min-h-0 bg-gray-50">
+        <div className="max-w-[98%] w-full h-full mx-auto px-4 py-5 flex flex-col min-h-0">
+          {isLoading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
+              <p className="text-gray-600">Loading models...</p>
+            </div>
+          )}
 
-            {/* Error State */}
-            {error && !isLoading && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                <p className="text-red-800 font-medium mb-2">Failed to load models</p>
-                <p className="text-red-600 text-sm">{error}</p>
-              </div>
-            )}
+          {error && !isLoading && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+              <p className="text-red-800 font-medium mb-2">Failed to load models</p>
+              <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
 
-            {/* Content - Only show when not loading and no error */}
-            {!isLoading && !error && (
-              <>
-            {/* Page Header - Only show when NOT accessed from dataset management */}
-            {!isFromDatasetManagement && (
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
+          {!isLoading && !error && (
+            <div className="flex-1 min-h-0 flex flex-col">
+              {!isFromDatasetManagement && (
+                <div className="mb-5 shrink-0">
                   <div className="flex items-center space-x-3">
                     <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
                       <Brain className="w-6 h-6 text-white" />
@@ -369,152 +391,163 @@ const ModelZooPage = () => {
                     <div>
                       <h2 className="text-3xl font-bold text-gray-900">Model Zoo</h2>
                       <p className="text-gray-600 mt-1">
-                        Explore and use state-of-the-art models for segmentation tasks
+                        Explore models and star your defaults for each task
                       </p>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Service Filter */}
-            <div className="flex items-center flex-wrap gap-2 mb-8">
-              <Filter className="w-4 h-4 text-gray-400 mr-1" />
-              {services.map((service) => (
-                <button
-                  key={service}
-                  onClick={() => setSelectedService(service)}
-                  className={`px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border ${
-                    selectedService === service
-                      ? "bg-teal-600 text-white border-teal-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900"
-                  }`}
-                >
-                  {service}
-                </button>
-              ))}
-            </div>
-
-            {/* Training runs – show jobs started from this page with status */}
-            {trainingJobs.length > 0 && (
-              <div className="mb-10">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full" />
-                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-teal-600" />
-                    Training runs
-                  </h3>
-                  <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20" />
-                </div>
-                <p className="text-sm text-gray-600 mb-4">
-                  Models you started training here. When a run finishes, the trained model will appear in the Semantic Segmentation list below.
-                </p>
-                <div className="space-y-3">
-                  {trainingJobs.map((job) => {
-                    const p = job.progress;
-                    const epochNum = p?.current_epoch ?? p?.epoch_count;
-                    const totalEpochs = p?.total_epochs ?? p?.num_epochs;
-                    const progressMessage =
-                      job.status === "STARTED" && p && typeof p === "object"
-                        ? [
-                            epochNum != null &&
-                              `Epoch ${epochNum}${totalEpochs != null ? ` / ${totalEpochs}` : ""}`,
-                            (p.loss ?? p.train_loss) != null &&
-                              `Loss ${Number(p.loss ?? p.train_loss).toFixed(4)}`,
-                            (p.val_dice ?? p.val_dice_coeff) != null &&
-                              `Val Dice ${Number(p.val_dice ?? p.val_dice_coeff).toFixed(4)}`,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ") || "Training in progress…"
-                        : job.status === "PENDING"
-                          ? "Waiting in queue…"
-                          : null;
-                    return (
+              {/* Training runs */}
+              {trainingJobs.length > 0 && (
+                <div className="mb-5 shrink-0">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full" />
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <GraduationCap className="w-5 h-5 text-teal-600" />
+                      Training runs
+                    </h3>
+                    <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20" />
+                  </div>
+                  <div className="space-y-3 max-h-[28vh] overflow-y-auto pr-1">
+                    {trainingJobs.map((job) => (
                       <TrainingJobCard
                         key={job.task_id}
                         job={job}
                         onCancel={handleCancelTraining}
-                        progressMessage={progressMessage}
+                        isCancelling={cancellingTaskId === job.task_id}
                       />
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Models Grid by Service */}
-            {Object.keys(filteredModels).map((serviceName) => (
-              <div key={serviceName} className="mb-10">
-                <div className="flex items-center gap-3 mb-5">
-                  <h3 className="text-lg font-semibold text-gray-900">{serviceName}</h3>
-                  <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">
-                    {filteredModels[serviceName].length}
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200" />
+              {/* Master–detail: viewer on the left, model preview list on the right */}
+              <div className="flex-1 min-h-0 flex gap-5">
+                {/* Detail viewer */}
+                <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                  <ModelDetailPanel
+                    model={selectedModel}
+                    isFavorite={selectedModel ? isFavorite(selectedModel) : false}
+                    onToggleFavorite={handleToggleFavorite}
+                    onAction={handleModelAction}
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {filteredModels[serviceName].map((model) => (
-                    <ModelCard
-                      key={model.identifier}
-                      model={model}
-                      onAction={handleModelAction}
+                {/* Preview list + controls */}
+                <div className="w-[340px] shrink-0 flex flex-col min-h-0">
+                  <div className="relative mb-2.5 shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search models"
+                      className="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
                     />
-                  ))}
+                  </div>
+
+                  {sortOptions.length > 1 && (
+                    <div className="relative mb-2.5 shrink-0">
+                      <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        aria-label="Sort models"
+                        className="w-full pl-9 pr-8 py-1.5 text-sm bg-white border border-gray-200 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                      >
+                        {sortOptions.map((key) => (
+                          <option key={key} value={key}>
+                            Sort: {SORT_STRATEGIES[key].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-1.5 mb-3 shrink-0">
+                    <FacetButton active={selectedTask === "all"} onClick={() => setSelectedTask("all")}>
+                      All
+                    </FacetButton>
+                    {presentTasks.map((task) => {
+                      const meta = getTaskMeta(task);
+                      return (
+                        <FacetButton
+                          key={task}
+                          active={selectedTask === task}
+                          onClick={() => setSelectedTask(task)}
+                        >
+                          {meta.short}
+                        </FacetButton>
+                      );
+                    })}
+                    {favoriteCount > 0 && (
+                      <FacetButton
+                        active={favoritesOnly}
+                        onClick={() => setFavoritesOnly((v) => !v)}
+                        icon={Star}
+                      >
+                        Favorites
+                      </FacetButton>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-h-0 overflow-y-auto -mr-1 pr-1 space-y-2">
+                    {sortedModels.length > 0 ? (
+                      sortedModels.map((model) => (
+                        <ModelChip
+                          key={model.identifier}
+                          model={model}
+                          isSelected={model.identifier === selectedModelId}
+                          isFavorite={isFavorite(model)}
+                          onSelect={(m) => setSelectedModelId(m.identifier)}
+                          onToggleFavorite={handleToggleFavorite}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-center py-10 px-4">
+                        <Brain className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                        <h3 className="text-sm font-semibold text-gray-900 mb-1">No models found</h3>
+                        <p className="text-xs text-gray-500">
+                          {models.length === 0
+                            ? "No models are registered yet."
+                            : "Try a different filter or search."}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            ))}
-
-            {/* Empty State (if no models) */}
-            {Object.keys(filteredModels).length === 0 && (
-              <div className="text-center py-12">
-                <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  No models found
-                </h3>
-                <p className="text-gray-600">
-                  Try selecting a different service filter
-                </p>
-              </div>
-            )}
-            </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-
-        {/* Training Modal */}
-        <TrainingModal
-          isOpen={trainingModal.isOpen}
-          onClose={() => setTrainingModal({ isOpen: false, model: null, actionType: null })}
-          model={trainingModal.model}
-          onSubmit={handleTrainingSubmit}
-          datasetId={datasetIdFromState}
-        />
       </div>
-    );
-  };
 
-  // If accessed from dataset management, use the shared layout with sidebar
+      <TrainingModal
+        isOpen={trainingModal.isOpen}
+        onClose={() => setTrainingModal({ isOpen: false, model: null, actionType: null })}
+        model={trainingModal.model}
+        onSubmit={handleTrainingSubmit}
+        datasetId={datasetIdFromState}
+      />
+    </div>
+  );
+
   if (isFromDatasetManagement && datasetIdFromState) {
     return (
       <DatasetManagementLayout datasetId={datasetIdFromState}>
-        <ModelZooContent />
+        {ModelZooContent()}
       </DatasetManagementLayout>
     );
   }
 
-  // Otherwise, show standalone page without sidebar
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white">
+    <div className="h-screen flex flex-col bg-gray-50">
+      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white shrink-0">
         <div className="max-w-[98%] mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button
-                onClick={handleBack}
-                className="flex items-center space-x-2 hover:text-teal-200 transition-colors"
-              >
+              <button onClick={handleBack} className="flex items-center space-x-2 hover:text-teal-200 transition-colors">
                 <ArrowLeft size={20} />
                 <span>Back</span>
               </button>
@@ -547,7 +580,9 @@ const ModelZooPage = () => {
         </div>
       </div>
 
-      <ModelZooContent />
+      <div className="flex-1 min-h-0">
+        {ModelZooContent()}
+      </div>
     </div>
   );
 };

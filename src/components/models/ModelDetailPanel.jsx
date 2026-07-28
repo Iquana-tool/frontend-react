@@ -1,0 +1,355 @@
+import React from "react";
+import {
+  Wrench,
+  GraduationCap,
+  Lightbulb,
+  Sparkles,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  MousePointerClick,
+  RefreshCw,
+  Hash,
+  Boxes,
+  Wand2,
+  Scan,
+  Star,
+  Cpu,
+  Timer,
+  Zap,
+  Gauge,
+  MemoryStick,
+  Layers,
+  Scale,
+  Maximize,
+} from "lucide-react";
+import { getTaskMeta, TASK_ORDER } from "../../constants/tasks";
+import {
+  formatParams,
+  formatGflops,
+  formatLatency,
+  formatThroughput,
+  formatVram,
+  formatResolution,
+} from "./modelStats";
+
+const TASK_VISUAL = {
+  "prompted-segmentation": { Icon: MousePointerClick, tile: "from-sky-500 to-blue-500" },
+  "instance-suggestion": { Icon: Wand2, tile: "from-violet-500 to-purple-500" },
+  "instance-segmentation": { Icon: Boxes, tile: "from-amber-500 to-orange-500" },
+};
+const DEFAULT_VISUAL = { Icon: Scan, tile: "from-teal-500 to-cyan-500" };
+
+const orderTasks = (tasks) =>
+  [...(tasks || [])].sort((a, b) => TASK_ORDER.indexOf(a) - TASK_ORDER.indexOf(b));
+
+// A single performance figure. Rendered only when the value is present.
+const StatTile = ({ Icon, label, value, hint }) => {
+  if (!value) return null;
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2.5" title={hint}>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
+        <Icon className="w-3.5 h-3.5 text-gray-400" />
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-semibold text-gray-900 tabular-nums leading-none">
+        {value}
+      </div>
+    </div>
+  );
+};
+
+const SpecRow = ({ Icon, label, children }) =>
+  children == null || children === "" ? null : (
+    <div className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-1.5 w-40 shrink-0 text-xs font-medium text-gray-500">
+        <Icon className="w-3.5 h-3.5 text-gray-400" />
+        {label}
+      </div>
+      <div className="min-w-0 flex-1 text-sm text-gray-800">{children}</div>
+    </div>
+  );
+
+const SectionTitle = ({ children }) => (
+  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{children}</h4>
+);
+
+/**
+ * Full detail view ("viewer") for the model selected in the zoo list. Everything
+ * the compact chip omits lives here: full description, performance figures,
+ * capabilities, a spec table, and the fine-tune action.
+ */
+const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onAction }) => {
+  if (!model) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-10">
+        <Scan className="w-14 h-14 text-gray-300 mb-4" />
+        <p className="text-gray-500">Select a model to see its details.</p>
+      </div>
+    );
+  }
+
+  const tasks = orderTasks(model.tasks);
+  const primaryTask = tasks[0];
+  const { Icon, tile } = TASK_VISUAL[primaryTask] || DEFAULT_VISUAL;
+
+  const badges = Array.isArray(model.badges) ? model.badges : [];
+  const promptTypes = Array.isArray(model.promptTypesSupported) ? model.promptTypesSupported : [];
+  const isReady = model.status !== "not_ready";
+  const showFinetuning = model.trainable === true;
+  const perf = model.performance || {};
+
+  const tags = (Array.isArray(model.tags) ? model.tags : []).filter((t) => {
+    const key = String(t.key || "").toLowerCase();
+    return key !== "task" && key !== "tasks" && !key.startsWith("task_");
+  });
+
+  const capabilities = [
+    model.pretrained && { label: "Pretrained", className: "bg-green-50 text-green-700" },
+    model.refinementSupported && {
+      label: "Refinement",
+      className: "bg-teal-50 text-teal-700",
+      Icon: RefreshCw,
+    },
+    showFinetuning && {
+      label: "Fine-tune on dataset",
+      className: "bg-purple-50 text-purple-700",
+      Icon: GraduationCap,
+    },
+  ].filter(Boolean);
+
+  const perfStats = [
+    { Icon: Cpu, label: "Parameters", value: formatParams(perf.num_parameters) },
+    { Icon: Zap, label: "GFLOPs", value: formatGflops(perf.gflops) },
+    {
+      Icon: Timer,
+      label: "Inference time",
+      value: formatLatency(perf.latency_ms),
+      hint: perf.reference_device ? `Measured on ${perf.reference_device}` : undefined,
+    },
+    { Icon: Gauge, label: "Throughput", value: formatThroughput(perf.throughput_img_s) },
+    { Icon: MemoryStick, label: "Peak VRAM", value: formatVram(perf.peak_vram_mb) },
+  ];
+  const hasPerf = perfStats.some((s) => s.value);
+  const perfContext = [perf.reference_device, formatResolution(perf.reference_input_size)]
+    .filter(Boolean)
+    .join(", ");
+
+  const hasSpecTable =
+    model.architecture ||
+    model.license ||
+    formatResolution(model.inputResolution) ||
+    promptTypes.length > 0 ||
+    model.refinementSupported ||
+    (Array.isArray(model.labelIds) && model.labelIds.length > 0) ||
+    tags.length > 0;
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="p-6 max-w-3xl">
+        {/* Header */}
+        <div className="flex items-start gap-4">
+          <div
+            className={`shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br ${tile} flex items-center justify-center shadow-sm`}
+          >
+            <Icon className="w-7 h-7 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold text-gray-900 leading-tight">{model.name}</h2>
+                {model.identifier && (
+                  <p className="text-xs text-gray-400 font-mono truncate mt-1" title={model.identifier}>
+                    {model.identifier}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {model.status && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      isReady ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {isReady ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5" />
+                    )}
+                    {isReady ? "Ready" : "Needs training"}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onToggleFavorite?.(model)}
+                  aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                  aria-pressed={isFavorite}
+                  title={
+                    isFavorite
+                      ? "Favorite — preselected in the annotation page"
+                      : "Set as your default model for its tasks"
+                  }
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <Star
+                    className={
+                      isFavorite ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-400"
+                    }
+                    style={{ width: 20, height: 20 }}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* Capability + badge chips */}
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {tasks.map((taskKey) => {
+                const meta = getTaskMeta(taskKey);
+                return (
+                  <span
+                    key={taskKey}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${meta.chip}`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                    {meta.label}
+                  </span>
+                );
+              })}
+              {badges.map((badge, i) => (
+                <span
+                  key={`badge-${i}`}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-[11px] font-medium"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {badge}
+                </span>
+              ))}
+              {capabilities.map((cap, i) => (
+                <span
+                  key={`cap-${i}`}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${cap.className}`}
+                >
+                  {cap.Icon && <cap.Icon className="w-3 h-3" />}
+                  {cap.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        {model.description && (
+          <p className="mt-5 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+            {model.description}
+          </p>
+        )}
+
+        {/* Usage tip */}
+        {model.usageTip && (
+          <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50/70 rounded-lg">
+            <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-800 leading-relaxed">{model.usageTip}</p>
+          </div>
+        )}
+
+        {/* Performance */}
+        {hasPerf && (
+          <div className="mt-6">
+            <SectionTitle>Performance</SectionTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {perfStats.map((s) => (
+                <StatTile key={s.label} {...s} />
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-gray-400">
+              Approximate figures{perfContext ? `, measured at ${perfContext}` : ""}. Actual speed
+              varies with hardware and input size.
+            </p>
+          </div>
+        )}
+
+        {/* Spec table */}
+        {hasSpecTable && (
+          <div className="mt-6">
+            <SectionTitle>Specifications</SectionTitle>
+            <div className="rounded-xl border border-gray-200 px-4 py-1">
+              <SpecRow Icon={Layers} label="Architecture">
+                {model.architecture}
+              </SpecRow>
+              <SpecRow Icon={Scale} label="License">
+                {model.license}
+              </SpecRow>
+              <SpecRow Icon={Maximize} label="Input resolution">
+                {formatResolution(model.inputResolution)}
+              </SpecRow>
+              <SpecRow Icon={MousePointerClick} label="Prompt types">
+                {promptTypes.length > 0 ? (
+                  <span className="flex flex-wrap gap-1.5">
+                    {promptTypes.map((pt, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded-full text-[11px] font-medium capitalize"
+                      >
+                        {String(pt).replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </SpecRow>
+              <SpecRow Icon={RefreshCw} label="Refinement">
+                {model.refinementSupported ? "Supported" : null}
+              </SpecRow>
+              <SpecRow Icon={Hash} label="Predicted labels">
+                {Array.isArray(model.labelIds) && model.labelIds.length > 0
+                  ? model.labelIds.join(", ")
+                  : null}
+              </SpecRow>
+              {tags.length > 0 && (
+                <SpecRow Icon={Sparkles} label="Tags">
+                  <span className="flex flex-wrap gap-1.5">
+                    {tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px]"
+                      >
+                        {tag.key && <span className="text-gray-400 mr-1">{tag.key}</span>}
+                        <span className="font-medium">{tag.value}</span>
+                      </span>
+                    ))}
+                  </span>
+                </SpecRow>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-6 flex items-center gap-3">
+          {model.infoUrl && (
+            <a
+              href={model.infoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-teal-600 transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Learn more
+            </a>
+          )}
+          {showFinetuning && (
+            <button
+              onClick={() => onAction?.(model, "finetuning")}
+              className="ml-auto inline-flex items-center gap-1.5 py-2 px-4 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+              title="Fine-tune this model on a dataset"
+            >
+              <Wrench className="w-4 h-4" />
+              Fine-tune
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ModelDetailPanel;

@@ -119,6 +119,8 @@ export const initialState = {
     isLoadingInstanceModels: false,
     isRunningSuggestion: false, // Track when suggestion segmentation (suggest similar) is running
     isRunningInstance: false, // Track when instance segmentation is running
+    favorites: {}, // User's favorite model per task: { task: registry_key }. Preselected in the selectors.
+    favoritesLoaded: false, // Guards a single favorites fetch before defaults are computed.
   },
   
   // Objects State
