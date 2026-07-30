@@ -77,6 +77,10 @@ export const useSetIsRunningInstance = () => useAnnotationStore(state => state.s
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
 export const useFetchAvailableSuggestionModels = () => useAnnotationStore(state => state.fetchAvailableSuggestionModels);
 export const useFetchAvailableInstanceModels = () => useAnnotationStore(state => state.fetchAvailableInstanceModels);
+export const useModelFavorites = () => useAnnotationStore(state => state.models.favorites);
+export const useFetchModelFavorites = () => useAnnotationStore(state => state.fetchModelFavorites);
+export const useSetFavoriteModel = () => useAnnotationStore(state => state.setFavoriteModel);
+export const useClearFavoriteModel = () => useAnnotationStore(state => state.clearFavoriteModel);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
 export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);
