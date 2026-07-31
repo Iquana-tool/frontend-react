@@ -19,12 +19,13 @@ import {
 } from "../api";
 import useThemeColors from "../hooks/useThemeColors";
 
-const TERMINAL = new Set(["SUCCESS", "FAILED"]);
+const TERMINAL = new Set(["SUCCESS", "FAILED", "CANCELLED"]);
 
 const STATE_STYLE = {
   PROGRESS: "bg-acS text-ac",
   SUCCESS: "bg-okBg text-ok",
   FAILED: "bg-errBg text-err",
+  CANCELLED: "bg-warnBg text-warn",
   starting: "bg-well text-t2",
 };
 
@@ -254,12 +255,15 @@ export default function ModelTrainingPage() {
     if (!activeTaskId) return;
     setIsStopping(true);
     try {
-      await cancelInstanceTraining(activeTaskId);
-    } catch (e) {
-      // run may already be terminal
+      const snapshot = await cancelInstanceTraining(activeTaskId);
+      setSelectedRun(snapshot);
+    } catch (err) {
+      setError(err.message || "Failed to stop training.");
+      return;
+    } finally {
+      setIsStopping(false);
     }
     setActiveTaskId(null);
-    setIsStopping(false);
     loadRuns();
   };
 
