@@ -19,7 +19,6 @@ import {
   usePanOffset,
   useSetZoomLevel,
   useSetPanOffset,
-  useFocusModeActive,
   useFocusModeObjectMask,
   useRefinementModeActive,
   useExitRefinementMode,
@@ -32,7 +31,6 @@ import PointPromptMarker from './prompts/PointPromptMarker';
 import BoxPromptMarker from './prompts/BoxPromptMarker';
 import LiveBoxPreview from './prompts/LiveBoxPreview';
 import PolygonPromptMarker from './prompts/PolygonPromptMarker';
-import PromptModeToolbar from './prompts/PromptModeToolbar';
 import DrawingPreview from './prompts/DrawingPreview';
 
 /**
@@ -58,13 +56,11 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
   const imageError = useImageError();
   const zoomLevel = useZoomLevel();
   const panOffset = usePanOffset();
-  const focusModeActive = useFocusModeActive();
   const focusedObjectMask = useFocusModeObjectMask();
   const refinementModeActive = useRefinementModeActive();
   const exitRefinementMode = useExitRefinementMode();
   // Focus/refinement overlays put an indicator at top-left; move our toolbar down
   // so it stays visible instead of being covered by that indicator.
-  const overlayActive = focusModeActive || refinementModeActive;
 
   // Store actions
   const addPointPrompt = useAddPointPrompt();
@@ -388,19 +384,11 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       className="absolute inset-0 z-10"
       style={{ cursor }}
     >
-      {/* Pan mode indicator */}
-      {isPanMode && (
-        <div className="absolute top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg z-50">
-          Pan Mode - Hold Space + Drag
-        </div>
-      )}
-
-      {/* Prompt drawing-mode selector (points / box / polygon / freehand) */}
-      <PromptModeToolbar supportedTypes={supportedPromptTypes} shiftDown={overlayActive} />
-
-      {/* Drawing instructions for polygon / freehand modes */}
+      {/* Drawing instructions for polygon / freehand modes. The prompt-mode
+          selector that used to sit here now lives in the workspace tool rail,
+          which also carries the model's supported-prompt-type gating. */}
       {isDrawMode && selectedModel && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg z-40 pointer-events-none bg-glass border border-ln2 text-t2">
           {promptMode === 'polygon'
             ? 'Click to add points · double-click or Enter to close · right-click undoes a point · Esc cancels'
             : 'Press and drag to trace an outline · release to close'}

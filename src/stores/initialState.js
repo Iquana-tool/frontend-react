@@ -14,6 +14,40 @@ export const initialState = {
     instanceWarningModalOpen: false,
   },
   
+  // Workspace shell state — panel/tab/theme layout of the redesigned annotation
+  // workspace. Kept separate from `ui` so the legacy sidebar flags above can be
+  // retired independently once nothing reads them.
+  workspace: {
+    theme: 'dark',              // 'dark' | 'light'
+    mode: 'annotate',           // 'annotate' | 'review'
+    /** When false, drawn shapes are committed as-is instead of becoming model prompts. */
+    aiAssist: true,
+    leftDrawerOpen: true,
+    rightPanelOpen: true,
+    rightTab: 'objects',        // 'objects' | 'labels'
+    filmstripOpen: true,
+    /** Review mode hides already-approved objects; this restores them. */
+    showApproved: false,
+    /** Label armed for the next annotation, and the source of the rail swatch. */
+    activeLabelId: null,
+    /** Hover is shared between the canvas and the object rows so both highlight. */
+    hoveredObjectId: null,
+    /** Which floating picker is open above the action bar, if any. */
+    picker: null,               // 'label' | 'model' | 'reject' | 'parent' | 'more' | null
+    /** Shortcut cheat-sheet overlay. Other modals keep their own local state. */
+    shortcutSheetOpen: false,
+    /** Per-object visibility — independent of the label-level filters. */
+    hiddenObjectIds: {},
+    /** Expanded/collapsed state of parent rows in the Objects tree. */
+    collapsedObjectIds: {},
+    /** Client-side colour overrides per label id; no backend field exists for these. */
+    labelColorOverrides: {},
+    /** Root ordering after a drag-reorder, or null to keep the natural order. */
+    rootOrder: null,
+    /** Live cursor position in image pixels, for the status bar. */
+    cursor: null,
+  },
+
   // Canvas State (needed for canvas components)
   canvas: {
     prompt: null,

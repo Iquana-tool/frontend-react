@@ -241,3 +241,49 @@ export const useSetImageScale = () => useAnnotationStore(state => state.setImage
 export const useStartCalibration = () => useAnnotationStore(state => state.startCalibration);
 export const useSetCalibrationPoint = () => useAnnotationStore(state => state.setCalibrationPoint);
 export const useCancelCalibration = () => useAnnotationStore(state => state.cancelCalibration);
+
+// Workspace shell selectors
+export const useWorkspaceTheme = () => useAnnotationStore(state => state.workspace.theme);
+export const useWorkspaceMode = () => useAnnotationStore(state => state.workspace.mode);
+export const useAiAssist = () => useAnnotationStore(state => state.workspace.aiAssist);
+export const useLeftDrawerOpen = () => useAnnotationStore(state => state.workspace.leftDrawerOpen);
+export const useRightPanelOpen = () => useAnnotationStore(state => state.workspace.rightPanelOpen);
+export const useRightTab = () => useAnnotationStore(state => state.workspace.rightTab);
+export const useFilmstripOpen = () => useAnnotationStore(state => state.workspace.filmstripOpen);
+export const useShowApproved = () => useAnnotationStore(state => state.workspace.showApproved);
+export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
+export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
+export const usePicker = () => useAnnotationStore(state => state.workspace.picker);
+export const useShortcutSheetOpen = () => useAnnotationStore(state => state.workspace.shortcutSheetOpen);
+export const useHiddenObjectIds = () => useAnnotationStore(state => state.workspace.hiddenObjectIds);
+export const useCollapsedObjectIds = () => useAnnotationStore(state => state.workspace.collapsedObjectIds);
+export const useLabelColorOverrides = () => useAnnotationStore(state => state.workspace.labelColorOverrides);
+export const useRootOrder = () => useAnnotationStore(state => state.workspace.rootOrder);
+export const useCursorPosition = () => useAnnotationStore(state => state.workspace.cursor);
+
+// Workspace action selectors
+export const useSetTheme = () => useAnnotationStore(state => state.setTheme);
+export const useToggleTheme = () => useAnnotationStore(state => state.toggleTheme);
+export const useSetWorkspaceMode = () => useAnnotationStore(state => state.setWorkspaceMode);
+export const useSetAiAssist = () => useAnnotationStore(state => state.setAiAssist);
+export const useToggleAiAssist = () => useAnnotationStore(state => state.toggleAiAssist);
+export const useToggleLeftDrawer = () => useAnnotationStore(state => state.toggleLeftDrawer);
+export const useSetLeftDrawerOpen = () => useAnnotationStore(state => state.setLeftDrawerOpen);
+export const useToggleRightPanel = () => useAnnotationStore(state => state.toggleRightPanel);
+export const useSetRightPanelOpen = () => useAnnotationStore(state => state.setRightPanelOpen);
+export const useSetRightTab = () => useAnnotationStore(state => state.setRightTab);
+export const useToggleFilmstrip = () => useAnnotationStore(state => state.toggleFilmstrip);
+export const useSetFilmstripOpen = () => useAnnotationStore(state => state.setFilmstripOpen);
+export const useToggleShowApproved = () => useAnnotationStore(state => state.toggleShowApproved);
+export const useSetActiveLabelId = () => useAnnotationStore(state => state.setActiveLabelId);
+export const useSetHoveredObjectId = () => useAnnotationStore(state => state.setHoveredObjectId);
+export const useSetPicker = () => useAnnotationStore(state => state.setPicker);
+export const useSetShortcutSheetOpen = () => useAnnotationStore(state => state.setShortcutSheetOpen);
+export const useToggleObjectHidden = () => useAnnotationStore(state => state.toggleObjectHidden);
+export const useToggleObjectCollapsed = () => useAnnotationStore(state => state.toggleObjectCollapsed);
+export const useExpandObject = () => useAnnotationStore(state => state.expandObject);
+export const useSetLabelColorOverride = () => useAnnotationStore(state => state.setLabelColorOverride);
+export const useReorderRootObject = () => useAnnotationStore(state => state.reorderRootObject);
+export const useInitRootOrder = () => useAnnotationStore(state => state.initRootOrder);
+export const useSetCursorPosition = () => useAnnotationStore(state => state.setCursorPosition);
+export const useResetWorkspaceForImage = () => useAnnotationStore(state => state.resetWorkspaceForImage);

@@ -2,63 +2,61 @@ import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
 /**
- * Warning modal for instance segmentation
- * Shows warning that running instance segmentation will override existing contours
+ * Confirms an instance-segmentation run, which replaces every contour on the
+ * mask. Destructive enough to warrant the danger treatment rather than the
+ * primary one.
  */
 const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white/20 backdrop-blur-sm p-2 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-white">Warning</h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white/80 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="p-6">
-          <p className="text-gray-700 text-sm leading-relaxed mb-4">
-            Running instance segmentation will <span className="font-semibold text-amber-600">override all contours</span> currently present on the mask.
-          </p>
-          <p className="text-gray-700 text-sm leading-relaxed">
-            This action cannot be undone. Do you want to proceed?
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex items-center justify-end space-x-3 border-t border-gray-200">
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="w-[360px] max-w-[calc(100%-32px)] rounded-12 bg-p1 border border-ln2 shadow-modal animate-dcPop">
+        <div className="flex items-center gap-[8px] px-[14px] py-[12px] border-b border-ln">
+          <AlertTriangle size={15} className="text-warn flex-none" />
+          <h2 className="flex-1 text-modaltitle font-bold text-t1">
+            Replace all annotations?
+          </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            aria-label="Close"
+            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="px-[14px] py-[12px] flex flex-col gap-[10px]">
+          <p className="text-row leading-[1.55] text-t2">
+            Running instance segmentation{' '}
+            <span className="font-semibold text-warn">overrides every contour</span>{' '}
+            currently on this image.
+          </p>
+          <p className="text-row leading-[1.55] text-t2">
+            This cannot be undone. Do you want to proceed?
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-[7px] px-[14px] py-[11px] border-t border-ln">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-7 px-[11px] rounded-7 border border-ln2 text-btn font-semibold text-t2 hover:bg-hv transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={onConfirm}
-            className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all duration-200 shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="h-7 px-[11px] rounded-7 border border-revLn bg-revBg2 text-btn font-bold text-rev hover:brightness-110 transition-[filter]"
           >
-            Proceed
+            Replace and run
           </button>
         </div>
       </div>

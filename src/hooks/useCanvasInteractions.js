@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { MAX_ZOOM, MIN_ZOOM } from '../components/annotationPage/workspace/constants';
 import { 
   useZoomLevel, 
   usePanOffset,
@@ -15,8 +16,9 @@ export const useCanvasInteractions = (containerRef) => {
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
 
-  // Pan mode state (controlled by spacebar)
-  const [isPanMode, setIsPanMode] = useState(false);
+  // Pan mode is either held (spacebar) or latched (the rail's Pan tool).
+  const [spacebarPan, setSpacebarPan] = useState(false);
+  const isPanMode = spacebarPan || currentTool === 'pan';
 
   // Mouse wheel zoom handler with cursor-focal zoom math
   const handleWheel = useCallback((e) => {
@@ -25,7 +27,7 @@ export const useCanvasInteractions = (containerRef) => {
 
     const delta = e.deltaY > 0 ? 0.9 : 1.1; // Zoom out or in
     const oldZoomLevel = zoomLevel;
-    const newZoomLevel = Math.max(0.1, Math.min(10, oldZoomLevel * delta));
+    const newZoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldZoomLevel * delta));
 
     if (newZoomLevel === oldZoomLevel) return;
 
@@ -47,7 +49,9 @@ export const useCanvasInteractions = (containerRef) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const handleMouseDown = useCallback((e) => {
-    // Don't pan when using AI annotation tool - it has its own pan controls
+    // The AI prompt canvas handles its own panning, so this container stays out
+    // of the way there. Selecting the Pan tool switches currentTool away from
+    // 'ai_annotation', so latched panning is unaffected by this guard.
     if (currentTool === 'ai_annotation') return;
     
     // Only pan with middle mouse button or left mouse + spacebar (pan mode)
@@ -116,7 +120,7 @@ export const useCanvasInteractions = (containerRef) => {
         e.preventDefault();
         e.stopPropagation();
         spacebarPressed = true;
-        setIsPanMode(true);
+        setSpacebarPan(true);
       }
     };
 
@@ -126,20 +130,20 @@ export const useCanvasInteractions = (containerRef) => {
         e.preventDefault();
         e.stopPropagation();
         spacebarPressed = false;
-        setIsPanMode(false);
+        setSpacebarPan(false);
       }
     };
 
     // Reset pan mode when focus is lost
     const handleBlur = () => {
       spacebarPressed = false;
-      setIsPanMode(false);
+      setSpacebarPan(false);
     };
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
         spacebarPressed = false;
-        setIsPanMode(false);
+        setSpacebarPan(false);
       }
     };
 

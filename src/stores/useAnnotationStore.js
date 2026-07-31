@@ -14,6 +14,7 @@ import { createFocusModeSlice } from './slices/focusModeSlice';
 import { createEditModeSlice } from './slices/editModeSlice';
 import { createAIAnnotationSlice } from './slices/aiAnnotationSlice';
 import { createObjectsSlice } from './slices/objectsSlice';
+import { createWorkspaceSlice, readStoredTheme } from './slices/workspaceSlice';
 
 /**
  * Combined annotation store using Zustand with Immer middleware
@@ -36,7 +37,8 @@ const useAnnotationStore = create()(
       immer((set, get) => ({
         // Initial state
         ...initialState,
-        
+        workspace: { ...initialState.workspace, theme: readStoredTheme() },
+
         // Combine all slices
         ...createUISlice(set),
         ...createModelsSlice(set, get),
@@ -48,6 +50,7 @@ const useAnnotationStore = create()(
         ...createEditModeSlice(set),
         ...createAIAnnotationSlice(set),
         ...createObjectsSlice(set),
+        ...createWorkspaceSlice(set),
       }))
     ),
     { name: 'annotation-store' }

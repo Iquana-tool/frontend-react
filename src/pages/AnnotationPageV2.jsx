@@ -3,7 +3,6 @@ import { Navigate, useParams } from 'react-router-dom';
 import MainLayout from '../components/annotationPage/layout/MainLayout';
 import ResponsiveWrapper from '../components/annotationPage/layout/ResponsiveWrapper';
 import DatasetLoader from '../components/annotationPage/layout/DatasetLoader';
-import DatasetNavigation from '../components/annotationPage/layout/DatasetNavigation';
 import useAnnotationSession from '../hooks/useAnnotationSession';
 import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
 import useWebSocketStatusToasts from '../hooks/useWebSocketStatusToasts';
@@ -168,11 +167,10 @@ const AnnotationPageV2 = () => {
 
   return (
     <DatasetLoader>
+      {/* The workspace shell carries its own toolbar (app menu, breadcrumb and
+          account chip), so the app navbar is not rendered here. */}
       <ResponsiveWrapper>
-        <div className="min-h-screen bg-gray-50">
-          <DatasetNavigation />
-          <MainLayout />
-        </div>
+        <MainLayout />
       </ResponsiveWrapper>
     </DatasetLoader>
   );

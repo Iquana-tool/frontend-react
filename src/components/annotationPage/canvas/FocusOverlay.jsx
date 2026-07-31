@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import ModeBanner from '../workspace/ModeBanner';
 import {
   useFocusModeActive,
   useFocusModeObjectId,
@@ -22,7 +23,11 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
   const setPanOffset = useSetPanOffset();
   const setZoomLevel = useSetZoomLevel();
   const refinementModeActive = useRefinementModeActive();
-  const containerRef = canvasRef; // Use the same container reference as SegmentationOverlay
+  // Geometry is measured from the image element, exactly as SegmentationOverlay
+  // does. The dim layer gets its own ref — binding it to `canvasRef` made React
+  // overwrite the image reference with the overlay div.
+  const containerRef = canvasRef;
+  const dimRef = useRef(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
 
   const handleExitFocusMode = async () => {
@@ -168,7 +173,7 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
     <>
       {/* Dimmed overlay with cutout for focused object - inside transform */}
       <div 
-        ref={containerRef}
+        ref={dimRef}
         className="absolute inset-0 pointer-events-none"
         style={{ 
           zIndex: 40,
@@ -207,50 +212,14 @@ const FocusOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) 
         )}
       </div>
 
-      {/* Text overlays - outside transform, fixed to viewport */}
-      <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 50 }}>
-        {/* Exit focus mode button - fixed to viewport top-right */}
-        <div className="absolute top-4 right-4 pointer-events-auto">
-          <button
-            onClick={handleExitFocusMode}
-            className="flex items-center gap-2 px-4 py-2 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl hover:bg-white border border-gray-200/50 transition-all duration-200 hover:shadow-2xl"
-          >
-            <svg
-              className="w-4 h-4 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-            <span className="text-sm font-semibold">Exit Focus</span>
-            <span className="text-xs text-gray-500 font-normal">(ESC)</span>
-          </button>
-        </div>
-
-        {/* Focus mode indicator - fixed to viewport top-left */}
-        <div className="absolute top-4 left-4 px-4 py-2.5 bg-white/95 backdrop-blur-sm text-gray-800 rounded-lg shadow-xl border border-gray-200/50 text-sm font-medium pointer-events-auto">
-          <div className="flex items-center gap-2.5">
-            <div className="relative">
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></div>
-              <div className="absolute inset-0 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping opacity-75"></div>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-gray-700">Focus Mode</span>
-                <span className="text-gray-400">·</span>
-                <span className="text-gray-600 font-medium">{focusedObject.label || `Object #${focusedObject.id}`}</span>
-              </div>
-              <span className="text-xs text-gray-500">Press ESC to exit focus mode</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ModeBanner
+        title="Focus Mode"
+        subject={focusedObject.label || `Object #${focusedObject.id}`}
+        hint="Annotations you draw are nested inside this object"
+        dotClass="bg-ok"
+        exitLabel="Exit focus"
+        onExit={handleExitFocusMode}
+      />
     </>
   );
 };
