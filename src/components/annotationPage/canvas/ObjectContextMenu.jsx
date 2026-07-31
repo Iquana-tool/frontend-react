@@ -524,7 +524,7 @@ const ObjectContextMenu = () => {
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[120px] max-w-[220px]"
+      className="absolute z-50 w-[216px] p-[5px] rounded-9 bg-p2 border border-ln2 shadow-ctx animate-dcPop"
       style={{
         left: `${adjustedPosition.x}px`,
         top: `${adjustedPosition.y}px`,
@@ -532,7 +532,7 @@ const ObjectContextMenu = () => {
     >
       {/* Header showing selection count */}
       {isMultiSelect && (
-        <div className="px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border-b border-blue-100">
+        <div className="px-[8px] py-[6px] mb-[3px] rounded-6 bg-acS text-meta font-bold text-ac">
           {targetObjects.length} objects selected
         </div>
       )}
@@ -540,7 +540,7 @@ const ObjectContextMenu = () => {
       {/* Reject Object Option */}
       <ContextMenuItem
         onClick={handleReject}
-        className="hover:bg-red-50 hover:text-red-700"
+        tone="danger"
         label={isMultiSelect ? `Reject ${targetObjects.length} objects` : "Reject object"}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -575,7 +575,6 @@ const ObjectContextMenu = () => {
         onClick={handleRefine}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Refinement mode is disabled for multiple selections' : 'Refine object'}
-        className="hover:bg-purple-50 hover:text-purple-700"
         label="Refine Object"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -589,7 +588,6 @@ const ObjectContextMenu = () => {
         onClick={handleLineEditContour}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Reshape is disabled for multiple selections' : 'Draw a line across the boundary to cut off or add a region'}
-        className="hover:bg-teal-50 hover:text-teal-700"
         label="Reshape by Line"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -603,7 +601,6 @@ const ObjectContextMenu = () => {
         onClick={handleEditContour}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Edit contour is disabled for multiple selections' : 'Drag the existing outline’s control points'}
-        className="hover:bg-blue-50 hover:text-blue-700"
         label="Edit Contour"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -616,7 +613,6 @@ const ObjectContextMenu = () => {
       <ContextMenuItem
         onClick={handleSuggestSimilar}
         disabled={isRunningSuggestion || !suggestionModel || !wsIsReady}
-        className="hover:bg-green-50 hover:text-green-700"
         title={
           !suggestionModel 
             ? 'Select a suggestion model first' 
@@ -635,11 +631,11 @@ const ObjectContextMenu = () => {
       />
 
       {/* Label section header */}
-      <div className="px-3 py-1 border-b border-gray-100">
-        <div className="text-xs font-medium text-gray-600">
-          {isMultiSelect ? `Assign label to ${targetObjects.length} objects` : 'Label'}
+      <div className="mt-[4px] pt-[6px] px-[8px] border-t border-ln">
+        <div className="text-sect font-bold tracking-[.08em] uppercase text-t3">
+          {isMultiSelect ? `Label ${targetObjects.length} objects` : 'Label'}
         </div>
-        <div className="text-[10px] font-normal text-gray-400">
+        <div className="mb-[4px] text-meta text-t3">
           {parentLabelName ? `Sub-labels of ${parentLabelName}` : 'Root level'}
         </div>
       </div>

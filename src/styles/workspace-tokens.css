@@ -1,0 +1,133 @@
+/**
+ * Design tokens for the annotation workspace.
+ *
+ * Scoped to `.iq-workspace` rather than `:root` on purpose: the workspace is the
+ * only dark surface in an otherwise light application, so the rest of the app
+ * (galleries, admin, docs) must not inherit these values. The Tailwind config
+ * maps utility class names onto these variables, so components use
+ * `bg-p1 text-t2` and never touch the hex codes directly.
+ *
+ * `--ac` / `--acS` / `--acLn` are derived from `--accent` at build time here
+ * rather than at runtime, since only one accent ships. Swapping the brand colour
+ * means editing `--accent` plus the three derivatives in both theme blocks.
+ */
+
+.iq-workspace {
+  --accent: #14b8a6;
+
+  /* Class palette — mirrors LABEL_COLORS in utils/labelColors.js */
+  --cls-1: #3b82f6;
+  --cls-2: #f97316;
+  --cls-3: #22c55e;
+  --cls-4: #8b5cf6;
+  --cls-5: #ef4444;
+  --cls-6: #06b6d4;
+  --cls-7: #f59e0b;
+  --cls-8: #ec4899;
+  --cls-9: #84cc16;
+  --cls-10: #6366f1;
+  --cls-11: #14b8a6;
+  --cls-12: #f43f5e;
+}
+
+.iq-workspace[data-theme='dark'] {
+  --app: #0f1114;
+  --p1: #191c20;
+  --p2: #22262b;
+  --canvas: #0a0b0d;
+  --ln: #282d33;
+  --ln2: #343a41;
+  --t1: #e7e9eb;
+  --t2: #98a0a8;
+  --t3: #6d757d;
+  --hv: rgba(255, 255, 255, 0.06);
+  --hv2: rgba(255, 255, 255, 0.12);
+  --well: rgba(255, 255, 255, 0.05);
+  --well2: rgba(255, 255, 255, 0.05);
+  --tip: #2b3138;
+  --glass: rgba(22, 25, 29, 0.86);
+
+  --ok: #4ade80;
+  --okBg: rgba(34, 197, 94, 0.14);
+  --okLn: rgba(34, 197, 94, 0.3);
+  --warn: #fbbf24;
+  --warnBg: rgba(245, 158, 11, 0.15);
+  --err: #f87171;
+  --errBg: rgba(239, 68, 68, 0.1);
+  --rev: #fb7185;
+  --revBg: rgba(244, 63, 94, 0.09);
+  --revBg2: rgba(244, 63, 94, 0.14);
+  --revLn: rgba(244, 63, 94, 0.24);
+
+  /* accent lightened +26 for text/icons on dark */
+  --ac: #2dd4bf;
+  --acS: rgba(20, 184, 166, 0.18);
+  --acLn: rgba(20, 184, 166, 0.42);
+  --onAccent: #04231f;
+
+  color-scheme: dark;
+}
+
+.iq-workspace[data-theme='light'] {
+  --app: #eceef1;
+  --p1: #ffffff;
+  --p2: #ffffff;
+  /* stays mid-grey so image colours read true */
+  --canvas: #4b5158;
+  --ln: #e2e5e9;
+  --ln2: #d3d7dc;
+  --t1: #14171a;
+  --t2: #5b636c;
+  --t3: #8b939b;
+  --hv: rgba(0, 0, 0, 0.05);
+  --hv2: rgba(0, 0, 0, 0.09);
+  --well: rgba(0, 0, 0, 0.045);
+  --well2: rgba(0, 0, 0, 0.03);
+  --tip: #1c1f23;
+  --glass: rgba(255, 255, 255, 0.92);
+
+  --ok: #15803d;
+  --okBg: rgba(34, 197, 94, 0.14);
+  --okLn: rgba(34, 197, 94, 0.35);
+  --warn: #b45309;
+  --warnBg: rgba(245, 158, 11, 0.16);
+  --err: #b91c1c;
+  --errBg: rgba(239, 68, 68, 0.09);
+  --rev: #be123c;
+  --revBg: rgba(244, 63, 94, 0.07);
+  --revBg2: rgba(244, 63, 94, 0.12);
+  --revLn: rgba(244, 63, 94, 0.22);
+
+  /* accent darkened −12 for contrast on white */
+  --ac: #08ac9a;
+  --acS: rgba(20, 184, 166, 0.13);
+  --acLn: rgba(20, 184, 166, 0.42);
+  --onAccent: #04231f;
+
+  color-scheme: light;
+}
+
+.iq-workspace {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin scrollbars matching the panel surfaces */
+.iq-workspace ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.iq-workspace ::-webkit-scrollbar-thumb {
+  background: rgba(140, 150, 160, 0.35);
+  border-radius: 6px;
+}
+.iq-workspace ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Native selects inherit the panel surface rather than the OS default */
+.iq-workspace select option {
+  background: var(--p2);
+  color: var(--t1);
+}

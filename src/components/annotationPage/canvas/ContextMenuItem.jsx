@@ -1,43 +1,29 @@
 import React from 'react';
 
 /**
- * A single menu item in a context menu
- * 
- * @param {Function} onClick - Click handler
- * @param {boolean} disabled - Whether the item is disabled
- * @param {string} className - Additional CSS classes for hover colors
- * @param {string} title - Tooltip text
- * @param {ReactNode} icon - SVG icon element
- * @param {string} label - Menu item label text
- * @param {boolean} hasBorder - Whether to show bottom border
+ * A single row in the canvas context menu.
+ *
+ * `tone` selects the hover treatment: `default` for ordinary actions, `danger`
+ * for destructive ones. Callers used to pass raw Tailwind hover classes, which
+ * hard-coded the light palette into every call site.
  */
-const ContextMenuItem = ({ 
-  onClick, 
-  disabled = false, 
-  className = 'hover:bg-blue-50 hover:text-blue-700',
-  title,
-  icon,
-  label,
-  hasBorder = true
-}) => {
-  const baseClasses = "w-full text-left px-3 py-2 text-sm transition-colors duration-150 flex items-center";
-  const borderClasses = hasBorder ? "border-b border-gray-100" : "";
-  const disabledClasses = disabled 
-    ? "text-gray-400 cursor-not-allowed opacity-50" 
-    : `text-gray-700 ${className}`;
-
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClasses} ${borderClasses} ${disabledClasses}`}
-      title={title}
-    >
-      {icon && <span className="w-4 h-4 mr-2 flex-shrink-0">{icon}</span>}
-      {label}
-    </button>
-  );
+const TONE = {
+  default: 'text-t1 hover:bg-hv',
+  danger: 'text-err hover:bg-errBg',
 };
 
-export default ContextMenuItem;
+const ContextMenuItem = ({ onClick, disabled = false, tone = 'default', title, icon, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    title={title}
+    className={`w-full h-7 px-[8px] flex items-center gap-[8px] rounded-6 text-btn text-left transition-colors
+      ${disabled ? 'text-t3 cursor-not-allowed opacity-50' : TONE[tone] || TONE.default}`}
+  >
+    {icon && <span className="w-[14px] h-[14px] flex-none flex items-center">{icon}</span>}
+    <span className="truncate">{label}</span>
+  </button>
+);
 
+export default ContextMenuItem;

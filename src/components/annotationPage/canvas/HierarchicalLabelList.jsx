@@ -1,53 +1,45 @@
 import React from 'react';
+import { getLabelColor } from '../../../utils/labelColors';
 
 /**
- * Renders a hierarchical list of labels with indentation for sub-labels
- * 
- * @param {Array} labelHierarchy - Array of root labels with nested children
- * @param {boolean} labelsLoading - Whether labels are currently loading
- * @param {Function} onLabelSelect - Callback when a label is selected
+ * Nested label list used inside the canvas context menu.
+ *
+ * Each row carries its class colour so the menu matches the swatches used in
+ * the Labels tab, the object rows and the polygons themselves.
  */
-const HierarchicalLabelList = ({ labelHierarchy, labelsLoading, onLabelSelect, emptyMessage = 'No labels available' }) => {
-  // Recursive function to render a label and its children
-  const renderLabel = (label, depth = 0) => {
-    const indent = depth * 16; // 16px indent per level
-    
-    return (
-      <React.Fragment key={label.id}>
-        <button
-          onClick={() => onLabelSelect(label)}
-          className="w-full text-left py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-150 flex items-center"
-          style={{ paddingLeft: `${12 + indent}px`, paddingRight: '12px' }}
-        >
-          <div className="w-2 h-2 rounded-full bg-gray-300 mr-2 flex-shrink-0"></div>
-          <span className="truncate">{label.name}</span>
-        </button>
-        {/* Render children recursively */}
-        {label.children && label.children.length > 0 && 
-          label.children.map(child => renderLabel(child, depth + 1))
-        }
-      </React.Fragment>
-    );
-  };
+const HierarchicalLabelList = ({
+  labelHierarchy,
+  labelsLoading,
+  onLabelSelect,
+  emptyMessage = 'No labels available',
+}) => {
+  const renderLabel = (label, depth = 0) => (
+    <React.Fragment key={label.id}>
+      <button
+        type="button"
+        onClick={() => onLabelSelect(label)}
+        className="w-full h-7 flex items-center gap-[7px] rounded-6 text-row text-t2 hover:bg-hv hover:text-t1 transition-colors text-left"
+        style={{ paddingLeft: 8 + depth * 14, paddingRight: 8 }}
+      >
+        <span
+          className="w-[9px] h-[9px] rounded-[2px] flex-none"
+          style={{ background: label.color || getLabelColor(label.id) }}
+        />
+        <span className="truncate">{label.name}</span>
+      </button>
+      {label.children?.map((child) => renderLabel(child, depth + 1))}
+    </React.Fragment>
+  );
 
   if (labelsLoading) {
-    return (
-      <div className="px-3 py-2 text-xs text-gray-500 text-center">
-        Loading labels...
-      </div>
-    );
+    return <div className="px-[8px] py-[6px] text-meta text-t3">Loading labels…</div>;
   }
 
   if (labelHierarchy.length === 0) {
-    return (
-      <div className="px-3 py-2 text-xs text-gray-500 text-center">
-        {emptyMessage}
-      </div>
-    );
+    return <div className="px-[8px] py-[6px] text-meta text-t3">{emptyMessage}</div>;
   }
 
-  return labelHierarchy.map(label => renderLabel(label));
+  return labelHierarchy.map((label) => renderLabel(label));
 };
 
 export default HierarchicalLabelList;
-

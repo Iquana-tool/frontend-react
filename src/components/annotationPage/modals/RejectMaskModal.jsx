@@ -87,16 +87,16 @@ const RejectMaskModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-        <div className="bg-gradient-to-r from-rose-500 to-red-500 text-white p-5 rounded-t-xl flex items-start justify-between">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade p-4">
+      <div className="w-[344px] max-w-full rounded-12 bg-p1 border border-ln2 shadow-modal animate-dcPop">
+        <div className="flex items-start justify-between px-[14px] py-[12px] border-b border-ln">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-full">
-              <RotateCcw className="w-5 h-5" />
+            <div className="p-[6px] rounded-full bg-revBg2 text-rev">
+              <RotateCcw className="w-3.5 h-3.5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold">Send back for rework</h3>
-              <p className="text-rose-100 text-sm">
+              <h3 className="text-modaltitle font-bold text-t1">Send back for rework</h3>
+              <p className="text-meta text-t3">
                 {contourId
                   ? `Object${contourLabel ? ` "${contourLabel}"` : ''} on this image`
                   : 'This whole image'}
@@ -105,32 +105,32 @@ const RejectMaskModal = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/20 transition-colors"
+            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        <div className="p-5">
+        <div className="px-[14px] py-[12px]">
           {loading ? (
-            <div className="flex items-center justify-center py-6 text-gray-500">
+            <div className="flex items-center justify-center py-6 text-row text-t3">
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
               Loading reasons…
             </div>
           ) : (
             <>
               <fieldset className="space-y-2">
-                <legend className="text-sm font-medium text-gray-700 mb-2">
+                <legend className="text-row font-semibold text-t2 mb-2">
                   What is wrong with it?
                 </legend>
                 {reasons.map((reason) => (
                   <label
                     key={reason.value}
-                    className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                    className={`flex items-center gap-[10px] px-[10px] py-[8px] rounded-7 border cursor-pointer transition-colors ${
                       selected === reason.value
-                        ? 'border-rose-400 bg-rose-50'
-                        : 'border-gray-200 hover:bg-gray-50'
+                        ? 'border-revLn bg-revBg2'
+                        : 'border-ln2 hover:bg-hv'
                     }`}
                   >
                     <input
@@ -139,15 +139,15 @@ const RejectMaskModal = ({
                       value={reason.value}
                       checked={selected === reason.value}
                       onChange={() => setSelected(reason.value)}
-                      className="w-4 h-4 text-rose-600 focus:ring-rose-500"
+                      className="w-3.5 h-3.5 accent-[var(--rev)]"
                     />
-                    <span className="text-sm text-gray-800">{reason.label}</span>
+                    <span className="text-row text-t1">{reason.label}</span>
                   </label>
                 ))}
               </fieldset>
 
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-row font-semibold text-t2 mb-1">
                   Note {noteRequired ? '(required)' : '(optional)'}
                 </label>
                 <textarea
@@ -156,17 +156,17 @@ const RejectMaskModal = ({
                   rows={3}
                   maxLength={1000}
                   placeholder="Anything that helps whoever picks this up next."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 text-sm"
+                  className="w-full px-[10px] py-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-revLn placeholder:text-t3"
                 />
               </div>
 
               {error && (
-                <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200">
-                  <p className="text-sm text-red-700">{error}</p>
+                <div className="mt-3 px-[10px] py-[8px] rounded-7 bg-errBg border border-ln2">
+                  <p className="text-row text-err">{error}</p>
                 </div>
               )}
 
-              <p className="mt-3 text-xs text-gray-500">
+              <p className="mt-3 text-sect leading-[1.5] text-t3">
                 The image goes back to the annotator and stays marked as sent back until
                 every open point on it is resolved.
               </p>
@@ -175,7 +175,7 @@ const RejectMaskModal = ({
                 <button
                   onClick={onClose}
                   disabled={submitting}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 h-7 rounded-7 border border-ln2 text-btn font-semibold text-t2 hover:bg-hv transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -183,7 +183,7 @@ const RejectMaskModal = ({
                   onClick={handleSubmit}
                   disabled={submitting || !selected || noteMissing}
                   title={noteMissing ? 'This reason needs a note.' : undefined}
-                  className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 h-7 rounded-7 border border-revLn bg-revBg2 text-btn font-bold text-rev hover:brightness-110 transition-[filter] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-[6px]"
                 >
                   {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   Send back

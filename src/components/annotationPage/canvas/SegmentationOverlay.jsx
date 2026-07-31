@@ -22,12 +22,26 @@ import {
   useEnterEditMode,
   useExitEditMode,
   useUpdateObject,
+  useHoveredObjectId,
+  useSetHoveredObjectId,
+  useWorkspaceMode,
+  useShowApproved,
+  useHiddenObjectIds,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
+import {
+  getPolygonStyle,
+  getChipLabel,
+  getChipBorder,
+  getCentroid,
+  HATCH_PATTERN_ID,
+  UNLABELLED_COLOR,
+} from '../workspace/annotationStyles';
+import { getObjectState } from '../workspace/objectViewModel';
 
 /**
  * Helper function to generate SVG path from x, y coordinate arrays
@@ -65,7 +79,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const currentTool = useCurrentTool();
   const containerRef = useRef(null);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
-  const [hoveredObjectId, setHoveredObjectId] = useState(null);
+  // Hover is shared with the Objects panel, so pointing at either representation
+  // highlights both.
+  const hoveredObjectId = useHoveredObjectId();
+  const setHoveredObjectId = useSetHoveredObjectId();
+  const workspaceMode = useWorkspaceMode();
+  const showApproved = useShowApproved();
+  const hiddenObjectIds = useHiddenObjectIds();
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
@@ -95,7 +115,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
   // Filter objects based on visibility settings and focus/refinement mode
   const visibleObjects = useMemo(() => {
-    let filtered = objectsList;
+    // Per-object visibility from the Objects panel's eye button. Applied first
+    // so a hidden object disappears regardless of the label-level filters.
+    let filtered = objectsList.filter((obj) => !hiddenObjectIds[obj.id]);
 
     // In focus or refinement mode, only show descendants of the active object
     // This hides ancestors, siblings, and unrelated objects that would otherwise
@@ -158,7 +180,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     }
 
     return filtered;
-  }, [objectsList, visibility, selectedObjects, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
+  }, [objectsList, hiddenObjectIds, visibility, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
   /**
    * Save the current edit-mode draft to backend and exit edit mode.
@@ -536,6 +558,69 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         </svg>
       )}
 
+      {/* Hatch used as the fill for unlabelled objects. Defined once, in its own
+          zero-sized SVG, so every object's <svg> can reference it by id. */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <pattern
+            id={HATCH_PATTERN_ID}
+            width="14"
+            height="14"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <rect width="14" height="14" fill="rgba(245,158,11,.10)" />
+            <line x1="0" y1="0" x2="0" y2="14" stroke="rgba(245,158,11,.55)" strokeWidth="4" />
+          </pattern>
+        </defs>
+      </svg>
+
+      {/* Object chips at each centroid. Purely informational, so they never take
+          pointer events — clicks belong to the polygon underneath. */}
+      {imageDimensions.width > 0 &&
+        visibleObjects.map((object) => {
+          if (focusModeActive && focusedObjectId === object.id) return null;
+          // Approved instances are noise while reviewing what is left.
+          if (workspaceMode === 'review' && !showApproved && getObjectState(object) === 'approved') {
+            return null;
+          }
+          const centroid = getCentroid(object);
+          if (!centroid) return null;
+
+          const isSelected = selectedObjects.includes(object.id);
+          const color =
+            getObjectState(object) === 'unlabelled' ? UNLABELLED_COLOR : object.color;
+
+          return (
+            <div
+              key={`chip-${object.id}`}
+              className="absolute pointer-events-none select-none"
+              style={{
+                left: `${imageDimensions.x + (centroid.x / 100) * imageDimensions.width}px`,
+                top: `${imageDimensions.y + (centroid.y / 100) * imageDimensions.height}px`,
+                transform: 'translate(-50%, -50%)',
+                zIndex: 35,
+              }}
+            >
+              <span
+                className="inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap"
+                style={{
+                  background: `rgba(10,12,14,${isSelected ? 0.94 : 0.74})`,
+                  color: '#eef1f3',
+                  border: getChipBorder(object, color),
+                  boxShadow: '0 3px 12px rgba(0,0,0,.35)',
+                }}
+              >
+                <span
+                  className="w-[6px] h-[6px] rounded-full"
+                  style={{ background: color }}
+                />
+                {getChipLabel(object)}
+              </span>
+            </div>
+          );
+        })}
+
       {/* Final Objects Masks */}
       {imageDimensions.width > 0 && visibleObjects.map((object) => {
         // Disable hover effects when in refinement mode
@@ -553,6 +638,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         // In refinement mode, highlight the refinement object prominently
         // Keep other objects visible but less prominent for context
         let fillOpacity, strokeWidth, glowIntensity, strokeColor;
+        let normalStyle = null;
         
         if (refinementModeActive) {
           if (isRefinementObject) {
@@ -569,11 +655,20 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             strokeColor = object.color;
           }
         } else {
-          // Normal mode styling
-          fillOpacity = isHovered ? 0.3 : (isSelected ? 0.35 : 0.2);
-          strokeWidth = isHovered ? 3 : (isSelected ? 4 : 2.5);
-          glowIntensity = isHovered ? 8 : (isSelected ? 6 : 4);
-          strokeColor = object.color;
+          // Normal mode: the design's state treatment (approved solid, pending
+          // dashed, unlabelled amber + marching ants), with hover and selection
+          // as modifiers on top.
+          const style = getPolygonStyle(object, {
+            hovered: isHovered,
+            selected: isSelected,
+            reviewMode: workspaceMode === 'review' && !showApproved,
+            color: object.color,
+          });
+          normalStyle = style;
+          fillOpacity = null;
+          strokeWidth = style.strokeWidth;
+          glowIntensity = isSelected ? 6 : 0;
+          strokeColor = style.stroke;
         }
         
         // ALWAYS generate path from x,y coordinates if available )
@@ -644,35 +739,21 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               </filter>
               
               {/* Animation styles for selected objects */}
-              {isSelected && (
+              {normalStyle?.marchingAnts && (
                 <style>
-                  {`
-                    @keyframes dash-${object.id} {
-                      to {
-                        stroke-dashoffset: -30;
-                      }
-                    }
-                    @keyframes pulse-${object.id} {
-                      0%, 100% {
-                        stroke-width: ${strokeWidth};
-                      }
-                      50% {
-                        stroke-width: ${strokeWidth + 1};
-                      }
-                    }
-                  `}
+                  {`@keyframes dash-${object.id} { to { stroke-dashoffset: -40; } }`}
                 </style>
               )}
             </defs>
             
             <path
               d={maskPath}
-              fill={hexToRgba(object.color, fillOpacity)}
+              fill={normalStyle ? normalStyle.fill : hexToRgba(object.color, fillOpacity)}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
               strokeLinecap="round"
-              strokeDasharray={isSelected ? "15,10" : "none"}
+              strokeDasharray={normalStyle ? normalStyle.strokeDasharray : (isSelected ? "15,10" : "none")}
               filter={
                 isRefinementObject
                   ? `url(#selected-glow-${object.id})` // Use selected glow for refinement object
@@ -687,7 +768,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 cursor: refinementModeActive ? 'default' : 'pointer',
                 // In refinement mode, disable pointer events so clicks pass through to canvas
                 pointerEvents: refinementModeActive ? 'none' : 'auto',
-                animation: isSelected ? `dash-${object.id} 2s linear infinite, pulse-${object.id} 2s ease-in-out infinite` : 'none'
+                transitionProperty: 'fill-opacity, stroke-width',
+                animation: normalStyle?.marchingAnts
+                  ? `dash-${object.id} 1.6s linear infinite`
+                  : 'none',
               }}
               onClick={(e) => handleObjectLeftClick(e, object)}
               onContextMenu={(e) => handleObjectRightClick(e, object)}

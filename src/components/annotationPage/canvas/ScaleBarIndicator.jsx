@@ -72,7 +72,7 @@ const ScaleBarIndicator = ({ canvasRef, zoomLevel = 1 }) => {
       style={{ zIndex: 50 }}
       aria-label={`Scale bar: ${barInfo.label}`}
     >
-      <div className="bg-slate-900/85 backdrop-blur-md border border-slate-700/60 shadow-xl rounded-xl px-3.5 py-2 text-white flex flex-col items-center gap-1.5 transition-all">
+      <div className="flex flex-col items-center gap-[5px] px-[10px] py-[7px] rounded-8 bg-glass border border-ln2 shadow-ctx backdrop-blur-sm">
         {/* Bar */}
         <div className="flex items-center gap-0">
           <div className="w-0.5 h-3.5 bg-white rounded-full shadow-xs" />
@@ -83,7 +83,7 @@ const ScaleBarIndicator = ({ canvasRef, zoomLevel = 1 }) => {
           <div className="w-0.5 h-3.5 bg-white rounded-full shadow-xs" />
         </div>
         {/* Label */}
-        <span className="text-xs font-bold tracking-wider leading-none text-slate-100 drop-shadow-xs">
+        <span className="font-mono text-meta font-bold tracking-wider leading-none text-t1">
           {barInfo.label}
         </span>
       </div>
