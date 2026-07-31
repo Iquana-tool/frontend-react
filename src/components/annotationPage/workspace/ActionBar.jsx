@@ -459,8 +459,12 @@ const ActionBar = () => {
     );
   }
 
+  // z-70 keeps the bar above every canvas overlay: the focus dim (z40), the
+  // prompt canvas as focus/refinement lift it (z45/z62) and the contour control
+  // points (z65). Those overlays are full-bleed and pointer-events-auto, so
+  // anything below them loses both the hover cursor and its clicks.
   return (
-    <div className="absolute left-1/2 bottom-4 -translate-x-1/2 z-40 w-max max-w-[calc(100%-28px)] flex flex-col items-center gap-[8px] pointer-events-none">
+    <div className="absolute left-1/2 bottom-4 -translate-x-1/2 z-[70] w-max max-w-[calc(100%-28px)] flex flex-col items-center gap-[8px] pointer-events-none">
       {picker && (
         <div className="pointer-events-auto">
           {picker === 'model' ? (

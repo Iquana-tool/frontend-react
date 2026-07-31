@@ -102,7 +102,7 @@ const ServiceCard = ({ service }) => {
                 value={service.selectedModel || ''}
                 onChange={(e) => service.setSelectedModel(e.target.value)}
                 aria-label={`${service.name} model`}
-                className="flex-1 h-[27px] px-[8px] rounded-6 border border-ln2 bg-well2 text-row text-t1 outline-none focus:border-acLn"
+                className="flex-1 h-[27px] px-[8px] rounded-6 border border-ln2 bg-well2 text-row text-t1 outline-none focus:border-ac"
               >
                 {service.models.map((model) => (
                   <option key={model.id} value={model.id}>

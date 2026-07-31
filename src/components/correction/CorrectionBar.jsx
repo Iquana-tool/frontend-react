@@ -216,28 +216,28 @@ const CorrectionBar = () => {
   };
 
   return (
-    <div className="bg-teal-50 border-b border-teal-200 px-4 py-2.5">
+    <div className="bg-acS border-b border-acLn px-4 py-2.5">
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-teal-800 flex-shrink-0">
+        <div className="flex items-center gap-2 text-ac flex-shrink-0">
           <Wrench className="w-5 h-5" />
           <span className="font-semibold text-sm">Correcting</span>
-          <span className="text-sm text-teal-600">
+          <span className="text-sm text-ac">
             {index + 1} / {total}
           </span>
         </div>
 
         <div className="flex-1 min-w-0 text-sm">
-          <span className="font-medium text-gray-900">{currentItem.reason_label}</span>
+          <span className="font-medium text-t1">{currentItem.reason_label}</span>
           {currentItem.contour_id != null && (
-            <span className="text-gray-500"> · object #{currentItem.contour_id}</span>
+            <span className="text-t3"> · object #{currentItem.contour_id}</span>
           )}
           {currentItem.note && (
-            <span className="text-gray-700"> — “{currentItem.note}”</span>
+            <span className="text-t2"> — “{currentItem.note}”</span>
           )}
           {currentItem.created_by && (
-            <span className="text-gray-400"> ({currentItem.created_by})</span>
+            <span className="text-t3"> ({currentItem.created_by})</span>
           )}
-          {error && <span className="block text-red-700">{error}</span>}
+          {error && <span className="block text-err">{error}</span>}
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -246,7 +246,7 @@ const CorrectionBar = () => {
               <button
                 onClick={() => focusWith('line')}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-teal-700 bg-white border border-teal-300 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-ac bg-p1 border border-acLn rounded-lg hover:bg-acS disabled:opacity-50 transition-colors"
                 title="Draw a line across the boundary to cut off or add a region"
               >
                 <PenLine className="w-3.5 h-3.5" />
@@ -255,7 +255,7 @@ const CorrectionBar = () => {
               <button
                 onClick={() => focusWith('points')}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-t2 bg-p1 border border-ln rounded-lg hover:bg-hv disabled:opacity-50 transition-colors"
                 title="Drag the existing outline's control points instead"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -267,7 +267,7 @@ const CorrectionBar = () => {
             <button
               onClick={() => focusWith('none')}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-teal-700 bg-white border border-teal-200 rounded-lg hover:bg-teal-100 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-ac bg-p1 border border-acLn rounded-lg hover:bg-acS disabled:opacity-50 transition-colors"
               title="Zoom to this instance"
             >
               <ScanEye className="w-3.5 h-3.5" />
@@ -277,7 +277,7 @@ const CorrectionBar = () => {
           <button
             onClick={() => resolveAndAdvance('fixed')}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:bg-gray-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-onAccent bg-accent rounded-lg hover:brightness-110 disabled:bg-ln2 transition-colors"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Mark as done
@@ -285,7 +285,7 @@ const CorrectionBar = () => {
           <button
             onClick={() => resolveAndAdvance('wont_fix')}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-t2 bg-p1 border border-ln2 rounded-lg hover:bg-hv disabled:opacity-50 transition-colors"
             title="Leave the annotation as it is — I checked, it is correct"
           >
             <XCircle className="w-4 h-4" />
@@ -294,7 +294,7 @@ const CorrectionBar = () => {
           <button
             onClick={goNext}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-t2 hover:text-t1 disabled:opacity-50 transition-colors"
             title="Skip this item — leaves it open for later"
           >
             <SkipForward className="w-4 h-4" />
@@ -303,7 +303,7 @@ const CorrectionBar = () => {
           <button
             onClick={handleExit}
             disabled={busy}
-            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm font-medium text-t3 hover:text-t1 disabled:opacity-50 transition-colors"
             title="End the correction session"
           >
             <X className="w-4 h-4" />

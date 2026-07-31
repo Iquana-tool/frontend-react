@@ -1,50 +1,19 @@
-// Consistent color palette for labels across the application
-export const LABEL_COLORS = [
-  '#3b82f6', // blue-500
-  '#f97316', // orange-500
-  '#22c55e', // green-500
-  '#8b5cf6', // violet-500
-  '#ef4444', // red-500
-  '#06b6d4', // cyan-500
-  '#f59e0b', // amber-500
-  '#ec4899', // pink-500
-  '#84cc16', // lime-500
-  '#6366f1', // indigo-500
-  '#14b8a6', // teal-500
-  '#f43f5e', // rose-500
-];
+import {
+  CLASS_PALETTE,
+  CLASS_PALETTE_LIGHT,
+  CLASS_PALETTE_DARK,
+} from '../styles/theme';
+
+// Re-exported under the label-domain names the rest of the app already uses.
+// The values themselves live in styles/theme.js, which is also what emits the
+// matching `--cls-N` variables — the two used to be maintained separately.
+export const LABEL_COLORS = CLASS_PALETTE;
 
 // Lighter variants for backgrounds and hover states
-export const LABEL_COLORS_LIGHT = [
-  '#dbeafe', // blue-100
-  '#fed7aa', // orange-100
-  '#dcfce7', // green-100
-  '#f3e8ff', // violet-100
-  '#fee2e2', // red-100
-  '#cffafe', // cyan-100
-  '#fef3c7', // amber-100
-  '#fce7f3', // pink-100
-  '#ecfccb', // lime-100
-  '#e0e7ff', // indigo-100
-  '#ccfbf1', // teal-100
-  '#ffe4e6', // rose-100
-];
+export const LABEL_COLORS_LIGHT = CLASS_PALETTE_LIGHT;
 
 // Darker variants for text and borders
-export const LABEL_COLORS_DARK = [
-  '#1e40af', // blue-800
-  '#ea580c', // orange-800
-  '#166534', // green-800
-  '#5b21b6', // violet-800
-  '#b91c1c', // red-800
-  '#155e75', // cyan-800
-  '#92400e', // amber-800
-  '#be185d', // pink-800
-  '#365314', // lime-800
-  '#3730a3', // indigo-800
-  '#134e4a', // teal-800
-  '#be123c', // rose-800
-];
+export const LABEL_COLORS_DARK = CLASS_PALETTE_DARK;
 
 /**
  * Get color for a label by its ID or index

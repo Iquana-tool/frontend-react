@@ -7,6 +7,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { IMAGE_STATUSES } from "../../utils/imageStatus";
+import useThemeColors from "../../hooks/useThemeColors";
 
 /**
  * Breakdown of a dataset's masks by annotation status.
@@ -15,6 +16,7 @@ import { IMAGE_STATUSES } from "../../utils/imageStatus";
  * without a second list to keep in sync.
  */
 const DatasetAnnotationProgress = ({ stats }) => {
+  const { colors } = useThemeColors();
   const rows = IMAGE_STATUSES.map((status) => ({
     key: status.key,
     name: status.label,
@@ -27,7 +29,7 @@ const DatasetAnnotationProgress = ({ stats }) => {
 
   if (total === 0) {
     return (
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-t3 mb-4">
         No annotations yet
       </p>
     );
@@ -39,7 +41,7 @@ const DatasetAnnotationProgress = ({ stats }) => {
 
   return (
     <div className="mb-4">
-      <h4 className="text-sm font-semibold text-gray-700 mb-4">
+      <h4 className="text-sm font-semibold text-t2 mb-4">
         Annotation status:
       </h4>
 
@@ -53,9 +55,9 @@ const DatasetAnnotationProgress = ({ stats }) => {
                   className="w-3 h-3 rounded-full mr-2"
                   style={{ backgroundColor: row.color }}
                 ></div>
-                <span>{row.name}:</span>
+                <span className="text-t2">{row.name}:</span>
               </div>
-              <span className="font-medium">
+              <span className="font-medium text-t1">
                 {row.value} ({percent(row.value)}%)
               </span>
             </div>
@@ -73,7 +75,7 @@ const DatasetAnnotationProgress = ({ stats }) => {
                 innerRadius={20}
                 outerRadius={40}
                 dataKey="value"
-                stroke="white"
+                stroke={colors.p1}
                 strokeWidth={2}
               >
                 {chartData.map((row) => (
@@ -82,12 +84,13 @@ const DatasetAnnotationProgress = ({ stats }) => {
               </Pie>
               <Tooltip
                 formatter={(value, name) => [`${value} (${percent(value)}%)`, name]}
-                labelStyle={{ color: '#374151' }}
+                labelStyle={{ color: colors.t2 }}
+                itemStyle={{ color: colors.t1 }}
                 contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
+                  backgroundColor: colors.p2,
+                  border: `1px solid ${colors.ln}`,
                   borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  boxShadow: 'var(--sh2)',
                 }}
               />
             </PieChart>
@@ -96,9 +99,9 @@ const DatasetAnnotationProgress = ({ stats }) => {
       </div>
 
       {/* Total Images - Separate row */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 text-sm">
-        <span className="font-medium text-gray-700">Total images:</span>
-        <span className="font-semibold text-gray-900">{total}</span>
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-ln text-sm">
+        <span className="font-medium text-t2">Total images:</span>
+        <span className="font-semibold text-t1">{total}</span>
       </div>
     </div>
   );

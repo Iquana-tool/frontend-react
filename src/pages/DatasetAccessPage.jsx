@@ -64,23 +64,23 @@ const DatasetAccessPage = () => {
   // look like a permission failure.
   if (!dataset) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-well flex items-center justify-center">
         {datasets?.length > 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md text-center">
-            <Users2 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-            <h1 className="text-lg font-bold text-gray-900 mb-1">Dataset not found</h1>
-            <p className="text-sm text-gray-600 mb-6">
+          <div className="bg-p1 rounded-xl shadow-sm border border-ln p-8 max-w-md text-center">
+            <Users2 className="w-12 h-12 text-t3 mx-auto mb-3" />
+            <h1 className="text-lg font-bold text-t1 mb-1">Dataset not found</h1>
+            <p className="text-sm text-t2 mb-6">
               It may have been deleted, or your access to it removed.
             </p>
             <button
               onClick={() => navigate('/datasets')}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              className="px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors"
             >
               Back to datasets
             </button>
           </div>
         ) : (
-          <div className="flex items-center text-gray-500">
+          <div className="flex items-center text-t3">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Loading dataset…
           </div>
@@ -91,16 +91,16 @@ const DatasetAccessPage = () => {
 
   if (!canList && !can(Permission.MEMBER_GRANT)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md text-center">
-          <ShieldAlert className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h1 className="text-lg font-bold text-gray-900 mb-1">Not available</h1>
-          <p className="text-sm text-gray-600 mb-6">
+      <div className="min-h-screen bg-well flex items-center justify-center p-4">
+        <div className="bg-p1 rounded-xl shadow-sm border border-ln p-8 max-w-md text-center">
+          <ShieldAlert className="w-12 h-12 text-t3 mx-auto mb-3" />
+          <h1 className="text-lg font-bold text-t1 mb-1">Not available</h1>
+          <p className="text-sm text-t2 mb-6">
             Your role on this dataset does not include managing who has access.
           </p>
           <button
             onClick={() => navigate(`/dataset/${datasetId}/datamanagement`)}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            className="px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors"
           >
             Back to dataset
           </button>
@@ -122,24 +122,24 @@ const DatasetAccessPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-well">
       {/* Header */}
-      <div className="bg-teal-600 text-white">
+      <div className="bg-p1 border-b border-ln">
         <div className="max-w-6xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
                 onClick={() => navigate(`/dataset/${datasetId}/datamanagement`)}
-                className="flex items-center gap-2 hover:text-teal-200 transition-colors flex-shrink-0"
+                className="flex items-center gap-2 text-t2 hover:text-ac transition-colors duration-150 flex-shrink-0"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <span className="hidden sm:inline">Back</span>
               </button>
-              <div className="h-6 w-px bg-teal-400 flex-shrink-0" />
-              <Users2 className="w-6 h-6 flex-shrink-0" />
+              <div className="h-6 w-px bg-ln flex-shrink-0" />
+              <Users2 className="w-6 h-6 flex-shrink-0 text-ac" />
               <div className="min-w-0">
-                <h1 className="text-xl font-bold truncate">Manage access</h1>
-                <p className="text-teal-100 text-sm truncate">{dataset.name}</p>
+                <h1 className="text-xl font-semibold tracking-tight text-t1 truncate">Manage access</h1>
+                <p className="text-t2 text-sm truncate">{dataset.name}</p>
               </div>
             </div>
             {role && <RoleBadge role={role} showDescription />}
@@ -149,8 +149,8 @@ const DatasetAccessPage = () => {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-4 p-3 rounded-lg bg-errBg border border-errLn">
+            <p className="text-sm text-err">{error}</p>
           </div>
         )}
 
@@ -167,17 +167,17 @@ const DatasetAccessPage = () => {
                       onClick={() => setSection(item.id)}
                       className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                         isActive
-                          ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                          : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+                          ? 'bg-acS text-ac border border-acLn'
+                          : 'text-t2 hover:bg-hv border border-transparent'
                       }`}
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />
                       <span className="flex-1 text-left">{item.label}</span>
                       {item.count !== undefined && (
-                        <span className="text-xs text-gray-400">{item.count}</span>
+                        <span className="text-xs text-t3">{item.count}</span>
                       )}
                       {item.soon && (
-                        <span className="text-[10px] uppercase tracking-wide text-gray-400 border border-gray-300 rounded px-1">
+                        <span className="text-[10px] uppercase tracking-wide text-t3 border border-ln2 rounded px-1">
                           Soon
                         </span>
                       )}
@@ -189,9 +189,9 @@ const DatasetAccessPage = () => {
           </nav>
 
           {/* Section body */}
-          <div className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex-1 min-w-0 bg-p1 rounded-xl border border-ln p-5">
             {loading ? (
-              <div className="flex items-center justify-center py-16 text-gray-500">
+              <div className="flex items-center justify-center py-16 text-t3">
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Loading access settings…
               </div>

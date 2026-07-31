@@ -38,6 +38,7 @@ import {
   getChipLabel,
   getChipBorder,
   getCentroid,
+  getBoundingBox,
   HATCH_PATTERN_ID,
   UNLABELLED_COLOR,
 } from '../workspace/annotationStyles';
@@ -591,14 +592,30 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           const color =
             getObjectState(object) === 'unlabelled' ? UNLABELLED_COLOR : object.color;
 
+          // A chip centered on the centroid fully covers objects shorter than
+          // its own rendered height (~24px: 10px text + padding + border) —
+          // exactly what happens with a small annotation nested inside a
+          // larger one. Once the object's own bbox can't contain the chip,
+          // anchor it just above the shape instead of on top of it.
+          const bbox = getBoundingBox(object);
+          const bboxHeightPx = bbox
+            ? ((bbox.maxY - bbox.minY) / 100) * imageDimensions.height
+            : Infinity;
+          const CHIP_HEIGHT_PX = 24;
+          const isSmall = bbox && bboxHeightPx < CHIP_HEIGHT_PX * 1.4;
+          const anchorX = isSmall ? (bbox.minX + bbox.maxX) / 2 : centroid.x;
+          const anchorY = isSmall ? bbox.minY : centroid.y;
+
           return (
             <div
               key={`chip-${object.id}`}
               className="absolute pointer-events-none select-none"
               style={{
-                left: `${imageDimensions.x + (centroid.x / 100) * imageDimensions.width}px`,
-                top: `${imageDimensions.y + (centroid.y / 100) * imageDimensions.height}px`,
-                transform: 'translate(-50%, -50%)',
+                left: `${imageDimensions.x + (anchorX / 100) * imageDimensions.width}px`,
+                top: `${imageDimensions.y + (anchorY / 100) * imageDimensions.height}px`,
+                transform: isSmall
+                  ? 'translate(-50%, calc(-100% - 6px))'
+                  : 'translate(-50%, -50%)',
                 zIndex: 35,
               }}
             >
@@ -800,19 +817,19 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl border border-amber-200 p-6 max-w-sm w-full mx-4"
+            className="bg-p1 rounded-xl shadow-2xl border border-warnLn p-6 max-w-sm w-full mx-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3 mb-4">
-              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
-                <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex-shrink-0 w-9 h-9 rounded-full bg-warnBg flex items-center justify-center">
+                <svg className="w-5 h-5 text-warn" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-base font-semibold text-gray-800">Label required for Focus Mode</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="text-base font-semibold text-t1">Label required for Focus Mode</h3>
+                <p className="text-sm text-t2 mt-1">
                   <strong>Object #{unlabelledPromptObject.id}</strong> does not have a label yet.
                   Please assign a label before entering Focus Mode.
                 </p>
@@ -822,7 +839,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               <button
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); setUnlabelledPromptObject(null); }}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-t2 hover:bg-hv rounded-lg transition-colors"
               >
                 Cancel
               </button>

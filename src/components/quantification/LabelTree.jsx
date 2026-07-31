@@ -22,35 +22,35 @@ const LabelTree = ({ labels, metricsByLabelId, childCountsPerLabelId, objectCoun
         <div
           className={`flex items-center p-3 rounded-lg border ${
             hasMetrics || hasChildCounts
-              ? "bg-teal-50 border-teal-200 hover:bg-teal-100"
-              : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+              ? "bg-acS border-acLn hover:bg-acS"
+              : "bg-well border-ln hover:bg-hv"
           } transition-colors`}
           style={{ marginLeft: `${depth * 24}px` }}
         >
           {hasChildren && (
             <button
               onClick={() => onToggleLabel(label.id)}
-              className="mr-2 p-1 hover:bg-white rounded transition-colors"
+              className="mr-2 p-1 hover:bg-p2 rounded transition-colors"
             >
               {isExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-600" />
+                <ChevronDown className="w-4 h-4 text-t2" />
               ) : (
-                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ChevronRight className="w-4 h-4 text-t2" />
               )}
             </button>
           )}
           {!hasChildren && <div className="w-6" />}
           <div className="flex-1">
             <div className="flex items-center space-x-2">
-              <span className="font-semibold text-gray-900">{label.name}</span>
-              <span className="text-xs text-gray-500">(ID: {label.id}, Value: {label.value})</span>
+              <span className="font-semibold text-t1">{label.name}</span>
+              <span className="text-xs text-t3">(ID: {label.id}, Value: {label.value})</span>
               {hasMetrics && (
-                <span className="text-xs bg-teal-500 text-white px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-accent text-onAccent px-2 py-0.5 rounded-full">
                   Has Metrics
                 </span>
               )}
               {hasChildCounts && (
-                <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-accent text-onAccent px-2 py-0.5 rounded-full">
                   Has Children
                 </span>
               )}
@@ -59,13 +59,13 @@ const LabelTree = ({ labels, metricsByLabelId, childCountsPerLabelId, objectCoun
                 Always visible (even when collapsed) so class sizes are scannable at a glance. */}
             {objectCounts && (
               <div className="mt-1 flex items-center gap-2 text-xs">
-                <span className="text-gray-700">
+                <span className="text-t2">
                   <span className="font-semibold">{objectCounts.total}</span> object{objectCounts.total === 1 ? "" : "s"}
                 </span>
-                <span className="text-green-700 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded">
+                <span className="text-ok bg-okBg border border-okLn px-1.5 py-0.5 rounded">
                   {objectCounts.reviewed} reviewed
                 </span>
-                <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                <span className="text-warn bg-warnBg border border-warnLn px-1.5 py-0.5 rounded">
                   {objectCounts.unreviewed} unreviewed
                 </span>
               </div>
@@ -79,7 +79,7 @@ const LabelTree = ({ labels, metricsByLabelId, childCountsPerLabelId, objectCoun
             {/* Metrics */}
             {hasMetrics && (
               <div className="mb-4">
-                <h5 className="text-sm font-semibold text-gray-700 mb-3">Object Metrics</h5>
+                <h5 className="text-sm font-semibold text-t2 mb-3">Object Metrics</h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {Object.entries(labelMetrics).map(([metricKey, metric]) => (
                     <SummaryMetricCard
@@ -96,8 +96,8 @@ const LabelTree = ({ labels, metricsByLabelId, childCountsPerLabelId, objectCoun
             {/* Child Counts */}
             {hasChildCounts && (
               <div>
-                <h5 className="text-sm font-semibold text-gray-700 mb-3">Child Object Counts</h5>
-                <p className="text-xs text-gray-600 mb-3">
+                <h5 className="text-sm font-semibold text-t2 mb-3">Child Object Counts</h5>
+                <p className="text-xs text-t2 mb-3">
                   Total number of child objects of each child label
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

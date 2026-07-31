@@ -1,0 +1,33 @@
+/**
+ * Workspace-only base styles.
+ *
+ * The colour tokens this file used to define now live in src/styles/theme.js
+ * and are emitted app-wide by the Tailwind plugin. What remains here is the
+ * handful of rules that must stay scoped to the workspace: it runs at a 12px
+ * base size that would be unreadable on the rest of the site.
+ */
+
+.iq-workspace {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin scrollbars matching the panel surfaces */
+.iq-workspace ::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+.iq-workspace ::-webkit-scrollbar-thumb {
+  background: rgba(140, 150, 160, 0.35);
+  border-radius: 6px;
+}
+.iq-workspace ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Native selects inherit the panel surface rather than the OS default */
+.iq-workspace select option {
+  background: var(--p2);
+  color: var(--t1);
+}

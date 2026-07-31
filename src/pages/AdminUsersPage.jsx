@@ -50,16 +50,16 @@ const AdminUsersPage = () => {
 
   if (!canManageUsers) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md text-center">
-          <ShieldCheck className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <h1 className="text-lg font-bold text-gray-900 mb-1">Admins only</h1>
-          <p className="text-sm text-gray-600 mb-6">
+      <div className="min-h-screen bg-well flex items-center justify-center p-4">
+        <div className="bg-p1 rounded-xl shadow-sm border border-ln p-8 max-w-md text-center">
+          <ShieldCheck className="w-12 h-12 text-t3 mx-auto mb-3" />
+          <h1 className="text-lg font-bold text-t1 mb-1">Admins only</h1>
+          <p className="text-sm text-t2 mb-6">
             You need the admin platform role to manage accounts.
           </p>
           <button
             onClick={() => navigate('/datasets')}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+            className="px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors"
           >
             Back to datasets
           </button>
@@ -99,16 +99,16 @@ const AdminUsersPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-teal-600 text-white">
+    <div className="min-h-screen bg-well">
+      <div className="bg-p1 border-b border-ln">
         <div className="max-w-5xl mx-auto px-4 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <UserCog className="w-6 h-6" />
-            <h1 className="text-2xl font-bold">User administration</h1>
+            <UserCog className="w-6 h-6 text-ac" />
+            <h1 className="text-2xl font-semibold tracking-tight text-t1">User administration</h1>
           </div>
           <button
             onClick={() => navigate('/datasets')}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 py-2 px-4 rounded-lg transition-colors"
+            className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
           >
             <ArrowLeft className="w-4 h-4" />
             Datasets
@@ -118,21 +118,21 @@ const AdminUsersPage = () => {
 
       <div className="max-w-5xl mx-auto px-4 py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm">{error}</p>
+          <div className="mb-6 p-4 bg-errBg border border-errLn rounded-lg">
+            <p className="text-err text-sm">{error}</p>
           </div>
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-gray-500">
+          <div className="flex items-center justify-center py-16 text-t3">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Loading accounts…
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="bg-p1 rounded-xl border border-ln overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-well text-t2">
                   <tr>
                     <th className="text-left font-medium px-4 py-3">Username</th>
                     <th className="text-left font-medium px-4 py-3">Platform role</th>
@@ -140,14 +140,14 @@ const AdminUsersPage = () => {
                     <th className="text-left font-medium px-4 py-3">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-ln">
                   {users.map((account) => {
                     const isSelf = account.username === user?.username;
                     return (
-                      <tr key={account.username} className={account.is_active ? '' : 'bg-gray-50'}>
-                        <td className="px-4 py-3 font-medium text-gray-900">
+                      <tr key={account.username} className={account.is_active ? '' : 'bg-well'}>
+                        <td className="px-4 py-3 font-medium text-t1">
                           {account.username}
-                          {isSelf && <span className="ml-2 text-xs text-gray-500">(you)</span>}
+                          {isSelf && <span className="ml-2 text-xs text-t3">(you)</span>}
                         </td>
                         <td className="px-4 py-3">
                           <select
@@ -156,7 +156,7 @@ const AdminUsersPage = () => {
                             // Removing your own admin role could lock everyone out,
                             // so the backend refuses it; don't offer it either.
                             disabled={isSelf || busy === `role:${account.username}`}
-                            className="px-2 py-1 border border-gray-300 rounded-lg bg-white disabled:bg-gray-100 disabled:text-gray-500 focus:ring-2 focus:ring-teal-500"
+                            className="px-2 py-1 border border-ln2 rounded-lg bg-p1 disabled:bg-well disabled:text-t3 focus:ring-2 focus:ring-ac"
                             title={
                               isSelf
                                 ? 'You cannot change your own platform role.'
@@ -170,15 +170,15 @@ const AdminUsersPage = () => {
                             ))}
                           </select>
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{account.dataset_count}</td>
+                        <td className="px-4 py-3 text-t2">{account.dataset_count}</td>
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleActive(account.username, !account.is_active)}
                             disabled={isSelf || busy === `active:${account.username}`}
                             className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                               account.is_active
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'
+                                ? 'bg-okBg text-ok border-okLn hover:bg-okBg'
+                                : 'bg-well text-t2 border-ln2 hover:bg-hv2'
                             }`}
                             title={
                               isSelf
@@ -200,7 +200,7 @@ const AdminUsersPage = () => {
           </div>
         )}
 
-        <p className="mt-4 text-xs text-gray-500">
+        <p className="mt-4 text-xs text-t3">
           Deactivating an account revokes its access immediately. The annotations and
           reviews it produced are kept.
         </p>

@@ -284,7 +284,7 @@ const ObjectsTab = () => {
                 onClick={toggleShowApproved}
                 title={showApproved ? 'Hide approved objects' : 'Show approved objects'}
                 aria-label={showApproved ? 'Hide approved objects' : 'Show approved objects'}
-                className="w-5 h-5 flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+                className="w-5 h-5 flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
               >
                 {showApproved ? <Eye size={13} /> : <EyeOff size={13} />}
               </button>
@@ -294,7 +294,7 @@ const ObjectsTab = () => {
                   type="button"
                   onClick={() => setOverflowOpen((open) => !open)}
                   aria-label="More object actions"
-                  className="w-5 h-5 flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+                  className="w-5 h-5 flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
                 >
                   <MoreHorizontal size={13} />
                 </button>

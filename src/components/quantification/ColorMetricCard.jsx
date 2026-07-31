@@ -23,30 +23,30 @@ const ColorMetricCard = ({ metric, catalog }) => {
   const name = catalog?.name || catalog?.key || "Color";
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
+    <div className="bg-p1 rounded-lg border border-ln p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{name}</h4>
-        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+        <h4 className="text-sm font-semibold text-t2 uppercase tracking-wide">{name}</h4>
+        <span className="text-xs text-t3 bg-well px-2 py-1 rounded">
           {count} {count === 1 ? "measurement" : "measurements"}
         </span>
       </div>
       <div className="flex items-center space-x-4">
         <div
-          className="w-14 h-14 rounded-lg border border-gray-300 flex-shrink-0"
+          className="w-14 h-14 rounded-lg border border-ln2 flex-shrink-0"
           style={{ backgroundColor: swatch }}
           title={swatch}
         />
         <div className="grid grid-cols-3 gap-3 flex-1">
           {means.map((mean, i) => (
             <div key={i}>
-              <p className="text-xs text-gray-500 mb-1">{componentNames[i] ?? i}</p>
-              <p className="text-sm font-bold text-teal-600">{mean.toFixed(1)}</p>
+              <p className="text-xs text-t3 mb-1">{componentNames[i] ?? i}</p>
+              <p className="text-sm font-bold text-ac">{mean.toFixed(1)}</p>
             </div>
           ))}
         </div>
       </div>
       {isLab && (
-        <p className="text-[11px] text-gray-400 mt-2">
+        <p className="text-[11px] text-t3 mt-2">
           CIELAB values use opencv 8-bit scaling (L,a,b each 0–255). Swatch is converted to sRGB.
         </p>
       )}

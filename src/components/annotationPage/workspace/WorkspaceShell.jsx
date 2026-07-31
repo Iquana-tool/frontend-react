@@ -16,7 +16,7 @@ import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 import { useDataset } from '../../../contexts/DatasetContext';
-import '../../../styles/workspace-tokens.css';
+import '../../../styles/workspace.css';
 import {
   useWorkspaceTheme,
   useWorkspaceMode,

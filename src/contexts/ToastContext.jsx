@@ -3,17 +3,19 @@ import { CheckCircle, XCircle, X, Info } from 'lucide-react';
 
 const ToastContext = createContext(null);
 
-// Visual treatment per toast type.
+// Visual treatment per toast type. Toasts sit on the raised panel surface so
+// they read as chrome rather than as page content, with the semantic colour
+// carried by the icon and left border only.
 const TOAST_STYLES = {
-  success: 'bg-teal-50 border-teal-200 text-teal-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+  success: 'bg-p2 border-okLn text-t1',
+  error: 'bg-p2 border-errLn text-t1',
+  info: 'bg-p2 border-acLn text-t1',
 };
 
 const TOAST_ICONS = {
-  success: <CheckCircle className="w-5 h-5 text-teal-500 flex-shrink-0 mt-0.5" />,
-  error: <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />,
-  info: <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />,
+  success: <CheckCircle className="w-[15px] h-[15px] text-ok flex-shrink-0 mt-[1px]" />,
+  error: <XCircle className="w-[15px] h-[15px] text-err flex-shrink-0 mt-[1px]" />,
+  info: <Info className="w-[15px] h-[15px] text-ac flex-shrink-0 mt-[1px]" />,
 };
 
 let toastId = 0;
@@ -41,16 +43,16 @@ export const ToastProvider = ({ children }) => {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`animate-slide-up pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm w-full
+            className={`animate-slide-up pointer-events-auto flex items-start gap-[8px] px-[14px] py-[11px] rounded-9 shadow-bar border max-w-sm w-full
               ${TOAST_STYLES[toast.type] || TOAST_STYLES.success}`}
           >
             {TOAST_ICONS[toast.type] || TOAST_ICONS.success}
-            <p className="text-sm font-medium flex-1">{toast.message}</p>
+            <p className="text-btn font-medium flex-1">{toast.message}</p>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              className="text-t3 hover:text-t1 transition-colors duration-150 flex-shrink-0"
             >
-              <X className="w-4 h-4" />
+              <X className="w-[14px] h-[14px]" />
             </button>
           </div>
         ))}

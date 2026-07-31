@@ -238,7 +238,7 @@ const ObjectRow = ({
           e.stopPropagation();
           onToggleHidden?.();
         }}
-        className="w-5 h-5 flex-none flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+        className="w-5 h-5 flex-none flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
       >
         {hidden ? <EyeOff size={13} /> : <Eye size={13} />}
       </button>

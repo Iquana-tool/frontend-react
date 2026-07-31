@@ -1,8 +1,10 @@
 import React from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import useThemeColors from "../../hooks/useThemeColors";
 
 // Rotating palette so each scalar metric chart gets a distinct color without hard-coding
-// which metrics exist.
+// which metrics exist. Fixed across themes like the annotation class palette —
+// a series identity, not a surface color.
 const BAR_COLORS = ["#14b8a6", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444", "#10b981", "#6366f1"];
 
 const PLOT_TYPES = ["box", "violin", "bar"];
@@ -48,7 +50,7 @@ const makeYScale = (min, max) => {
 };
 
 // Y axis ticks (5 evenly spaced) + gridlines.
-const AxisAndGrid = ({ scale }) => {
+const AxisAndGrid = ({ scale, colors }) => {
   const ticks = Array.from({ length: 5 }, (_, i) => scale.lo + ((scale.hi - scale.lo) * i) / 4);
   return (
     <g>
@@ -56,8 +58,8 @@ const AxisAndGrid = ({ scale }) => {
         const y = scale.y(t);
         return (
           <g key={i}>
-            <line x1={MARGIN.left} x2={MARGIN.left + INNER_W} y1={y} y2={y} stroke="#e5e7eb" strokeDasharray="3 3" />
-            <text x={MARGIN.left - 6} y={y + 3} textAnchor="end" fontSize="10" fill="#6b7280">
+            <line x1={MARGIN.left} x2={MARGIN.left + INNER_W} y1={y} y2={y} stroke={colors.ln2} strokeDasharray="3 3" />
+            <text x={MARGIN.left - 6} y={y + 3} textAnchor="end" fontSize="10" fill={colors.t3}>
               {fmt(t)}
             </text>
           </g>
@@ -68,7 +70,7 @@ const AxisAndGrid = ({ scale }) => {
 };
 
 // X-axis category labels (rotated so long label names fit).
-const CategoryLabels = ({ rows, bandWidth }) => (
+const CategoryLabels = ({ rows, bandWidth, colors }) => (
   <g>
     {rows.map((r, i) => {
       const cx = MARGIN.left + bandWidth * (i + 0.5);
@@ -78,7 +80,7 @@ const CategoryLabels = ({ rows, bandWidth }) => (
           x={cx}
           y={MARGIN.top + INNER_H + 14}
           fontSize="10"
-          fill="#374151"
+          fill={colors.t2}
           textAnchor="end"
           transform={`rotate(-45 ${cx} ${MARGIN.top + INNER_H + 14})`}
         >
@@ -90,12 +92,12 @@ const CategoryLabels = ({ rows, bandWidth }) => (
 );
 
 // A distinct diamond marker for the MEAN so the average stays readable on box & violin.
-const MeanMarker = ({ cx, cy, color }) => {
+const MeanMarker = ({ cx, cy, color, colors }) => {
   const s = 5;
   return (
     <polygon
       points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`}
-      fill="#111827"
+      fill={colors.t1}
       stroke={color}
       strokeWidth="1.5"
     >
@@ -105,7 +107,7 @@ const MeanMarker = ({ cx, cy, color }) => {
 };
 
 // One box-and-whisker per label from {min,q1,median,q3,max, whiskers, outliers, mean}.
-const BoxPlot = ({ rows, color }) => {
+const BoxPlot = ({ rows, color, colors }) => {
   const allMin = Math.min(...rows.map((r) => r.stats.min));
   const allMax = Math.max(...rows.map((r) => r.stats.max));
   const scale = makeYScale(allMin, allMax);
@@ -114,7 +116,7 @@ const BoxPlot = ({ rows, color }) => {
 
   return (
     <svg viewBox={`0 0 ${PLOT_W} ${PLOT_H}`} width="100%" height={PLOT_H} role="img">
-      <AxisAndGrid scale={scale} />
+      <AxisAndGrid scale={scale} colors={colors} />
       {rows.map((r, i) => {
         const cx = MARGIN.left + band * (i + 0.5);
         const s = r.stats;
@@ -147,17 +149,17 @@ const BoxPlot = ({ rows, color }) => {
               <circle key={j} cx={cx} cy={scale.y(o)} r="2" fill="none" stroke={color} />
             ))}
             {/* mean marker (distinct diamond) */}
-            <MeanMarker cx={cx} cy={scale.y(s.mean)} color={color} />
+            <MeanMarker cx={cx} cy={scale.y(s.mean)} color={color} colors={colors} />
           </g>
         );
       })}
-      <CategoryLabels rows={rows} bandWidth={band} />
+      <CategoryLabels rows={rows} bandWidth={band} colors={colors} />
     </svg>
   );
 };
 
 // One mirrored KDE violin per label, with median and mean lines marked.
-const ViolinPlot = ({ rows, color }) => {
+const ViolinPlot = ({ rows, color, colors }) => {
   const allMin = Math.min(...rows.map((r) => r.stats.min));
   const allMax = Math.max(...rows.map((r) => r.stats.max));
   const scale = makeYScale(allMin, allMax);
@@ -166,7 +168,7 @@ const ViolinPlot = ({ rows, color }) => {
 
   return (
     <svg viewBox={`0 0 ${PLOT_W} ${PLOT_H}`} width="100%" height={PLOT_H} role="img">
-      <AxisAndGrid scale={scale} />
+      <AxisAndGrid scale={scale} colors={colors} />
       {rows.map((r, i) => {
         const cx = MARGIN.left + band * (i + 0.5);
         const s = r.stats;
@@ -205,29 +207,30 @@ const ViolinPlot = ({ rows, color }) => {
               x2={cx + halfW}
               y1={yMean}
               y2={yMean}
-              stroke="#111827"
+              stroke={colors.t1}
               strokeWidth="1"
               strokeDasharray="3 2"
             />
-            <MeanMarker cx={cx} cy={yMean} color={color} />
+            <MeanMarker cx={cx} cy={yMean} color={color} colors={colors} />
           </g>
         );
       })}
-      <CategoryLabels rows={rows} bandWidth={band} />
+      <CategoryLabels rows={rows} bandWidth={band} colors={colors} />
     </svg>
   );
 };
 
 // Legacy mean bar chart (backward-compatible view; needs no distribution data).
-const MeanBarChart = ({ comparisonData, metricKey, color }) => (
+const MeanBarChart = ({ comparisonData, metricKey, color, colors }) => (
   <ResponsiveContainer width="100%" height={PLOT_H}>
     <BarChart data={comparisonData}>
-      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-      <XAxis dataKey="label" tick={{ fontSize: 11 }} angle={-45} textAnchor="end" height={60} />
-      <YAxis tick={{ fontSize: 11 }} />
+      <CartesianGrid strokeDasharray="3 3" stroke={colors.ln2} />
+      <XAxis dataKey="label" tick={{ fontSize: 11, fill: colors.t2 }} angle={-45} textAnchor="end" height={60} />
+      <YAxis tick={{ fontSize: 11, fill: colors.t3 }} />
       <Tooltip
         formatter={(value) => [value?.toFixed(4) || "N/A", "Mean"]}
-        contentStyle={{ backgroundColor: "white", border: "1px solid #e5e7eb", borderRadius: "4px" }}
+        contentStyle={{ backgroundColor: colors.p2, border: `1px solid ${colors.ln}`, borderRadius: "8px", color: colors.t1 }}
+        labelStyle={{ color: colors.t2 }}
       />
       <Bar dataKey={metricKey} fill={color} radius={[4, 4, 0, 0]} />
     </BarChart>
@@ -248,44 +251,46 @@ const ComparisonCharts = ({
   distributionData = null,
   distributionLoading = false,
 }) => {
+  const { colors } = useThemeColors();
+
   if (!comparisonData || comparisonData.length === 0 || metricKeys.length === 0) {
     return null;
   }
 
   const renderPlot = (metricKey, color) => {
     if (plotType === "bar") {
-      return <MeanBarChart comparisonData={comparisonData} metricKey={metricKey} color={color} />;
+      return <MeanBarChart comparisonData={comparisonData} metricKey={metricKey} color={color} colors={colors} />;
     }
     if (distributionLoading) {
-      return <div className="h-[250px] flex items-center justify-center text-sm text-gray-400">Loading distribution…</div>;
+      return <div className="h-[250px] flex items-center justify-center text-sm text-t3">Loading distribution…</div>;
     }
     const rows = distRowsForMetric(comparisonData, distributionData, metricKey);
     if (rows.length === 0) {
       return (
-        <div className="h-[250px] flex items-center justify-center text-sm text-gray-400 text-center px-4">
+        <div className="h-[250px] flex items-center justify-center text-sm text-t3 text-center px-4">
           Not enough data for a distribution. Switch to Bar to see the mean.
         </div>
       );
     }
     return plotType === "violin" ? (
-      <ViolinPlot rows={rows} color={color} />
+      <ViolinPlot rows={rows} color={color} colors={colors} />
     ) : (
-      <BoxPlot rows={rows} color={color} />
+      <BoxPlot rows={rows} color={color} colors={colors} />
     );
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+    <div className="bg-p1 rounded-lg shadow-sm border border-ln p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Metric Comparison Across Labels</h2>
-        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden" role="group">
+        <h2 className="text-lg font-semibold text-t1">Metric Comparison Across Labels</h2>
+        <div className="inline-flex rounded-lg border border-ln overflow-hidden" role="group">
           {PLOT_TYPES.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => onPlotTypeChange && onPlotTypeChange(t)}
               className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                plotType === t ? "bg-teal-500 text-white" : "bg-white text-gray-700 hover:bg-gray-100"
+                plotType === t ? "bg-accent text-onAccent" : "bg-p1 text-t2 hover:bg-hv"
               }`}
             >
               {PLOT_LABELS[t]}
@@ -301,14 +306,14 @@ const ComparisonCharts = ({
           const color = BAR_COLORS[index % BAR_COLORS.length];
           return (
             <div key={metricKey}>
-              <h3 className="text-sm font-medium text-gray-700 mb-3">{title}</h3>
+              <h3 className="text-sm font-medium text-t2 mb-3">{title}</h3>
               {renderPlot(metricKey, color)}
             </div>
           );
         })}
       </div>
       {plotType !== "bar" && (
-        <p className="text-[11px] text-gray-400 mt-3">
+        <p className="text-[11px] text-t3 mt-3">
           Box/violin show the distribution per label. The mean is drawn as a diamond marker
           (median as a solid line) so the average stays readable.
         </p>

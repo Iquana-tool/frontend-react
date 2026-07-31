@@ -373,7 +373,7 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
 
       {/* Discoverability hint for the insert/delete gestures. */}
       <div
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[62] pointer-events-none px-3 py-1.5 rounded-lg bg-gray-900/80 text-white text-xs font-medium shadow-lg backdrop-blur-sm"
+        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[62] pointer-events-none px-3 py-1.5 rounded-lg bg-scrim text-white text-xs font-medium shadow-lg backdrop-blur-sm"
       >
         Drag a point to reshape · Click the outline to add a point · Double-click a point to remove · Esc to discard
       </div>

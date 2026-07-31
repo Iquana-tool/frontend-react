@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import PromptOverlay from './PromptOverlay';
 import SegmentationOverlay from './SegmentationOverlay';
 import AIPromptCanvas from './AIPromptCanvas';
+import InferenceScanOverlay from './InferenceScanOverlay';
 import ManualDrawCanvas from './ManualDrawCanvas';
 import ModelSelectionHint from './ModelSelectionHint';
 import ObjectContextMenu from './ObjectContextMenu';
@@ -109,6 +110,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
 
       <ScaleCalibrationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
       <ScaleBarIndicator canvasRef={canvasRef} zoomLevel={zoomLevel} />
+      <InferenceScanOverlay containerRef={containerRef} />
       <ObjectContextMenu />
 
       {currentTool === 'ai_annotation' && (

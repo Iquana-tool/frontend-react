@@ -176,28 +176,28 @@ const AnnotationViewerPage = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-well">
       {/* Header */}
-      <div className="bg-teal-600 text-white flex-shrink-0">
+      <div className="bg-p1 border-b border-ln flex-shrink-0">
         <div className="px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => navigate(`/dataset/${datasetId}/datamanagement`)}
-              className="flex items-center gap-2 hover:text-teal-200 transition-colors flex-shrink-0"
+              className="flex items-center gap-2 text-t2 hover:text-ac transition-colors duration-150 flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
               <span className="hidden sm:inline">Back</span>
             </button>
-            <div className="h-6 w-px bg-teal-400 flex-shrink-0" />
-            <Eye className="w-5 h-5 flex-shrink-0" />
-            <h1 className="text-lg font-bold truncate">
+            <div className="h-6 w-px bg-ln flex-shrink-0" />
+            <Eye className="w-5 h-5 flex-shrink-0 text-ac" />
+            <h1 className="text-lg font-semibold tracking-tight text-t1 truncate">
               {dataset?.name || 'Annotations'}
             </h1>
             {role && <RoleBadge role={role} showDescription />}
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="text-sm text-teal-100 hidden md:inline">Read-only view</span>
+            <span className="text-sm text-t3 hidden md:inline">Read-only view</span>
             {canAnnotate && (
               <button
                 onClick={() =>
@@ -207,7 +207,7 @@ const AnnotationViewerPage = () => {
                     }`
                   )
                 }
-                className="bg-white/10 hover:bg-white/20 py-1.5 px-3 rounded-lg transition-colors text-sm"
+                className="bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-1.5 px-3 rounded-lg transition-colors duration-150 text-sm"
               >
                 Open annotation tools
               </button>
@@ -217,20 +217,20 @@ const AnnotationViewerPage = () => {
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-b border-red-200 flex-shrink-0">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="px-4 py-2 bg-errBg border-b border-errLn flex-shrink-0">
+          <p className="text-sm text-err">{error}</p>
         </div>
       )}
 
       <div className="flex-1 flex min-h-0">
         {/* Image list */}
-        <aside className="w-56 border-r border-gray-200 bg-white flex flex-col flex-shrink-0">
-          <div className="px-3 py-2 border-b border-gray-200 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <aside className="w-56 border-r border-ln bg-p1 flex flex-col flex-shrink-0">
+          <div className="px-3 py-2 border-b border-ln text-xs font-semibold uppercase tracking-wide text-t3">
             Images ({images.length})
           </div>
           <div className="flex-1 overflow-y-auto">
             {loadingList ? (
-              <div className="flex items-center justify-center py-8 text-gray-500 text-sm">
+              <div className="flex items-center justify-center py-8 text-t3 text-sm">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 Loading…
               </div>
@@ -242,8 +242,8 @@ const AnnotationViewerPage = () => {
                   <button
                     key={image.image_id}
                     onClick={() => handleSelectImage(image)}
-                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 transition-colors ${
-                      isActive ? 'bg-teal-50 text-teal-800 font-medium' : 'hover:bg-gray-50'
+                    className={`w-full text-left px-3 py-2 text-sm border-b border-ln transition-colors ${
+                      isActive ? 'bg-acS text-ac font-medium' : 'hover:bg-hv'
                     }`}
                   >
                     <span className="block truncate">Image {image.image_id}</span>
@@ -257,7 +257,7 @@ const AnnotationViewerPage = () => {
               })
             )}
             {!loadingList && images.length === 0 && (
-              <p className="p-4 text-sm text-gray-500 text-center">
+              <p className="p-4 text-sm text-t3 text-center">
                 This dataset has no images yet.
               </p>
             )}
@@ -267,7 +267,7 @@ const AnnotationViewerPage = () => {
         {/* Canvas */}
         <main className="flex-1 relative min-w-0">
           {loadingImage && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-gray-900/60 text-white">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-scrim text-white">
               <Loader2 className="w-6 h-6 animate-spin mr-2" />
               Loading image…
             </div>
@@ -283,7 +283,7 @@ const AnnotationViewerPage = () => {
             />
           ) : (
             !loadingImage && (
-              <div className="h-full flex flex-col items-center justify-center text-gray-400">
+              <div className="h-full flex flex-col items-center justify-center text-t3">
                 <ImageOff className="w-10 h-10 mb-2" />
                 <p className="text-sm">Select an image to view its annotations.</p>
               </div>
@@ -292,18 +292,18 @@ const AnnotationViewerPage = () => {
         </main>
 
         {/* Object list */}
-        <aside className="w-72 border-l border-gray-200 bg-white flex flex-col flex-shrink-0">
-          <div className="px-3 py-2 border-b border-gray-200">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+        <aside className="w-72 border-l border-ln bg-p1 flex flex-col flex-shrink-0">
+          <div className="px-3 py-2 border-b border-ln">
+            <div className="text-xs font-semibold uppercase tracking-wide text-t3 mb-2">
               Annotations ({contours.length})
             </div>
             <div className="relative">
-              <Search className="w-4 h-4 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-t3 absolute left-2 top-1/2 -translate-y-1/2" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Filter by label"
-                className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full pl-8 pr-2 py-1.5 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-ac"
               />
             </div>
           </div>
@@ -316,17 +316,17 @@ const AnnotationViewerPage = () => {
                 <div
                   key={contour.id}
                   onClick={() => handleSelectContour(contour.id)}
-                  className={`px-3 py-2 border-b border-gray-100 cursor-pointer transition-colors ${
-                    isSelected ? 'bg-teal-50' : 'hover:bg-gray-50'
+                  className={`px-3 py-2 border-b border-ln cursor-pointer transition-colors ${
+                    isSelected ? 'bg-acS' : 'hover:bg-hv'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span
-                        className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10"
+                        className="w-3 h-3 rounded-full flex-shrink-0 border border-ln"
                         style={{ backgroundColor: colorFor(contour) }}
                       />
-                      <span className="text-sm text-gray-900 truncate">
+                      <span className="text-sm text-t1 truncate">
                         {labelNameFor(contour)}
                       </span>
                     </div>
@@ -335,17 +335,17 @@ const AnnotationViewerPage = () => {
                         e.stopPropagation();
                         handleSelectContour(contour.id, { zoom: true });
                       }}
-                      className="p-1 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                      className="p-1 rounded hover:bg-hv2 transition-colors flex-shrink-0"
                       title="Zoom to this annotation"
                     >
-                      <Crosshair className="w-4 h-4 text-gray-500" />
+                      <Crosshair className="w-4 h-4 text-t3" />
                     </button>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-gray-500 flex flex-wrap gap-x-2">
+                  <div className="mt-0.5 text-[11px] text-t3 flex flex-wrap gap-x-2">
                     <span>#{contour.id}</span>
                     {contour.added_by && <span>by {contour.added_by}</span>}
                     {reviewers.length > 0 && (
-                      <span className="text-emerald-600">
+                      <span className="text-ok">
                         approved by {reviewers.join(', ')}
                       </span>
                     )}
@@ -355,12 +355,12 @@ const AnnotationViewerPage = () => {
             })}
 
             {!loadingImage && contours.length === 0 && selectedImage && (
-              <p className="p-4 text-sm text-gray-500 text-center">
+              <p className="p-4 text-sm text-t3 text-center">
                 This image has no annotations yet.
               </p>
             )}
             {contours.length > 0 && visibleContours.length === 0 && (
-              <p className="p-4 text-sm text-gray-500 text-center">
+              <p className="p-4 text-sm text-t3 text-center">
                 No annotations match &quot;{search}&quot;.
               </p>
             )}

@@ -11,7 +11,7 @@ const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-scrim animate-dcFade"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -26,7 +26,7 @@ const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
           >
             <X size={14} />
           </button>

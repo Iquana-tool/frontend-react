@@ -8,13 +8,13 @@ const ChildCountCard = ({ childLabelName, count }) => {
   if (!count) return null;
 
   return (
-    <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+    <div className="bg-acS rounded-lg border border-acLn p-4">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-blue-700">Child: {childLabelName}</h4>
+        <h4 className="text-sm font-semibold text-ac">Child: {childLabelName}</h4>
       </div>
       <div>
-        <p className="text-xs text-blue-600 mb-1">Total child objects</p>
-        <p className="text-2xl font-bold text-blue-900">{count.toLocaleString()}</p>
+        <p className="text-xs text-ac mb-1">Total child objects</p>
+        <p className="text-2xl font-bold text-ac">{count.toLocaleString()}</p>
       </div>
     </div>
   );

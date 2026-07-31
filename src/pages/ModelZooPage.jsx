@@ -19,6 +19,7 @@ import {
 } from "../api/training";
 import { getModelFavorites, setModelFavorite, clearModelFavorite } from "../api/models";
 import { TASK_ORDER, getTaskMeta } from "../constants/tasks";
+import ThemeToggle from "../components/ui/ThemeToggle";
 
 // The toolbox serves `tags` as a dict (e.g. { domain: "general" }), but older
 // payloads may use an array or comma string. Normalize all three into
@@ -336,8 +337,8 @@ const ModelZooPage = () => {
       aria-pressed={active}
       className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors border ${
         active
-          ? "bg-teal-600 text-white border-teal-600"
-          : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900"
+          ? "bg-accent text-onAccent border-acLn"
+          : "bg-p1 text-t2 border-ln hover:border-ln2 hover:text-t1"
       }`}
     >
       {Icon && <Icon className="w-4 h-4" />}
@@ -346,37 +347,37 @@ const ModelZooPage = () => {
   );
 
   const ModelZooContent = () => (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-p1">
       {isFromDatasetManagement && datasetIdFromState && (
-        <div className="p-3 sm:p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="p-3 sm:p-4 border-b border-ln bg-p1 sticky top-0 z-10">
           <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
             <button
               onClick={() => navigate(`/dataset/${datasetIdFromState}/datamanagement`)}
-              className="flex items-center space-x-1.5 sm:space-x-2 text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base"
+              className="flex items-center space-x-1.5 sm:space-x-2 text-t2 hover:text-t1 transition-colors text-sm sm:text-base"
             >
               <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
               <span className="hidden sm:inline">Back to Overview</span>
               <span className="sm:hidden">Back</span>
             </button>
-            <div className="h-5 sm:h-6 w-px bg-gray-300"></div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Model Zoo</h2>
+            <div className="h-5 sm:h-6 w-px bg-ln2"></div>
+            <h2 className="text-lg sm:text-xl font-bold text-t1">Model Zoo</h2>
           </div>
         </div>
       )}
 
-      <div className="flex-1 min-h-0 bg-gray-50">
+      <div className="flex-1 min-h-0 bg-well">
         <div className="max-w-[98%] w-full h-full mx-auto px-4 py-5 flex flex-col min-h-0">
           {isLoading && (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="w-12 h-12 text-teal-600 animate-spin mb-4" />
-              <p className="text-gray-600">Loading models...</p>
+              <Loader2 className="w-12 h-12 text-ac animate-spin mb-4" />
+              <p className="text-t2">Loading models...</p>
             </div>
           )}
 
           {error && !isLoading && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-              <p className="text-red-800 font-medium mb-2">Failed to load models</p>
-              <p className="text-red-600 text-sm">{error}</p>
+            <div className="bg-errBg border border-errLn rounded-lg p-6 text-center">
+              <p className="text-err font-medium mb-2">Failed to load models</p>
+              <p className="text-err text-sm">{error}</p>
             </div>
           )}
 
@@ -385,12 +386,12 @@ const ModelZooPage = () => {
               {!isFromDatasetManagement && (
                 <div className="mb-5 shrink-0">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
-                      <Brain className="w-6 h-6 text-white" />
+                    <div className="w-12 h-12 bg-acS rounded-8 flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-ac" />
                     </div>
                     <div>
-                      <h2 className="text-3xl font-bold text-gray-900">Model Zoo</h2>
-                      <p className="text-gray-600 mt-1">
+                      <h2 className="text-3xl font-bold text-t1">Model Zoo</h2>
+                      <p className="text-t2 mt-1">
                         Explore models and star your defaults for each task
                       </p>
                     </div>
@@ -402,12 +403,12 @@ const ModelZooPage = () => {
               {trainingJobs.length > 0 && (
                 <div className="mb-5 shrink-0">
                   <div className="flex items-center space-x-3 mb-3">
-                    <div className="h-1 w-12 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full" />
-                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      <GraduationCap className="w-5 h-5 text-teal-600" />
+                    <div className="h-1 w-12 bg-accent rounded-full" />
+                    <h3 className="text-lg font-bold text-t1 flex items-center gap-2">
+                      <GraduationCap className="w-5 h-5 text-ac" />
                       Training runs
                     </h3>
-                    <div className="h-1 flex-1 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-full opacity-20" />
+                    <div className="h-1 flex-1 bg-ln2 rounded-full" />
                   </div>
                   <div className="space-y-3 max-h-[28vh] overflow-y-auto pr-1">
                     {trainingJobs.map((job) => (
@@ -425,7 +426,7 @@ const ModelZooPage = () => {
               {/* Master–detail: viewer on the left, model preview list on the right */}
               <div className="flex-1 min-h-0 flex gap-5">
                 {/* Detail viewer */}
-                <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="flex-1 min-w-0 bg-p1 rounded-2xl border border-ln shadow-sm overflow-hidden">
                   <ModelDetailPanel
                     model={selectedModel}
                     isFavorite={selectedModel ? isFavorite(selectedModel) : false}
@@ -437,24 +438,24 @@ const ModelZooPage = () => {
                 {/* Preview list + controls */}
                 <div className="w-[340px] shrink-0 flex flex-col min-h-0">
                   <div className="relative mb-2.5 shrink-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-t3" />
                     <input
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search models"
-                      className="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-full focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                      className="w-full pl-9 pr-3 py-1.5 text-sm bg-p1 border border-ln rounded-full focus:outline-none focus:ring-1 focus:ring-ac focus:border-ac"
                     />
                   </div>
 
                   {sortOptions.length > 1 && (
                     <div className="relative mb-2.5 shrink-0">
-                      <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-t3 pointer-events-none" />
                       <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
                         aria-label="Sort models"
-                        className="w-full pl-9 pr-8 py-1.5 text-sm bg-white border border-gray-200 rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full pl-9 pr-8 py-1.5 text-sm bg-p1 border border-ln rounded-full appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-ac focus:border-ac"
                       >
                         {sortOptions.map((key) => (
                           <option key={key} value={key}>
@@ -506,9 +507,9 @@ const ModelZooPage = () => {
                       ))
                     ) : (
                       <div className="text-center py-10 px-4">
-                        <Brain className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                        <h3 className="text-sm font-semibold text-gray-900 mb-1">No models found</h3>
-                        <p className="text-xs text-gray-500">
+                        <Brain className="w-12 h-12 text-t3 mx-auto mb-3" />
+                        <h3 className="text-sm font-semibold text-t1 mb-1">No models found</h3>
+                        <p className="text-xs text-t3">
                           {models.length === 0
                             ? "No models are registered yet."
                             : "Try a different filter or search."}
@@ -542,18 +543,18 @@ const ModelZooPage = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white shrink-0">
+    <div className="h-screen flex flex-col bg-well">
+      <div className="bg-p1 text-t1 border-b border-ln shrink-0">
         <div className="max-w-[98%] mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <button onClick={handleBack} className="flex items-center space-x-2 hover:text-teal-200 transition-colors">
+              <button onClick={handleBack} className="flex items-center gap-[7px] text-t2 hover:text-ac transition-colors duration-150">
                 <ArrowLeft size={20} />
                 <span>Back</span>
               </button>
-              <div className="h-6 w-px bg-teal-400"></div>
+              <div className="h-6 w-px bg-ln"></div>
               <h1
-                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+                className="text-2xl font-semibold tracking-tight cursor-pointer hover:text-ac transition-colors duration-150"
                 onClick={() => navigate("/")}
               >
                 IQuana
@@ -561,19 +562,20 @@ const ModelZooPage = () => {
             </div>
             <div className="flex items-center space-x-4">
               {isAuthenticated && user && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white">
+                <div className="flex items-center gap-[6px] px-3 py-1.5 text-sm text-t3">
                   <User className="w-4 h-4" />
                   <span className="font-medium">{user.username}</span>
                 </div>
               )}
               <button
                 onClick={() => navigate("/docs")}
-                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+                className="flex items-center gap-[7px] bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-6 transition-colors duration-150"
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Documentation</span>
               </button>
-              <ReportBugLink />
+              <ThemeToggle />
+          <ReportBugLink />
               <AuthButtons showLogoutOnly={true} />
             </div>
           </div>

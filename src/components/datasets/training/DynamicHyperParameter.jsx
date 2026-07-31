@@ -29,7 +29,7 @@ export default function DynamicHyperParameter({ param, value, onChange }) {
       <select
         value={String(current)}
         onChange={(e) => onChange(key, coerce(e.target.value, type))}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"
       >
         {options.map((opt) => (
           <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
@@ -67,18 +67,18 @@ export default function DynamicHyperParameter({ param, value, onChange }) {
         step={type === "int" ? 1 : "any"}
         value={current}
         onChange={(e) => onChange(key, coerce(e.target.value, type))}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"
       />
     );
   }
 
   return (
     <div>
-      <label className="flex items-center justify-between text-sm font-medium text-gray-800 mb-1">
+      <label className="flex items-center justify-between text-sm font-medium text-t1 mb-1">
         <span>{label}</span>
       </label>
       {control}
-      {description && <p className="text-[11px] text-gray-500 mt-1">{description}</p>}
+      {description && <p className="text-[11px] text-t3 mt-1">{description}</p>}
     </div>
   );
 }

@@ -16,10 +16,10 @@ const PlaceholderImage = ({ src, alt, className, fallbackText = "No image" }) =>
 
   if (imageError || !src) {
     return (
-      <div className={`bg-gray-200 flex items-center justify-center ${className}`}>
+      <div className={`bg-hv2 flex items-center justify-center ${className}`}>
         <div className="text-center">
-          <ImageIcon className="w-6 h-6 text-gray-400 mx-auto mb-1" />
-          <span className="text-gray-400 text-xs">{fallbackText}</span>
+          <ImageIcon className="w-6 h-6 text-t3 mx-auto mb-1" />
+          <span className="text-t3 text-xs">{fallbackText}</span>
         </div>
       </div>
     );
@@ -28,8 +28,8 @@ const PlaceholderImage = ({ src, alt, className, fallbackText = "No image" }) =>
   return (
     <div className={`relative ${className}`}>
       {imageLoading && (
-        <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
-          <div className="animate-pulse bg-gray-300 w-full h-full"></div>
+        <div className="absolute inset-0 bg-hv2 flex items-center justify-center">
+          <div className="animate-pulse bg-ln2 w-full h-full"></div>
         </div>
       )}
       <img 

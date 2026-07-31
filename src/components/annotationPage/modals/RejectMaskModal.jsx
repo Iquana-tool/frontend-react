@@ -87,7 +87,7 @@ const RejectMaskModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade p-4">
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-scrim animate-dcFade p-4">
       <div className="w-[344px] max-w-full rounded-12 bg-p1 border border-ln2 shadow-modal animate-dcPop">
         <div className="flex items-start justify-between px-[14px] py-[12px] border-b border-ln">
           <div className="flex items-center gap-3">
@@ -105,7 +105,7 @@ const RejectMaskModal = ({
           </div>
           <button
             onClick={onClose}
-            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
             aria-label="Close"
           >
             <X className="w-3.5 h-3.5" />
@@ -156,7 +156,7 @@ const RejectMaskModal = ({
                   rows={3}
                   maxLength={1000}
                   placeholder="Anything that helps whoever picks this up next."
-                  className="w-full px-[10px] py-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-revLn placeholder:text-t3"
+                  className="w-full px-[10px] py-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-rev placeholder:text-t3"
                 />
               </div>
 

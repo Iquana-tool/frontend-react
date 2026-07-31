@@ -56,9 +56,9 @@ const DatasetSelector = () => {
 
   if (loading && datasets.length === 0) {
     return (
-      <div className="flex items-center gap-2 p-3 bg-white rounded-lg border">
-        <Database className="w-4 h-4 text-blue-600" />
-        <span className="text-sm text-gray-600">Loading datasets...</span>
+      <div className="flex items-center gap-2 p-3 bg-p1 rounded-lg border">
+        <Database className="w-4 h-4 text-ac" />
+        <span className="text-sm text-t2">Loading datasets...</span>
       </div>
     );
   }
@@ -69,33 +69,33 @@ const DatasetSelector = () => {
       <div className="relative">
         <button
           onClick={() => setShowDropdown(!showDropdown)}
-          className="w-full flex items-center justify-between p-3 bg-white rounded-lg border hover:border-blue-300 transition-colors"
+          className="w-full flex items-center justify-between p-3 bg-p1 rounded-lg border hover:border-acLn transition-colors"
         >
           <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-blue-600" />
+            <Database className="w-4 h-4 text-ac" />
             <div className="text-left">
               <div className="font-medium text-sm">
                 {currentDataset ? currentDataset.name : 'No dataset selected'}
               </div>
               {currentDataset && (
-                <div className="text-xs text-gray-500 truncate max-w-48">
+                <div className="text-xs text-t3 truncate max-w-48">
                   {currentDataset.description || 'No description'}
                 </div>
               )}
             </div>
           </div>
-          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-t3 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
         </button>
 
         {/* Dropdown */}
         {showDropdown && (
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+          <div className="absolute top-full left-0 right-0 mt-1 bg-p1 border rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
             {datasets.length > 0 ? (
               datasets.map((dataset) => (
                 <div
                   key={dataset.id}
-                  className={`flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 ${
-                    currentDataset?.id === dataset.id ? 'bg-blue-50' : ''
+                  className={`flex items-center justify-between p-3 hover:bg-hv cursor-pointer border-b last:border-b-0 ${
+                    currentDataset?.id === dataset.id ? 'bg-acS' : ''
                   }`}
                   onClick={() => {
                     selectDataset(dataset);
@@ -105,14 +105,14 @@ const DatasetSelector = () => {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm">{dataset.name}</div>
                     {dataset.description && (
-                      <div className="text-xs text-gray-500 truncate">
+                      <div className="text-xs text-t3 truncate">
                         {dataset.description}
                       </div>
                     )}
                   </div>
                   <button
                     onClick={(e) => handleDeleteDataset(dataset.id, e)}
-                    className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded"
+                    className="ml-2 p-1 text-err hover:bg-errBg rounded"
                     title="Delete dataset"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -120,7 +120,7 @@ const DatasetSelector = () => {
                 </div>
               ))
             ) : (
-              <div className="p-3 text-sm text-gray-500 text-center">
+              <div className="p-3 text-sm text-t3 text-center">
                 No datasets available
               </div>
             )}
@@ -131,7 +131,7 @@ const DatasetSelector = () => {
                 setShowCreateForm(true);
                 setShowDropdown(false);
               }}
-              className="w-full flex items-center gap-2 p-3 text-blue-600 hover:bg-blue-50 border-t"
+              className="w-full flex items-center gap-2 p-3 text-ac hover:bg-acS border-t"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Create New Dataset</span>
@@ -142,32 +142,32 @@ const DatasetSelector = () => {
 
       {/* Create Dataset Form */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-scrim flex items-center justify-center z-50">
+          <div className="bg-p1 rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold mb-4">Create New Dataset</h3>
             <form onSubmit={handleCreateDataset} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-t2 mb-1">
                   Dataset Name *
                 </label>
                 <input
                   type="text"
                   value={newDatasetName}
                   onChange={(e) => setNewDatasetName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-ln2 rounded-md focus:outline-none focus:ring-2 focus:ring-ac"
                   placeholder="Enter dataset name"
                   required
                   disabled={isCreating}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-t2 mb-1">
                   Description
                 </label>
                 <textarea
                   value={newDatasetDescription}
                   onChange={(e) => setNewDatasetDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-ln2 rounded-md focus:outline-none focus:ring-2 focus:ring-ac"
                   placeholder="Enter dataset description (optional)"
                   rows={3}
                   disabled={isCreating}
@@ -177,7 +177,7 @@ const DatasetSelector = () => {
                 <button
                   type="submit"
                   disabled={isCreating || !newDatasetName.trim()}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-accent text-onAccent py-2 px-4 rounded-md hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCreating ? 'Creating...' : 'Create Dataset'}
                 </button>
@@ -189,7 +189,7 @@ const DatasetSelector = () => {
                     setNewDatasetDescription('');
                   }}
                   disabled={isCreating}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 disabled:opacity-50"
+                  className="flex-1 bg-ln2 text-t2 py-2 px-4 rounded-md hover:bg-t3 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -201,15 +201,15 @@ const DatasetSelector = () => {
 
       {/* Error Display */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="p-3 bg-errBg border border-errLn rounded-lg">
+          <p className="text-sm text-err">{error}</p>
         </div>
       )}
 
       {/* No Dataset Warning */}
       {!currentDataset && datasets.length > 0 && (
-        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <p className="text-sm text-yellow-700">
+        <div className="p-3 bg-warnBg border border-warnLn rounded-lg">
+          <p className="text-sm text-warn">
             Please select a dataset to start working with images and labels.
           </p>
         </div>

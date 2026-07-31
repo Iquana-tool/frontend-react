@@ -108,9 +108,10 @@ const PermissionMatrix = ({
     'sticky left-0',
     compact ? 'px-3 py-1.5' : 'px-4 py-2',
     compact ? 'min-w-[200px] max-w-[280px]' : 'min-w-[260px] max-w-[380px]',
-    // Literal grey-200 rather than theme(), so the class survives any Tailwind
-    // config that does not resolve theme() inside arbitrary values.
-    'shadow-[1px_0_0_0_#e5e7eb]',
+    // A raw var() rather than a Tailwind colour token: arbitrary-value classes
+    // don't run through the `colors` map, so `shadow-ln` isn't resolvable here,
+    // but plain CSS custom properties work directly and still track the theme.
+    'shadow-[1px_0_0_0_var(--ln)]',
   ].join(' ');
 
   const roleCell = [
@@ -120,7 +121,7 @@ const PermissionMatrix = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-10 text-gray-500">
+      <div className="flex items-center justify-center py-10 text-t3">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
         Loading permissions…
       </div>
@@ -129,9 +130,9 @@ const PermissionMatrix = ({
 
   if (error) {
     return (
-      <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex gap-2">
-        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-        <p className="text-sm text-amber-800">{error}</p>
+      <div className="p-4 rounded-lg bg-warnBg border border-warnLn flex gap-2">
+        <AlertTriangle className="w-5 h-5 text-warn flex-shrink-0" />
+        <p className="text-sm text-warn">{error}</p>
       </div>
     );
   }
@@ -148,12 +149,12 @@ const PermissionMatrix = ({
                 key={entry.role}
                 className={`p-3 rounded-lg border ${
                   highlightRole === entry.role
-                    ? 'border-teal-400 bg-teal-50'
-                    : 'border-gray-200 bg-gray-50'
+                    ? 'border-acLn bg-acS'
+                    : 'border-ln bg-well'
                 }`}
               >
-                <h5 className="font-semibold text-gray-900 text-sm">{meta.label}</h5>
-                <p className="text-gray-600 text-sm mt-0.5">{meta.description}</p>
+                <h5 className="font-semibold text-t1 text-sm">{meta.label}</h5>
+                <p className="text-t2 text-sm mt-0.5">{meta.description}</p>
               </div>
             );
           })}
@@ -163,12 +164,12 @@ const PermissionMatrix = ({
       {/* The table scrolls inside this box rather than pushing the page sideways.
           `w-max` stops the browser compressing columns to fit a narrow container —
           without it the permission text wraps to one word per line in the modal. */}
-      <div className="overflow-x-auto border border-gray-200 rounded-lg relative">
+      <div className="overflow-x-auto border border-ln rounded-lg relative">
         <table className="w-max min-w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-gray-50">
+            <tr className="bg-well">
               <th
-                className={`${labelCell} text-left font-semibold text-gray-700 bg-gray-50 z-20`}
+                className={`${labelCell} text-left font-semibold text-t2 bg-well z-20`}
               >
                 Permission
               </th>
@@ -177,8 +178,8 @@ const PermissionMatrix = ({
                   key={entry.role}
                   className={`${roleCell} font-semibold text-center ${
                     highlightRole === entry.role
-                      ? 'text-teal-700 bg-teal-100/70'
-                      : 'text-gray-700'
+                      ? 'text-ac bg-acS'
+                      : 'text-t2'
                   }`}
                 >
                   {DATASET_ROLE_LABELS[entry.role]?.label || entry.role}
@@ -193,24 +194,24 @@ const PermissionMatrix = ({
                     colSpan across the row: a spanning cell cannot stick, so the
                     heading used to slide out of view while the permission column
                     stayed put. */}
-                <tr className="bg-gray-100 border-t border-gray-200">
+                <tr className="bg-well border-t border-ln">
                   <th
                     scope="colgroup"
-                    className={`${labelCell} text-left text-xs font-bold uppercase tracking-wide text-gray-500 bg-gray-100 z-20 py-1.5`}
+                    className={`${labelCell} text-left text-xs font-bold uppercase tracking-wide text-t3 bg-well z-20 py-1.5`}
                   >
                     {group.title}
                   </th>
-                  <td colSpan={roles.length} className="bg-gray-100" />
+                  <td colSpan={roles.length} className="bg-well" />
                 </tr>
                 {group.permissions.map(([permission, description]) => (
-                  <tr key={permission} className="border-t border-gray-200 group">
+                  <tr key={permission} className="border-t border-ln group">
                     <th
                       scope="row"
-                      className={`${labelCell} text-left font-normal text-gray-800 bg-white z-10 group-hover:bg-gray-50`}
+                      className={`${labelCell} text-left font-normal text-t1 bg-p1 z-10 group-hover:bg-well`}
                     >
                       {description}
                       {showKeys && (
-                        <span className="block text-[11px] text-gray-400 font-mono">
+                        <span className="block text-[11px] text-t3 font-mono">
                           {permission}
                         </span>
                       )}
@@ -221,17 +222,17 @@ const PermissionMatrix = ({
                         <td
                           key={entry.role}
                           className={`${roleCell} text-center ${
-                            highlightRole === entry.role ? 'bg-teal-50/60' : ''
+                            highlightRole === entry.role ? 'bg-acS' : ''
                           }`}
                         >
                           {granted ? (
                             <Check
-                              className="w-4 h-4 text-emerald-600 mx-auto"
+                              className="w-4 h-4 text-ok mx-auto"
                               aria-label="Allowed"
                             />
                           ) : (
                             <Minus
-                              className="w-4 h-4 text-gray-300 mx-auto"
+                              className="w-4 h-4 text-t3 mx-auto"
                               aria-label="Not allowed"
                             />
                           )}
@@ -246,7 +247,7 @@ const PermissionMatrix = ({
         </table>
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-t3">
         Owners can additionally grant or withhold a single permission for one
         collaborator, so someone&apos;s effective access may differ slightly from their
         role. Their exact permissions are shown in Manage access.

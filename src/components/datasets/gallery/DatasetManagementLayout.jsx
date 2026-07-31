@@ -76,7 +76,7 @@ const DatasetManagementLayout = ({ children, datasetId: propDatasetId }) => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-well">
       <SmallScreenMessage />
 
       {/* Large Screen Content - Show dataset management layout on screens 1024px and above */}
@@ -89,7 +89,7 @@ const DatasetManagementLayout = ({ children, datasetId: propDatasetId }) => {
         {/* Main Content */}
         <div className="max-w-full mx-auto flex h-[calc(100vh-73px)]">
           {/* Left Sidebar - Dataset Info (Persistent across all views) */}
-          <div className="w-100 bg-white border-r border-gray-200 flex-shrink-0">
+          <div className="w-100 bg-p1 border-r border-ln flex-shrink-0">
             <DatasetInfo 
               dataset={dataset}
               stats={stats}

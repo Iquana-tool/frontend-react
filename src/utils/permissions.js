@@ -142,11 +142,11 @@ export const ASSIGNABLE_DATASET_ROLES = [
 
 /** Tailwind classes for the role badge, escalating in visual weight. */
 export const DATASET_ROLE_BADGE_CLASSES = {
-    [DatasetRole.VIEWER]: 'bg-gray-100 text-gray-700 border-gray-200',
-    [DatasetRole.ANNOTATOR]: 'bg-sky-100 text-sky-800 border-sky-200',
-    [DatasetRole.REVIEWER]: 'bg-violet-100 text-violet-800 border-violet-200',
-    [DatasetRole.CURATOR]: 'bg-amber-100 text-amber-800 border-amber-200',
-    [DatasetRole.OWNER]: 'bg-teal-100 text-teal-800 border-teal-200',
+    [DatasetRole.VIEWER]: 'bg-well text-t2 border-ln',
+    [DatasetRole.ANNOTATOR]: 'bg-acS text-ac border-acLn',
+    [DatasetRole.REVIEWER]: 'bg-acS text-ac border-acLn',
+    [DatasetRole.CURATOR]: 'bg-warnBg text-warn border-warnLn',
+    [DatasetRole.OWNER]: 'bg-acS text-ac border-acLn',
 };
 
 /**

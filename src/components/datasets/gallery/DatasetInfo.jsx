@@ -24,20 +24,20 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
       {/* Dataset Header */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <FileText className="w-5 h-5 text-teal-600 mr-2" />
-          <h2 className="text-xl font-bold text-gray-900">Dataset Overview</h2>
+          <FileText className="w-5 h-5 text-ac mr-2" />
+          <h2 className="text-xl font-bold text-t1">Dataset Overview</h2>
         </div>
         
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-4 rounded-lg text-white mb-4">
+        <div className="bg-p2 border border-ln p-4 rounded-8 text-t1 mb-4">
           <h3 className="text-lg font-bold mb-2">{dataset.name}</h3>
-          <p className="text-teal-100 text-sm">
+          <p className="text-t2 text-sm">
             {dataset.description || "No description provided"}
           </p>
         </div>
 
         <button
           onClick={onStartAnnotation}
-          className="w-full flex items-center justify-center space-x-2 bg-teal-600 text-white py-3 px-4 rounded-lg hover:bg-teal-700 transition-colors font-medium"
+          className="w-full flex items-center justify-center space-x-2 bg-accent text-onAccent py-3 px-4 rounded-lg hover:brightness-110 transition-colors font-medium"
         >
           <Play size={18} />
           <span>Start Annotation</span>
@@ -47,24 +47,24 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
       {/* Annotation Status */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <BarChart3 className="w-5 h-5 text-teal-600 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Annotation Status</h3>
+          <BarChart3 className="w-5 h-5 text-ac mr-2" />
+          <h3 className="text-lg font-semibold text-t1">Annotation Status</h3>
         </div>
         
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="bg-well p-4 rounded-lg">
           <DatasetAnnotationProgress stats={stats} />
           
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="text-sm text-gray-600 space-y-1">
+          <div className="mt-4 pt-4 border-t border-ln">
+            <div className="text-sm text-t2 space-y-1">
               <div className="flex justify-between">
                 <span>Completed:</span>
-                <span className="font-medium text-green-600">
+                <span className="font-medium text-ok">
                   {(stats.finished || 0) + (stats.reviewable || 0)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span>Remaining:</span>
-                <span className="font-medium text-orange-600">
+                <span className="font-medium text-warn">
                   {(stats.not_started || 0) + (stats.in_progress || 0)}
                 </span>
               </div>
@@ -76,11 +76,11 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
       {/* Labels */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
-          <Tag className="w-5 h-5 text-teal-600 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Labels</h3>
+          <Tag className="w-5 h-5 text-ac mr-2" />
+          <h3 className="text-lg font-semibold text-t1">Labels</h3>
         </div>
         
-        <div className="bg-gray-50 p-4 rounded-lg">
+        <div className="bg-well p-4 rounded-lg">
           <EditableLabels 
             dataset={dataset}
             labels={currentLabels}

@@ -82,12 +82,12 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
   };
 
   return (
-    <div className="bg-rose-50 border-b border-rose-200 px-4 py-3">
+    <div className="bg-revBg border-b border-revLn px-4 py-3">
       <div className="flex items-start gap-3">
-        <RotateCcw className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+        <RotateCcw className="w-5 h-5 text-err flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-rose-900">
+            <p className="text-sm font-semibold text-err">
               Sent back for rework
               {rejections.length > 1 && ` (${rejections.length} points)`}
             </p>
@@ -95,7 +95,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
               <button
                 onClick={handleResolveAll}
                 disabled={busy === 'all'}
-                className="text-xs font-medium text-rose-700 hover:text-rose-900 underline disabled:opacity-50"
+                className="text-xs font-medium text-err hover:text-err underline disabled:opacity-50"
               >
                 Mark all as done
               </button>
@@ -103,7 +103,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
           </div>
 
           {loading && rejections.length === 0 ? (
-            <p className="text-sm text-rose-800 mt-1 flex items-center gap-2">
+            <p className="text-sm text-err mt-1 flex items-center gap-2">
               <Loader2 className="w-3 h-3 animate-spin" />
               Loading feedback…
             </p>
@@ -115,16 +115,16 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
                   className="flex items-start justify-between gap-3 text-sm"
                 >
                   <div className="min-w-0">
-                    <span className="font-medium text-rose-900">
+                    <span className="font-medium text-err">
                       {rejection.reason_label}
                     </span>
                     {rejection.contour_id && (
-                      <span className="text-rose-700"> · object #{rejection.contour_id}</span>
+                      <span className="text-err"> · object #{rejection.contour_id}</span>
                     )}
                     {rejection.note && (
-                      <span className="block text-rose-800">{rejection.note}</span>
+                      <span className="block text-err">{rejection.note}</span>
                     )}
-                    <span className="block text-xs text-rose-600">
+                    <span className="block text-xs text-err">
                       {rejection.created_by} ·{' '}
                       {new Date(rejection.created_at).toLocaleString()}
                     </span>
@@ -133,7 +133,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
                     <button
                       onClick={() => handleResolve(rejection.id)}
                       disabled={busy === rejection.id}
-                      className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-rose-700 bg-white border border-rose-300 rounded hover:bg-rose-100 disabled:opacity-50 transition-colors"
+                      className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-err bg-p1 border border-revLn rounded hover:bg-revBg disabled:opacity-50 transition-colors"
                       title="Mark this point as addressed"
                     >
                       {busy === rejection.id ? (
@@ -149,7 +149,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
             </ul>
           )}
 
-          {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+          {error && <p className="mt-2 text-sm text-err">{error}</p>}
         </div>
       </div>
     </div>

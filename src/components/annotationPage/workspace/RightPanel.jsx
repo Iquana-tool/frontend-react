@@ -24,7 +24,7 @@ const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount }) => (
         type="button"
         onClick={onExpand}
         aria-label="Expand panel"
-        className="w-[26px] h-[26px] flex items-center justify-center rounded-6 bg-hv text-t2 hover:bg-hv2 hover:text-t1 transition-colors"
+        className="w-[26px] h-[26px] flex items-center justify-center rounded-6 bg-hv text-t2 hover:bg-hv2 hover:text-ac transition-colors duration-150"
       >
         <ChevronLeft size={14} strokeWidth={1.9} />
       </button>
@@ -112,7 +112,7 @@ const RightPanel = () => {
           onClick={toggleOpen}
           aria-label="Collapse panel"
           title="Collapse panel (⌥2)"
-          className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+          className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
         >
           <ChevronRight size={14} strokeWidth={1.9} />
         </button>

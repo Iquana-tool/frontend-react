@@ -34,8 +34,8 @@ const Tooltip = ({ label, shortcut, placement = 'right', disabled = false, child
           role="tooltip"
           className={`absolute z-[90] flex items-center gap-[7px] h-7 px-[9px] rounded-7 bg-tip border border-ln2 shadow-tip animate-dcFade pointer-events-none whitespace-nowrap ${PLACEMENT[placement]}`}
         >
-          <span className="text-btn font-semibold text-t1">{label}</span>
-          {shortcut && <Kbd>{shortcut}</Kbd>}
+          <span className="text-btn font-semibold text-onTip">{label}</span>
+          {shortcut && <Kbd tone="tip">{shortcut}</Kbd>}
         </div>
       )}
     </div>

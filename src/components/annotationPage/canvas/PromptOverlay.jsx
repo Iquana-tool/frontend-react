@@ -60,13 +60,13 @@ const PromptOverlay = ({ canvasRef }) => {
         >
           {/* Red circle with crosshair for visual feedback */}
           <div className="relative">
-            <div className="w-6 h-6 bg-red-500 border-2 border-white rounded-full shadow-lg"></div>
+            <div className="w-6 h-6 bg-err border-2 border-white rounded-full shadow-lg"></div>
             {/* Crosshair */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-3 h-0.5 bg-white"></div>
+              <div className="w-3 h-0.5 bg-p1"></div>
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-0.5 h-3 bg-white"></div>
+              <div className="w-0.5 h-3 bg-p1"></div>
             </div>
           </div>
         </div>

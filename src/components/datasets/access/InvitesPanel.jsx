@@ -56,14 +56,14 @@ const InvitesPanel = ({ access }) => {
 
   return (
     <div className="space-y-4">
-      <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="p-4 bg-well rounded-lg border border-ln">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+            <label className="block text-xs font-medium text-t2 mb-1">Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 focus:ring-2 focus:ring-ac"
             >
               {ASSIGNABLE_DATASET_ROLES.map((option) => (
                 <option key={option} value={option}>
@@ -73,13 +73,13 @@ const InvitesPanel = ({ access }) => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Expires</label>
+            <label className="block text-xs font-medium text-t2 mb-1">Expires</label>
             <select
               value={String(expiry)}
               onChange={(e) =>
                 setExpiry(e.target.value === 'null' ? null : Number(e.target.value))
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 focus:ring-2 focus:ring-ac"
             >
               {EXPIRY_OPTIONS.map((option) => (
                 <option key={option.label} value={String(option.value)}>
@@ -89,21 +89,21 @@ const InvitesPanel = ({ access }) => {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Max uses</label>
+            <label className="block text-xs font-medium text-t2 mb-1">Max uses</label>
             <input
               type="number"
               min="1"
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
               placeholder="Unlimited"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
+              className="w-full px-3 py-2 border border-ln2 rounded-lg focus:ring-2 focus:ring-ac"
             />
           </div>
         </div>
         <button
           onClick={handleCreate}
           disabled={busy === 'invite'}
-          className="mt-3 w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+          className="mt-3 w-full px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 disabled:bg-ln2 transition-colors flex items-center justify-center gap-2"
         >
           {busy === 'invite' ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -112,14 +112,14 @@ const InvitesPanel = ({ access }) => {
           )}
           Create invite link
         </button>
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-t3">
           Invite links cannot grant ownership.
         </p>
       </div>
 
       {freshInvite && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm font-medium text-amber-900 mb-2">
+        <div className="p-4 bg-warnBg border border-warnLn rounded-lg">
+          <p className="text-sm font-medium text-warn mb-2">
             Copy this link now — it is not stored and cannot be shown again.
           </p>
           <div className="flex gap-2">
@@ -127,11 +127,11 @@ const InvitesPanel = ({ access }) => {
               readOnly
               value={freshInvite.url}
               onFocus={(e) => e.target.select()}
-              className="flex-1 min-w-0 px-3 py-2 text-sm border border-amber-300 rounded-lg bg-white font-mono"
+              className="flex-1 min-w-0 px-3 py-2 text-sm border border-warnLn rounded-lg bg-p1 font-mono"
             />
             <button
               onClick={handleCopy}
-              className="px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-1 flex-shrink-0"
+              className="px-3 py-2 bg-warn text-onAccent rounded-6 hover:brightness-110 transition-colors flex items-center gap-1 flex-shrink-0"
             >
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               {copied ? 'Copied' : 'Copy'}
@@ -140,18 +140,18 @@ const InvitesPanel = ({ access }) => {
         </div>
       )}
 
-      <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+      <ul className="divide-y divide-ln border border-ln rounded-lg">
         {invites.map((invite) => (
           <li key={invite.id} className="flex items-center justify-between gap-3 p-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <RoleBadge role={invite.role} />
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-t3">
                   {invite.uses} use{invite.uses === 1 ? '' : 's'}
                   {invite.max_uses ? ` of ${invite.max_uses}` : ''}
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-t3 mt-1">
                 {invite.expires_at
                   ? `Expires ${new Date(invite.expires_at).toLocaleString()}`
                   : 'Never expires'}
@@ -162,16 +162,16 @@ const InvitesPanel = ({ access }) => {
               <button
                 onClick={() => revokeInvite(invite.id)}
                 disabled={busy === `invite:${invite.id}`}
-                className="p-1.5 rounded hover:bg-red-100 transition-colors flex-shrink-0"
+                className="p-1.5 rounded hover:bg-errBg transition-colors flex-shrink-0"
                 title="Revoke this link"
               >
-                <Trash2 className="w-4 h-4 text-red-600" />
+                <Trash2 className="w-4 h-4 text-err" />
               </button>
             )}
           </li>
         ))}
         {invites.length === 0 && (
-          <li className="p-4 text-sm text-gray-500 text-center">
+          <li className="p-4 text-sm text-t3 text-center">
             No active invite links.
           </li>
         )}
