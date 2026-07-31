@@ -19,14 +19,14 @@ const DatasetCard = ({
   const [showAccessModal, setShowAccessModal] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-p1 rounded-xl shadow-sm border border-ln overflow-hidden hover:shadow-md transition-shadow">
       {/* Dataset Header */}
-      <div className="bg-gradient-to-r from-teal-500 to-cyan-500 p-6 text-white relative">
+      <div className="bg-p2 border-b border-ln p-6 text-t1 relative">
         <Can permission={Permission.DATASET_DELETE} dataset={dataset}>
           <DeleteDatasetButton dataset={dataset} onClick={onDelete} />
         </Can>
         <h3 className="text-xl font-bold mb-2 pr-8">{dataset.name}</h3>
-        <p className="text-teal-100 text-sm">
+        <p className="text-t2 text-sm">
           {dataset.description || "No description provided"}
         </p>
         {dataset.my_role && (
@@ -79,7 +79,7 @@ const DatasetCard = ({
           >
             <button
               onClick={() => setShowAccessModal(true)}
-              className="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-gray-700 transition-colors flex items-center justify-center space-x-1"
+              className="flex-1 bg-well border border-ln text-t2 py-2 px-4 rounded-6 text-sm hover:bg-hv transition-colors duration-150 flex items-center justify-center space-x-1"
             >
               <Users2 className="w-4 h-4 flex-shrink-0" />
               <span>Access</span>
@@ -87,7 +87,7 @@ const DatasetCard = ({
           </Can>
           <button
             onClick={() => onOpenDataset(dataset)}
-            className="flex-1 bg-teal-600 text-white py-2 px-4 rounded-lg text-sm hover:bg-teal-700 transition-colors"
+            className="flex-1 bg-accent text-onAccent py-2 px-4 rounded-lg text-sm hover:brightness-110 transition-colors"
           >
             Open
           </button>

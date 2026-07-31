@@ -22,11 +22,11 @@ const TaskAssignmentPanel = ({ members = [] }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
-        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      <div className="flex items-start gap-3 p-4 rounded-lg bg-acS border border-acLn">
+        <Info className="w-5 h-5 text-ac flex-shrink-0 mt-0.5" />
         <div>
-          <h4 className="font-medium text-gray-900">Not available yet</h4>
-          <p className="text-sm text-gray-700 mt-1">
+          <h4 className="font-medium text-t1">Not available yet</h4>
+          <p className="text-sm text-t2 mt-1">
             Today everyone with access works from the same pool of images. Assignment
             will let you hand specific images to specific people, so several annotators
             can share a dataset without colliding on the same image, and so you can see
@@ -35,14 +35,14 @@ const TaskAssignmentPanel = ({ members = [] }) => {
         </div>
       </div>
 
-      <div className="border border-dashed border-gray-300 rounded-lg p-4">
+      <div className="border border-dashed border-ln2 rounded-lg p-4">
         <div className="flex items-center gap-2 mb-3">
-          <ClipboardList className="w-5 h-5 text-gray-400" />
-          <h4 className="font-medium text-gray-700">Who work could be assigned to</h4>
+          <ClipboardList className="w-5 h-5 text-t3" />
+          <h4 className="font-medium text-t2">Who work could be assigned to</h4>
         </div>
 
         {assignable.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-t3">
             Nobody on this dataset annotates or reviews yet. Add collaborators as{' '}
             {DATASET_ROLE_LABELS[DatasetRole.ANNOTATOR].label.toLowerCase()} or{' '}
             {DATASET_ROLE_LABELS[DatasetRole.REVIEWER].label.toLowerCase()} first.
@@ -52,9 +52,9 @@ const TaskAssignmentPanel = ({ members = [] }) => {
             {assignable.map((member) => (
               <li
                 key={member.username}
-                className="flex items-center justify-between text-sm text-gray-500"
+                className="flex items-center justify-between text-sm text-t3"
               >
-                <span className="text-gray-700">{member.username}</span>
+                <span className="text-t2">{member.username}</span>
                 <span className="text-xs">
                   {DATASET_ROLE_LABELS[member.role]?.label} · no assignments
                 </span>

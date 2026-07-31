@@ -36,9 +36,9 @@ const ScaleWarningBanner = ({ scaleStatus }) => {
     : `Images use different scale units (${distinct_units.join(", ")}), showing pixel units. Use a single unit across all images to see real-world quantifications.`;
 
   return (
-    <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
-      <p className="text-sm text-amber-800">{message}</p>
+    <div className="mb-6 flex items-start gap-3 rounded-lg border border-warnLn bg-warnBg px-4 py-3">
+      <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warn" />
+      <p className="text-sm text-warn">{message}</p>
     </div>
   );
 };
@@ -182,8 +182,8 @@ const QuantificationPage = () => {
       <DatasetManagementLayout>
         <div className="h-full flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading quantifications...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-acLn mx-auto mb-4"></div>
+            <p className="text-t2">Loading quantifications...</p>
           </div>
         </div>
       </DatasetManagementLayout>
@@ -195,7 +195,7 @@ const QuantificationPage = () => {
       <DatasetManagementLayout>
         <div className="h-full flex items-center justify-center">
           <div className="text-center">
-            <p className="text-red-600 mb-4">Error: {error}</p>
+            <p className="text-err mb-4">Error: {error}</p>
           </div>
         </div>
       </DatasetManagementLayout>
@@ -207,7 +207,7 @@ const QuantificationPage = () => {
       <DatasetManagementLayout>
         <div className="h-full flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-600 mb-4">No data available</p>
+            <p className="text-t2 mb-4">No data available</p>
           </div>
         </div>
       </DatasetManagementLayout>
@@ -232,18 +232,18 @@ const QuantificationPage = () => {
 
   return (
     <DatasetManagementLayout>
-      <div className="h-full flex flex-col bg-white overflow-y-auto">
+      <div className="h-full flex flex-col bg-p1 overflow-y-auto">
         {/* Page Header */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="bg-p1 border-b border-ln sticky top-0 z-10">
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dataset Quantifications</h1>
+                <h1 className="text-2xl font-bold text-t1">Dataset Quantifications</h1>
               </div>
               <div className="flex items-center space-x-3">
                 <button
                   onClick={handleExport}
-                  className="flex items-center space-x-2 px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors"
+                  className="flex items-center space-x-2 px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   <span>Export Quantification</span>
@@ -254,7 +254,7 @@ const QuantificationPage = () => {
         </div>
 
         {/* Profile selector + expand controls */}
-        <div className="bg-white border-b border-gray-200">
+        <div className="bg-p1 border-b border-ln">
           <div className="px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <ProfileSelector
@@ -270,21 +270,21 @@ const QuantificationPage = () => {
                 {/* Inclusion toggles: by default only finalized work (fully-annotated masks
                     + reviewed objects) is quantified; these surface in-progress work. */}
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-sm text-t2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeInProgress}
                       onChange={(e) => setIncludeInProgress(e.target.checked)}
-                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      className="rounded border-ln2 text-ac focus:ring-ac"
                     />
                     <span>Include in-progress masks</span>
                   </label>
-                  <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                  <label className="flex items-center gap-1.5 text-sm text-t2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeUnreviewed}
                       onChange={(e) => setIncludeUnreviewed(e.target.checked)}
-                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      className="rounded border-ln2 text-ac focus:ring-ac"
                     />
                     <span>Include unreviewed objects</span>
                   </label>
@@ -292,13 +292,13 @@ const QuantificationPage = () => {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleExpandAll}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-t2 bg-well rounded-lg hover:bg-hv2 transition-colors"
                   >
                     Expand All
                   </button>
                   <button
                     onClick={handleCollapseAll}
-                    className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-t2 bg-well rounded-lg hover:bg-hv2 transition-colors"
                   >
                     Collapse All
                   </button>
@@ -313,9 +313,9 @@ const QuantificationPage = () => {
           <ScaleWarningBanner scaleStatus={data.scale_status} />
 
           {allFilteredOut && (
-            <div className="mb-6 flex items-start gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3">
-              <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
-              <p className="text-sm text-blue-800">
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-acLn bg-acS px-4 py-3">
+              <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-ac" />
+              <p className="text-sm text-ac">
                 This dataset has {totalCensus.toLocaleString()} annotated{" "}
                 {totalCensus === 1 ? "object" : "objects"}, but they are hidden because their
                 masks are not marked fully-annotated and/or the objects are unreviewed. Enable{" "}
@@ -339,8 +339,8 @@ const QuantificationPage = () => {
           />
 
           {/* Label Hierarchy and Metrics */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Label Hierarchy & Metrics</h2>
+          <div className="bg-p1 rounded-lg shadow-sm border border-ln p-6 mb-6">
+            <h2 className="text-lg font-semibold text-t1 mb-4">Label Hierarchy & Metrics</h2>
             {data.labels?.root_level_labels && data.labels.root_level_labels.length > 0 ? (
               <LabelTree
                 labels={data.labels.root_level_labels}
@@ -353,15 +353,15 @@ const QuantificationPage = () => {
                 onToggleLabel={handleToggleLabel}
               />
             ) : (
-              <div className="text-center py-8 text-gray-500">No labels found in this dataset.</div>
+              <div className="text-center py-8 text-t3">No labels found in this dataset.</div>
             )}
           </div>
 
           {/* Unlabeled Objects Metrics */}
           {unlabeledMetrics && Object.keys(unlabeledMetrics).length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Unlabeled Objects</h2>
-              <p className="text-sm text-gray-600 mb-4">
+            <div className="bg-p1 rounded-lg shadow-sm border border-ln p-6 mb-6">
+              <h2 className="text-lg font-semibold text-t1 mb-4">Unlabeled Objects</h2>
+              <p className="text-sm text-t2 mb-4">
                 Metrics for objects that do not have an assigned label.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

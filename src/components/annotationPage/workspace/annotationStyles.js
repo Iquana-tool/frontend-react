@@ -93,3 +93,19 @@ export const getCentroid = (object) => {
   }
   return { x: (sumX / n) * 100, y: (sumY / n) * 100 };
 };
+
+/** Bounding box of a normalized contour, as percentages of the image box. */
+export const getBoundingBox = (object) => {
+  if (!object?.x?.length) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < object.x.length; i += 1) {
+    if (object.x[i] < minX) minX = object.x[i];
+    if (object.x[i] > maxX) maxX = object.x[i];
+    if (object.y[i] < minY) minY = object.y[i];
+    if (object.y[i] > maxY) maxY = object.y[i];
+  }
+  return { minX: minX * 100, maxX: maxX * 100, minY: minY * 100, maxY: maxY * 100 };
+};

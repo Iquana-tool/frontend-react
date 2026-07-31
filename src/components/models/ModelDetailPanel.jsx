@@ -34,11 +34,11 @@ import {
 } from "./modelStats";
 
 const TASK_VISUAL = {
-  "prompted-segmentation": { Icon: MousePointerClick, tile: "from-sky-500 to-blue-500" },
-  "instance-suggestion": { Icon: Wand2, tile: "from-violet-500 to-purple-500" },
-  "instance-segmentation": { Icon: Boxes, tile: "from-amber-500 to-orange-500" },
+  "prompted-segmentation": { Icon: MousePointerClick, tile: "bg-acS text-ac" },
+  "instance-suggestion": { Icon: Wand2, tile: "bg-acS text-ac" },
+  "instance-segmentation": { Icon: Boxes, tile: "bg-warnBg text-warn" },
 };
-const DEFAULT_VISUAL = { Icon: Scan, tile: "from-teal-500 to-cyan-500" };
+const DEFAULT_VISUAL = { Icon: Scan, tile: "bg-acS text-ac" };
 
 const orderTasks = (tasks) =>
   [...(tasks || [])].sort((a, b) => TASK_ORDER.indexOf(a) - TASK_ORDER.indexOf(b));
@@ -47,12 +47,12 @@ const orderTasks = (tasks) =>
 const StatTile = ({ Icon, label, value, hint }) => {
   if (!value) return null;
   return (
-    <div className="rounded-xl border border-gray-200 bg-gray-50/70 px-3 py-2.5" title={hint}>
-      <div className="flex items-center gap-1.5 text-[11px] font-medium text-gray-500">
-        <Icon className="w-3.5 h-3.5 text-gray-400" />
+    <div className="rounded-xl border border-ln bg-well px-3 py-2.5" title={hint}>
+      <div className="flex items-center gap-1.5 text-[11px] font-medium text-t3">
+        <Icon className="w-3.5 h-3.5 text-t3" />
         {label}
       </div>
-      <div className="mt-1 text-lg font-semibold text-gray-900 tabular-nums leading-none">
+      <div className="mt-1 text-lg font-semibold text-t1 tabular-nums leading-none">
         {value}
       </div>
     </div>
@@ -61,17 +61,17 @@ const StatTile = ({ Icon, label, value, hint }) => {
 
 const SpecRow = ({ Icon, label, children }) =>
   children == null || children === "" ? null : (
-    <div className="flex items-start gap-3 py-2 border-b border-gray-100 last:border-0">
-      <div className="flex items-center gap-1.5 w-40 shrink-0 text-xs font-medium text-gray-500">
-        <Icon className="w-3.5 h-3.5 text-gray-400" />
+    <div className="flex items-start gap-3 py-2 border-b border-ln last:border-0">
+      <div className="flex items-center gap-1.5 w-40 shrink-0 text-xs font-medium text-t3">
+        <Icon className="w-3.5 h-3.5 text-t3" />
         {label}
       </div>
-      <div className="min-w-0 flex-1 text-sm text-gray-800">{children}</div>
+      <div className="min-w-0 flex-1 text-sm text-t1">{children}</div>
     </div>
   );
 
 const SectionTitle = ({ children }) => (
-  <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">{children}</h4>
+  <h4 className="text-xs font-semibold uppercase tracking-wide text-t3 mb-2">{children}</h4>
 );
 
 /**
@@ -83,8 +83,8 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
   if (!model) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-10">
-        <Scan className="w-14 h-14 text-gray-300 mb-4" />
-        <p className="text-gray-500">Select a model to see its details.</p>
+        <Scan className="w-14 h-14 text-t3 mb-4" />
+        <p className="text-t3">Select a model to see its details.</p>
       </div>
     );
   }
@@ -105,15 +105,15 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
   });
 
   const capabilities = [
-    model.pretrained && { label: "Pretrained", className: "bg-green-50 text-green-700" },
+    model.pretrained && { label: "Pretrained", className: "bg-okBg text-ok" },
     model.refinementSupported && {
       label: "Refinement",
-      className: "bg-teal-50 text-teal-700",
+      className: "bg-acS text-ac",
       Icon: RefreshCw,
     },
     showFinetuning && {
       label: "Fine-tune on dataset",
-      className: "bg-purple-50 text-purple-700",
+      className: "bg-acS text-ac",
       Icon: GraduationCap,
     },
   ].filter(Boolean);
@@ -150,16 +150,16 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
         {/* Header */}
         <div className="flex items-start gap-4">
           <div
-            className={`shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br ${tile} flex items-center justify-center shadow-sm`}
+            className={`shrink-0 w-14 h-14 rounded-2xl ${tile} flex items-center justify-center shadow-sm`}
           >
-            <Icon className="w-7 h-7 text-white" />
+            <Icon className="w-7 h-7" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-2xl font-bold text-gray-900 leading-tight">{model.name}</h2>
+                <h2 className="text-2xl font-bold text-t1 leading-tight">{model.name}</h2>
                 {model.identifier && (
-                  <p className="text-xs text-gray-400 font-mono truncate mt-1" title={model.identifier}>
+                  <p className="text-xs text-t3 font-mono truncate mt-1" title={model.identifier}>
                     {model.identifier}
                   </p>
                 )}
@@ -168,7 +168,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
                 {model.status && (
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      isReady ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                      isReady ? "bg-okBg text-ok" : "bg-warnBg text-warn"
                     }`}
                   >
                     {isReady ? (
@@ -189,11 +189,11 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
                       ? "Favorite — preselected in the annotation page"
                       : "Set as your default model for its tasks"
                   }
-                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-hv transition-colors"
                 >
                   <Star
                     className={
-                      isFavorite ? "fill-amber-400 text-amber-400" : "text-gray-300 hover:text-amber-400"
+                      isFavorite ? "fill-amber-400 text-warn" : "text-t3 hover:text-warn"
                     }
                     style={{ width: 20, height: 20 }}
                   />
@@ -218,7 +218,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
               {badges.map((badge, i) => (
                 <span
                   key={`badge-${i}`}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-[11px] font-medium"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-acS text-ac rounded-full text-[11px] font-medium"
                 >
                   <Sparkles className="w-3 h-3" />
                   {badge}
@@ -239,16 +239,16 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
 
         {/* Description */}
         {model.description && (
-          <p className="mt-5 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+          <p className="mt-5 text-sm text-t2 leading-relaxed whitespace-pre-wrap">
             {model.description}
           </p>
         )}
 
         {/* Usage tip */}
         {model.usageTip && (
-          <div className="mt-4 flex items-start gap-2 p-3 bg-amber-50/70 rounded-lg">
-            <Lightbulb className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-            <p className="text-sm text-amber-800 leading-relaxed">{model.usageTip}</p>
+          <div className="mt-4 flex items-start gap-2 p-3 bg-warnBg rounded-lg">
+            <Lightbulb className="w-4 h-4 text-warn mt-0.5 shrink-0" />
+            <p className="text-sm text-warn leading-relaxed">{model.usageTip}</p>
           </div>
         )}
 
@@ -261,7 +261,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
                 <StatTile key={s.label} {...s} />
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-gray-400">
+            <p className="mt-2 text-[11px] text-t3">
               Approximate figures{perfContext ? `, measured at ${perfContext}` : ""}. Actual speed
               varies with hardware and input size.
             </p>
@@ -272,7 +272,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
         {hasSpecTable && (
           <div className="mt-6">
             <SectionTitle>Specifications</SectionTitle>
-            <div className="rounded-xl border border-gray-200 px-4 py-1">
+            <div className="rounded-xl border border-ln px-4 py-1">
               <SpecRow Icon={Layers} label="Architecture">
                 {model.architecture}
               </SpecRow>
@@ -288,7 +288,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
                     {promptTypes.map((pt, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded-full text-[11px] font-medium capitalize"
+                        className="inline-flex items-center px-2 py-0.5 bg-acS text-ac rounded-full text-[11px] font-medium capitalize"
                       >
                         {String(pt).replace(/_/g, " ")}
                       </span>
@@ -310,9 +310,9 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
                     {tags.map((tag, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full text-[11px]"
+                        className="inline-flex items-center px-2 py-0.5 bg-well text-t2 rounded-full text-[11px]"
                       >
-                        {tag.key && <span className="text-gray-400 mr-1">{tag.key}</span>}
+                        {tag.key && <span className="text-t3 mr-1">{tag.key}</span>}
                         <span className="font-medium">{tag.value}</span>
                       </span>
                     ))}
@@ -330,7 +330,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
               href={model.infoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-teal-600 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-t3 hover:text-ac transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
               Learn more
@@ -339,7 +339,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
           {showFinetuning && (
             <button
               onClick={() => onAction?.(model, "finetuning")}
-              className="ml-auto inline-flex items-center gap-1.5 py-2 px-4 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+              className="ml-auto inline-flex items-center gap-1.5 py-2 px-4 rounded-lg text-sm font-medium bg-accent text-onAccent hover:brightness-110 transition-colors"
               title="Fine-tune this model on a dataset"
             >
               <Wrench className="w-4 h-4" />

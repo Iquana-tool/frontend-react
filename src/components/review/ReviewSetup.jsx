@@ -94,12 +94,12 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-4xl mx-auto p-6 sm:p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-1">Start a review session</h2>
-        <p className="text-gray-600 mb-2">
+        <h2 className="text-2xl font-bold text-t1 mb-1">Start a review session</h2>
+        <p className="text-t2 mb-2">
           Choose how to work through the annotations awaiting review.
         </p>
         {pending != null && (
-          <p className="text-sm font-medium text-teal-700 mb-6">
+          <p className="text-sm font-medium text-ac mb-6">
             {pending === 0
               ? reviewedCount > 0
                 ? `No unreviewed instances — but ${reviewedCount} already-reviewed instance${
@@ -126,37 +126,37 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
                 onClick={() => setMode(key)}
                 className={`text-left rounded-xl border-2 p-4 transition-all ${
                   active
-                    ? 'border-teal-500 bg-teal-50 shadow-sm'
-                    : 'border-gray-200 bg-white hover:border-teal-300'
+                    ? 'border-acLn bg-acS shadow-sm'
+                    : 'border-ln bg-p1 hover:border-acLn'
                 }`}
               >
-                <Icon className={`w-6 h-6 mb-2 ${active ? 'text-teal-600' : 'text-gray-400'}`} />
-                <div className="font-semibold text-gray-900 mb-1">{title}</div>
-                <div className="text-sm text-gray-600 leading-snug">{description}</div>
+                <Icon className={`w-6 h-6 mb-2 ${active ? 'text-ac' : 'text-t3'}`} />
+                <div className="font-semibold text-t1 mb-1">{title}</div>
+                <div className="text-sm text-t2 leading-snug">{description}</div>
               </button>
             );
           })}
         </div>
 
         {/* Second opinions: re-open work that other reviewers already approved. */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+        <div className="bg-p1 rounded-xl border border-ln p-4 mb-6">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
               checked={includeReviewed}
               onChange={(e) => setIncludeReviewed(e.target.checked)}
-              className="mt-0.5 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="mt-0.5 rounded border-ln2 text-ac focus:ring-ac"
             />
             <span>
-              <span className="block text-sm font-semibold text-gray-700">
+              <span className="block text-sm font-semibold text-t2">
                 Include already-reviewed instances
                 {reviewedCount > 0 && (
-                  <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 text-xs font-medium">
+                  <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-acS text-ac text-xs font-medium">
                     +{reviewedCount}
                   </span>
                 )}
               </span>
-              <span className="block text-sm text-gray-600">
+              <span className="block text-sm text-t2">
                 Re-review approved work, your own approvals included. Accepting
                 again confirms an approval; sending an instance back withdraws
                 your earlier approval of it.
@@ -167,14 +167,14 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
 
         {/* Ordering — only meaningful when the queue is instance-by-instance. */}
         {isInstanceMode && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-            <div className="text-sm font-semibold text-gray-700 mb-3">Queue order</div>
+          <div className="bg-p1 rounded-xl border border-ln p-4 mb-6">
+            <div className="text-sm font-semibold text-t2 mb-3">Queue order</div>
             <div className="flex flex-wrap items-center gap-3">
               {strategies.length > 1 && (
                 <select
                   value={strategy}
                   onChange={(e) => setStrategy(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="border border-ln2 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ac focus:border-ac"
                 >
                   {strategies.map((option) => (
                     <option key={option.key} value={option.key}>
@@ -183,13 +183,13 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
                   ))}
                 </select>
               )}
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+              <div className="flex rounded-lg border border-ln2 overflow-hidden">
                 <button
                   onClick={() => setDirection('asc')}
                   className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
                     direction === 'asc'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'bg-accent text-onAccent'
+                      : 'bg-p1 text-t2 hover:bg-hv'
                   }`}
                 >
                   <ArrowUpNarrowWide className="w-4 h-4" />
@@ -199,15 +199,15 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
                   onClick={() => setDirection('desc')}
                   className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
                     direction === 'desc'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-50'
+                      ? 'bg-accent text-onAccent'
+                      : 'bg-p1 text-t2 hover:bg-hv'
                   }`}
                 >
                   <ArrowDownWideNarrow className="w-4 h-4" />
                   Descending
                 </button>
               </div>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-t3">
                 {strategies.find((option) => option.key === strategy)?.description ||
                   'Root instances first, then their children.'}
               </span>
@@ -217,31 +217,31 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
 
         {/* Label filter for the custom mode. */}
         {mode === 'custom' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-            <div className="text-sm font-semibold text-gray-700 mb-3">
+          <div className="bg-p1 rounded-xl border border-ln p-4 mb-6">
+            <div className="text-sm font-semibold text-t2 mb-3">
               Labels to review ({selectedLabelIds.length} selected)
             </div>
             {indentedLabels.length === 0 ? (
-              <p className="text-sm text-gray-500">This dataset has no labels yet.</p>
+              <p className="text-sm text-t3">This dataset has no labels yet.</p>
             ) : (
               <div className="max-h-64 overflow-y-auto space-y-1">
                 {indentedLabels.map((label) => (
                   <label
                     key={label.id}
-                    className="flex items-center gap-2 py-1 px-2 rounded hover:bg-gray-50 cursor-pointer"
+                    className="flex items-center gap-2 py-1 px-2 rounded hover:bg-hv cursor-pointer"
                     style={{ paddingLeft: `${8 + label.depth * 20}px` }}
                   >
                     <input
                       type="checkbox"
                       checked={selectedLabelIds.includes(label.id)}
                       onChange={() => toggleLabel(label.id)}
-                      className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      className="rounded border-ln2 text-ac focus:ring-ac"
                     />
                     <span
-                      className="w-3 h-3 rounded-full border border-black/10 flex-shrink-0"
+                      className="w-3 h-3 rounded-full border border-ln flex-shrink-0"
                       style={{ backgroundColor: getLabelColor(label.id) }}
                     />
-                    <span className="text-sm text-gray-800">{label.name}</span>
+                    <span className="text-sm text-t1">{label.name}</span>
                   </label>
                 ))}
               </div>
@@ -254,8 +254,8 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
           disabled={!canStart}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-colors ${
             canStart
-              ? 'bg-teal-600 text-white hover:bg-teal-700'
-              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              ? 'bg-accent text-onAccent hover:brightness-110'
+              : 'bg-hv2 text-t3 cursor-not-allowed'
           }`}
         >
           {building ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}

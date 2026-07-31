@@ -27,19 +27,19 @@ const ReviewPolicyPanel = ({ access, dataset }) => {
 
   return (
     <div className="space-y-4">
-      <label className="flex items-start gap-3 p-4 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+      <label className="flex items-start gap-3 p-4 border border-ln rounded-lg cursor-pointer hover:bg-hv transition-colors">
         <input
           type="checkbox"
           checked={enabled}
           onChange={handleToggle}
           disabled={busy === 'settings'}
-          className="mt-1 w-4 h-4 text-teal-600 rounded focus:ring-teal-500"
+          className="mt-1 w-4 h-4 text-ac rounded focus:ring-ac"
         />
         <span>
-          <span className="block font-medium text-gray-900">
+          <span className="block font-medium text-t1">
             Require independent review
           </span>
-          <span className="block text-sm text-gray-600 mt-1">
+          <span className="block text-sm text-t2 mt-1">
             An annotation cannot be approved by the person who created it, so
             &quot;finished&quot; means someone else actually checked it. Leave this off if
             you annotate and review this dataset on your own — otherwise you will never

@@ -283,24 +283,24 @@ const ManagementCardsView = ({
   })).filter((group) => group.cards.length > 0);
 
   return (
-    <div className="overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 p-4 sm:p-5 lg:p-6 h-full">
+    <div className="overflow-y-auto bg-app p-4 sm:p-5 lg:p-6 h-full">
       <div className="w-full mx-auto">
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-1 sm:mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">Dataset Management</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-t1">Dataset Management</h2>
             {role && <RoleBadge role={role} showDescription />}
           </div>
-          <p className="text-sm sm:text-base text-gray-600">Manage your dataset, models, and annotations</p>
+          <p className="text-sm sm:text-base text-t2">Manage your dataset, models, and annotations</p>
         </div>
 
         <div className="space-y-8 sm:space-y-10">
           {groupsInOrder.map((group) => (
             <section key={group.id}>
               <div className="flex items-center gap-4 mb-4 sm:mb-5">
-                <h3 className="text-base sm:text-lg font-semibold text-gray-700 whitespace-nowrap">
+                <h3 className="text-base sm:text-lg font-semibold text-t2 whitespace-nowrap">
                   {group.title}
                 </h3>
-                <div className="flex-1 h-px bg-gray-200" />
+                <div className="flex-1 h-px bg-hv2" />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
                 {group.cards.map((card) => (

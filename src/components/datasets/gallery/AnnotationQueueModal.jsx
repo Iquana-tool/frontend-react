@@ -124,25 +124,25 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 py-6">
-        <div className="fixed inset-0 bg-gray-500/75 transition-opacity" onClick={onClose} />
+        <div className="fixed inset-0 bg-scrim transition-opacity" onClick={onClose} />
 
-        <div className="relative inline-block w-full max-w-lg text-left align-middle bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="relative inline-block w-full max-w-lg text-left align-middle bg-p1 rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="relative bg-gradient-to-r from-teal-500 to-teal-600 px-6 py-5 text-white">
+          <div className="relative bg-p2 border-b border-ln px-6 py-5 text-t1">
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+              className="absolute top-4 right-4 p-1 rounded-lg text-t3 hover:text-t1 hover:bg-hv2 transition-colors"
               title="Close"
             >
               <X size={20} />
             </button>
             <div className="flex items-center gap-3 pr-8">
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white/20 shrink-0">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-hv shrink-0">
                 <SquarePen className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">Annotate images</h3>
-                <p className="text-sm text-white/90 mt-0.5">
+                <p className="text-sm text-t3 mt-0.5">
                   Choose the order to work through{" "}
                   {dataset?.name ? `“${dataset.name}”` : "this dataset"}.
                 </p>
@@ -153,30 +153,30 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
           {/* Body */}
           <div className="px-6 py-5 space-y-4 min-h-[8rem]">
             {loading ? (
-              <div className="flex items-center justify-center py-8 text-gray-500">
+              <div className="flex items-center justify-center py-8 text-t3">
                 <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Loading…
               </div>
             ) : noImages ? (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <div className="p-4 bg-warnBg border border-warnLn rounded-lg text-sm text-warn">
                 This dataset has no images yet. Upload some from Data Management first.
               </div>
             ) : (
               <>
                 {/* Resume state: offer to pick up the saved order, with a way to rebuild. */}
                 {hasSavedQueue && !recomputing && (
-                  <div className="rounded-xl border border-teal-200 bg-teal-50 p-4">
-                    <div className="text-sm font-semibold text-gray-800">
+                  <div className="rounded-xl border border-acLn bg-acS p-4">
+                    <div className="text-sm font-semibold text-t1">
                       Resume your saved queue
                     </div>
-                    <div className="text-sm text-gray-600 mt-0.5">
+                    <div className="text-sm text-t2 mt-0.5">
                       Ordered <span className="font-medium">{savedStrategyLabel}</span>. You’ll
                       start at the first unfinished image.
                     </div>
                     <button
                       type="button"
                       onClick={() => setRecomputing(true)}
-                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-teal-700 hover:text-teal-800"
+                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-ac hover:text-ac"
                     >
                       <RotateCcw className="w-4 h-4" />
                       Change or recompute order
@@ -188,7 +188,7 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
                 {showChooser && (
                   <div className="space-y-2">
                     {hasSavedQueue && (
-                      <div className="text-sm font-semibold text-gray-700">Pick a new order</div>
+                      <div className="text-sm font-semibold text-t2">Pick a new order</div>
                     )}
                     {strategies.map((option) => {
                       const Icon = STRATEGY_ICONS[option.key] || ArrowDownUp;
@@ -202,27 +202,27 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
                           onClick={() => setStrategy(option.key)}
                           className={`w-full text-left rounded-xl border-2 p-3 transition-all flex items-start gap-3 ${
                             disabled
-                              ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-70"
+                              ? "border-ln bg-well cursor-not-allowed opacity-70"
                               : active
-                                ? "border-teal-500 bg-teal-50 shadow-sm"
-                                : "border-gray-200 bg-white hover:border-teal-300"
+                                ? "border-acLn bg-acS shadow-sm"
+                                : "border-ln bg-p1 hover:border-acLn"
                           }`}
                         >
                           <Icon
                             className={`w-5 h-5 mt-0.5 shrink-0 ${
-                              active && !disabled ? "text-teal-600" : "text-gray-400"
+                              active && !disabled ? "text-ac" : "text-t3"
                             }`}
                           />
                           <span className="flex-1">
                             <span className="flex items-center gap-2">
-                              <span className="font-semibold text-gray-900">{option.label}</span>
+                              <span className="font-semibold text-t1">{option.label}</span>
                               {disabled && (
-                                <span className="inline-block px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 text-[11px] font-medium">
+                                <span className="inline-block px-1.5 py-0.5 rounded bg-hv2 text-t2 text-[11px] font-medium">
                                   Coming soon
                                 </span>
                               )}
                             </span>
-                            <span className="block text-sm text-gray-600 leading-snug">
+                            <span className="block text-sm text-t2 leading-snug">
                               {option.description}
                             </span>
                           </span>
@@ -233,7 +233,7 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
                 )}
 
                 {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <div className="p-3 bg-errBg border border-errLn rounded-lg text-sm text-err">
                     {error}
                   </div>
                 )}
@@ -242,11 +242,11 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex justify-end gap-3 px-6 py-4 bg-well border-t border-ln">
             <button
               onClick={onClose}
               disabled={busy}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-t2 bg-p1 border border-ln2 rounded-lg hover:bg-hv transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -254,7 +254,7 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
               <button
                 onClick={handleResume}
                 disabled={busy}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-60"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-60"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                 Resume
@@ -263,7 +263,7 @@ const AnnotationQueueModal = ({ isOpen, onClose, dataset, onStart }) => {
               <button
                 onClick={handleBuild}
                 disabled={busy || loading || noImages || !strategy}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                 {busy ? "Building…" : "Build queue & start"}

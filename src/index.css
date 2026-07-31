@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The page surface. Individual pages layer panels (bg-p1/bg-p2) on top of this
+   rather than setting their own background. */
+body {
+  @apply bg-app text-t1;
+}
+
 /* Hide broken image icons */
 img:not([src]), img[src=""] {
   visibility: hidden;
@@ -25,29 +31,31 @@ img:not([src]), img[src=""] {
 
 /* Modern card hover effects */
 .hover-card-rise {
-  @apply transition-all duration-300 ease-out transform hover:-translate-y-1 hover:shadow-md;
+  @apply transition-all duration-150 ease-out transform hover:-translate-y-0.5 hover:shadow-bar;
 }
 
-/* Input focus states */
-input:focus, select:focus {
-  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+/* Input focus states. Solid accent, not the translucent acLn border token —
+   a focus indicator needs to clear 3:1 contrast (WCAG 1.4.11), which a
+   low-alpha line cannot guarantee against every surface it lands on. */
+input:focus, select:focus, textarea:focus {
+  @apply outline-none ring-2 ring-ac;
 }
 
 /* Modern button styles */
 .btn {
-  @apply px-4 py-2 rounded-md font-medium transition-all duration-200 transform;
+  @apply px-4 py-2 rounded-6 font-medium transition-colors duration-150;
 }
 
 .btn-primary {
-  @apply bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 hover:shadow-md;
+  @apply bg-accent text-onAccent hover:brightness-110 active:brightness-95;
 }
 
 .btn-secondary {
-  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 active:bg-gray-400;
+  @apply bg-well text-t1 border border-ln hover:bg-hv active:bg-hv2;
 }
 
 .btn-danger {
-  @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  @apply bg-err text-onAccent hover:brightness-110 active:brightness-95;
 }
 
 .btn-sm {
@@ -60,12 +68,12 @@ input:focus, select:focus {
 
 /* App-specific custom styles */
 .dropzone {
-  @apply p-8 border-2 border-dashed border-gray-300 rounded-lg text-center cursor-pointer transition-colors;
+  @apply p-8 border-2 border-dashed border-ln2 rounded-8 text-center cursor-pointer transition-colors;
 }
 
 /* Glass morphism effect for cards */
 .glass-card {
-  @apply backdrop-blur-sm bg-white/80 border border-white/20 shadow-lg;
+  @apply backdrop-blur-sm bg-glass border border-ln shadow-bar;
 }
 
 /* Gradient animations */
@@ -86,11 +94,12 @@ input:focus, select:focus {
   animation: gradient 8s ease infinite;
 }
 
-/* Toast notification animations */
+/* Toast notification animations. Timed to match the workspace's dcPop/dcFade
+   scale so panels and toasts settle at the same rate. */
 @keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -99,13 +108,13 @@ input:focus, select:focus {
 }
 
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out forwards;
+  animation: slide-up 0.18s ease-out forwards;
 }
 
 @keyframes fade-in {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.95);
+    transform: translate(-50%, -50%) scale(0.98);
   }
   100% {
     opacity: 1;
@@ -114,7 +123,7 @@ input:focus, select:focus {
 }
 
 .animate-fade-in {
-  animation: fade-in 0.3s ease-out forwards;
+  animation: fade-in 0.14s ease-out forwards;
 }
 
 /* Modern card skeleton loading animation */
@@ -183,20 +192,20 @@ input:focus, select:focus {
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  @apply bg-gray-100 rounded-lg;
+  background: transparent;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-lg;
+  @apply bg-ln2 rounded-6;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  @apply bg-t3;
 }
 
 /* Image grid hover effects */
 .image-grid-item {
-  @apply transition-all duration-300 ease-out overflow-hidden;
+  @apply transition-all duration-150 ease-out overflow-hidden;
 }
 
 .image-grid-item:hover img {
@@ -204,5 +213,5 @@ input:focus, select:focus {
 }
 
 .image-grid-item img {
-  @apply transition-transform duration-500 ease-out;
+  @apply transition-transform duration-300 ease-out;
 }

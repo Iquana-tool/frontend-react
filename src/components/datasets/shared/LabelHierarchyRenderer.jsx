@@ -37,7 +37,7 @@ const LabelHierarchyRenderer = ({
 
     // Default label input rendering
     const renderInput = renderLabelInput || ((label, depth) => (
-      <span className="font-medium text-gray-900">{label.name}</span>
+      <span className="font-medium text-t1">{label.name}</span>
     ));
 
     // Default actions rendering
@@ -46,7 +46,7 @@ const LabelHierarchyRenderer = ({
         {onAddLabel && (
           <button
             onClick={() => onAddLabel(label)}
-            className="p-1 text-teal-600 hover:bg-teal-100 rounded"
+            className="p-1 text-ac hover:bg-acS rounded"
             title="Add sublabel"
           >
             <Plus size={14} />
@@ -55,7 +55,7 @@ const LabelHierarchyRenderer = ({
         {onEditLabel && (
           <button
             onClick={() => onEditLabel(label)}
-            className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+            className="p-1 text-ac hover:bg-acS rounded"
             title="Edit label"
           >
             <Edit2 size={14} />
@@ -64,7 +64,7 @@ const LabelHierarchyRenderer = ({
         {onDeleteLabel && (
           <button
             onClick={() => onDeleteLabel(label)}
-            className="p-1 text-red-600 hover:bg-red-100 rounded"
+            className="p-1 text-err hover:bg-errBg rounded"
             title="Delete label"
           >
             {isCreation ? <X size={14} /> : <Trash2 size={14} />}
@@ -78,12 +78,12 @@ const LabelHierarchyRenderer = ({
     if (!isCreation) {
       return (
         <div key={label.id}>
-          <div className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-gray-50 transition-colors">
+          <div className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-hv transition-colors">
             {/* Expand/Collapse Button (or aligning spacer) */}
             {hasChildLabels && onToggleExpanded ? (
               <button
                 onClick={() => onToggleExpanded(label.id)}
-                className="p-0.5 text-gray-400 hover:text-gray-700 rounded shrink-0"
+                className="p-0.5 text-t3 hover:text-t1 rounded shrink-0"
                 title={isExpanded ? 'Collapse' : 'Expand'}
               >
                 {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -94,7 +94,7 @@ const LabelHierarchyRenderer = ({
 
             {/* Color Dot */}
             <div
-              className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-white shadow-sm"
+              className="w-3.5 h-3.5 rounded-full shrink-0 ring-2 ring-p1 shadow-sm"
               style={{ backgroundColor: getColor(label) }}
             />
 
@@ -105,7 +105,7 @@ const LabelHierarchyRenderer = ({
 
             {/* Sublabel Count Badge */}
             {hasChildLabels && (
-              <span className="shrink-0 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              <span className="shrink-0 text-xs text-t3 bg-well px-2 py-0.5 rounded-full">
                 {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
               </span>
             )}
@@ -122,7 +122,7 @@ const LabelHierarchyRenderer = ({
 
           {/* Children — indented with a vertical connector line */}
           {hasChildLabels && isExpanded && label.children && (
-            <div className="ml-[15px] pl-3 border-l border-gray-200">
+            <div className="ml-[15px] pl-3 border-l border-ln">
               <LabelHierarchyRenderer
                 labels={label.children}
                 expandedLabels={expandedLabels}
@@ -149,7 +149,7 @@ const LabelHierarchyRenderer = ({
           className={
             mode === 'creation'
               ? 'border rounded-lg'
-              : 'border border-gray-200 rounded-lg p-3 bg-white'
+              : 'border border-ln rounded-lg p-3 bg-p1'
           }
           style={mode === 'creation' ? {} : { marginLeft: `${marginLeft}px` }}
         >
@@ -159,7 +159,7 @@ const LabelHierarchyRenderer = ({
               {hasChildLabels && onToggleExpanded && (
                 <button
                   onClick={() => onToggleExpanded(label.id)}
-                  className={`p-1 mr-2 ${mode === 'creation' ? 'text-gray-500 hover:text-gray-700' : 'text-gray-600 hover:bg-gray-100 rounded'}`}
+                  className={`p-1 mr-2 ${mode === 'creation' ? 'text-t3 hover:text-t1' : 'text-t2 hover:bg-hv rounded'}`}
                   title={isExpanded ? 'Collapse' : 'Expand'}
                 >
                   {isExpanded ? (
@@ -184,7 +184,7 @@ const LabelHierarchyRenderer = ({
 
               {/* Sublabel Count Badge */}
               {hasChildLabels && (
-                <span className={`ml-2 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full ${mode === 'creation' ? 'mr-2' : ''}`}>
+                <span className={`ml-2 text-xs text-ac bg-acS px-2 py-1 rounded-full ${mode === 'creation' ? 'mr-2' : ''}`}>
                   {label.children.length} sublabel{label.children.length !== 1 ? 's' : ''}
                 </span>
               )}
@@ -200,7 +200,7 @@ const LabelHierarchyRenderer = ({
 
           {/* Children Labels */}
           {hasChildLabels && isExpanded && label.children && (
-            <div className={mode === 'creation' ? 'border-t bg-gray-50 p-3' : 'mt-2'}>
+            <div className={mode === 'creation' ? 'border-t bg-well p-3' : 'mt-2'}>
               <LabelHierarchyRenderer
                 labels={label.children}
                 expandedLabels={expandedLabels}

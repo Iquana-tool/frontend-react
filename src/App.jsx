@@ -5,6 +5,7 @@ import { DatasetProvider } from "./contexts/DatasetContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import useDocumentTheme from "./hooks/useDocumentTheme";
 import Login from "./components/auth/Login";
 import LandingPage from "./pages/LandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
@@ -22,6 +23,8 @@ import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
 
 function App() {
+  useDocumentTheme();
+
   return (
     <AuthProvider>
       <ToastProvider>

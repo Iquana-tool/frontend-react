@@ -84,7 +84,7 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
   }, [galleryActions, resetLoadedImages]);
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-p1">
       <GalleryHeader
         imageCount={filteredImages.length}
         totalCount={images.length}
@@ -100,21 +100,21 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 lg:p-4">
         {images.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
-            <ImageIcon className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+            <ImageIcon className="w-10 h-10 sm:w-12 sm:h-12 text-t3 mx-auto mb-3 sm:mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold text-t1 mb-1 sm:mb-2">
               No images found
             </h3>
-            <p className="text-sm sm:text-base text-gray-600">
+            <p className="text-sm sm:text-base text-t2">
               This dataset doesn't contain any images yet.
             </p>
           </div>
         ) : filteredImages.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
-            <Search className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+            <Search className="w-10 h-10 sm:w-12 sm:h-12 text-t3 mx-auto mb-3 sm:mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold text-t1 mb-1 sm:mb-2">
               No results found
             </h3>
-            <p className="text-sm sm:text-base text-gray-600">
+            <p className="text-sm sm:text-base text-t2">
               Try adjusting your search or filter criteria.
             </p>
           </div>

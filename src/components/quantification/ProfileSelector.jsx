@@ -138,11 +138,11 @@ const ProfileSelector = ({
 
   return (
     <div className="flex items-center space-x-3">
-      <label className="text-sm font-medium text-gray-700">Profile</label>
+      <label className="text-sm font-medium text-t2">Profile</label>
       <select
         value={activeProfileId ?? ""}
         onChange={(e) => onSelect(Number(e.target.value))}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+        className="px-3 py-1.5 text-sm border border-ln2 rounded-lg bg-p1 focus:outline-none focus:ring-2 focus:ring-ac"
       >
         {profiles.map((p) => (
           <option key={p.id} value={p.id}>
@@ -154,49 +154,49 @@ const ProfileSelector = ({
       <button
         onClick={() => openEditor(activeProfile)}
         disabled={!activeProfile}
-        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-t2 bg-well rounded-lg hover:bg-hv2 transition-colors disabled:opacity-50"
       >
         <Settings className="w-4 h-4" />
         <span>Edit</span>
       </button>
       <button
         onClick={() => openEditor(null)}
-        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-teal-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
+        className="flex items-center space-x-1 px-3 py-1.5 text-sm font-medium text-ac bg-acS rounded-lg hover:bg-acS transition-colors"
       >
         <Plus className="w-4 h-4" />
         <span>New</span>
       </button>
 
       {editorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-              <h3 className="text-lg font-semibold text-gray-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4">
+          <div className="bg-p1 rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-ln sticky top-0 bg-p1">
+              <h3 className="text-lg font-semibold text-t1">
                 {editingProfile ? "Edit profile" : "New profile"}
               </h3>
-              <button onClick={() => setEditorOpen(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-5 h-5 text-gray-500" />
+              <button onClick={() => setEditorOpen(false)} className="p-1 hover:bg-hv rounded">
+                <X className="w-5 h-5 text-t3" />
               </button>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               {errorMsg && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <div className="text-sm text-err bg-errBg border border-errLn rounded-lg px-3 py-2">
                   {errorMsg}
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                <label className="block text-sm font-medium text-t2 mb-1">Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:outline-none focus:ring-2 focus:ring-ac"
                 />
               </div>
 
-              <label className="flex items-center space-x-2 text-sm text-gray-700">
+              <label className="flex items-center space-x-2 text-sm text-t2">
                 <input
                   type="checkbox"
                   checked={isDefault}
@@ -206,21 +206,21 @@ const ProfileSelector = ({
               </label>
 
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Metrics</h4>
+                <h4 className="text-sm font-semibold text-t2 mb-2">Metrics</h4>
                 <div className="space-y-2">
                   {catalog.map((metric) => {
                     const selected = !!selectedMetrics[metric.key];
                     const cfg = selectedMetrics[metric.key];
                     return (
-                      <div key={metric.key} className="border border-gray-200 rounded-lg p-3">
+                      <div key={metric.key} className="border border-ln rounded-lg p-3">
                         <label className="flex items-center space-x-2 text-sm">
                           <input
                             type="checkbox"
                             checked={selected}
                             onChange={() => toggleMetric(metric.key)}
                           />
-                          <span className="font-medium text-gray-800">{metric.name}</span>
-                          <span className="text-xs text-gray-400">
+                          <span className="font-medium text-t1">{metric.name}</span>
+                          <span className="text-xs text-t3">
                             {metric.tier} · {metric.unit_kind}
                           </span>
                         </label>
@@ -255,8 +255,8 @@ const ProfileSelector = ({
                                     onClick={() => toggleMetricLabel(metric.key, l.id)}
                                     className={`px-2 py-0.5 text-xs rounded-full border ${
                                       cfg.label_ids.includes(l.id)
-                                        ? "bg-teal-500 text-white border-teal-500"
-                                        : "bg-white text-gray-600 border-gray-300"
+                                        ? "bg-accent text-onAccent border-acLn"
+                                        : "bg-p1 text-t2 border-ln2"
                                     }`}
                                   >
                                     {l.name}
@@ -273,12 +273,12 @@ const ProfileSelector = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-ln sticky bottom-0 bg-p1">
               {editingProfile ? (
                 <button
                   onClick={handleDelete}
                   disabled={saving}
-                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-err hover:bg-errBg rounded-lg transition-colors disabled:opacity-50"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete</span>
@@ -289,14 +289,14 @@ const ProfileSelector = ({
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setEditorOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-t2 bg-well rounded-lg hover:bg-hv2 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={saving || !name.trim()}
-                  className="px-4 py-2 text-sm font-medium text-white bg-teal-500 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-50"
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>

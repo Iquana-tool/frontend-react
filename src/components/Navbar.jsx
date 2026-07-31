@@ -4,6 +4,16 @@ import { Database, BookOpen, User, Brain } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "./auth/AuthButtons";
 import ReportBugLink from "./ui/ReportBugLink";
+import ThemeToggle from "./ui/ThemeToggle";
+
+// Nav items are uniform, so the active/idle treatment lives in one place rather
+// than being repeated per button.
+const navItemClass = (active) =>
+  [
+    "flex items-center gap-[7px] px-[11px] h-[30px] rounded-6 text-btn font-medium",
+    "transition-colors duration-150",
+    active ? "text-ac bg-acS" : "text-t2 hover:text-t1 hover:bg-hv",
+  ].join(" ");
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -15,34 +25,34 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-glass backdrop-blur-md border-b border-ln">
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div 
-            className="flex items-center space-x-2 cursor-pointer"
+          <div
+            className="flex items-center gap-[8px] cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <div className="w-8 h-8 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-lg flex items-center justify-center">
-              <Database className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 bg-accent rounded-7 flex items-center justify-center">
+              <Database className="w-[18px] h-[18px] text-onAccent" />
             </div>
-            <span 
-              className="text-xl font-bold text-gray-900 cursor-pointer hover:text-teal-600 transition-colors duration-200"
+            <span
+              className="text-xl font-semibold tracking-tight text-t1 cursor-pointer transition-colors duration-150 hover:text-ac"
               onClick={(e) => {
                 e.stopPropagation();
                 navigate('/');
               }}
             >
-              I<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Quana</span>
+              I<span className="text-ac">Quana</span>
             </span>
           </div>
 
           {/* Navigation Links */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-[4px]">
             {/* Username Display */}
             {isAuthenticated && user && (
-              <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-600">
-                <User className="w-4 h-4" />
+              <div className="flex items-center gap-[6px] px-[10px] text-btn text-t3">
+                <User className="w-[14px] h-[14px]" />
                 <span className="font-medium">{user.username}</span>
               </div>
             )}
@@ -50,54 +60,44 @@ const Navbar = () => {
             {isAuthenticated && (
               <button
                 onClick={() => navigate('/datasets')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                  isActive('/datasets') 
-                    ? 'text-teal-600 bg-teal-50' 
-                    : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
-                }`}
+                className={navItemClass(isActive('/datasets'))}
               >
-                <Database className="w-4 h-4" />
+                <Database className="w-[14px] h-[14px]" />
                 <span>Datasets</span>
               </button>
             )}
 
             <button
               onClick={() => navigate('/models')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                isActive('/models') 
-                  ? 'text-teal-600 bg-teal-50' 
-                  : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
-              }`}
+              className={navItemClass(isActive('/models'))}
             >
-              <Brain className="w-4 h-4" />
+              <Brain className="w-[14px] h-[14px]" />
               <span>Models</span>
             </button>
-            
+
             <button
               onClick={() => navigate('/docs')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
-                isActive('/docs') 
-                  ? 'text-teal-600 bg-teal-50' 
-                  : 'text-gray-600 hover:text-teal-600 hover:bg-gray-50'
-              }`}
+              className={navItemClass(isActive('/docs'))}
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-[14px] h-[14px]" />
               <span>Documentation</span>
             </button>
 
-            <ReportBugLink 
-              className="flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-teal-600 hover:bg-gray-50 transition-all duration-200"
-              textColor="text-gray-600"
-              bgColor="hover:bg-gray-50"
+            <ReportBugLink
+              className={navItemClass(false)}
+              textColor="text-t2"
+              bgColor="hover:bg-hv"
             />
 
+            <ThemeToggle />
+
             {/* Auth Section */}
-            <div className="flex items-center space-x-2 ml-4 pl-4 border-l border-gray-200">
-              <AuthButtons 
-                textColor="text-gray-600"
-                buttonClass={isAuthenticated 
-                  ? "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-all duration-200"
-                  : "flex items-center space-x-2 px-4 py-2 rounded-lg font-medium text-white bg-teal-600 hover:bg-teal-700 transition-all duration-200"
+            <div className="flex items-center gap-[8px] ml-[8px] pl-[12px] border-l border-ln">
+              <AuthButtons
+                textColor="text-t2"
+                buttonClass={isAuthenticated
+                  ? "flex items-center gap-[7px] px-[11px] h-[30px] rounded-6 text-btn font-medium text-t2 hover:text-err hover:bg-errBg transition-colors duration-150"
+                  : "flex items-center gap-[7px] px-[11px] h-[30px] rounded-6 text-btn font-medium text-onAccent bg-accent hover:brightness-110 transition-all duration-150"
                 }
                 showLogoutOnly={true}
               />
@@ -109,4 +109,4 @@ const Navbar = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;

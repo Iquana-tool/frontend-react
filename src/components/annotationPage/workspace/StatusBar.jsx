@@ -47,7 +47,7 @@ const StatusBar = () => {
         type="button"
         onClick={() => setRailTool('scale')}
         title="Draw a line on the image to set the physical scale"
-        className="hover:text-t1 transition-colors"
+        className="hover:text-ac transition-colors duration-150"
       >
         {calibrated ? `1px = ${scale.scaleX.toFixed(4)} ${scale.unit}` : 'uncalibrated'}
       </button>
@@ -61,7 +61,7 @@ const StatusBar = () => {
       <span className="flex-1" />
 
       {!filmstripOpen && (
-        <button type="button" onClick={toggleFilmstrip} className="hover:text-t1 transition-colors">
+        <button type="button" onClick={toggleFilmstrip} className="hover:text-ac transition-colors duration-150">
           show navigator
         </button>
       )}

@@ -219,23 +219,30 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
     if (!dragStart) return;
 
-    // Box preview only matters in box mode
-    if (promptMode !== 'box') return;
+    // Box gestures are available in box mode and, as a shortcut, in point mode:
+    // a click drops a point, a drag draws a box without switching tools.
+    if (promptMode !== 'box' && promptMode !== 'point') return;
 
     const stage = e.target.getStage();
     const pointerPosition = stage.getPointerPosition();
     const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
     if (!coords) return;
 
-    if (!isDragging) {
+    let dragging = isDragging;
+    if (!dragging) {
       const distance = Math.sqrt(
         Math.pow(pointerPosition.x - dragStart.stageX, 2) +
         Math.pow(pointerPosition.y - dragStart.stageY, 2)
       );
       if (distance > 5) {
         setIsDragging(true);
+        dragging = true;
       }
     }
+
+    // In point mode, hold the preview back until the pointer has clearly moved
+    // so a plain click never flashes a box outline.
+    if (promptMode === 'point' && !dragging) return;
 
     setActivePreview({
       x1: dragStart.stageX,
@@ -256,7 +263,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
       return;
     }
 
-    if (promptMode === 'box' && isDragging && dragStart) {
+    if ((promptMode === 'box' || promptMode === 'point') && isDragging && dragStart) {
       const stage = e.target.getStage();
       const pointerPosition = stage.getPointerPosition();
       const coords = stageToImageCoords(pointerPosition.x, pointerPosition.y);
@@ -270,6 +277,15 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
             showFocusModeWarning('Box annotation is outside the focused object boundary');
           } else {
             addBoxPrompt(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY);
+          }
+        } else if (promptMode === 'point') {
+          // Pointer moved enough to look like a drag, but the resulting box is
+          // degenerate (common when zoomed out). Fall back to the point the
+          // user was most likely aiming for rather than dropping the gesture.
+          if (!isPointInFocusedObject(coords.imageX, coords.imageY, focusedObjectMask)) {
+            showFocusModeWarning('Point annotation is outside the focused object boundary');
+          } else {
+            addPointPrompt(coords.imageX, coords.imageY, 'positive');
           }
         }
       }
@@ -348,10 +364,10 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
   if (imageLoading) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+      <div className="absolute inset-0 flex items-center justify-center bg-well">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading image...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-acLn mx-auto mb-2"></div>
+          <p className="text-t2">Loading image...</p>
         </div>
       </div>
     );
@@ -361,10 +377,10 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
   if (imageError) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+      <div className="absolute inset-0 flex items-center justify-center bg-well">
         <div className="text-center">
-          <p className="text-red-600 mb-2">Failed to load image</p>
-          <p className="text-sm text-gray-600">{imageError}</p>
+          <p className="text-err mb-2">Failed to load image</p>
+          <p className="text-sm text-t2">{imageError}</p>
         </div>
       </div>
     );
@@ -484,7 +500,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
 
       {focusModeWarning && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <div className="bg-err text-onAccent px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>

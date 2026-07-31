@@ -250,13 +250,13 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
 
           {/* Instruction banner */}
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/95 text-white text-sm font-medium shadow-lg">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-warn text-onAccent text-sm font-medium shadow-lg">
               <span>
                 {!p1
                   ? '📏 Click the first point on the image'
                   : '📏 Click the second point to complete the line'}
               </span>
-              <span className="text-white/70 text-xs ml-2">ESC to cancel</span>
+              <span className="text-onAccent opacity-70 text-xs ml-2">ESC to cancel</span>
             </div>
           </div>
         </div>

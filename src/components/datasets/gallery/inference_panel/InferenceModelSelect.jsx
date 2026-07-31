@@ -93,16 +93,16 @@ export default function InferenceModelSelect({
 
     if (loading) {
         return (
-            <div className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 bg-gray-50">
-                <span className="text-gray-500">Loading models...</span>
+            <div className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg mb-3 bg-well">
+                <span className="text-t3">Loading models...</span>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="w-full px-3 py-2 text-sm border border-red-300 rounded-lg mb-3 bg-red-50">
-                <span className="text-red-600 text-xs">{error}</span>
+            <div className="w-full px-3 py-2 text-sm border border-errLn rounded-lg mb-3 bg-errBg">
+                <span className="text-err text-xs">{error}</span>
             </div>
         );
     }
@@ -115,7 +115,7 @@ export default function InferenceModelSelect({
                 trainedModels, baseModels));
             }
             }
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent mb-3"
+            className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent mb-3"
         >
             {trainedModels.length === 0 && baseModels.length === 0 && (
                 <option value="">No models available</option>

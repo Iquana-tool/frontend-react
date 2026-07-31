@@ -59,8 +59,8 @@ const MembersPanel = ({ access, datasetName }) => {
   return (
     <div className="space-y-4">
       {canGrant && (
-        <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="p-4 bg-well rounded-lg border border-ln">
+          <label className="block text-sm font-medium text-t2 mb-2">
             Add someone
           </label>
           <div className="flex flex-col sm:flex-row gap-2">
@@ -70,13 +70,13 @@ const MembersPanel = ({ access, datasetName }) => {
               onChange={(e) => setNewUsername(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="Username"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+              className="flex-1 px-3 py-2 border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-ac"
               disabled={busy === 'add'}
             />
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500"
+              className="px-3 py-2 border border-ln2 rounded-lg bg-p1 focus:ring-2 focus:ring-ac"
               disabled={busy === 'add'}
             >
               {ASSIGNABLE_DATASET_ROLES.map((role) => (
@@ -88,7 +88,7 @@ const MembersPanel = ({ access, datasetName }) => {
             <button
               onClick={handleAdd}
               disabled={busy === 'add'}
-              className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+              className="px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 disabled:bg-ln2 transition-colors flex items-center justify-center gap-2"
             >
               {busy === 'add' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -98,25 +98,25 @@ const MembersPanel = ({ access, datasetName }) => {
               Add
             </button>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-t3">
             {DATASET_ROLE_LABELS[newRole].description}
           </p>
         </div>
       )}
 
-      <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+      <ul className="divide-y divide-ln border border-ln rounded-lg">
         {members.map((member) => {
           const isOwner = member.role === DatasetRole.OWNER;
           const isSelf = member.username === user?.username;
           return (
             <li key={member.username} className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0">
-                <p className="font-medium text-gray-900 truncate">
+                <p className="font-medium text-t1 truncate">
                   {member.username}
-                  {isSelf && <span className="ml-2 text-xs text-gray-500">(you)</span>}
+                  {isSelf && <span className="ml-2 text-xs text-t3">(you)</span>}
                 </p>
                 {member.granted_by && !isOwner && (
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-t3 truncate">
                     Added by {member.granted_by}
                   </p>
                 )}
@@ -131,7 +131,7 @@ const MembersPanel = ({ access, datasetName }) => {
                     value={member.role}
                     onChange={(e) => changeRole(member.username, e.target.value)}
                     disabled={busy === `role:${member.username}`}
-                    className="px-2 py-1 text-sm border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-teal-500"
+                    className="px-2 py-1 text-sm border border-ln2 rounded-lg bg-p1 focus:ring-2 focus:ring-ac"
                   >
                     {ASSIGNABLE_DATASET_ROLES.map((role) => (
                       <option key={role} value={role}>
@@ -145,10 +145,10 @@ const MembersPanel = ({ access, datasetName }) => {
                   <button
                     onClick={() => handleTransfer(member.username)}
                     disabled={busy === `transfer:${member.username}`}
-                    className="p-1.5 rounded hover:bg-amber-100 transition-colors"
+                    className="p-1.5 rounded hover:bg-warnBg transition-colors"
                     title="Transfer ownership to this user"
                   >
-                    <Crown className="w-4 h-4 text-amber-600" />
+                    <Crown className="w-4 h-4 text-warn" />
                   </button>
                 )}
 
@@ -156,10 +156,10 @@ const MembersPanel = ({ access, datasetName }) => {
                   <button
                     onClick={() => revokeMember(member.username)}
                     disabled={busy === `revoke:${member.username}`}
-                    className="p-1.5 rounded hover:bg-red-100 transition-colors"
+                    className="p-1.5 rounded hover:bg-errBg transition-colors"
                     title="Remove access"
                   >
-                    <Trash2 className="w-4 h-4 text-red-600" />
+                    <Trash2 className="w-4 h-4 text-err" />
                   </button>
                 )}
               </div>
@@ -167,11 +167,11 @@ const MembersPanel = ({ access, datasetName }) => {
           );
         })}
         {members.length === 0 && (
-          <li className="p-4 text-sm text-gray-500 text-center">No collaborators yet.</li>
+          <li className="p-4 text-sm text-t3 text-center">No collaborators yet.</li>
         )}
       </ul>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-t3">
         Removing someone revokes their access. The annotations they made stay in the
         dataset.
       </p>

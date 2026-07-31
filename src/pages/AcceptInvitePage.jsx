@@ -70,11 +70,11 @@ const AcceptInvitePage = () => {
   };
 
   const shell = (children) => (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 max-w-md w-full overflow-hidden">
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white p-6">
+    <div className="min-h-screen bg-well flex items-center justify-center p-4">
+      <div className="bg-p1 rounded-xl shadow-sm border border-ln max-w-md w-full overflow-hidden">
+        <div className="bg-p2 border-b border-ln text-t1 p-6">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-white/20 rounded-full">
+            <div className="p-2 bg-hv rounded-full">
               <Users2 className="w-6 h-6" />
             </div>
             <h1 className="text-xl font-bold">Dataset invitation</h1>
@@ -87,7 +87,7 @@ const AcceptInvitePage = () => {
 
   if (authLoading || loading) {
     return shell(
-      <div className="flex items-center justify-center py-6 text-gray-500">
+      <div className="flex items-center justify-center py-6 text-t3">
         <Loader2 className="w-5 h-5 animate-spin mr-2" />
         Checking the invitation…
       </div>
@@ -97,14 +97,14 @@ const AcceptInvitePage = () => {
   if (accepted) {
     return shell(
       <div className="text-center">
-        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-        <p className="text-gray-900 font-medium mb-1">{accepted.message}</p>
-        <p className="text-sm text-gray-600 mb-6">
+        <CheckCircle2 className="w-12 h-12 text-ok mx-auto mb-3" />
+        <p className="text-t1 font-medium mb-1">{accepted.message}</p>
+        <p className="text-sm text-t2 mb-6">
           You can now open it from your dataset list.
         </p>
         <button
           onClick={() => navigate('/datasets')}
-          className="w-full px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
+          className="w-full px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors flex items-center justify-center gap-2"
         >
           Go to datasets
           <ArrowRight className="w-4 h-4" />
@@ -116,12 +116,12 @@ const AcceptInvitePage = () => {
   if (error && !preview) {
     return shell(
       <div className="text-center">
-        <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
-        <p className="text-gray-900 font-medium mb-1">Invitation unavailable</p>
-        <p className="text-sm text-gray-600 mb-6">{error}</p>
+        <AlertTriangle className="w-12 h-12 text-warn mx-auto mb-3" />
+        <p className="text-t1 font-medium mb-1">Invitation unavailable</p>
+        <p className="text-sm text-t2 mb-6">{error}</p>
         <button
           onClick={() => navigate('/datasets')}
-          className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          className="w-full px-4 py-2 border border-ln2 text-t2 rounded-lg hover:bg-hv transition-colors"
         >
           Back to datasets
         </button>
@@ -135,26 +135,26 @@ const AcceptInvitePage = () => {
 
   return shell(
     <div>
-      <p className="text-sm text-gray-600 mb-1">
-        <span className="font-medium text-gray-900">{preview.invited_by}</span> invited you to
+      <p className="text-sm text-t2 mb-1">
+        <span className="font-medium text-t1">{preview.invited_by}</span> invited you to
       </p>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">{preview.dataset_name}</h2>
+      <h2 className="text-lg font-bold text-t1 mb-1">{preview.dataset_name}</h2>
       {preview.dataset_description && (
-        <p className="text-sm text-gray-600 mb-4">{preview.dataset_description}</p>
+        <p className="text-sm text-t2 mb-4">{preview.dataset_description}</p>
       )}
 
-      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg mb-4">
+      <div className="p-4 bg-well border border-ln rounded-lg mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm text-gray-600">You would join as</span>
+          <span className="text-sm text-t2">You would join as</span>
           <RoleBadge role={preview.role} />
         </div>
-        {roleMeta && <p className="text-sm text-gray-600">{roleMeta.description}</p>}
+        {roleMeta && <p className="text-sm text-t2">{roleMeta.description}</p>}
       </div>
 
       {!preview.is_valid && (
-        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-800">
+        <div className="mb-4 p-3 rounded-lg bg-warnBg border border-warnLn flex gap-2">
+          <AlertTriangle className="w-4 h-4 text-warn flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-warn">
             This link has expired, been revoked, or reached its usage limit. Ask{' '}
             {preview.invited_by} for a new one.
           </p>
@@ -162,8 +162,8 @@ const AcceptInvitePage = () => {
       )}
 
       {preview.already_member && (
-        <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-          <p className="text-sm text-blue-800">
+        <div className="mb-4 p-3 rounded-lg bg-acS border border-acLn">
+          <p className="text-sm text-ac">
             You already have access to this dataset as{' '}
             <strong>{DATASET_ROLE_LABELS[preview.current_role]?.label}</strong>.
             {alreadyHigher && ' Accepting will never lower the role you already have.'}
@@ -172,22 +172,22 @@ const AcceptInvitePage = () => {
       )}
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="mb-4 p-3 rounded-lg bg-errBg border border-errLn">
+          <p className="text-sm text-err">{error}</p>
         </div>
       )}
 
       <div className="flex gap-3">
         <button
           onClick={() => navigate('/datasets')}
-          className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex-1 px-4 py-2 border border-ln2 text-t2 rounded-lg hover:bg-hv transition-colors"
         >
           Not now
         </button>
         <button
           onClick={handleAccept}
           disabled={accepting || !preview.is_valid}
-          className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 disabled:bg-ln2 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
         >
           {accepting && <Loader2 className="w-4 h-4 animate-spin" />}
           Accept invitation

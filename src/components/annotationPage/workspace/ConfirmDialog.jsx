@@ -19,7 +19,7 @@ const ConfirmDialog = ({
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-scrim animate-dcFade"
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel?.();
       }}

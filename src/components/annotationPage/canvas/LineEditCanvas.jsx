@@ -223,7 +223,7 @@ const LineEditCanvas = () => {
   return (
     <div ref={containerRef} className="absolute inset-0 z-[60]" style={{ cursor }}>
       {/* Mode selector */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg p-1">
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-p1 backdrop-blur-sm border border-ln rounded-xl shadow-lg p-1">
         {MODES.map(({ id, label, icon: Icon, hotkey }) => {
           const isActive = mode === id;
           return (
@@ -233,7 +233,7 @@ const LineEditCanvas = () => {
               onClick={() => setMode(id)}
               title={`${label} (${hotkey})`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isActive ? 'bg-teal-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                isActive ? 'bg-accent text-onAccent shadow-sm' : 'text-t2 hover:bg-hv'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
@@ -241,12 +241,12 @@ const LineEditCanvas = () => {
             </button>
           );
         })}
-        <div className="w-px h-5 bg-gray-200 mx-1" />
+        <div className="w-px h-5 bg-hv2 mx-1" />
         <button
           type="button"
           onClick={stopLineEdit}
           title="Cancel (Esc)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-t2 hover:bg-hv transition-colors"
         >
           <X className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Cancel</span>
@@ -254,7 +254,7 @@ const LineEditCanvas = () => {
       </div>
 
       {/* Instruction */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none text-center">
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-scrim text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none text-center">
         {mode === 'polygon'
           ? 'Click a line across the boundary · double-click or Enter to finish · outside adds, inside cuts'
           : 'Drag a line across the boundary · release to finish · outside adds a region, inside cuts one off'}

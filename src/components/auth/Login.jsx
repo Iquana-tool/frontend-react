@@ -53,52 +53,44 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-gradient-to-br from-teal-200/30 via-cyan-200/20 to-blue-200/25 rounded-full filter blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-32 -right-32 w-[700px] h-[700px] bg-gradient-to-tl from-indigo-200/25 via-blue-200/30 to-cyan-200/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-emerald-200/20 via-teal-200/25 to-cyan-200/15 rounded-full filter blur-2xl animate-pulse" style={{ animationDelay: '4s' }}></div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-app py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
 
       {/* Main Content */}
       <div className="relative z-10 w-full max-w-md mx-auto">
 
         {/* Brand Header */}
-        <div className="text-center mb-12">
-          <div 
-            className="inline-flex items-center space-x-2 mb-8 cursor-pointer"
+        <div className="text-center mb-10">
+          <div
+            className="inline-flex items-center gap-[8px] mb-7 cursor-pointer"
             onClick={() => navigate('/')}
           >
-            <div className="w-10 h-10 bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Database className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 bg-accent rounded-8 flex items-center justify-center">
+              <Database className="w-[22px] h-[22px] text-onAccent" />
             </div>
-            <span className="text-2xl font-bold text-gray-900">
-              I<span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600">Quana</span>
+            <span className="text-2xl font-semibold tracking-tight text-t1">
+              I<span className="text-ac">Quana</span>
             </span>
           </div>
-          
-          <h2 className="text-4xl font-black text-gray-900 mb-3">
+
+          <h2 className="text-3xl font-semibold tracking-tight text-t1 mb-2">
             Sign in to your account
           </h2>
-          <p className="text-gray-600 text-sm">
+          <p className="text-t3 text-sm">
             Continue to segment your images
           </p>
         </div>
 
-        {/* Glass Morphism Card */}
-        <div className="backdrop-blur-sm bg-white/90 border border-white/20 rounded-2xl shadow-2xl p-8 relative z-20">
+        <div className="bg-p1 border border-ln rounded-12 shadow-modal p-8 relative z-20">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-4 animate-slide-up">
-                <div className="text-sm text-red-800 font-medium">{error}</div>
+              <div className="rounded-8 bg-errBg border border-errLn p-[14px] animate-slide-up">
+                <div className="text-sm text-err font-medium">{error}</div>
               </div>
             )}
-            
+
             <div className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="username" className="block text-sm font-medium text-t2 mb-2">
                   Username
                 </label>
                 <input
@@ -106,15 +98,15 @@ const Login = () => {
                   name="username"
                   type="text"
                   required
-                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="w-full px-[14px] py-[10px] bg-well border border-ln rounded-8 text-t1 placeholder-t3 focus:outline-none focus:ring-2 focus:ring-ac focus:border-ac transition-colors duration-150"
                   placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                 />
               </div>
-              
+
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                <label htmlFor="password" className="block text-sm font-medium text-t2 mb-2">
                   Password
                 </label>
                 <input
@@ -122,7 +114,7 @@ const Login = () => {
                   name="password"
                   type="password"
                   required
-                  className="w-full px-4 py-3 bg-white/60 backdrop-blur-sm border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="w-full px-[14px] py-[10px] bg-well border border-ln rounded-8 text-t1 placeholder-t3 focus:outline-none focus:ring-2 focus:ring-ac focus:border-ac transition-colors duration-150"
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -134,35 +126,32 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="group relative w-full flex items-center justify-center px-6 py-3.5 text-base font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-0.5 hover:scale-[1.02] overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                className="group w-full flex items-center justify-center gap-[8px] px-6 py-[11px] text-base font-semibold text-onAccent bg-accent rounded-8 shadow-primary hover:brightness-110 active:brightness-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span className="relative z-10 flex items-center space-x-2">
-                  {isLoading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Signing in...</span>
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="w-5 h-5" />
-                      <span>Sign in</span>
-                      <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-teal-600 to-cyan-700 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                {isLoading ? (
+                  <>
+                    <div className="w-[18px] h-[18px] border-2 border-onAccent border-t-transparent rounded-full animate-spin"></div>
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-[18px] h-[18px]" />
+                    <span>Sign in</span>
+                    <ArrowRight className="w-[18px] h-[18px] group-hover:translate-x-1 transition-transform duration-150" />
+                  </>
+                )}
               </button>
             </div>
 
-            <div className="text-center pt-4 border-t border-gray-200/50">
-              <p className="text-sm text-gray-600">
+            <div className="text-center pt-4 border-t border-ln">
+              <p className="text-sm text-t2">
                 Don't have an account?{' '}
                 <Link
                   to="/register"
-                  className="font-semibold text-teal-600 hover:text-teal-700 transition-colors duration-200 inline-flex items-center space-x-1 group"
+                  className="font-medium text-ac hover:brightness-110 transition-all duration-150 inline-flex items-center gap-[4px] group"
                 >
                   <span>Create one</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-150" />
                 </Link>
               </p>
             </div>
@@ -173,7 +162,7 @@ const Login = () => {
         <div className="text-center mt-6">
           <button
             onClick={() => navigate('/')}
-            className="text-sm text-gray-600 hover:text-teal-600 transition-colors duration-200 inline-flex items-center space-x-1"
+            className="text-sm text-t3 hover:text-t1 transition-colors duration-150 inline-flex items-center gap-[4px]"
           >
             <ArrowRight className="w-4 h-4 rotate-180" />
             <span>Back to homepage</span>

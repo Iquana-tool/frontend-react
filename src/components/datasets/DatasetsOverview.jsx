@@ -15,6 +15,7 @@ import DatasetCard from "./DatasetCard";
 import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
 import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
+import ThemeToggle from "../ui/ThemeToggle";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
@@ -174,24 +175,26 @@ const DatasetsOverview = ({ onOpenDataset }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-well flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading datasets...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-acLn mx-auto mb-4"></div>
+          <p className="text-t2">Loading datasets...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-teal-600 text-white">
+    <div className="min-h-screen bg-well">
+      {/* Header. Neutral panel, matching the shared Navbar and every other page
+          header — not a solid accent fill, which fought the neutral text
+          tokens these nav items use and made them nearly invisible. */}
+      <div className="bg-p1 border-b border-ln">
         <div className="max-w-[98%] mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <h1 
-                className="text-2xl font-bold cursor-pointer hover:text-teal-200 transition-colors"
+              <h1
+                className="text-2xl font-semibold tracking-tight text-t1 cursor-pointer hover:text-ac transition-colors duration-150"
                 onClick={() => navigate('/')}
               >
                 IQuana
@@ -200,12 +203,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
             <div className="flex items-center space-x-4">
               {isAuthenticated && user && (
                 <div
-                  className="flex items-center space-x-2 px-3 py-1.5 text-sm text-white"
+                  className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3"
                   title={GLOBAL_ROLE_LABELS[globalRole]?.description}
                 >
                   <User className="w-4 h-4" />
-                  <span className="font-medium">{user.username}</span>
-                  <span className="px-2 py-0.5 rounded-full bg-white/20 text-xs">
+                  <span className="font-medium text-t2">{user.username}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-hv text-xs text-t2">
                     {GLOBAL_ROLE_LABELS[globalRole]?.label || globalRole}
                   </span>
                 </div>
@@ -213,7 +216,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               {canManageUsers && (
                 <button
                   onClick={() => navigate("/admin/users")}
-                  className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+                  className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
                 >
                   <UserCog className="w-4 h-4" />
                   <span>Users</span>
@@ -221,13 +224,18 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               )}
               <button
                 onClick={() => navigate("/docs")}
-                className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg transition-colors"
+                className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Documentation</span>
               </button>
-              <ReportBugLink />
-              <AuthButtons showLogoutOnly={true} />
+              <ThemeToggle />
+          <ReportBugLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />
+              <AuthButtons
+                textColor="text-t2"
+                buttonClass="flex items-center space-x-2 bg-hv hover:bg-errBg text-t2 hover:text-err py-2 px-4 rounded-lg transition-colors duration-150"
+                showLogoutOnly={true}
+              />
             </div>
           </div>
         </div>
@@ -237,11 +245,11 @@ const DatasetsOverview = ({ onOpenDataset }) => {
       <div className="max-w-[98%] mx-auto px-4 py-8">
         {/* Page Header */}
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">Datasets</h2>
+          <h2 className="text-3xl font-bold text-t1">Datasets</h2>
           {canCreateDatasets && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors"
+              className="flex items-center space-x-2 bg-accent text-onAccent px-6 py-3 rounded-lg hover:brightness-110 transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span>Add new dataset</span>
@@ -251,33 +259,33 @@ const DatasetsOverview = ({ onOpenDataset }) => {
 
         {/* Error Display */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600">{error}</p>
+          <div className="mb-6 p-4 bg-errBg border border-errLn rounded-lg">
+            <p className="text-err">{error}</p>
           </div>
         )}
 
         {/* Loading indicator for dataset data */}
         {loadingData && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-600">Loading dataset information...</p>
+          <div className="mb-6 p-4 bg-acS border border-acLn rounded-lg">
+            <p className="text-ac">Loading dataset information...</p>
           </div>
         )}
 
         {/* Datasets Grid */}
         {datasets.length === 0 ? (
           <div className="text-center py-12">
-            <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <FolderOpen className="w-16 h-16 text-t3 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-t1 mb-2">
               No datasets yet
             </h3>
             {canCreateDatasets ? (
               <>
-                <p className="text-gray-600 mb-6">
+                <p className="text-t2 mb-6">
                   Get started by creating your first dataset
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors"
+                  className="bg-accent text-onAccent px-6 py-3 rounded-lg hover:brightness-110 transition-colors"
                 >
                   Create your first dataset
                 </button>
@@ -285,7 +293,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
             ) : (
               // Guests can only work in datasets they were invited to, so telling
               // them to create one would just lead to a 403.
-              <p className="text-gray-600 max-w-md mx-auto">
+              <p className="text-t2 max-w-md mx-auto">
                 Your account cannot create datasets. Ask a dataset owner to send you an
                 invite link, and it will show up here once you accept it.
               </p>

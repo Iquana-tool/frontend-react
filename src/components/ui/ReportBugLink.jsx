@@ -14,8 +14,8 @@ import { Bug } from 'lucide-react';
 const ReportBugLink = ({ 
   variant = 'default',
   className,
-  textColor = 'text-white',
-  bgColor = 'bg-white/10 hover:bg-white/20',
+  textColor = 'text-t2',
+  bgColor = 'bg-hv hover:bg-hv2',
   hideTextOnMobile = false
 }) => {
   const isMobile = variant === 'mobile';
@@ -24,8 +24,7 @@ const ReportBugLink = ({
   const spaceClass = isMobile ? 'space-x-1' : 'space-x-2';
   const padding = isMobile ? 'py-1.5 px-2' : 'py-2 px-4';
   
-  // Default classes for teal navbar 
-  const defaultClassName = `flex items-center ${spaceClass} ${bgColor} ${textColor} ${padding} rounded-lg transition-colors ${textSize}`;
+  const defaultClassName = `flex items-center ${spaceClass} ${bgColor} ${textColor} ${padding} rounded-6 transition-colors duration-150 ${textSize}`;
   
   const finalClassName = className || defaultClassName;
   const textDisplayClass = hideTextOnMobile ? 'hidden md:inline' : '';

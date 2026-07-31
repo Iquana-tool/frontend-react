@@ -10,7 +10,7 @@ const DeleteDatasetButton = ({ dataset, onClick, className = "" }) => {
   return (
     <button
       onClick={handleClick}
-      className={`absolute top-4 right-4 p-2 text-white bg-black/20 hover:bg-red-500 hover:scale-110 rounded-full transition-all duration-200 shadow-lg backdrop-blur-sm ${className}`}
+      className={`absolute top-4 right-4 p-2 text-t3 bg-hv hover:bg-errBg hover:text-err hover:scale-110 rounded-full transition-all duration-150 ${className}`}
       title="Delete dataset"
     >
       <Trash2 className="w-4 h-4" />

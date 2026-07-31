@@ -33,7 +33,7 @@ const ToolOptionsDrawer = () => {
           type="button"
           onClick={toggleDrawer}
           aria-label="Collapse tool options"
-          className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+          className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
         >
           <ChevronLeft size={14} strokeWidth={1.9} />
         </button>
@@ -51,6 +51,11 @@ const ToolOptionsDrawer = () => {
               ? 'Shapes you draw become prompts for the selected model.'
               : 'Shapes you draw are saved as objects exactly as drawn, with no model involved.'}
           </p>
+          {railTool === 'point' && (
+            <p className="mt-[6px] text-sect leading-[1.5] text-t3">
+              Click to drop a point · drag to draw a box · right-click for a negative point.
+            </p>
+          )}
         </div>
 
         <div className="h-px bg-ln" />

@@ -224,7 +224,7 @@ const LabelsTab = () => {
                       e.stopPropagation();
                       toggleVisibility(label.id);
                     }}
-                    className="w-5 h-5 flex-none flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+                    className="w-5 h-5 flex-none flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
                   >
                     {visible ? <Eye size={13} /> : <EyeOff size={13} />}
                   </button>
@@ -272,7 +272,7 @@ const LabelsTab = () => {
               }}
               placeholder="Label name"
               aria-label="New label name"
-              className="flex-1 min-w-0 h-7 px-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-acLn placeholder:text-t3"
+              className="flex-1 min-w-0 h-7 px-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-ac placeholder:text-t3"
             />
             <button
               type="button"

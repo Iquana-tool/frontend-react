@@ -103,22 +103,22 @@ const ReviewPage = () => {
   }, [loadSummary]);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <div className="bg-teal-600 text-white flex-shrink-0">
+    <div className="h-screen flex flex-col bg-well">
+      <div className="bg-p1 border-b border-ln flex-shrink-0">
         <div className="px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() =>
                 queue ? handleExitSession() : navigate(`/dataset/${datasetId}/datamanagement`)
               }
-              className="flex items-center gap-2 hover:text-teal-200 transition-colors flex-shrink-0"
+              className="flex items-center gap-2 text-t2 hover:text-ac transition-colors duration-150 flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5" />
               <span className="hidden sm:inline">{queue ? 'End session' : 'Back'}</span>
             </button>
-            <div className="h-6 w-px bg-teal-400 flex-shrink-0" />
-            <ClipboardCheck className="w-5 h-5 flex-shrink-0" />
-            <h1 className="text-lg font-bold truncate">
+            <div className="h-6 w-px bg-ln flex-shrink-0" />
+            <ClipboardCheck className="w-5 h-5 flex-shrink-0 text-ac" />
+            <h1 className="text-lg font-semibold tracking-tight text-t1 truncate">
               Review {dataset?.name ? `· ${dataset.name}` : ''}
             </h1>
             {role && <RoleBadge role={role} showDescription />}
@@ -127,18 +127,18 @@ const ReviewPage = () => {
       </div>
 
       {error && (
-        <div className="px-4 py-2 bg-red-50 border-b border-red-200 flex-shrink-0">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="px-4 py-2 bg-errBg border-b border-errLn flex-shrink-0">
+          <p className="text-sm text-err">{error}</p>
         </div>
       )}
 
       <div className="flex-1 min-h-0">
         {!mayReview && !loading ? (
-          <div className="h-full flex items-center justify-center text-gray-500 text-sm">
+          <div className="h-full flex items-center justify-center text-t3 text-sm">
             You do not have review permissions on this dataset.
           </div>
         ) : loading ? (
-          <div className="h-full flex items-center justify-center text-gray-500">
+          <div className="h-full flex items-center justify-center text-t3">
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Loading…
           </div>

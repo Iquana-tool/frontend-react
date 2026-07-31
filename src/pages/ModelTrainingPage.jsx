@@ -17,14 +17,15 @@ import {
   cancelInstanceTraining,
   streamInstanceTrainingProgress,
 } from "../api";
+import useThemeColors from "../hooks/useThemeColors";
 
 const TERMINAL = new Set(["SUCCESS", "FAILED"]);
 
 const STATE_STYLE = {
-  PROGRESS: "bg-blue-100 text-blue-700",
-  SUCCESS: "bg-green-100 text-green-700",
-  FAILED: "bg-red-100 text-red-700",
-  starting: "bg-gray-100 text-gray-600",
+  PROGRESS: "bg-acS text-ac",
+  SUCCESS: "bg-okBg text-ok",
+  FAILED: "bg-errBg text-err",
+  starting: "bg-well text-t2",
 };
 
 const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString() : "—");
@@ -35,18 +36,18 @@ function RunCard({ run, selected, onClick }) {
     <button
       onClick={onClick}
       className={`w-full text-left p-3 rounded-xl border transition-colors ${
-        selected ? "border-indigo-500 bg-indigo-50" : "border-gray-200 bg-white hover:bg-gray-50"
+        selected ? "border-acLn bg-acS" : "border-ln bg-p1 hover:bg-hv"
       }`}
     >
       <div className="flex items-center justify-between mb-1">
         <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATE_STYLE[run.state] || STATE_STYLE.starting}`}>
           {run.state}
         </span>
-        <span className="text-[11px] text-gray-400 flex items-center gap-1">
+        <span className="text-[11px] text-t3 flex items-center gap-1">
           <Clock size={11} /> {fmtTime(run.start_time)}
         </span>
       </div>
-      <div className="text-xs text-gray-600">
+      <div className="text-xs text-t2">
         {(run.label_ids?.length ?? 0)} class{(run.label_ids?.length ?? 0) === 1 ? "" : "es"}
         {run.total_epochs ? ` · ${run.epoch}/${run.total_epochs} epochs` : ""}
         {lastLoss(run) != null ? ` · loss ${lastLoss(run).toFixed(3)}` : ""}
@@ -56,6 +57,7 @@ function RunCard({ run, selected, onClick }) {
 }
 
 function ProgressPanel({ snapshot, onStop, isStopping }) {
+  const { colors } = useThemeColors();
   const total = snapshot.total_epochs || 0;
   const current = snapshot.epoch || 0;
   const percent = total ? Math.min(100, Math.round((current / total) * 100)) : 0;
@@ -64,7 +66,7 @@ function ProgressPanel({ snapshot, onStop, isStopping }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-gray-700">
+      <div className="flex items-center gap-2 text-sm text-t2">
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATE_STYLE[snapshot.state] || STATE_STYLE.starting}`}>
           {snapshot.state}
         </span>
@@ -72,55 +74,57 @@ function ProgressPanel({ snapshot, onStop, isStopping }) {
           <span className="flex items-center gap-1"><Loader2 className="w-4 h-4 animate-spin" /> Waiting for worker…</span>
         ) : (
           <span className="flex items-center gap-1">
-            <Cpu className="w-4 h-4 text-indigo-600" /> Epoch {current}{total ? ` / ${total}` : ""}
+            <Cpu className="w-4 h-4 text-ac" /> Epoch {current}{total ? ` / ${total}` : ""}
           </span>
         )}
       </div>
 
       {total > 0 && (
-        <div className="w-full bg-gray-200 rounded h-2">
-          <div className="bg-indigo-500 h-2 rounded" style={{ width: `${percent}%`, transition: "width 0.5s" }} />
+        <div className="w-full bg-hv2 rounded h-2">
+          <div className="bg-accent h-2 rounded" style={{ width: `${percent}%`, transition: "width 0.5s" }} />
         </div>
       )}
 
       {lossData.length > 0 ? (
         <div>
-          <h3 className="text-sm font-semibold text-gray-800">Training loss</h3>
-          <p className="text-[11px] text-gray-500 mb-2">
+          <h3 className="text-sm font-semibold text-t1">Training loss</h3>
+          <p className="text-[11px] text-t3 mb-2">
             Mask2Former combined loss (classification + mask + dice), averaged per epoch. Lower is better.
           </p>
           <div className="w-full h-64">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={lossData} margin={{ top: 5, right: 10, bottom: 20, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="3 3" stroke={colors.ln2} />
                 <XAxis
                   dataKey="epoch"
-                  tick={{ fontSize: 11 }}
-                  label={{ value: "epoch", position: "insideBottom", offset: -10, fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: colors.t2 }}
+                  label={{ value: "epoch", position: "insideBottom", offset: -10, fontSize: 11, fill: colors.t3 }}
                 />
                 <YAxis
-                  tick={{ fontSize: 11 }}
+                  tick={{ fontSize: 11, fill: colors.t2 }}
                   width={56}
-                  label={{ value: "loss", angle: -90, position: "insideLeft", fontSize: 11 }}
+                  label={{ value: "loss", angle: -90, position: "insideLeft", fontSize: 11, fill: colors.t3 }}
                 />
                 <Tooltip
                   formatter={(value) => [Number(value).toFixed(4), "loss"]}
                   labelFormatter={(epoch) => `Epoch ${epoch}`}
+                  contentStyle={{ backgroundColor: colors.p2, border: `1px solid ${colors.ln}`, borderRadius: '8px', color: colors.t1 }}
+                  labelStyle={{ color: colors.t2 }}
                 />
-                <Line type="monotone" dataKey="loss" stroke="#6366F1" dot={false} name="Training loss" />
+                <Line type="monotone" dataKey="loss" stroke={colors.ac} dot={false} name="Training loss" />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-gray-500">No loss logged yet.</p>
+        <p className="text-sm text-t3">No loss logged yet.</p>
       )}
 
       {isActive && (
         <button
           onClick={onStop}
           disabled={isStopping}
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-onAccent bg-err rounded-lg hover:brightness-110 transition-colors disabled:opacity-60"
         >
           {isStopping ? <Loader2 className="w-4 h-4 animate-spin" /> : <StopCircle className="w-4 h-4" />}
           {isStopping ? "Stopping…" : "Stop Training"}
@@ -276,13 +280,13 @@ export default function ModelTrainingPage() {
 
   return (
     <DatasetManagementLayout>
-      <div className="h-full flex flex-col bg-white overflow-hidden">
+      <div className="h-full flex flex-col bg-p1 overflow-hidden">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
-          <GraduationCap className="w-6 h-6 text-indigo-600" />
+        <div className="bg-p1 border-b border-ln px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
+          <GraduationCap className="w-6 h-6 text-ac" />
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Model Training</h1>
-            <p className="text-sm text-gray-600">
+            <h1 className="text-2xl font-bold text-t1">Model Training</h1>
+            <p className="text-sm text-t2">
               Train an instance segmentation model on {currentDataset?.name ? `“${currentDataset.name}”` : "this dataset"}.
             </p>
           </div>
@@ -290,20 +294,20 @@ export default function ModelTrainingPage() {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left: run history */}
-          <aside className="w-72 shrink-0 border-r border-gray-200 flex flex-col">
-            <div className="p-3 border-b border-gray-200">
+          <aside className="w-72 shrink-0 border-r border-ln flex flex-col">
+            <div className="p-3 border-b border-ln">
               <button
                 onClick={handleNewTraining}
                 className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  mode === "config" ? "bg-indigo-600 text-white" : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+                  mode === "config" ? "bg-accent text-onAccent" : "bg-acS text-ac hover:bg-acS"
                 }`}
               >
                 <Plus size={16} /> New Training
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 px-1">Run history</p>
-              {runs.length === 0 && <p className="text-xs text-gray-400 px-1">No runs yet.</p>}
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-t3 px-1">Run history</p>
+              {runs.length === 0 && <p className="text-xs text-t3 px-1">No runs yet.</p>}
               {runs.map((run) => (
                 <RunCard
                   key={run.run_id || run.task_id}
@@ -318,7 +322,7 @@ export default function ModelTrainingPage() {
           {/* Right: config or progress */}
           <main className="flex-1 overflow-y-auto p-6">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+              <div className="mb-4 p-3 bg-errBg border border-errLn rounded-lg text-sm text-err">{error}</div>
             )}
 
             {mode === "run" && selectedRun ? (
@@ -329,11 +333,11 @@ export default function ModelTrainingPage() {
               <div className="max-w-2xl space-y-6">
                 {/* Model */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-800 mb-1">Model</label>
+                  <label className="block text-sm font-medium text-t1 mb-1">Model</label>
                   <select
                     value={modelKey}
                     onChange={(e) => setModelKey(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"
                   >
                     {models.length === 0 && <option value="mask2former">Mask2Former</option>}
                     {models.map((m) => (
@@ -341,32 +345,32 @@ export default function ModelTrainingPage() {
                     ))}
                   </select>
                   {selectedModel?.description && (
-                    <p className="text-[11px] text-gray-500 mt-1 line-clamp-2">{selectedModel.description}</p>
+                    <p className="text-[11px] text-t3 mt-1 line-clamp-2">{selectedModel.description}</p>
                   )}
                 </div>
 
                 {/* Labels */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-800">Classes to train ({selectedLabelIds.size}/{labels.length})</label>
+                    <label className="block text-sm font-medium text-t1">Classes to train ({selectedLabelIds.size}/{labels.length})</label>
                     <button
                       type="button"
                       onClick={() => setSelectedLabelIds(allSelected ? new Set() : new Set(labels.map((l) => l.id)))}
-                      className="text-xs text-indigo-600 hover:underline"
+                      className="text-xs text-ac hover:underline"
                     >
                       {allSelected ? "Clear all" : "Select all"}
                     </button>
                   </div>
-                  <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-                    {labels.length === 0 && <p className="text-xs text-gray-400 p-3">This dataset has no labels.</p>}
+                  <div className="max-h-44 overflow-y-auto border border-ln rounded-lg divide-y divide-ln">
+                    {labels.length === 0 && <p className="text-xs text-t3 p-3">This dataset has no labels.</p>}
                     {labels.map((l) => (
-                      <label key={l.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+                      <label key={l.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-hv">
                         <input type="checkbox" checked={selectedLabelIds.has(l.id)} onChange={() => toggleLabel(l.id)} className="h-4 w-4" />
                         {l.name}
                       </label>
                     ))}
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-1">Multiclass by default — all labels are selected. Deselect to train a smaller model.</p>
+                  <p className="text-[11px] text-t3 mt-1">Multiclass by default — all labels are selected. Deselect to train a smaller model.</p>
                 </div>
 
                 {/* Advanced (model-declared params) */}
@@ -375,7 +379,7 @@ export default function ModelTrainingPage() {
                     <button
                       type="button"
                       onClick={() => setShowAdvanced((s) => !s)}
-                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+                      className="flex items-center gap-1 text-sm font-medium text-t2 hover:text-t1"
                     >
                       {showAdvanced ? <ChevronDown size={16} /> : <ChevronRight size={16} />} Training parameters
                     </button>
@@ -390,19 +394,19 @@ export default function ModelTrainingPage() {
                 )}
 
                 {/* Auto-train (coming soon) */}
-                <div className="p-4 rounded-xl border border-dashed border-gray-300 bg-gray-50">
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <Sparkles size={16} className="text-gray-400" />
+                <div className="p-4 rounded-xl border border-dashed border-ln2 bg-well">
+                  <div className="flex items-center gap-2 text-sm font-medium text-t2">
+                    <Sparkles size={16} className="text-t3" />
                     Automated training triggers
-                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-gray-200 text-gray-500 px-2 py-0.5 rounded-full">Coming soon</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide bg-hv2 text-t3 px-2 py-0.5 rounded-full">Coming soon</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">Automatically retrain as new images are fully annotated.</p>
+                  <p className="text-xs text-t3 mt-1">Automatically retrain as new images are fully annotated.</p>
                 </div>
 
                 <button
                   onClick={handleStart}
                   disabled={isStarting || selectedLabelIds.size === 0}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-60"
                 >
                   {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
                   {isStarting ? "Starting…" : "Start Training"}

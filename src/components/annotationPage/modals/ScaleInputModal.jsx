@@ -34,7 +34,7 @@ const ScaleInputModal = ({ pixelDistance, onConfirm, onCancel }) => {
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-[rgba(4,6,8,.62)] animate-dcFade"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-scrim animate-dcFade"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className="w-[344px] max-w-[calc(100%-32px)] rounded-12 bg-p1 border border-ln2 shadow-modal animate-dcPop overflow-hidden">
@@ -46,7 +46,7 @@ const ScaleInputModal = ({ pixelDistance, onConfirm, onCancel }) => {
           </div>
           <button
             onClick={onCancel}
-            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-t1 transition-colors"
+            className="w-[22px] h-[22px] flex items-center justify-center rounded-5 text-t3 hover:bg-hv hover:text-ac transition-colors duration-150"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -83,13 +83,13 @@ const ScaleInputModal = ({ pixelDistance, onConfirm, onCancel }) => {
                 onChange={(e) => { setKnownDistance(e.target.value); setError(''); }}
                 placeholder="e.g. 100"
                 autoFocus
-                className="flex-1 min-w-0 h-8 px-[10px] rounded-7 bg-well border border-ln2 font-mono text-row text-t1 outline-none focus:border-acLn placeholder:text-t3"
+                className="flex-1 min-w-0 h-8 px-[10px] rounded-7 bg-well border border-ln2 font-mono text-row text-t1 outline-none focus:border-ac placeholder:text-t3"
               />
               <select
                 id="scale-unit-select"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-[110px] h-8 px-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-acLn"
+                className="w-[110px] h-8 px-[8px] rounded-7 bg-well border border-ln2 text-row text-t1 outline-none focus:border-ac"
               >
                 {SUPPORTED_UNITS.map(u => (
                   <option key={u.value} value={u.value}>{u.label}</option>

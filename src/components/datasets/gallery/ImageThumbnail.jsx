@@ -13,18 +13,18 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
   return (
     <div
       data-image-id={image.id}
-      className="group relative bg-white border border-gray-200 rounded-md sm:rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer"
+      className="group relative bg-p1 border border-ln rounded-md sm:rounded-lg overflow-hidden hover:shadow-md transition-all cursor-pointer"
       onClick={() => onImageClick(image)}
     >
       <div className="aspect-square relative">
         <img
           src={imageSrc}
           alt={image.file_name || image.name}
-          className={`w-full h-full object-cover ${isLoading ? 'opacity-50 bg-gray-100' : ''}`}
+          className={`w-full h-full object-cover ${isLoading ? 'opacity-50 bg-well' : ''}`}
         />
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <ImageIcon className="w-8 h-8 text-gray-400" />
+            <ImageIcon className="w-8 h-8 text-t3" />
           </div>
         )}
       </div>
@@ -47,7 +47,7 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
               e.stopPropagation();
               onDeleteImage(image.id, e);
             }}
-            className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full shadow-lg"
+            className="opacity-0 group-hover:opacity-100 transition-opacity bg-err hover:bg-err text-onAccent p-1.5 rounded-full shadow-lg"
             title="Delete image"
           >
             <Trash2 size={14} />

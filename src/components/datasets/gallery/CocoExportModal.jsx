@@ -60,18 +60,18 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
     >
       <span
         className={`mt-0.5 relative w-9 h-5 rounded-full transition-colors shrink-0 ${
-          checked ? "bg-teal-500" : "bg-gray-300"
+          checked ? "bg-accent" : "bg-ln2"
         }`}
       >
         <span
-          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+          className={`absolute top-0.5 w-4 h-4 bg-p1 rounded-full shadow transition-transform ${
             checked ? "translate-x-4" : "translate-x-0.5"
           }`}
         />
       </span>
       <span className="flex-1">
-        <span className="block text-sm font-medium text-gray-800">{label}</span>
-        {description && <span className="block text-xs text-gray-500">{description}</span>}
+        <span className="block text-sm font-medium text-t1">{label}</span>
+        {description && <span className="block text-xs text-t3">{description}</span>}
       </span>
     </button>
   );
@@ -79,25 +79,25 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 py-6">
-        <div className="fixed inset-0 bg-gray-500/75 transition-opacity" onClick={onClose} />
+        <div className="fixed inset-0 bg-scrim transition-opacity" onClick={onClose} />
 
-        <div className="relative inline-block w-full max-w-lg text-left align-middle bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="relative inline-block w-full max-w-lg text-left align-middle bg-p1 rounded-2xl shadow-xl overflow-hidden">
           {/* Header */}
-          <div className="relative bg-gradient-to-r from-teal-500 to-cyan-500 px-6 py-5 text-white">
+          <div className="relative bg-p2 border-b border-ln px-6 py-5 text-t1">
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-colors"
+              className="absolute top-4 right-4 p-1 rounded-lg text-t3 hover:text-t1 hover:bg-hv2 transition-colors"
               title="Close"
             >
               <X size={20} />
             </button>
             <div className="flex items-center gap-3 pr-8">
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white/20 shrink-0">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-hv shrink-0">
                 <Download className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">Export to COCO</h3>
-                <p className="text-sm text-white/90 mt-0.5">
+                <p className="text-sm text-t3 mt-0.5">
                   Download {dataset?.name ? `“${dataset.name}”` : "this dataset"} in COCO format for ML tasks.
                 </p>
               </div>
@@ -119,10 +119,10 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
                 }
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-colors ${
                   !canExportImages
-                    ? "border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed"
+                    ? "border-ln text-t3 bg-well cursor-not-allowed"
                     : includeImages
-                      ? "border-teal-500 bg-teal-50 text-teal-800"
-                      : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                      ? "border-acLn bg-acS text-ac"
+                      : "border-ln text-t2 hover:bg-hv"
                 }`}
               >
                 {canExportImages ? (
@@ -131,7 +131,7 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
                   <Lock className="w-5 h-5" />
                 )}
                 <span className="text-sm font-semibold">Images + annotations</span>
-                <span className="text-[11px] text-gray-500">
+                <span className="text-[11px] text-t3">
                   {canExportImages ? "ZIP bundle" : "Not permitted"}
                 </span>
               </button>
@@ -140,13 +140,13 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
                 onClick={() => setIncludeImages(false)}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-colors ${
                   !includeImages
-                    ? "border-teal-500 bg-teal-50 text-teal-800"
-                    : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                    ? "border-acLn bg-acS text-ac"
+                    : "border-ln text-t2 hover:bg-hv"
                 }`}
               >
                 <FileJson className="w-5 h-5" />
                 <span className="text-sm font-semibold">Annotations only</span>
-                <span className="text-[11px] text-gray-500">COCO JSON</span>
+                <span className="text-[11px] text-t3">COCO JSON</span>
               </button>
             </div>
 
@@ -168,13 +168,13 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
 
             {/* Contour selection */}
             <div>
-              <label className="block text-sm font-medium text-gray-800 mb-1">
+              <label className="block text-sm font-medium text-t1 mb-1">
                 Contours to include
               </label>
               <select
                 value={contourSelection}
                 onChange={(e) => setContourSelection(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"
               >
                 <option value="all">All (parents and children)</option>
                 <option value="leaves">Leaves only (innermost)</option>
@@ -183,25 +183,25 @@ const CocoExportModal = ({ isOpen, onClose, dataset }) => {
             </div>
 
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="p-3 bg-errBg border border-errLn rounded-lg text-sm text-err">
                 {error}
               </div>
             )}
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex justify-end gap-3 px-6 py-4 bg-well border-t border-ln">
             <button
               onClick={onClose}
               disabled={isExporting}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-t2 bg-p1 border border-ln2 rounded-lg hover:bg-hv transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-60"
             >
               {isExporting ? (
                 <>

@@ -61,9 +61,9 @@ const VisibilitySection = () => {
         <span className="flex-1" />
         <span className="text-meta text-t3">{activeMode.label}</span>
         {expanded ? (
-          <ChevronUp size={13} className="text-t3 group-hover:text-t1 transition-colors" />
+          <ChevronUp size={13} className="text-t3 group-hover:text-ac transition-colors duration-150" />
         ) : (
-          <ChevronDown size={13} className="text-t3 group-hover:text-t1 transition-colors" />
+          <ChevronDown size={13} className="text-t3 group-hover:text-ac transition-colors duration-150" />
         )}
       </button>
 

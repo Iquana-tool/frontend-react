@@ -180,10 +180,10 @@ const ManualDrawCanvas = () => {
 
   if (imageLoading) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+      <div className="absolute inset-0 flex items-center justify-center bg-well">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600 mx-auto mb-2"></div>
-          <p className="text-gray-600">Loading image...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-acLn mx-auto mb-2"></div>
+          <p className="text-t2">Loading image...</p>
         </div>
       </div>
     );
@@ -193,10 +193,10 @@ const ManualDrawCanvas = () => {
 
   if (imageError) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+      <div className="absolute inset-0 flex items-center justify-center bg-well">
         <div className="text-center">
-          <p className="text-red-600 mb-2">Failed to load image</p>
-          <p className="text-sm text-gray-600">{imageError}</p>
+          <p className="text-err mb-2">Failed to load image</p>
+          <p className="text-sm text-t2">{imageError}</p>
         </div>
       </div>
     );
@@ -208,13 +208,13 @@ const ManualDrawCanvas = () => {
     <div ref={containerRef} className="absolute inset-0 z-10" style={{ cursor }}>
       {/* Pan mode indicator */}
       {isPanMode && (
-        <div className="absolute top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow-lg z-50">
+        <div className="absolute top-4 right-4 bg-accent text-onAccent px-3 py-1 rounded-full text-sm font-medium shadow-lg z-50">
           Pan Mode - Hold Space + Drag
         </div>
       )}
 
       {/* Drawing-mode selector (polygon / freehand) */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg p-1">
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-p1 backdrop-blur-sm border border-ln rounded-xl shadow-lg p-1">
         {MODES.map(({ id, label, icon: Icon, hotkey }) => {
           const isActive = mode === id;
           return (
@@ -224,14 +224,14 @@ const ManualDrawCanvas = () => {
               onClick={() => setMode(id)}
               title={`${label} drawing (${hotkey})`}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isActive ? 'bg-teal-500 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+                isActive ? 'bg-accent text-onAccent shadow-sm' : 'text-t2 hover:bg-hv'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">{label}</span>
               <kbd
                 className={`hidden md:inline text-[10px] font-semibold leading-none px-1 py-0.5 rounded border ${
-                  isActive ? 'border-white/40 text-white/90' : 'border-gray-300 text-gray-400'
+                  isActive ? 'border-white/40 text-white/90' : 'border-ln2 text-t3'
                 }`}
               >
                 {hotkey}
@@ -242,7 +242,7 @@ const ManualDrawCanvas = () => {
       </div>
 
       {/* Drawing instructions */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none">
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-scrim text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none">
         {mode === 'polygon'
           ? 'Click to add points · double-click or Enter to close · right-click undoes a point · Esc cancels'
           : 'Press and drag to trace an outline · release to close'}
@@ -273,8 +273,8 @@ const ManualDrawCanvas = () => {
       {statusMessage && (
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
           <div
-            className={`px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-white ${
-              statusMessage.error ? 'bg-red-500' : 'bg-teal-600'
+            className={`px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-onAccent ${
+              statusMessage.error ? 'bg-err' : 'bg-accent'
             }`}
           >
             {statusMessage.text}

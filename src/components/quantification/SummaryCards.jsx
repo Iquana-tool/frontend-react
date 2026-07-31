@@ -15,29 +15,29 @@ import {
 } from "../../utils/quantificationUtils";
 
 const ACCENTS = {
-  teal: "bg-teal-50 text-teal-600",
-  blue: "bg-blue-50 text-blue-600",
-  violet: "bg-violet-50 text-violet-600",
-  amber: "bg-amber-50 text-amber-600",
+  teal: "bg-acS text-ac",
+  blue: "bg-acS text-ac",
+  violet: "bg-acS text-ac",
+  amber: "bg-warnBg text-warn",
 };
 
 const StatCard = ({ icon: Icon, label, value, hint, accent = "teal" }) => (
-  <div className="bg-white rounded-lg border border-gray-200 p-4">
+  <div className="bg-p1 rounded-lg border border-ln p-4">
     <div className="flex items-center space-x-2 mb-2">
       <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${ACCENTS[accent]}`}>
         <Icon className="w-4 h-4" />
       </span>
-      <h3 className="text-sm font-medium text-gray-700">{label}</h3>
+      <h3 className="text-sm font-medium text-t2">{label}</h3>
     </div>
-    <p className="text-2xl font-bold text-gray-900 leading-tight">{value}</p>
-    {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
+    <p className="text-2xl font-bold text-t1 leading-tight">{value}</p>
+    {hint && <p className="text-xs text-t3 mt-1">{hint}</p>}
   </div>
 );
 
 const SectionHeader = ({ children }) => (
   <div className="flex items-center gap-3 mb-3">
-    <div className="h-1 w-8 bg-gradient-to-r from-teal-500 to-cyan-500 rounded-full" />
-    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">{children}</h3>
+    <div className="h-1 w-8 bg-accent rounded-full" />
+    <h3 className="text-sm font-semibold text-t2 uppercase tracking-wide">{children}</h3>
   </div>
 );
 

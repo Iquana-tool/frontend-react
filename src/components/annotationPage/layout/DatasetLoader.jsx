@@ -181,21 +181,21 @@ const DatasetLoader = ({ children }) => {
   // Show dataset not found message
   if (datasetNotFound) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-well flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-red-600 text-2xl">⚠️</span>
+          <div className="w-16 h-16 bg-errBg rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-err text-2xl">⚠️</span>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Dataset Not Found</h2>
-          <p className="text-gray-600 mb-4">
+          <h2 className="text-xl font-semibold text-t1 mb-2">Dataset Not Found</h2>
+          <p className="text-t2 mb-4">
             The dataset with ID "{datasetId}" could not be found.
           </p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-t3 text-sm">
             Redirecting to datasets page in 3 seconds...
           </p>
           <button
             onClick={() => navigate("/datasets")}
-            className="mt-4 bg-teal-600 text-white px-6 py-2 rounded-lg hover:bg-teal-700 transition-colors"
+            className="mt-4 bg-accent text-onAccent px-6 py-2 rounded-lg hover:brightness-110 transition-colors"
           >
             Go to Datasets Now
           </button>
@@ -207,10 +207,10 @@ const DatasetLoader = ({ children }) => {
   // If datasets are still loading or no current dataset is selected, show loading
   if (loading || !currentDataset || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-well flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dataset...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-acLn mx-auto mb-4"></div>
+          <p className="text-t2">Loading dataset...</p>
         </div>
       </div>
     );
@@ -224,10 +224,10 @@ const DatasetLoader = ({ children }) => {
   // If no images are loaded yet, show loading
   if (!hasImages) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-well flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading images...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-acLn mx-auto mb-4"></div>
+          <p className="text-t2">Loading images...</p>
         </div>
       </div>
     );

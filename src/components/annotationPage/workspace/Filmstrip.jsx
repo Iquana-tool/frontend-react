@@ -94,7 +94,7 @@ const Filmstrip = () => {
         onClick={toggleFilmstrip}
         aria-label="Hide navigator"
         title="Hide navigator"
-        className="w-[22px] h-[44px] flex-none flex items-center justify-center rounded-6 bg-well text-t3 hover:text-t1 transition-colors"
+        className="w-[22px] h-[44px] flex-none flex items-center justify-center rounded-6 bg-well text-t3 hover:text-ac transition-colors duration-150"
       >
         <ChevronDown size={14} />
       </button>

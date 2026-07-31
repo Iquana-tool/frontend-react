@@ -1,5 +1,34 @@
+const plugin = require('tailwindcss/plugin');
+const { shared, themes, DEFAULT_THEME } = require('./src/styles/theme');
+
+/**
+ * Emits the palette from src/styles/theme.js as CSS variables.
+ *
+ * `:root` carries the default theme so tokens resolve even before any
+ * `data-theme` attribute is set, and both themes are also emitted as attribute
+ * selectors so a subtree can opt out of the document-level choice.
+ *
+ * `color-scheme` rides along with the attribute selectors rather than sitting
+ * on `:root`, so native scrollbars and form controls only follow the theme on
+ * elements that have explicitly opted in.
+ */
+const themeVariables = plugin(({ addBase }) => {
+  addBase({
+    ':root': { ...shared, ...themes[DEFAULT_THEME] },
+    "[data-theme='dark']": { ...themes.dark, colorScheme: 'dark' },
+    "[data-theme='light']": { ...themes.light, colorScheme: 'light' },
+  });
+});
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // Tied to the same [data-theme] attribute the token plugin reads, not a
+  // `.dark` class, so `dark:` variants track the real theme switch. Only used
+  // for the handful of literal brand gradients (landing hero, parallax orbs)
+  // that intentionally sit outside the token system — everything built from
+  // `bg-p1`/`text-t2`/etc. already reflects the theme via CSS variables and
+  // needs no `dark:` variant at all.
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
   ],
@@ -18,9 +47,9 @@ module.exports = {
       maxWidth: {
         'app': '98%',
       },
-      // Annotation-workspace tokens. These resolve to the CSS variables defined
-      // in src/styles/workspace-tokens.css, which are scoped to `.iq-workspace`
-      // — so `bg-p1` outside the workspace resolves to nothing, by design.
+      // Design tokens. These resolve to the CSS variables emitted by the
+      // themeVariables plugin above from src/styles/theme.js — the one place
+      // the palette is defined.
       colors: {
         app: 'var(--app)',
         p1: 'var(--p1)',
@@ -36,14 +65,18 @@ module.exports = {
         well: 'var(--well)',
         well2: 'var(--well2)',
         tip: 'var(--tip)',
+        onTip: 'var(--onTip)',
         glass: 'var(--glass)',
+        scrim: 'var(--scrim)',
         ok: 'var(--ok)',
         okBg: 'var(--okBg)',
         okLn: 'var(--okLn)',
         warn: 'var(--warn)',
         warnBg: 'var(--warnBg)',
+        warnLn: 'var(--warnLn)',
         err: 'var(--err)',
         errBg: 'var(--errBg)',
+        errLn: 'var(--errLn)',
         rev: 'var(--rev)',
         revBg: 'var(--revBg)',
         revBg2: 'var(--revBg2)',
@@ -77,15 +110,26 @@ module.exports = {
         12: '12px',
         14: '14px',
       },
+      // Elevation resolves through the theme too. A shadow tuned for dark
+      // surfaces reads as a dirty smudge on light ones, so the four steps are
+      // redefined per theme in theme.js. Tailwind's own sm/md/lg/xl/2xl are
+      // remapped onto the same steps so existing `shadow-lg` call sites become
+      // theme-correct without being touched.
       boxShadow: {
-        tip: '0 10px 26px rgba(0,0,0,.5)',
-        dropdown: '0 18px 44px rgba(0,0,0,.55)',
-        ctx: '0 20px 46px rgba(0,0,0,.55)',
-        picker: '0 22px 54px rgba(0,0,0,.55)',
-        bar: '0 14px 40px rgba(0,0,0,.45)',
-        modal: '0 30px 80px rgba(0,0,0,.6)',
-        stage: '0 10px 50px rgba(0,0,0,.55)',
-        primary: '0 4px 14px rgba(20,184,166,.3)',
+        sm: 'var(--sh1)',
+        DEFAULT: 'var(--sh1)',
+        md: 'var(--sh2)',
+        lg: 'var(--sh2)',
+        xl: 'var(--sh3)',
+        '2xl': 'var(--sh4)',
+        tip: 'var(--sh2)',
+        dropdown: 'var(--sh3)',
+        ctx: 'var(--sh3)',
+        picker: 'var(--sh3)',
+        bar: 'var(--sh2)',
+        modal: 'var(--sh4)',
+        stage: 'var(--sh3)',
+        primary: 'var(--shAc)',
       },
       animation: {
         progress: 'progress 2s ease-in-out infinite',
@@ -99,6 +143,8 @@ module.exports = {
         dcScan: 'dcScan 1.1s ease-in-out infinite',
         dcCloud: 'dcCloud 1.7s ease-in-out infinite',
         dcHalo: 'dcHalo 1.7s ease-in-out infinite',
+        dcSweep: 'dcSweep 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite',
+        dcAura: 'dcAura 2.6s ease-in-out infinite',
       },
       keyframes: {
         progress: {
@@ -137,8 +183,18 @@ module.exports = {
           '0%, 100%': { opacity: '.10' },
           '50%': { opacity: '.30' },
         },
+        // Inference scan. The band is fully clear of the frame at both ends, so
+        // the loop restart is invisible and needs no alternate direction.
+        dcSweep: {
+          '0%': { transform: 'translateY(-130%)' },
+          '100%': { transform: 'translateY(230%)' },
+        },
+        dcAura: {
+          '0%, 100%': { opacity: '.42' },
+          '50%': { opacity: '.9' },
+        },
       },
     },
   },
-  plugins: [],
+  plugins: [themeVariables],
 }

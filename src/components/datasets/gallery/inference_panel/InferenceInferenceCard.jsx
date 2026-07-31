@@ -11,13 +11,13 @@ function ProgressBar({ current, total }) {
     const percent = Math.min(100, Math.round((current / total) * 100));
     return (
         <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="flex justify-between text-xs text-t3 mb-1">
                 <span>Training Progress:</span>
                 <span>{current} / {total} {batchSize == 1 ? "Images" : "Batches"}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded h-2">
+            <div className="w-full bg-hv2 rounded h-2">
                 <div
-                    className="bg-violet-500 h-2 rounded"
+                    className="bg-accent h-2 rounded"
                     style={{ width: `${percent}%`, transition: 'width 0.5s' }}
                 />
             </div>
@@ -108,14 +108,14 @@ export default function InferenceInferenceCard({ model, dataset }) {
     }, [manualAnnotations, automaticAnnotations, pendingAnnotations, dataset.id, cancelInference]);
 
     return (
-        <div className="p-4 bg-white rounded-lg shadow-md">
+        <div className="p-4 bg-p1 rounded-lg shadow-md">
             <div className="flex items-center gap-2 mb-4">
-                <Brain size={20} className="text-violet-600" />
+                <Brain size={20} className="text-ac" />
                 <h3 className="text-lg font-semibold">Inference</h3>
             </div>
             {isTrained && !isTraining && (
                 <div className="mb-4">
-                    <p className="text-sm text-gray-600 mb-2">
+                    <p className="text-sm text-t2 mb-2">
                         Run inference on the dataset using the selected model.
                     </p>
                     <div className={`gap-2 mb-2 ${isLoading ? "opacity-50 pointer-events-none" : ""}`}>
@@ -148,30 +148,30 @@ export default function InferenceInferenceCard({ model, dataset }) {
                             Pending Annotations
                         </label>
                     </div>
-                    <div className="text-sm text-yellow-600 mb-2 gap-2">
+                    <div className="text-sm text-warn mb-2 gap-2">
                         <Info size={16} className="inline mr-1" />
                         Note: Inference will overwrite any existing annotations on the selected images.
                     </div>
                     {isInfering && (
-                        <div className="text-sm text-gray-500 mb-2">
+                        <div className="text-sm text-t3 mb-2">
                             <Info size={16} className="inline mr-1" />
                             Running inference...
                             <ProgressBar current={inferredImages} total={images.length} />
                             <button
                                 onClick={() => {setCancelInference((prev) => !prev);}}
                                 disabled={!model || !dataset }
-                                className={`px-4 py-2 w-full rounded-md ${isLoading ? "bg-gray-300" : "bg-red-600 hover:bg-red-700"} text-white`}
+                                className={`px-4 py-2 w-full rounded-md ${isLoading ? "bg-ln2" : "bg-err hover:brightness-110"} text-onAccent`}
                             >
                                 {`Cancel Inference`}
                             </button>
                         </div>
                     )}
                     {!isInfering && (
-                        <div className="text-sm text-gray-500 mb-2">
+                        <div className="text-sm text-t3 mb-2">
                             <button
                                 onClick={handleInference}
                                 disabled={!model || !dataset || isInfering}
-                                className={`px-4 py-2 w-full rounded-md ${isLoading ? "bg-gray-300" : "bg-violet-600 hover:bg-violet-700"} text-white`}
+                                className={`px-4 py-2 w-full rounded-md ${isLoading ? "bg-ln2" : "bg-accent hover:brightness-110"} text-onAccent`}
                             >
                                 {isInfering ? "Running..." : `Run Inference on ${images.length} Images`}
                             </button>
@@ -180,13 +180,13 @@ export default function InferenceInferenceCard({ model, dataset }) {
              </div>
             )}
             {isTraining && (
-                <div className="text-sm text-yellow-600 mb-2">
+                <div className="text-sm text-warn mb-2">
                     <Info size={16} className="inline mr-1" />
                     The model is currently training. Inference will be available once training is complete.
                 </div>
             )}
             {!isTrained &&
-                <div className="text-gray-500 mt-2">
+                <div className="text-t3 mt-2">
                     <Info size={16} className="inline mr-1" />
                     <span>
                         Inference can only be run on trained models. Please train a model first.

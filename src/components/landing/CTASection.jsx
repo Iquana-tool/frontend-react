@@ -1,42 +1,29 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
-const CTASection = ({ scrollY }) => {
+const CTASection = () => {
   const navigate = useNavigate();
 
   return (
-    <section 
-      className="relative py-24"
-      style={{
-        transform: `translate3d(0, ${scrollY * 0.02}px, 0)`
-      }}
-    >
-      <div 
-        className="relative max-w-4xl mx-auto px-6 text-center"
-        style={{
-          transform: `translate3d(0, ${scrollY * 0.01}px, 0)`
-        }}
-      >
-        <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-teal-400 to-cyan-500 rounded-3xl mb-8 shadow-lg">
-          <Zap className="w-10 h-10 text-white" />
-        </div>
-        <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-8">
-          Advance Marine Research with AI
+    <section className="relative py-14 px-6">
+      <div className="max-w-3xl mx-auto text-center bg-p1 border border-ln rounded-14 p-10 shadow-sm">
+        <h2 className="text-3xl font-semibold tracking-tight text-t1 mb-3">
+          Ready to segment your first reef survey?
         </h2>
-        <p className="text-xl text-gray-600 mb-12 leading-relaxed">
-          Use IQuana for coral segmentation and morphological analysis.
+        <p className="text-t2 mb-6">
+          Upload a dataset and start annotating in minutes.
         </p>
         <button
           onClick={() => navigate('/datasets')}
-          className="group relative inline-flex items-center justify-center px-12 py-4 text-xl font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-2xl shadow-2xl hover:shadow-cyan-500/25 transition-all duration-300 transform hover:-translate-y-1 hover:scale-105"
+          className="group inline-flex items-center gap-[8px] px-7 py-[13px] text-[15px] font-semibold text-onAccent bg-accent rounded-9 shadow-primary hover:brightness-110 active:brightness-95 transition-all duration-150"
         >
-          <span className="relative z-10">Start Segmenting</span>
-          <div className="absolute inset-0 bg-gradient-to-r from-teal-400 to-cyan-500 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity blur-xl"></div>
+          Start segmenting
+          <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform duration-150" />
         </button>
       </div>
     </section>
   );
 };
 
-export default CTASection; 
+export default CTASection;

@@ -207,7 +207,7 @@ const AnnotationViewerCanvas = ({
   };
 
   return (
-    <div className="relative w-full h-full bg-gray-900 overflow-hidden">
+    <div className="relative w-full h-full bg-app overflow-hidden">
       <div
         ref={containerRef}
         className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
@@ -276,27 +276,27 @@ const AnnotationViewerCanvas = ({
       </div>
 
       {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-1 bg-white/90 rounded-lg shadow p-1">
+      <div className="absolute bottom-4 right-4 flex flex-col gap-1 bg-p1 rounded-lg shadow p-1">
         <button
           onClick={() => zoomTo(zoom * ZOOM_STEP)}
-          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+          className="p-1.5 hover:bg-hv rounded transition-colors"
           title="Zoom in"
         >
-          <Plus className="w-4 h-4 text-gray-700" />
+          <Plus className="w-4 h-4 text-t2" />
         </button>
         <button
           onClick={() => zoomTo(zoom / ZOOM_STEP)}
-          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+          className="p-1.5 hover:bg-hv rounded transition-colors"
           title="Zoom out"
         >
-          <Minus className="w-4 h-4 text-gray-700" />
+          <Minus className="w-4 h-4 text-t2" />
         </button>
         <button
           onClick={resetView}
-          className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+          className="p-1.5 hover:bg-hv rounded transition-colors"
           title="Fit to window"
         >
-          <Maximize2 className="w-4 h-4 text-gray-700" />
+          <Maximize2 className="w-4 h-4 text-t2" />
         </button>
       </div>
     </div>
