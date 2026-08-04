@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  GraduationCap, Plus, Cpu, StopCircle, Loader2, ChevronDown, ChevronRight, Clock, Sparkles,
+  GraduationCap, Plus, Cpu, StopCircle, Loader2, ChevronDown, ChevronRight, Clock, Sparkles, AlertTriangle,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -16,20 +16,45 @@ import {
   startInstanceTraining,
   cancelInstanceTraining,
   streamInstanceTrainingProgress,
+  getInstanceLabelAnnotationCounts,
 } from "../api";
 import useThemeColors from "../hooks/useThemeColors";
 
-const TERMINAL = new Set(["SUCCESS", "FAILED"]);
+const TERMINAL = new Set(["SUCCESS", "FAILED", "CANCELLED"]);
 
 const STATE_STYLE = {
   PROGRESS: "bg-acS text-ac",
   SUCCESS: "bg-okBg text-ok",
   FAILED: "bg-errBg text-err",
+  CANCELLED: "bg-warnBg text-warn",
   starting: "bg-well text-t2",
 };
 
 const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString() : "—");
 const lastLoss = (snap) => (snap?.loss?.length ? snap.loss[snap.loss.length - 1].value : null);
+const RUN_NAME_PATTERN = /^[\p{L}\p{N}_\-\s]{1,80}$/u;
+
+const mergeRunSnapshot = (run, snapshot) => ({
+  ...run,
+  ...snapshot,
+  // Preserve optimistic values until the worker-created MLflow run is discoverable.
+  run_name: snapshot.run_name || run.run_name,
+  label_ids: snapshot.label_ids?.length ? snapshot.label_ids : run.label_ids,
+  total_epochs: snapshot.total_epochs ?? run.total_epochs,
+  training_parameters: Object.keys(snapshot.training_parameters || {}).length
+    ? snapshot.training_parameters
+    : run.training_parameters,
+  start_time: snapshot.start_time ?? run.start_time,
+});
+
+const getRunNameError = (value) => {
+  if (value.length === 0) return null;
+  if (value.length > 80) return "Run name must be 80 characters or fewer.";
+  if (!RUN_NAME_PATTERN.test(value)) {
+    return "Run name may contain only letters, numbers, underscores, hyphens, and whitespace.";
+  }
+  return null;
+};
 
 function RunCard({ run, selected, onClick }) {
   return (
@@ -48,6 +73,9 @@ function RunCard({ run, selected, onClick }) {
         </span>
       </div>
       <div className="text-xs text-t2">
+        {run.run_name && (
+          <p className="text-xs font-medium text-t1 truncate mb-0.5">{run.run_name}</p>
+        )}
         {(run.label_ids?.length ?? 0)} class{(run.label_ids?.length ?? 0) === 1 ? "" : "es"}
         {run.total_epochs ? ` · ${run.epoch}/${run.total_epochs} epochs` : ""}
         {lastLoss(run) != null ? ` · loss ${lastLoss(run).toFixed(3)}` : ""}
@@ -62,6 +90,7 @@ function ProgressPanel({ snapshot, onStop, isStopping }) {
   const current = snapshot.epoch || 0;
   const percent = total ? Math.min(100, Math.round((current / total) * 100)) : 0;
   const lossData = (snapshot.loss || []).map((d) => ({ epoch: d.epoch, loss: d.value }));
+  const trainingParameters = snapshot.training_parameters || {};
   const isActive = !TERMINAL.has(snapshot.state) && snapshot.state !== "starting";
 
   return (
@@ -78,6 +107,20 @@ function ProgressPanel({ snapshot, onStop, isStopping }) {
           </span>
         )}
       </div>
+
+      {Object.keys(trainingParameters).length > 0 && (
+        <div className="p-3 rounded-lg border border-ln bg-well">
+          <h3 className="text-sm font-semibold text-t1 mb-2">Training configuration</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            {Object.entries(trainingParameters).map(([key, value]) => (
+              <div key={key}>
+                <span className="block text-t3 capitalize">{key.replace(/_/g, " ")}</span>
+                <span className="font-medium text-t1">{String(value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {total > 0 && (
         <div className="w-full bg-hv2 rounded h-2">
@@ -152,6 +195,9 @@ export default function ModelTrainingPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [error, setError] = useState(null);
+  const [annotationCounts, setAnnotationCounts] = useState({});
+  const [annotationCountStatus, setAnnotationCountStatus] = useState("loading");
+  const [modelRunName, setModelRunName] = useState("");
 
   const streamRef = useRef(null);
 
@@ -163,7 +209,15 @@ export default function ModelTrainingPage() {
   const loadRuns = useCallback(async () => {
     try {
       const res = await getInstanceTrainingRuns(datasetId);
-      setRuns(res.runs || []);
+      const serverRuns = Array.isArray(res?.runs) ? res.runs : [];
+      setRuns((currentRuns) => {
+        const serverTaskIds = new Set(serverRuns.map((run) => run.task_id).filter(Boolean));
+        const pendingLocalRuns = currentRuns.filter(
+          (run) => run.task_id && !serverTaskIds.has(run.task_id) && !TERMINAL.has(run.state)
+        );
+        return [...serverRuns, ...pendingLocalRuns]
+          .sort((a, b) => (b.start_time || 0) - (a.start_time || 0));
+      });
     } catch (e) {
       // non-fatal
     }
@@ -172,6 +226,8 @@ export default function ModelTrainingPage() {
   // Initial load: labels, models, runs.
   useEffect(() => {
     if (!datasetId) return;
+    setAnnotationCountStatus("loading");
+    setAnnotationCounts({});
     (async () => {
       try {
         const labelRes = await fetchLabels(datasetId);
@@ -181,6 +237,16 @@ export default function ModelTrainingPage() {
         setSelectedLabelIds(new Set(list.map((l) => l.id)));
       } catch (e) {
         setError(e.message || "Failed to load labels.");
+      }
+      try {
+        const countRes = await getInstanceLabelAnnotationCounts(datasetId);
+        if (countRes?.success !== true || !countRes.reviewed_annotation_counts) {
+          throw new Error("Annotation counts were not returned.");
+        }
+        setAnnotationCounts(countRes.reviewed_annotation_counts);
+        setAnnotationCountStatus("success");
+      } catch {
+        setAnnotationCountStatus("error");
       }
       try {
         const modelRes = await getInstanceModels();
@@ -208,7 +274,16 @@ export default function ModelTrainingPage() {
     const controller = streamInstanceTrainingProgress(
       activeTaskId,
       (snap) => {
-        setSelectedRun(snap);
+        setSelectedRun((currentRun) => (currentRun ? mergeRunSnapshot(currentRun, snap) : snap));
+        setRuns((currentRuns) => {
+          const matchingIndex = currentRuns.findIndex(
+            (run) => run.task_id === snap.task_id || (snap.run_id && run.run_id === snap.run_id)
+          );
+          if (matchingIndex === -1) return [snap, ...currentRuns];
+          return currentRuns.map((run, index) => (
+            index === matchingIndex ? mergeRunSnapshot(run, snap) : run
+          ));
+        });
         if (TERMINAL.has(snap.state)) {
           setActiveTaskId(null);
           loadRuns();
@@ -229,6 +304,7 @@ export default function ModelTrainingPage() {
   });
 
   const handleStart = async () => {
+    if (getRunNameError(modelRunName)) return;
     setError(null);
     setIsStarting(true);
     try {
@@ -238,9 +314,27 @@ export default function ModelTrainingPage() {
         label_ids: Array.from(selectedLabelIds),
         model_registry_key: modelKey,
         hyper_parameter: hyperValues,
+        model_run_name: modelRunName.trim() || undefined,
       });
+      const labelIds = Array.from(selectedLabelIds);
+      const optimisticRun = {
+        task_id: res.task_id,
+        run_id: null,
+        state: "starting",
+        epoch: 0,
+        total_epochs: hyperValues.epochs ? Number(hyperValues.epochs) : null,
+        loss: [],
+        label_ids: labelIds,
+        training_parameters: { ...hyperValues },
+        run_name: modelRunName.trim() || undefined,
+        start_time: Date.now(),
+      };
+      setRuns((currentRuns) => [
+        optimisticRun,
+        ...currentRuns.filter((run) => run.task_id !== res.task_id),
+      ]);
       setMode("run");
-      setSelectedRun({ task_id: res.task_id, run_id: null, state: "starting", epoch: 0, total_epochs: null, loss: [], label_ids: Array.from(selectedLabelIds) });
+      setSelectedRun(optimisticRun);
       setActiveTaskId(res.task_id);
       loadRuns();
     } catch (err) {
@@ -254,12 +348,15 @@ export default function ModelTrainingPage() {
     if (!activeTaskId) return;
     setIsStopping(true);
     try {
-      await cancelInstanceTraining(activeTaskId);
-    } catch (e) {
-      // run may already be terminal
+      const snapshot = await cancelInstanceTraining(activeTaskId);
+      setSelectedRun((currentRun) => (currentRun ? mergeRunSnapshot(currentRun, snapshot) : snapshot));
+    } catch (err) {
+      setError(err.message || "Failed to stop training.");
+      return;
+    } finally {
+      setIsStopping(false);
     }
     setActiveTaskId(null);
-    setIsStopping(false);
     loadRuns();
   };
 
@@ -277,6 +374,12 @@ export default function ModelTrainingPage() {
   };
 
   const allSelected = labels.length > 0 && selectedLabelIds.size === labels.length;
+  const noAnnotations =
+    annotationCountStatus === "success" &&
+    selectedLabelIds.size > 0 &&
+    [...selectedLabelIds].every((id) => (annotationCounts[id] ?? 0) === 0);
+  const runNameError = getRunNameError(modelRunName);
+  const hasActiveRun = activeTaskId != null || runs.some((run) => !TERMINAL.has(run.state));
 
   return (
     <DatasetManagementLayout>
@@ -361,14 +464,37 @@ export default function ModelTrainingPage() {
                       {allSelected ? "Clear all" : "Select all"}
                     </button>
                   </div>
+                  {annotationCountStatus === "loading" && (
+                    <p className="text-[11px] text-t3 mb-1" role="status">Loading annotation counts…</p>
+                  )}
+                  {annotationCountStatus === "error" && (
+                    <p className="text-[11px] text-warn mb-1" role="alert">
+                      Unable to load annotation counts. Training will be validated by the backend.
+                    </p>
+                  )}
                   <div className="max-h-44 overflow-y-auto border border-ln rounded-lg divide-y divide-ln">
                     {labels.length === 0 && <p className="text-xs text-t3 p-3">This dataset has no labels.</p>}
-                    {labels.map((l) => (
-                      <label key={l.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-hv">
-                        <input type="checkbox" checked={selectedLabelIds.has(l.id)} onChange={() => toggleLabel(l.id)} className="h-4 w-4" />
-                        {l.name}
-                      </label>
-                    ))}
+                    {labels.map((l) => {
+                      const countKnown = annotationCountStatus === "success";
+                      const count = countKnown ? (annotationCounts[l.id] ?? 0) : null;
+                      return (
+                        <label key={l.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-hv">
+                          <input type="checkbox" checked={selectedLabelIds.has(l.id)} onChange={() => toggleLabel(l.id)} className="h-4 w-4" />
+                          <span className="flex-1">{l.name}</span>
+                          <span
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${countKnown
+                              ? (count === 0 ? "bg-errBg text-err" : "bg-okBg text-ok")
+                              : "bg-well text-t3"
+                            }`}
+                            title={countKnown
+                              ? `${count} reviewed annotation${count === 1 ? "" : "s"}`
+                              : "Annotation count unavailable"}
+                          >
+                            {countKnown ? count : (annotationCountStatus === "loading" ? "…" : "—")}
+                          </span>
+                        </label>
+                      );
+                    })}
                   </div>
                   <p className="text-[11px] text-t3 mt-1">Multiclass by default — all labels are selected. Deselect to train a smaller model.</p>
                 </div>
@@ -403,9 +529,43 @@ export default function ModelTrainingPage() {
                   <p className="text-xs text-t3 mt-1">Automatically retrain as new images are fully annotated.</p>
                 </div>
 
+                {/* Run name */}
+                <div>
+                  <label htmlFor="model-run-name" className="block text-sm font-medium text-t1 mb-1">
+                    Run name <span className="text-t3 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="model-run-name"
+                    type="text"
+                    value={modelRunName}
+                    onChange={(e) => setModelRunName(e.target.value)}
+                    maxLength={80}
+                    aria-invalid={Boolean(runNameError)}
+                    aria-describedby="run-name-help"
+                    placeholder="e.g. Cells-FineTuned-v1"
+                    className={`w-full px-3 py-2 text-sm border rounded-lg bg-well text-t1 focus:ring-2 focus:ring-ac focus:border-transparent ${runNameError ? "border-errLn" : "border-ln"}`}
+                  />
+                  <p id="run-name-help" className={`text-[11px] mt-1 ${runNameError ? "text-err" : "text-t3"}`}>
+                    {runNameError || "Optional, 1–80 characters: letters, numbers, underscores, hyphens, or whitespace."}
+                  </p>
+                </div>
+
+                {noAnnotations && (
+                  <p className="text-xs text-err">
+                    The selected classes have no reviewed annotations. Review some annotations before training.
+                  </p>
+                )}
+
+                {hasActiveRun && (
+                  <div className="flex items-center gap-2 p-3 bg-warnBg border border-warnLn rounded-lg text-sm text-warn">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    A training run is still active. Starting another may cause GPU memory contention.
+                  </div>
+                )}
+
                 <button
                   onClick={handleStart}
-                  disabled={isStarting || selectedLabelIds.size === 0}
+                  disabled={isStarting || selectedLabelIds.size === 0 || noAnnotations || Boolean(runNameError)}
                   className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-onAccent bg-accent rounded-lg hover:brightness-110 transition-colors disabled:opacity-60"
                 >
                   {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <GraduationCap className="w-4 h-4" />}
