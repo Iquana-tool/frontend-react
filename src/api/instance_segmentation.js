@@ -12,12 +12,24 @@ export const getInstanceModels = async () => {
 };
 
 /**
+ * Fetch reviewed annotation counts per label ID for a dataset.
+ */
+export const getInstanceLabelAnnotationCounts = async (datasetId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/instance_segmentation/training/label-annotation-counts?dataset_id=${datasetId}`,
+        { headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
+/**
  * Start training an instance segmentation model on a dataset.
  * @param {Object} cfg
  * @param {number} cfg.dataset_id
  * @param {number[]} [cfg.label_ids] - labels to train on; empty/omitted = all dataset labels (multiclass)
  * @param {string} [cfg.model_registry_key] - base model to fine-tune
  * @param {Object} [cfg.hyper_parameter] - hyperparameter overrides keyed by model param key
+ * @param {string} [cfg.model_run_name] - optional human-readable alias for this run
  * @returns {Promise<{success: boolean, task_id: string}>}
  */
 export const startInstanceTraining = async ({
@@ -25,11 +37,12 @@ export const startInstanceTraining = async ({
     label_ids = [],
     model_registry_key = "mask2former",
     hyper_parameter = {},
+    model_run_name = undefined,
 }) => {
     const response = await fetch(`${API_BASE_URL}/instance_segmentation/training/start`, {
         method: "POST",
         headers: getAuthHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ dataset_id, label_ids, model_registry_key, hyper_parameter }),
+        body: JSON.stringify({ dataset_id, label_ids, model_registry_key, hyper_parameter, model_run_name }),
     });
     return handleApiError(response);
 };
