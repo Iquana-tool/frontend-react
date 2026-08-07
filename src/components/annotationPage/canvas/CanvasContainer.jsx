@@ -11,6 +11,7 @@ import RefinementOverlay from './RefinementOverlay';
 import EditableContourOverlay from './EditableContourOverlay';
 import LineEditCanvas from './LineEditCanvas';
 import ScaleCalibrationOverlay from './ScaleCalibrationOverlay';
+import PatchPickOverlay from './PatchPickOverlay';
 import ScaleBarIndicator from './ScaleBarIndicator';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
@@ -22,6 +23,7 @@ import {
   useRefinementModeActive,
   useFocusModeActive,
   useLineEditActive,
+  useWorkspaceMode,
 } from '../../../stores/selectors/annotationSelectors';
 
 /**
@@ -40,6 +42,13 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
   const focusModeActive = useFocusModeActive();
   const lineEditActive = useLineEditActive();
   const setCursorPosition = useSetCursorPosition();
+  const workspaceMode = useWorkspaceMode();
+
+  // Calibrate mode borrows the canvas for measuring, not for annotating. The
+  // drawing surfaces are gated on the mode rather than only on the tool because
+  // stepping to another image resets the tool to 'ai_annotation', which would
+  // otherwise put the prompt canvas back over the calibration overlays.
+  const annotating = workspaceMode !== 'calibrate';
 
   useAIAnnotationShortcuts();
   useFocusModeEscape();
@@ -95,7 +104,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
           draggable={false}
         />
 
-        {currentTool !== 'ai_annotation' && <PromptOverlay canvasRef={canvasRef} />}
+        {annotating && currentTool !== 'ai_annotation' && <PromptOverlay canvasRef={canvasRef} />}
       </div>
 
       {/* Overlays sit outside the transform so their own coordinate maths holds. */}
@@ -109,11 +118,12 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
       {lineEditActive && <LineEditCanvas />}
 
       <ScaleCalibrationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+      <PatchPickOverlay canvasRef={canvasRef} />
       <ScaleBarIndicator canvasRef={canvasRef} zoomLevel={zoomLevel} />
       <InferenceScanOverlay containerRef={containerRef} />
       <ObjectContextMenu />
 
-      {currentTool === 'ai_annotation' && (
+      {annotating && currentTool === 'ai_annotation' && (
         <div
           className="absolute inset-0 pointer-events-none"
           /* Focus mode lifts the prompt canvas above the dim (z40) but below the
@@ -132,7 +142,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
         </div>
       )}
 
-      {currentTool === 'manual_drawing' && (
+      {annotating && currentTool === 'manual_drawing' && (
         <div className="absolute inset-0 pointer-events-auto">
           <ManualDrawCanvas />
         </div>

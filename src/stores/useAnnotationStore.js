@@ -15,6 +15,7 @@ import { createEditModeSlice } from './slices/editModeSlice';
 import { createAIAnnotationSlice } from './slices/aiAnnotationSlice';
 import { createObjectsSlice } from './slices/objectsSlice';
 import { createWorkspaceSlice, readStoredTheme } from './slices/workspaceSlice';
+import { createCalibrationSlice } from './slices/calibrationSlice';
 
 /**
  * Combined annotation store using Zustand with Immer middleware
@@ -30,6 +31,7 @@ import { createWorkspaceSlice, readStoredTheme } from './slices/workspaceSlice';
  * - Edit Mode: Contour editing mode
  * - AI Annotation: AI prompts and undo/redo
  * - Objects: Annotation objects, selection, visibility
+ * - Calibration: The Calibrate tab's per-image calibration state
  */
 const useAnnotationStore = create()(
   devtools(
@@ -51,6 +53,7 @@ const useAnnotationStore = create()(
         ...createAIAnnotationSlice(set),
         ...createObjectsSlice(set),
         ...createWorkspaceSlice(set),
+        ...createCalibrationSlice(set),
       }))
     ),
     { name: 'annotation-store' }

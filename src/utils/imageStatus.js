@@ -1,4 +1,4 @@
-import { Circle, Clock, Eye, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Check, Circle, Clock, Eye, CheckCircle2, RotateCcw, X } from 'lucide-react';
 
 /**
  * The annotation statuses an image's mask can have, with the colors/icons used
@@ -86,21 +86,33 @@ export const getImageStatus = (image) => {
  * image done?". The dataset manager keeps the full five-way breakdown, which is
  * where the review pipeline is actually managed from.
  */
+/**
+ * `icon` and `tone` are for surfaces too small to carry a label — the filmstrip
+ * tiles, at 6-10px. Shape does the work there rather than colour: three shades of
+ * the same dot are not distinguishable at that size, whereas a cross, a ring and
+ * a tick are, and they still read for anyone who cannot separate the hues.
+ */
 export const COARSE_STATUSES = [
   {
     key: 'not_started',
     label: 'Not started',
     badge: 'bg-well text-t1',
+    icon: X,
+    tone: 'text-t3',
   },
   {
     key: 'in_progress',
     label: 'In progress',
     badge: 'bg-acS text-ac',
+    icon: Circle,
+    tone: 'text-warn',
   },
   {
     key: 'finished',
     label: 'Finished',
     badge: 'bg-okBg text-ok',
+    icon: Check,
+    tone: 'text-ok',
   },
 ];
 

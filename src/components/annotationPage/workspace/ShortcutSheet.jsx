@@ -26,7 +26,7 @@ const GROUPS = [
       { keys: 'E', label: 'Edit the selected contour' },
       { keys: 'R', label: 'Reject (review mode)' },
       { keys: '⌫', label: 'Remove last prompt, or delete the selection' },
-      { keys: 'esc', label: 'Clear the selection or leave focus mode' },
+      { keys: 'esc', label: 'Clear the selection, leave focus mode, or cancel a calibration measurement' },
     ],
   },
   {

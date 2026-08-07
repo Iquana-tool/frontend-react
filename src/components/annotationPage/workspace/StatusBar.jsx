@@ -3,6 +3,7 @@ import useRailTools from './useRailTools';
 import { getRailTool } from './toolModel';
 import {
   useActiveLabelId,
+  useCalibrationEntries,
   useDatasetLabels,
   useZoomLevel,
   useCursorPosition,
@@ -10,6 +11,7 @@ import {
   useFilmstripOpen,
   useToggleFilmstrip,
   useImageScale,
+  useSetWorkspaceMode,
   useWebSocketIsReady,
 } from '../../../stores/selectors/annotationSelectors';
 
@@ -17,8 +19,12 @@ import {
  * Monospace status bar under the filmstrip.
  *
  * Reports the active tool and label, the scale calibration (clicking it
- * re-opens calibration, replacing the old ScaleControl button), zoom, cursor
- * position, object count and session health.
+ * re-opens calibration, replacing the old ScaleControl button), the wider
+ * calibration state, zoom, cursor position, object count and session health.
+ *
+ * The calibration readout is what keeps the Calibrate tab from having to be a
+ * gate: most sessions open the image to annotate, so the tab is where you go
+ * when something is wrong or new, and this is what tells you that it is.
  */
 const StatusBar = () => {
   const { railTool, setRailTool } = useRailTools();
@@ -31,9 +37,17 @@ const StatusBar = () => {
   const toggleFilmstrip = useToggleFilmstrip();
   const scale = useImageScale();
   const sessionReady = useWebSocketIsReady();
+  const calibrationEntries = useCalibrationEntries();
+  const setWorkspaceMode = useSetWorkspaceMode();
 
   const activeLabel = labels.find((label) => String(label.id) === String(activeLabelId));
   const calibrated = scale?.unit && scale.unit !== 'px' && scale.scaleX > 0;
+
+  // Entries only exist once the Calibrate tab has loaded them for this image, so
+  // the chip stays hidden rather than claiming "0 calibrated" on an image it has
+  // not looked at yet.
+  const calibratedCount = calibrationEntries.filter((entry) => entry.calibrated).length;
+  const uncalibratedCount = calibrationEntries.length - calibratedCount;
 
   return (
     <div className="h-6 flex-none flex items-center gap-[10px] px-[10px] bg-p1 border-t border-ln font-mono text-sect text-t3 whitespace-nowrap overflow-hidden">
@@ -51,6 +65,19 @@ const StatusBar = () => {
       >
         {calibrated ? `1px = ${scale.scaleX.toFixed(4)} ${scale.unit}` : 'uncalibrated'}
       </button>
+
+      {calibrationEntries.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setWorkspaceMode('calibrate')}
+          title="Open the Calibrate tab"
+          className={`transition-colors duration-150 hover:text-ac ${
+            uncalibratedCount ? 'text-warn' : 'text-ok'
+          }`}
+        >
+          cal {calibratedCount}/{calibrationEntries.length}
+        </button>
+      )}
 
       <span className="tabular-nums">{Math.round(zoomLevel * 100)}%</span>
 

@@ -292,9 +292,13 @@ const TopToolbar = () => {
         <ToolbarButton icon={Maximize} label="Reset view" onClick={resetView} />
       </Group>
 
-      {/* Annotate / Review mode */}
+      {/* Calibrate / Annotate / Review.
+          Three views of the same image sharing one canvas and one viewport —
+          switching keeps the zoom, the pan and the selection, which is the whole
+          reason calibration is a mode here rather than a separate page. */}
       <Group>
         {[
+          { id: 'calibrate', label: 'Calibrate' },
           { id: 'annotate', label: 'Annotate' },
           { id: 'review', label: 'Review' },
         ].map(({ id, label }) => {
