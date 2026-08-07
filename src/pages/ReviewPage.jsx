@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ClipboardCheck, Loader2 } from 'lucide-react';
 import * as api from '../api';
 import { fetchReviewSummary, buildReviewQueue } from '../api/reviews';
@@ -27,6 +27,7 @@ const readableError = (err, fallback) =>
 const ReviewPage = () => {
   const { datasetId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated } = useAuth();
   const { datasets } = useDataset();
 
@@ -154,6 +155,7 @@ const ReviewPage = () => {
             labels={labels}
             building={building}
             onStart={handleStart}
+            defaultOnlySubmitted={location.state?.onlySubmitted !== false}
           />
         )}
       </div>

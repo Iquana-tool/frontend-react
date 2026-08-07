@@ -11,6 +11,7 @@ export * from "./api/models";
 export * from "./api/quantifications";
 export * from "./api/automatic_segmentation";
 export * from "./api/instance_segmentation";
+export * from "./api/inference";
 export * from "./api/members";
 export * from "./api/reviews";
 export * from "./api/annotation_queue";
