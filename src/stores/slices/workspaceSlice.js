@@ -46,10 +46,41 @@ export const createWorkspaceSlice = (set) => ({
     persistTheme(next);
   }),
 
+  /**
+   * Switch the workspace between Calibrate / Annotate / Review.
+   *
+   * The three modes share one canvas, one image and one viewport — what changes
+   * is the chrome around it: which tools the rail offers and which panel is in
+   * front. That is why this is a mode rather than a route: navigating away and
+   * back would lose the zoom, the pan and the selection, and calibration is
+   * something you do *while looking at* the image.
+   *
+   * Entering and leaving Calibrate has to tidy up after itself. An armed
+   * patch-pick or a live scale calibration keeps an overlay above the canvas
+   * swallowing clicks, so both are cancelled on the way out; and the annotation
+   * tools are meaningless here, so the tool drops to pan on the way in.
+   */
   setWorkspaceMode: (mode) => set((state) => {
+    const previous = state.workspace.mode;
+    if (previous === mode) return;
     state.workspace.mode = mode;
+
     // Leaving review mode should not strand the "show approved" escape hatch on.
     if (mode !== 'review') state.workspace.showApproved = false;
+
+    if (mode === 'calibrate') {
+      // The calibration controls live in the left drawer, so opening the mode
+      // with it collapsed would show a rail with nowhere to configure anything.
+      state.workspace.leftDrawerOpen = true;
+      state.ui.currentTool = 'pan';
+      state.workspace.picker = null;
+    } else if (previous === 'calibrate') {
+      state.calibration.activePick = null;
+      state.calibration.activeKind = null;
+      state.images.scale.isCalibrating = false;
+      state.images.scale.calibrationPoints = null;
+      state.ui.currentTool = 'ai_annotation';
+    }
   }),
 
   setAiAssist: (on) => set((state) => {

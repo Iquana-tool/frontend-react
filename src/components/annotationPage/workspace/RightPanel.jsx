@@ -11,13 +11,21 @@ import {
   useObjectsList,
 } from '../../../stores/selectors/annotationSelectors';
 
+/**
+ * The panel lists what has been annotated, in every mode.
+ *
+ * Calibration deliberately does not appear here: it is a tool, not a product, so
+ * it lives on the left with the rail and the options drawer. Keeping the objects
+ * and the label taxonomy visible while calibrating also costs nothing — the
+ * canvas is the same canvas, and seeing what is annotated is still useful.
+ */
 const TABS = [
   { id: 'objects', label: 'Objects', icon: Layers },
   { id: 'labels', label: 'Labels', icon: Tag },
 ];
 
 /** The 38px strip the panel collapses to. */
-const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount }) => (
+const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount, tabs }) => (
   <div className="w-[38px] flex-none flex flex-col items-center gap-[4px] py-[6px] bg-p1 border-l border-ln">
     <Tooltip label="Expand panel" shortcut="⌥2" placement="bottomRight">
       <button
@@ -32,7 +40,7 @@ const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount }) => (
 
     <div className="w-[22px] h-px bg-ln2 my-[4px]" />
 
-    {TABS.map(({ id, label, icon: Icon }) => (
+    {tabs.map(({ id, label, icon: Icon }) => (
       <Tooltip key={id} label={label} placement="bottomRight">
         <button
           type="button"
@@ -69,13 +77,18 @@ const RightPanel = () => {
   const setTab = useSetRightTab();
   const objects = useObjectsList();
 
+  // A tab id left over from an earlier build (or an earlier mode) must not blank
+  // the panel out.
+  const activeTab = TABS.some((entry) => entry.id === tab) ? tab : TABS[0].id;
+
   if (!open) {
     return (
       <CollapsedStrip
         onExpand={toggleOpen}
         onPickTab={setTab}
-        activeTab={tab}
+        activeTab={activeTab}
         objectCount={objects.length}
+        tabs={TABS}
       />
     );
   }
@@ -87,7 +100,7 @@ const RightPanel = () => {
         className="h-[34px] flex-none flex items-center gap-[4px] px-[6px] border-b border-ln"
       >
         {TABS.map(({ id, label, icon: Icon }) => {
-          const active = tab === id;
+          const active = activeTab === id;
           return (
             <button
               key={id}
@@ -118,7 +131,7 @@ const RightPanel = () => {
         </button>
       </div>
 
-      {tab === 'objects' ? <ObjectsTab /> : <LabelsTab />}
+      {activeTab === 'objects' ? <ObjectsTab /> : <LabelsTab />}
     </div>
   );
 };

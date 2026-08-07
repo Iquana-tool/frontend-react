@@ -242,6 +242,38 @@ export const useStartCalibration = () => useAnnotationStore(state => state.start
 export const useSetCalibrationPoint = () => useAnnotationStore(state => state.setCalibrationPoint);
 export const useCancelCalibration = () => useAnnotationStore(state => state.cancelCalibration);
 
+// Calibration selectors — the Calibrate tab. Distinct from the four above,
+// which are the *scale* kind's draw-a-line interaction and predate the tab.
+export const useCalibrationKinds = () => useAnnotationStore(state => state.calibration.kinds);
+export const useCalibrationKindsLoaded = () => useAnnotationStore(state => state.calibration.kindsLoaded);
+export const useCalibrationEntries = () => useAnnotationStore(state => state.calibration.entries);
+export const useCalibrationLoading = () => useAnnotationStore(state => state.calibration.loading);
+export const useCalibrationError = () => useAnnotationStore(state => state.calibration.error);
+export const useActiveCalibrationKind = () => useAnnotationStore(state => state.calibration.activeKind);
+export const useActivePatchPick = () => useAnnotationStore(state => state.calibration.activePick);
+export const useSampleRadius = () => useAnnotationStore(state => state.calibration.sampleRadius);
+export const usePendingSamples = () => useAnnotationStore(state => state.calibration.pending);
+export const useWedgeState = () => useAnnotationStore(state => state.calibration.wedge);
+
+// Calibration action selectors
+export const useSetCalibrationKinds = () => useAnnotationStore(state => state.setCalibrationKinds);
+export const useSetCalibrationEntries = () => useAnnotationStore(state => state.setCalibrationEntries);
+export const useSetCalibrationLoading = () => useAnnotationStore(state => state.setCalibrationLoading);
+export const useSetCalibrationError = () => useAnnotationStore(state => state.setCalibrationError);
+export const useSetActiveCalibrationKind = () => useAnnotationStore(state => state.setActiveCalibrationKind);
+export const useStartPatchPick = () => useAnnotationStore(state => state.startPatchPick);
+export const useCancelPatchPick = () => useAnnotationStore(state => state.cancelPatchPick);
+export const useSetSampleRadius = () => useAnnotationStore(state => state.setSampleRadius);
+export const useSetPendingSample = () => useAnnotationStore(state => state.setPendingSample);
+export const useClearPendingSamples = () => useAnnotationStore(state => state.clearPendingSamples);
+export const useResetCalibrationForImage = () => useAnnotationStore(state => state.resetCalibrationForImage);
+export const useAddWedgeEnd = () => useAnnotationStore(state => state.addWedgeEnd);
+export const useSetWedgePoint = () => useAnnotationStore(state => state.setWedgePoint);
+export const useSetWedgeSampling = () => useAnnotationStore(state => state.setWedgeSampling);
+export const useSetWedgeSamples = () => useAnnotationStore(state => state.setWedgeSamples);
+export const useSetWedgeSample = () => useAnnotationStore(state => state.setWedgeSample);
+export const useClearWedge = () => useAnnotationStore(state => state.clearWedge);
+
 // Workspace shell selectors
 export const useWorkspaceTheme = () => useAnnotationStore(state => state.workspace.theme);
 export const useWorkspaceMode = () => useAnnotationStore(state => state.workspace.mode);

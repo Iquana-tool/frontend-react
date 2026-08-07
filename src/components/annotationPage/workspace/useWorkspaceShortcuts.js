@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import useRailTools from './useRailTools';
 import useWorkspaceImageNav from './useWorkspaceImageNav';
 import useObjectActions from './useObjectActions';
-import { RAIL_TOOL_BY_KEY, getRailTool } from './toolModel';
+import { RAIL_TOOL_BY_KEY, getRailTool, railToolsForMode } from './toolModel';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './constants';
 import annotationSession from '../../../services/annotationSession';
 import {
@@ -89,7 +89,13 @@ export default function useWorkspaceShortcuts() {
       const railTool =
         upper === 'R' && mode === 'review' ? undefined : RAIL_TOOL_BY_KEY[upper];
 
-      if (railTool && !getRailTool(railTool).unavailable) {
+      // A shortcut must not reach a tool the current mode's rail does not offer —
+      // otherwise `P` would arm the point tool in Calibrate mode, where the rail
+      // deliberately has no shape tools at all.
+      const inThisMode = railTool
+        && railToolsForMode(mode).some((tool) => tool.id === railTool);
+
+      if (inThisMode && !getRailTool(railTool).unavailable) {
         event.preventDefault();
         setRailTool(railTool);
         return;
@@ -97,8 +103,11 @@ export default function useWorkspaceShortcuts() {
 
       switch (upper) {
         case 'A':
-          event.preventDefault();
-          toggleAssist();
+          // AI assist has nothing to act on while calibrating.
+          if (mode !== 'calibrate') {
+            event.preventDefault();
+            toggleAssist();
+          }
           break;
         case 'L':
           if (selectedIds.length > 0) {

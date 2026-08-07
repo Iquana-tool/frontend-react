@@ -19,7 +19,9 @@ export const initialState = {
   // retired independently once nothing reads them.
   workspace: {
     theme: 'dark',              // 'dark' | 'light'
-    mode: 'annotate',           // 'annotate' | 'review'
+    // The workspace tab. All three share one canvas and one viewport; they differ
+    // in the rail's tools and which side panel is in front. See setWorkspaceMode.
+    mode: 'annotate',           // 'calibrate' | 'annotate' | 'review'
     /** When false, drawn shapes are committed as-is instead of becoming model prompts. */
     aiAssist: true,
     leftDrawerOpen: true,
@@ -140,6 +142,49 @@ export const initialState = {
     },
   },
   
+  // Calibration State — the Calibrate tab's view of the current image.
+  //
+  // Only the scale sub-object under `images.scale` above is duplicated here in
+  // spirit: that one stays as-is because the status bar, the scale-bar indicator
+  // and the draw-a-line overlay all read it, and it is refreshed from the same
+  // backend response this slice loads.
+  calibration: {
+    /** Registry metadata from the server; fetched once and reused per image. */
+    kinds: [],
+    kindsLoaded: false,
+    /** One entry per kind for the current image, calibrated or not. */
+    entries: [],
+    loading: false,
+    error: null,
+    /** Which calibration the rail has selected in Calibrate mode. */
+    activeKind: null,
+    /**
+     * What the canvas is currently capturing clicks for, if anything.
+     *   { kind, mode: 'role',        role }   — one named reference (two-patch)
+     *   { kind, mode: 'wedge_ends'         }  — the two ends of a reference card
+     *   { kind, mode: 'wedge_patch', index }  — one card patch, to re-read it
+     */
+    activePick: null,
+    /** Radius of the sampled disc, in image pixels. */
+    sampleRadius: 8,
+    /** Sampled-but-unsaved named references: { [kind]: { [role]: sample } }. */
+    pending: {},
+    /**
+     * Reference-card placement for the current image.
+     *
+     * The card's patches are evenly spaced along a rigid strip, so clicking the
+     * first and last patch centres is enough to place all of them — 2 clicks
+     * instead of 20. `points` is what that produced, `samples` what they read,
+     * and either can be corrected one patch at a time when a disc lands badly.
+     */
+    wedge: {
+      ends: [],       // [{x, y}, {x, y}] in image pixels, as clicked
+      points: [],     // derived patch centres, image pixels
+      samples: [],    // one sample per point, aligned by index
+      sampling: false,
+    },
+  },
+
   // Model State
   models: {
     promptedModel: null, // Store model ID as string, not object

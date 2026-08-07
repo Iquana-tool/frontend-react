@@ -2,17 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import useWorkspaceImageNav from './useWorkspaceImageNav';
 import { getImageById } from '../../../api/images';
-import { getImageStatus } from '../../../utils/imageStatus';
+import { getCoarseStatus, getImageStatus } from '../../../utils/imageStatus';
 import { useToggleFilmstrip } from '../../../stores/selectors/annotationSelectors';
-
-/** Status dot colours, mapped from the shared image-status lifecycle. */
-const STATUS_DOT = {
-  finished: 'var(--ok)',
-  reviewable: 'var(--warn)',
-  in_progress: 'var(--warn)',
-  rejected: 'var(--rev)',
-  not_started: 'var(--t3)',
-};
 
 /**
  * Bottom image navigator.
@@ -20,6 +11,12 @@ const STATUS_DOT = {
  * Thumbnails load lazily through an IntersectionObserver rather than the old
  * gallery's fixed 200ms-apart timer chain, which fired a request for every
  * image in the dataset whether or not it was ever scrolled into view.
+ *
+ * Tiles carry the three-state coarse status, matching the pill in the toolbar
+ * above rather than the five-state lifecycle the dataset manager shows. That is
+ * the model this page is meant to use — while annotating, whether a mask is
+ * awaiting review or was sent back is noise against "is this image done?" — and
+ * three shapes stay legible on a 62x46 thumbnail where five colours did not.
  */
 const Filmstrip = () => {
   const { imageList, currentIndex, goToImage } = useWorkspaceImageNav();
@@ -102,7 +99,10 @@ const Filmstrip = () => {
       <div ref={stripRef} className="flex-1 min-w-0 flex items-center gap-[7px] overflow-x-auto py-[4px]">
         {imageList.map((image, index) => {
           const active = index === currentIndex;
-          const status = getImageStatus(image);
+          // Resolve through the detailed status first so legacy image shapes
+          // (a bare `finished` flag, a "completed" string) are still understood.
+          const status = getCoarseStatus(getImageStatus(image).key);
+          const StatusIcon = status.icon;
           return (
             <button
               key={image.id}
@@ -116,7 +116,7 @@ const Filmstrip = () => {
               type="button"
               onClick={() => goToImage(image)}
               aria-current={active}
-              title={image.name}
+              title={`${image.name} — ${status.label}`}
               className={`relative w-[62px] h-[46px] flex-none rounded-6 overflow-hidden transition-shadow ${
                 active
                   ? 'shadow-[0_0_0_2px_var(--accent)]'
@@ -134,10 +134,15 @@ const Filmstrip = () => {
                 <span className="block w-full h-full bg-well" />
               )}
 
+              {/* On its own disc: the tile behind it is arbitrary photography,
+                  so a bare icon would sit on whatever the thumbnail happens to
+                  be there and disappear against half of them. */}
               <span
-                className="absolute top-[3px] right-[3px] w-[6px] h-[6px] rounded-full"
-                style={{ background: STATUS_DOT[status.key] || STATUS_DOT.not_started }}
-              />
+                className={`absolute top-[3px] right-[3px] w-[14px] h-[14px] rounded-full
+                  flex items-center justify-center bg-p1 ${status.tone}`}
+              >
+                <StatusIcon size={10} strokeWidth={3} />
+              </span>
               <span className="absolute bottom-0 left-0 max-w-full px-[3px] font-mono text-badge text-white bg-black/60 truncate">
                 {image.name}
               </span>

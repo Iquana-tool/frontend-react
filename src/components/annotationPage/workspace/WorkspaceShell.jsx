@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import TopToolbar from './TopToolbar';
 import ToolRail from './ToolRail';
 import ToolOptionsDrawer from './ToolOptionsDrawer';
+import CalibrationDrawer from './CalibrationDrawer';
 import RightPanel from './RightPanel';
 import ActionBar from './ActionBar';
 import Filmstrip from './Filmstrip';
@@ -11,6 +12,7 @@ import ReviewBanner from './ReviewBanner';
 import ShortcutSheet from './ShortcutSheet';
 import useWorkspaceShortcuts from './useWorkspaceShortcuts';
 import useArmedLabelAutoApply from './useArmedLabelAutoApply';
+import { useCalibrationSync } from './useCalibrationState';
 import MainCanvas from '../canvas/MainCanvas';
 import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
@@ -24,8 +26,13 @@ import {
   useFilmstripOpen,
   useCurrentImageId,
   useCurrentMaskId,
+  useCurrentTool,
+  useSetCurrentTool,
   useResetWorkspaceForImage,
 } from '../../../stores/selectors/annotationSelectors';
+
+/** The only tools the rail offers in Calibrate mode. See toolModel.js. */
+const CALIBRATE_TOOLS = ['pan', 'zoom', 'set_scale'];
 
 /**
  * The annotation workspace shell.
@@ -44,6 +51,8 @@ const WorkspaceShell = () => {
   const filmstripOpen = useFilmstripOpen();
   const currentImageId = useCurrentImageId();
   const maskId = useCurrentMaskId();
+  const currentTool = useCurrentTool();
+  const setCurrentTool = useSetCurrentTool();
   const resetForImage = useResetWorkspaceForImage();
   const { datasets } = useDataset();
   const { datasetId } = useParams();
@@ -52,12 +61,24 @@ const WorkspaceShell = () => {
   useWorkspaceShortcuts();
   // Applies the armed label to anything segmented while a class is armed.
   useArmedLabelAutoApply();
+  // Loads the image's calibrations here rather than in the Calibrate tab, so the
+  // status bar can report them without the tab ever having been opened.
+  useCalibrationSync();
 
   // Per-image view state (hidden rows, manual ordering, collapse) must not
   // carry over when the user steps to another image.
   useEffect(() => {
     resetForImage();
   }, [currentImageId, resetForImage]);
+
+  // Stepping to another image resets the tool to the annotation default, which
+  // in Calibrate mode is not on the rail at all. Put it back to a tool that is,
+  // so the rail keeps showing what is actually selected.
+  useEffect(() => {
+    if (mode === 'calibrate' && !CALIBRATE_TOOLS.includes(currentTool)) {
+      setCurrentTool('pan');
+    }
+  }, [mode, currentTool, setCurrentTool]);
 
   // RejectionBanner permission-checks against the dataset the route names —
   // `currentDataset` may still be the previously opened one.
@@ -80,7 +101,12 @@ const WorkspaceShell = () => {
 
       <div className="flex-1 min-h-0 flex">
         <ToolRail />
-        {leftDrawerOpen && <ToolOptionsDrawer />}
+        {/* The drawer is the rail's companion in both modes: it configures
+            whatever the rail selected. In Calibrate mode that is a calibration
+            rather than a drawing tool. */}
+        {leftDrawerOpen && (
+          mode === 'calibrate' ? <CalibrationDrawer /> : <ToolOptionsDrawer />
+        )}
 
         <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">
           <div className="flex-1 relative overflow-hidden">

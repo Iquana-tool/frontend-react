@@ -47,6 +47,33 @@ export const RAIL_TOOLS = [
   { id: 'scale', name: 'Set scale', key: 'R', icon: 'Ruler' },
 ];
 
+/**
+ * The rail in Calibrate mode.
+ *
+ * Calibration is measurement, not annotation, so the shape tools are not offered
+ * there — a point or a polygon has nothing to contribute to a scale or a colour
+ * reference. What is left is the navigation needed to see a reference clearly.
+ *
+ * Below these, the rail shows one button per calibration kind: pick the
+ * calibration on the rail, configure it in the drawer, measure it on the canvas.
+ * That is the same shape as the annotation rail it stands in for, and it scales
+ * to a sixth calibration kind as a sixth icon rather than a sixth card to scroll
+ * past.
+ */
+export const CALIBRATE_RAIL_TOOL_IDS = ['pan', 'zoom'];
+
+export const railToolsForMode = (mode) => (
+  mode === 'calibrate'
+    ? RAIL_TOOLS.filter((tool) => CALIBRATE_RAIL_TOOL_IDS.includes(tool.id))
+    : RAIL_TOOLS
+);
+
+/** Icon per calibration kind, falling back for a kind this build predates. */
+export const CALIBRATION_KIND_ICONS = {
+  scale: 'Ruler',
+  response: 'Palette',
+};
+
 /** Prompt-shaped rail tools, i.e. the ones that drive `promptMode`. */
 const SHAPE_TOOLS = new Set(['point', 'box', 'polygon', 'freehand']);
 
