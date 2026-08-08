@@ -15,6 +15,7 @@ import DocumentationPage from "./pages/DocumentationPage";
 import QuantificationPage from "./pages/QuantificationPage";
 import ModelZooPage from "./pages/ModelZooPage";
 import ModelTrainingPage from "./pages/ModelTrainingPage";
+import BatchInferencePage from "./pages/BatchInferencePage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
@@ -155,6 +156,16 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ModelTrainingPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Batch inference: hand the whole dataset to an orchestration of models
+                and watch it work, instead of running one model per image by hand. */}
+            <Route
+              path="/dataset/:datasetId/inference"
+              element={
+                <ProtectedRoute>
+                  <BatchInferencePage />
                 </ProtectedRoute>
               }
             />
