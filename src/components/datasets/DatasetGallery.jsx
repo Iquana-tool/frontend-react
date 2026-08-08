@@ -112,6 +112,10 @@ const DatasetGallery = () => {
     navigate(`/dataset/${datasetId}/training`);
   };
 
+  const handleBatchInferenceClick = () => {
+    navigate(`/dataset/${datasetId}/inference`);
+  };
+
   const handleBrowseAnnotations = () => {
     navigate(`/dataset/${datasetId}/view`);
   };
@@ -141,6 +145,7 @@ const DatasetGallery = () => {
             onLabelManagementClick={handleLabelManagementClick}
             onExportCocoClick={() => setShowCocoModal(true)}
             onModelTrainingClick={handleModelTrainingClick}
+            onBatchInferenceClick={handleBatchInferenceClick}
             onBrowseAnnotations={handleBrowseAnnotations}
             onManageAccessClick={handleManageAccessClick}
             onReviewClick={handleReviewClick}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Wrench, Settings, HelpCircle } from 'lucide-react';
+import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Wrench, Settings, HelpCircle, Wand2 } from 'lucide-react';
 import ManagementCard from './ManagementCard';
 import RoleBadge from '../RoleBadge';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -35,6 +35,7 @@ const ManagementCardsView = ({
   onLabelManagementClick,
   onExportCocoClick,
   onModelTrainingClick,
+  onBatchInferenceClick,
   onBrowseAnnotations,
   onManageAccessClick,
   onReviewClick,
@@ -227,6 +228,16 @@ const ManagementCardsView = ({
       onClick: onModelTrainingClick,
       permitted: can(Permission.AI_TRAIN),
       color: 'indigo',
+    },
+    {
+      id: 'batch-inference',
+      group: 'models',
+      icon: Wand2,
+      title: 'Batch Inference',
+      description: 'Let your models annotate the whole dataset — one model per label, run in hierarchy order',
+      onClick: onBatchInferenceClick,
+      permitted: can(Permission.AI_BATCH_INFER),
+      color: 'purple',
     },
     {
       id: 'quantifications',

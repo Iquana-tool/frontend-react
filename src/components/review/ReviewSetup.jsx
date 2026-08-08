@@ -53,12 +53,15 @@ const flattenWithDepth = (labels) => {
  * The review session's launch pad: granularity, ordering, and (for the custom
  * mode) which labels to sweep. Calls `onStart` with the options the API expects.
  */
-const ReviewSetup = ({ summary, labels, building, onStart }) => {
+const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted = true }) => {
   const [mode, setMode] = useState('hierarchy');
   const [direction, setDirection] = useState('asc');
   const [strategy, setStrategy] = useState('hierarchy');
   const [selectedLabelIds, setSelectedLabelIds] = useState([]);
   const [includeReviewed, setIncludeReviewed] = useState(false);
+  // Defaults to submitted work only. Batch inference deep-links with this off: it writes
+  // predictions onto masks nobody has submitted yet, so its output is invisible otherwise.
+  const [onlySubmitted, setOnlySubmitted] = useState(defaultOnlySubmitted);
 
   const strategies = summary?.strategies || [];
   const indentedLabels = useMemo(() => flattenWithDepth(labels), [labels]);
@@ -79,7 +82,7 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
   const canStart =
     !building &&
     (mode !== 'custom' || selectedLabelIds.length > 0) &&
-    (available == null || available > 0);
+    (available == null || available > 0 || !onlySubmitted);
 
   const handleStart = () => {
     onStart({
@@ -87,6 +90,7 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
       sortStrategy: strategy,
       direction,
       labelIds: mode === 'custom' ? selectedLabelIds : null,
+      onlySubmitted,
       includeReviewed,
     });
   };
@@ -136,6 +140,30 @@ const ReviewSetup = ({ summary, labels, building, onStart }) => {
               </button>
             );
           })}
+        </div>
+
+        {/* Work that is not finished yet. The pending count above only measures submitted
+            masks, so anything written onto an in-progress image — notably batch-inference
+            predictions — is invisible until this is off. */}
+        <div className="bg-p1 rounded-xl border border-ln p-4 mb-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={!onlySubmitted}
+              onChange={(e) => setOnlySubmitted(!e.target.checked)}
+              className="mt-0.5 rounded border-ln2 text-ac focus:ring-ac"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-t2">
+                Include images still being annotated
+              </span>
+              <span className="block text-sm text-t2">
+                By default only images somebody marked as fully annotated are reviewed. Turn
+                this on to also sweep work in progress — including annotations a model just
+                produced, which nobody has submitted yet.
+              </span>
+            </span>
+          </label>
         </div>
 
         {/* Second opinions: re-open work that other reviewers already approved. */}
