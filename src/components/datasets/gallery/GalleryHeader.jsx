@@ -1,6 +1,6 @@
 import React from 'react';
 import { Search } from 'lucide-react';
-import { PHASES, PHASE_STATES, getPhase } from '../../../utils/imageStatus';
+import { PHASES, getPhase, stateLabel, statesOfPhase } from '../../../utils/imageStatus';
 
 /**
  * The phases you can judge an image on, plus the combined view.
@@ -34,12 +34,13 @@ const GalleryHeader = ({
   // "Overall" there is no phase to borrow from, so the neutral state colours stand.
   const phase = getPhase(filterPhase);
 
-  // "All" first, then one chip per state with its count in the selected phase.
+  // "All" first, then one chip per state the selected phase can actually be in —
+  // only Review has a "Not reviewable yet" bucket, so only Review gets that chip.
   const filters = [
     { key: 'all', label: 'All', count: totalCount, dot: null },
-    ...PHASE_STATES.map((s) => ({
+    ...statesOfPhase(filterPhase).map((s) => ({
       key: s.key,
-      label: s.label,
+      label: stateLabel(filterPhase, s.key),
       count: counts[s.key] || 0,
       dot: phase ? phase.fill[s.key] : s.dot,
       ring: phase ? phase.ring : s.ring,

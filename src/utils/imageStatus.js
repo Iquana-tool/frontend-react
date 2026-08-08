@@ -1,4 +1,4 @@
-import { Check, Circle, CheckCircle2, Clock, Eye, PenTool, Ruler, X } from 'lucide-react';
+import { Ban, Check, Circle, CheckCircle2, Clock, Eye, PenTool, Ruler, X } from 'lucide-react';
 
 /**
  * An image moves through three phases — Calibrate, Annotate, Review — and each one
@@ -30,6 +30,24 @@ import { Check, Circle, CheckCircle2, Clock, Eye, PenTool, Ruler, X } from 'luci
  * and they still read for anyone who cannot separate the hues.
  */
 export const PHASE_STATES = [
+  {
+    // A phase with a prerequisite that has produced nothing yet. Only Review has
+    // one, so this state never occurs on Calibrate or Annotate — see `states` on
+    // each phase below.
+    //
+    // Neutral grey in every phase rather than a fourth tone of the hue: it is not
+    // a step of that phase's progress, it is work that does not exist yet, and
+    // colouring it in-hue would make an untouched dataset's Review bar look as
+    // though reviewing had begun.
+    key: 'blocked',
+    label: 'Not ready',
+    icon: Ban,
+    smallIcon: Ban,
+    dot: 'bg-ln2',
+    badge: 'bg-well text-t3',
+    ring: 'ring-ln2',
+    tone: 'text-t3',
+  },
   {
     key: 'not_started',
     label: 'Not started',
@@ -64,6 +82,12 @@ export const PHASE_STATES = [
 
 export const PHASE_STATE_MAP = Object.fromEntries(PHASE_STATES.map((s) => [s.key, s]));
 
+/** The three states a phase without a prerequisite — and the overall status — use. */
+export const OVERALL_STATES = PHASE_STATES.filter((s) => s.key !== 'blocked');
+
+/** Neutral fill for `blocked`, shared by all phases. See the state's note above. */
+const BLOCKED_FILL = 'bg-ln2';
+
 /**
  * The three phases, in workflow order — which is also their display order.
  *
@@ -73,10 +97,16 @@ export const PHASE_STATE_MAP = Object.fromEntries(PHASE_STATES.map((s) => [s.key
  * around its canvas — draws from the same family, so the colour rather than the
  * label is what says which step you are looking at.
  *
- * `fill` maps the three progress states onto that hue's three tones. The class
- * names are spelled out rather than composed (`bg-${token}${n}`) because Tailwind
- * finds classes by scanning source text; a constructed name is purged from the
- * build and renders as no colour at all.
+ * `fill` maps the states onto that hue's tones. The class names are spelled out
+ * rather than composed (`bg-${token}${n}`) because Tailwind finds classes by
+ * scanning source text; a constructed name is purged from the build and renders
+ * as no colour at all.
+ *
+ * `states` is what the phase can actually report, and is what bars, legends and
+ * filter chips iterate. Calibrate and Annotate are independent of everything, so
+ * they have three; Review depends on Annotate and adds `blocked` for images with
+ * nothing drawn to review. Iterating the full catalogue instead would put a
+ * permanently-empty "Not ready" segment on two of the three bars.
  */
 export const PHASES = [
   {
@@ -90,6 +120,7 @@ export const PHASES = [
     border: 'border-calLn',
     ring: 'ring-calLn',
     cssVar: '--cal',
+    states: OVERALL_STATES,
     fill: {
       not_started: 'bg-cal3',
       in_progress: 'bg-cal2',
@@ -107,6 +138,7 @@ export const PHASES = [
     border: 'border-annLn',
     ring: 'ring-annLn',
     cssVar: '--ann',
+    states: OVERALL_STATES,
     fill: {
       not_started: 'bg-ann3',
       in_progress: 'bg-ann2',
@@ -124,7 +156,13 @@ export const PHASES = [
     border: 'border-revLn',
     ring: 'ring-revLn',
     cssVar: '--rev',
+    states: PHASE_STATES,
+    // "Not reviewable yet" rather than the generic "Not ready": the reviewer's
+    // question is whether this image is theirs to open, and the specific wording
+    // answers it without them having to work out what is missing.
+    stateLabels: { blocked: 'Not reviewable yet' },
     fill: {
+      blocked: BLOCKED_FILL,
       not_started: 'bg-rev3',
       in_progress: 'bg-rev2',
       finished: 'bg-rev1',
@@ -146,6 +184,20 @@ export const PHASE_KEYS = PHASES.map((p) => p.key);
 export const getPhase = (phase) => PHASE_MAP[phase] || null;
 
 /**
+ * What a state is called within a phase.
+ *
+ * Phases may override a label where the generic one is vague: Review calls
+ * `blocked` "Not reviewable yet" rather than "Not ready".
+ */
+export const stateLabel = (phase, state) => {
+  const descriptor = getStateDescriptor(state);
+  return getPhase(phase)?.stateLabels?.[descriptor.key] || descriptor.label;
+};
+
+/** The states a phase can report, as descriptors, in order. */
+export const statesOfPhase = (phase) => getPhase(phase)?.states || OVERALL_STATES;
+
+/**
  * The Tailwind fill class for one phase in one state.
  *
  * Without a phase (the combined view) this returns the neutral state colour, so
@@ -154,7 +206,10 @@ export const getPhase = (phase) => PHASE_MAP[phase] || null;
 export const phaseFill = (phase, state) => {
   const descriptor = getPhase(phase);
   const stateKey = getStateDescriptor(state).key;
-  return descriptor ? descriptor.fill[stateKey] : PHASE_STATE_MAP[stateKey].dot;
+  if (!descriptor) return PHASE_STATE_MAP[stateKey].dot;
+  // A phase that cannot be blocked has no fill for it; fall back to the neutral
+  // rather than rendering an element with no background class at all.
+  return descriptor.fill[stateKey] || BLOCKED_FILL;
 };
 
 /**
@@ -204,11 +259,13 @@ export const getPhaseStatus = (image, phase) =>
  *
  * Strict at both ends, matching `image_status.combine` on the backend: finished
  * only once every phase is, not started only while none has been touched.
+ * `blocked` counts as untouched — a fresh image has a blocked review, and that
+ * must not stop it reading as not started.
  */
 export const combineStatuses = (phases) => {
   const states = PHASE_KEYS.map((key) => getStateDescriptor(phases?.[key]).key);
   if (states.every((s) => s === 'finished')) return 'finished';
-  if (states.every((s) => s === 'not_started')) return 'not_started';
+  if (states.every((s) => s === 'not_started' || s === 'blocked')) return 'not_started';
   return 'in_progress';
 };
 
@@ -225,13 +282,15 @@ export const getImageStatus = (image) => {
   return PHASE_STATE_MAP.not_started;
 };
 
-/** An all-zero `{state: 0}` object. */
-export const emptyStateCounts = () =>
-  Object.fromEntries(PHASE_STATES.map((s) => [s.key, 0]));
+/** An all-zero `{state: 0}` object for one phase, or for the overall row. */
+export const emptyStateCounts = (phase = null) =>
+  Object.fromEntries(statesOfPhase(phase).map((s) => [s.key, 0]));
 
 /** An all-zero `{phase: {state: 0}}` table, including the `overall` row. */
-export const emptyPhaseCounts = () =>
-  Object.fromEntries([...PHASE_KEYS, 'overall'].map((key) => [key, emptyStateCounts()]));
+export const emptyPhaseCounts = () => ({
+  ...Object.fromEntries(PHASE_KEYS.map((key) => [key, emptyStateCounts(key)])),
+  overall: emptyStateCounts(),
+});
 
 /**
  * Tally images into `{phase: {state: count}}`, with an `overall` row alongside.

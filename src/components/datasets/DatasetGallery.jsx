@@ -74,6 +74,34 @@ const DatasetGallery = () => {
     navigate(`/dataset/${dataset.id}/annotate/${image.id}`);
   };
 
+  // Calibrate opens the annotation workspace in its Calibrate tab rather than a
+  // page of its own — calibrating means working on the image, at the same zoom and
+  // pan as annotating it. `?mode=calibrate` is read once on arrival and then
+  // stripped, so switching mode afterwards does not fight the URL.
+  //
+  // Lands on the first image with no calibration at all, so the card resumes where
+  // the work stopped instead of always reopening image one.
+  const handleCalibrateClick = async () => {
+    if (!dataset) return;
+    const open = (imageId) =>
+      navigate(
+        imageId
+          ? `/dataset/${dataset.id}/annotate/${imageId}?mode=calibrate`
+          : `/dataset/${dataset.id}/annotate?mode=calibrate`
+      );
+    try {
+      const response = await api.fetchImagesWithAnnotationStatus(
+        dataset.id, 'not_started', 'calibrate'
+      );
+      const pending = response?.success ? response.image_data || [] : [];
+      open(pending[0]?.image_id);
+    } catch (err) {
+      // The lookup is a convenience; failing it should still open the tab.
+      console.error('Error finding an uncalibrated image:', err);
+      open(null);
+    }
+  };
+
   // Refresh images list - uses normalizeImage to ensure consistent shape
   // (the API returns image_id not id; without normalization data-image-id is
   // undefined and the IntersectionObserver cannot load thumbnails)
@@ -148,6 +176,7 @@ const DatasetGallery = () => {
             onBatchInferenceClick={handleBatchInferenceClick}
             onBrowseAnnotations={handleBrowseAnnotations}
             onManageAccessClick={handleManageAccessClick}
+            onCalibrateClick={handleCalibrateClick}
             onReviewClick={handleReviewClick}
             onCorrectClick={handleCorrectClick}
           />

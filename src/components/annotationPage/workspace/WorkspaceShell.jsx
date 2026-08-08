@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import TopToolbar from './TopToolbar';
 import ToolRail from './ToolRail';
 import ToolOptionsDrawer from './ToolOptionsDrawer';
@@ -29,6 +29,7 @@ import {
   useCurrentMaskId,
   useCurrentTool,
   useSetCurrentTool,
+  useSetWorkspaceMode,
   useResetWorkspaceForImage,
 } from '../../../stores/selectors/annotationSelectors';
 
@@ -54,9 +55,11 @@ const WorkspaceShell = () => {
   const maskId = useCurrentMaskId();
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
+  const setWorkspaceMode = useSetWorkspaceMode();
   const resetForImage = useResetWorkspaceForImage();
   const { datasets } = useDataset();
   const { datasetId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useAnnotationKeyboardShortcuts();
   useWorkspaceShortcuts();
@@ -80,6 +83,19 @@ const WorkspaceShell = () => {
       setCurrentTool('pan');
     }
   }, [mode, currentTool, setCurrentTool]);
+
+  // `?mode=` lets a caller open the workspace on a given tab — the dataset page's
+  // Calibrate card is the one that does. It is an instruction, not state: applied
+  // once and then stripped from the URL, so a later switch to another mode is not
+  // undone the next time this effect runs.
+  useEffect(() => {
+    const requested = searchParams.get('mode');
+    if (!requested) return;
+    if (getPhase(requested)) setWorkspaceMode(requested);
+    const next = new URLSearchParams(searchParams);
+    next.delete('mode');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setWorkspaceMode]);
 
   // RejectionBanner permission-checks against the dataset the route names —
   // `currentDataset` may still be the previously opened one.

@@ -39,6 +39,10 @@ const ManagementCard = ({
   // and click affordance, dims itself, and shows a "Coming soon" tag so it reads
   // as not-yet-available rather than broken.
   disabled = false,
+  // The workflow cards carry their own phase's progress bar, so the number sits
+  // next to the button that changes it rather than in a sidebar the eye has to
+  // travel to. Any node; in practice a <PhaseProgressBar compact />.
+  progress = null,
 }) => {
   const c = PALETTE[color] || PALETTE.blue;
 
@@ -66,11 +70,14 @@ const ManagementCard = ({
           Coming soon
         </span>
       ) : (
-        stat && (
-          <p className={`mt-3 text-sm sm:text-base font-semibold ${c.stat}`}>
-            {stat}
-          </p>
-        )
+        <>
+          {stat && (
+            <p className={`mt-3 text-sm sm:text-base font-semibold ${c.stat}`}>
+              {stat}
+            </p>
+          )}
+          {progress && <div className="mt-4">{progress}</div>}
+        </>
       )}
     </div>
   );

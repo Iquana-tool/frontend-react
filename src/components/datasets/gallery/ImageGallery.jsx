@@ -6,10 +6,10 @@ import ImageThumbnail from "./ImageThumbnail";
 import UploadModal from "./UploadModal";
 import GalleryHeader from "./GalleryHeader";
 import {
-  PHASE_STATES,
   getImageStatus,
   getImageStatusCounts,
   getPhaseStatus,
+  statesOfPhase,
 } from "../../../utils/imageStatus";
 import {
   useSearchTerm,
@@ -37,15 +37,16 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         image.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         image.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // "all" (or any unknown legacy value) shows everything; otherwise match the
-      // image on the selected axis — one phase, or the combined status.
+      // "all" (or any state the selected phase cannot be in) shows everything;
+      // otherwise match the image on the selected axis — one phase, or the
+      // combined status.
       const state =
         filterPhase === "overall"
           ? getImageStatus(image).key
           : getPhaseStatus(image, filterPhase).key;
       const matchesFilter =
         filterStatus === "all" ||
-        !PHASE_STATES.some((s) => s.key === filterStatus) ||
+        !statesOfPhase(filterPhase).some((s) => s.key === filterStatus) ||
         state === filterStatus;
 
       return matchesSearch && matchesFilter;
@@ -96,8 +97,13 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
 
   const handlePhaseChange = useCallback((newPhase) => {
     galleryActions.setFilterPhase(newPhase);
+    // Not every state exists on every phase: leaving "Not reviewable yet" selected
+    // while switching to Calibrate would show an empty grid with no chip lit up.
+    if (!statesOfPhase(newPhase).some((s) => s.key === filterStatus)) {
+      galleryActions.setFilterStatus('all');
+    }
     resetLoadedImages();
-  }, [galleryActions, resetLoadedImages]);
+  }, [galleryActions, resetLoadedImages, filterStatus]);
 
   return (
     <div className="h-full flex flex-col bg-p1">
