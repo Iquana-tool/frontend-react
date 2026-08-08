@@ -143,7 +143,11 @@ class AnnotationSession {
               failed: this.failedServices,
               objects: message.data?.objects || null,
               maskId: message.data?.mask_id ?? null,
+              // The image's combined status, plus its Calibrate/Annotate/Review
+              // breakdown — both arrive with SESSION_INITIALIZED so the workspace
+              // needs no extra REST call to draw the status pill.
               maskStatus: message.data?.mask_status ?? null,
+              phaseStatus: message.data?.phase_status ?? null,
             });
           }
         );

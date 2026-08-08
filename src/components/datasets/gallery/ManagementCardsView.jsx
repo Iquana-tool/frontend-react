@@ -139,7 +139,7 @@ const ManagementCardsView = ({
       stat: annotationStat,
       onClick: onAnnotationClick,
       permitted: canAnnotate,
-      color: 'teal',
+      color: 'annotate',
     },
     {
       id: 'review',
@@ -150,7 +150,7 @@ const ManagementCardsView = ({
       stat: reviewStat,
       onClick: onReviewClick,
       permitted: canReview,
-      color: 'orange',
+      color: 'review',
     },
     {
       id: 'correct',

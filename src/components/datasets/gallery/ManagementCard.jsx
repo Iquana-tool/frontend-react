@@ -15,10 +15,17 @@ const PALETTE = {
   green:  { iconBg: 'bg-okBg',  iconHover: 'group-hover:bg-okBg',  icon: 'text-ok',  border: 'border-okLn',  hoverBorder: 'hover:border-okLn',  title: 'group-hover:text-ok',  stat: 'text-ok' },
   teal:   { iconBg: 'bg-acS',   iconHover: 'group-hover:bg-acS',   icon: 'text-ac',   border: 'border-acLn',   hoverBorder: 'hover:border-acLn',   title: 'group-hover:text-ac',   stat: 'text-ac' },
   orange: { iconBg: 'bg-warnBg', iconHover: 'group-hover:bg-warnBg', icon: 'text-warn', border: 'border-warnLn', hoverBorder: 'hover:border-warnLn', title: 'group-hover:text-warn', stat: 'text-warn' },
-  rose:   { iconBg: 'bg-revBg',   iconHover: 'group-hover:bg-revBg',   icon: 'text-err',   border: 'border-revLn',   hoverBorder: 'hover:border-revLn',   title: 'group-hover:text-err',   stat: 'text-err' },
+  rose:   { iconBg: 'bg-errBg',   iconHover: 'group-hover:bg-errBg',   icon: 'text-err',   border: 'border-errLn',   hoverBorder: 'hover:border-errLn',   title: 'group-hover:text-err',   stat: 'text-err' },
   pink:   { iconBg: 'bg-acS',   iconHover: 'group-hover:bg-acS',   icon: 'text-ac',   border: 'border-acLn',   hoverBorder: 'hover:border-acLn',   title: 'group-hover:text-ac',   stat: 'text-ac' },
   amber:  { iconBg: 'bg-warnBg',  iconHover: 'group-hover:bg-warnBg',  icon: 'text-warn',  border: 'border-warnLn',  hoverBorder: 'hover:border-warnLn',  title: 'group-hover:text-warn',  stat: 'text-warn' },
   slate:  { iconBg: 'bg-well',  iconHover: 'group-hover:bg-hv2',  icon: 'text-t2',  border: 'border-ln',  hoverBorder: 'hover:border-ln2',  title: 'group-hover:text-t2',  stat: 'text-t2' },
+
+  // The workflow phases keep their own hue here too, so the card you click to
+  // start reviewing is the same purple as the mode it opens and the Review bar
+  // on the dataset's progress.
+  calibrate: { iconBg: 'bg-calBg', iconHover: 'group-hover:bg-calBg', icon: 'text-cal', border: 'border-calLn', hoverBorder: 'hover:border-calLn', title: 'group-hover:text-cal', stat: 'text-cal' },
+  annotate:  { iconBg: 'bg-annBg', iconHover: 'group-hover:bg-annBg', icon: 'text-ann', border: 'border-annLn', hoverBorder: 'hover:border-annLn', title: 'group-hover:text-ann', stat: 'text-ann' },
+  review:    { iconBg: 'bg-revBg', iconHover: 'group-hover:bg-revBg', icon: 'text-rev', border: 'border-revLn', hoverBorder: 'hover:border-revLn', title: 'group-hover:text-rev', stat: 'text-rev' },
 };
 
 const ManagementCard = ({

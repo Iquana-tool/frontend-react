@@ -44,32 +44,19 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
         </button>
       </div>
 
-      {/* Annotation Status */}
+      {/* Workflow status */}
       <div className="mb-6">
         <div className="flex items-center mb-3">
           <BarChart3 className="w-5 h-5 text-ac mr-2" />
-          <h3 className="text-lg font-semibold text-t1">Annotation Status</h3>
+          <h3 className="text-lg font-semibold text-t1">Workflow Status</h3>
         </div>
-        
+
+        {/* The bars carry the per-phase counts and the finished total. The
+            "Completed / Remaining" pair that used to sit below them added
+            `finished + reviewable`, which was only ever an artefact of the old
+            single lifecycle putting review states on the annotation axis. */}
         <div className="bg-well p-4 rounded-lg">
           <DatasetAnnotationProgress stats={stats} />
-          
-          <div className="mt-4 pt-4 border-t border-ln">
-            <div className="text-sm text-t2 space-y-1">
-              <div className="flex justify-between">
-                <span>Completed:</span>
-                <span className="font-medium text-ok">
-                  {(stats.finished || 0) + (stats.reviewable || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Remaining:</span>
-                <span className="font-medium text-warn">
-                  {(stats.not_started || 0) + (stats.in_progress || 0)}
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 import { useDataset } from '../../../contexts/DatasetContext';
+import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
 import '../../../styles/workspace.css';
 import {
   useWorkspaceTheme,
@@ -84,6 +85,10 @@ const WorkspaceShell = () => {
   // `currentDataset` may still be the previously opened one.
   const dataset = datasets?.find((d) => String(d.id) === String(datasetId)) || null;
 
+  // The workspace modes are the workflow phases, so the mode's colour comes
+  // straight from the phase palette rather than a second table here.
+  const modePhase = getPhase(mode) || PHASE_MAP.annotate;
+
   return (
     <div
       className="iq-workspace fixed inset-0 flex flex-col overflow-hidden bg-app text-t1"
@@ -112,6 +117,15 @@ const WorkspaceShell = () => {
           <div className="flex-1 relative overflow-hidden">
             <MainCanvas />
             <ActionBar />
+            {/* Mode ring. The stage fills the screen and the eye lives on it, so
+                the mode has to be answerable without looking back at the toolbar.
+                An inset border in the phase's hue does that at the edge of vision
+                and costs no space; `pointer-events-none` keeps it clear of every
+                canvas interaction underneath. */}
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 border-2 ${modePhase.border}`}
+            />
           </div>
 
           {filmstripOpen && <Filmstrip />}

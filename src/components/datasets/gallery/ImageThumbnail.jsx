@@ -1,6 +1,11 @@
 import React from 'react';
 import { Image as ImageIcon, Trash2 } from 'lucide-react';
-import { getImageStatus } from '../../../utils/imageStatus';
+import {
+  PHASES,
+  getImageStatus,
+  getPhaseStatuses,
+  getStateDescriptor,
+} from '../../../utils/imageStatus';
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
 
@@ -9,6 +14,7 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
   const isLoading = !thumbnailUrl && !image.thumbnail && !isLoaded;
   const status = getImageStatus(image);
   const StatusIcon = status.icon;
+  const phases = getPhaseStatuses(image);
 
   return (
     <div
@@ -55,8 +61,27 @@ const ImageThumbnail = ({ image, thumbnailUrl, isLoaded, onImageClick, onDeleteI
         </div>
       )}
 
-      {/* Status accent strip for at-a-glance scanning */}
-      <div className={`h-1 w-full ${status.dot}`} />
+      {/* Per-phase strip: three segments in workflow order, so a tile says which
+          step it is stuck on without being opened. The badge above only carries
+          the combined answer, which is the same for "never calibrated" and
+          "never annotated".
+
+          Each segment is a tone of its own phase's hue, so position and colour
+          agree — the third segment is always purple, whatever its state. With one
+          shared ramp the three segments changed colour independently and the strip
+          had to be counted along rather than read. */}
+      <div className="flex h-1 w-full">
+        {PHASES.map((phase) => {
+          const state = getStateDescriptor(phases[phase.key]);
+          return (
+            <div
+              key={phase.key}
+              className={`h-full flex-1 ${phase.fill[state.key]}`}
+              title={`${phase.label}: ${state.label}`}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 };

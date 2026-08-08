@@ -17,6 +17,7 @@ export const useCurrentImage = () => useAnnotationStore(state => state.images.cu
 export const useCurrentImageId = () => useAnnotationStore(state => state.images.currentImageId);
 export const useImageList = () => useAnnotationStore(state => state.images.imageList);
 export const useAnnotationStatus = () => useAnnotationStore(state => state.images.annotationStatus);
+export const usePhaseStatus = () => useAnnotationStore(state => state.images.phaseStatus);
 
 // Image loading and display selectors
 export const useImageObject = () => useAnnotationStore(state => state.images.imageObject);
@@ -87,6 +88,7 @@ export const useInitializeLabelVisibility = () => useAnnotationStore(state => st
 export const useSetCurrentImage = () => useAnnotationStore(state => state.setCurrentImage);
 export const useSetImageList = () => useAnnotationStore(state => state.setImageList);
 export const useSetAnnotationStatus = () => useAnnotationStore(state => state.setAnnotationStatus);
+export const useSetPhaseStatus = () => useAnnotationStore(state => state.setPhaseStatus);
 
 // Image loading and display actions
 export const useSetImageObject = () => useAnnotationStore(state => state.setImageObject);

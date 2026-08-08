@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import * as api from '../api';
-import { emptyStatusCounts } from '../utils/imageStatus';
+import { emptyPhaseCounts, emptyStateCounts } from '../utils/imageStatus';
 import { useAuth } from './AuthContext';
 
 const DatasetContext = createContext();
@@ -54,23 +54,24 @@ export const DatasetProvider = ({ children }) => {
     }
   }, []);
 
-  // Get annotation progress for a dataset.
+  // Get per-phase progress for a dataset (Calibrate / Annotate / Review).
   // Memoised because consumers list it in effect dependency arrays (see
   // useDatasetGalleryData) — an unstable identity there re-fires the fetch on
   // every single provider render.
   const getAnnotationProgress = useCallback(async (datasetId) => {
-    // Spreading the backend's counts over a zeroed template keeps this working
-    // when a status is added server-side (as `rejected` was) without listing
-    // each key by hand here.
-    const empty = { ...emptyStatusCounts(), total: 0 };
+    // Merging the backend's counts into a zeroed template per phase keeps this
+    // working when a phase or state is added server-side without listing each
+    // key by hand here.
+    const empty = { ...emptyPhaseCounts(), total: 0 };
     try {
       const response = await api.getAnnotationProgress(datasetId);
       if (response.success) {
-        return {
-          ...empty,
-          ...(response.num_masks_with_status || {}),
-          total: response.total_images || 0,
-        };
+        const merged = { ...empty, total: response.total_images || 0 };
+        const rows = { ...(response.phases || {}), overall: response.overall || {} };
+        for (const [phase, counts] of Object.entries(rows)) {
+          merged[phase] = { ...(merged[phase] || emptyStateCounts()), ...counts };
+        }
+        return merged;
       }
       return empty;
     } catch (err) {

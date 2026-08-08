@@ -1,159 +1,253 @@
-import { Check, Circle, Clock, Eye, CheckCircle2, RotateCcw, X } from 'lucide-react';
+import { Check, Circle, CheckCircle2, Clock, Eye, PenTool, Ruler, X } from 'lucide-react';
 
 /**
- * The annotation statuses an image's mask can have, with the colors/icons used
- * to present them. Order matches the natural annotation lifecycle.
+ * An image moves through three phases — Calibrate, Annotate, Review — and each one
+ * is tracked separately with the same three states.
  *
- * Single source of truth for the gallery badge, the status filters and the
- * dataset progress chart.
+ * This replaces a single five-value lifecycle (not started / in progress /
+ * reviewable / sent back / finished) that folded the phases together. It could only
+ * describe one dimension of progress at a time, so a reviewed image nobody had
+ * calibrated read as "finished" and a calibrated image nobody had annotated read as
+ * "not started". Three independent axes say both, and the overall status is derived
+ * from them rather than being a fourth thing that can drift.
+ *
+ * Single source of truth for the gallery badges and filters, the filmstrip tiles,
+ * the workspace pill and the dataset progress bars. Mirrors
+ * `app/services/image_status.py` on the backend.
  */
-export const IMAGE_STATUSES = [
+
+/**
+ * The three states, in order.
+ *
+ * The colours here are the *phase-agnostic* ones, for surfaces that show progress
+ * without saying which step it belongs to: the combined status pill, the filmstrip
+ * tiles, the gallery's "Overall" filter row. Anywhere the phase is known, the
+ * phase's own hue wins — see `PHASES` below.
+ *
+ * `icon` / `tone` are for surfaces too small to carry a label — the filmstrip tiles,
+ * at 6-10px. Shape does the work there rather than colour: three shades of the same
+ * dot are not distinguishable at that size, whereas a cross, a ring and a tick are,
+ * and they still read for anyone who cannot separate the hues.
+ */
+export const PHASE_STATES = [
   {
     key: 'not_started',
     label: 'Not started',
     icon: Circle,
+    smallIcon: X,
     dot: 'bg-t3',
     badge: 'bg-well text-t2',
     ring: 'ring-ln2',
-    chart: '#DC2626',
-  },
-  {
-    key: 'in_progress',
-    label: 'In progress',
-    icon: Clock,
-    dot: 'bg-warn',
-    badge: 'bg-warnBg text-warn',
-    ring: 'ring-warn',
-    chart: '#F59E0B',
-  },
-  {
-    // A reviewer sent this mask back. It belongs to the annotator again until
-    // every rejection on it is resolved.
-    key: 'rejected',
-    label: 'Sent back',
-    icon: RotateCcw,
-    dot: 'bg-rev',
-    badge: 'bg-revBg text-err',
-    ring: 'ring-rev',
-    chart: '#F43F5E',
-  },
-  {
-    key: 'reviewable',
-    label: 'Reviewable',
-    icon: Eye,
-    dot: 'bg-accent',
-    badge: 'bg-acS text-ac',
-    ring: 'ring-ac',
-    chart: '#3B82F6',
-  },
-  {
-    key: 'finished',
-    label: 'Finished',
-    icon: CheckCircle2,
-    dot: 'bg-ok',
-    badge: 'bg-okBg text-ok',
-    ring: 'ring-ok',
-    chart: '#059669',
-  },
-];
-
-export const IMAGE_STATUS_MAP = Object.fromEntries(IMAGE_STATUSES.map((s) => [s.key, s]));
-
-// Legacy/alias status values mapped onto canonical keys.
-const STATUS_ALIASES = {
-  completed: 'finished',
-  done: 'finished',
-  reviewed: 'finished',
-};
-
-/**
- * Resolve an image to its status descriptor, tolerating legacy shapes
- * (e.g. a bare `finished` flag or a "completed" status string).
- */
-export const getImageStatus = (image) => {
-  const raw = image?.status;
-  if (raw && IMAGE_STATUS_MAP[raw]) return IMAGE_STATUS_MAP[raw];
-  if (raw && STATUS_ALIASES[raw]) return IMAGE_STATUS_MAP[STATUS_ALIASES[raw]];
-  if (image?.finished) return IMAGE_STATUS_MAP.finished;
-  return IMAGE_STATUS_MAP.not_started;
-};
-
-/**
- * The three-state view of the same lifecycle, for the annotation page.
- *
- * While annotating, the review sub-states are noise: whether a mask is awaiting
- * review or has been sent back, the annotator's own question is only "is this
- * image done?". The dataset manager keeps the full five-way breakdown, which is
- * where the review pipeline is actually managed from.
- */
-/**
- * `icon` and `tone` are for surfaces too small to carry a label — the filmstrip
- * tiles, at 6-10px. Shape does the work there rather than colour: three shades of
- * the same dot are not distinguishable at that size, whereas a cross, a ring and
- * a tick are, and they still read for anyone who cannot separate the hues.
- */
-export const COARSE_STATUSES = [
-  {
-    key: 'not_started',
-    label: 'Not started',
-    badge: 'bg-well text-t1',
-    icon: X,
     tone: 'text-t3',
   },
   {
     key: 'in_progress',
     label: 'In progress',
-    badge: 'bg-acS text-ac',
-    icon: Circle,
+    icon: Clock,
+    smallIcon: Circle,
+    dot: 'bg-warn',
+    badge: 'bg-warnBg text-warn',
+    ring: 'ring-warn',
     tone: 'text-warn',
   },
   {
     key: 'finished',
     label: 'Finished',
+    icon: CheckCircle2,
+    smallIcon: Check,
+    dot: 'bg-ok',
     badge: 'bg-okBg text-ok',
-    icon: Check,
+    ring: 'ring-ok',
     tone: 'text-ok',
   },
 ];
 
-export const COARSE_STATUS_MAP = Object.fromEntries(
-  COARSE_STATUSES.map((s) => [s.key, s])
-);
+export const PHASE_STATE_MAP = Object.fromEntries(PHASE_STATES.map((s) => [s.key, s]));
 
 /**
- * Collapse a detailed status onto one of the three coarse states.
+ * The three phases, in workflow order — which is also their display order.
  *
- * `reviewable` and `rejected` both fold into `in_progress`: the work exists but
- * is not signed off, which is all the annotation page needs to say.
+ * Each owns a hue from the phase palette in `styles/theme.js`: Calibrate blue,
+ * Annotate teal, Review purple. Everything that shows a phase — the progress
+ * bars, the gallery chips, the per-image strip, the workspace mode and the ring
+ * around its canvas — draws from the same family, so the colour rather than the
+ * label is what says which step you are looking at.
+ *
+ * `fill` maps the three progress states onto that hue's three tones. The class
+ * names are spelled out rather than composed (`bg-${token}${n}`) because Tailwind
+ * finds classes by scanning source text; a constructed name is purged from the
+ * build and renders as no colour at all.
  */
-const COARSE_BY_DETAILED = {
-  not_started: 'not_started',
-  in_progress: 'in_progress',
-  rejected: 'in_progress',
-  reviewable: 'in_progress',
-  finished: 'finished',
+export const PHASES = [
+  {
+    key: 'calibrate',
+    label: 'Calibrate',
+    barLabel: 'Calibrated',
+    icon: Ruler,
+    text: 'text-cal',
+    bg: 'bg-calBg',
+    bg2: 'bg-calBg2',
+    border: 'border-calLn',
+    ring: 'ring-calLn',
+    cssVar: '--cal',
+    fill: {
+      not_started: 'bg-cal3',
+      in_progress: 'bg-cal2',
+      finished: 'bg-cal1',
+    },
+  },
+  {
+    key: 'annotate',
+    label: 'Annotate',
+    barLabel: 'Annotated',
+    icon: PenTool,
+    text: 'text-ann',
+    bg: 'bg-annBg',
+    bg2: 'bg-annBg2',
+    border: 'border-annLn',
+    ring: 'ring-annLn',
+    cssVar: '--ann',
+    fill: {
+      not_started: 'bg-ann3',
+      in_progress: 'bg-ann2',
+      finished: 'bg-ann1',
+    },
+  },
+  {
+    key: 'review',
+    label: 'Review',
+    barLabel: 'Reviewed',
+    icon: Eye,
+    text: 'text-rev',
+    bg: 'bg-revBg',
+    bg2: 'bg-revBg2',
+    border: 'border-revLn',
+    ring: 'ring-revLn',
+    cssVar: '--rev',
+    fill: {
+      not_started: 'bg-rev3',
+      in_progress: 'bg-rev2',
+      finished: 'bg-rev1',
+    },
+  },
+];
+
+export const PHASE_MAP = Object.fromEntries(PHASES.map((p) => [p.key, p]));
+
+export const PHASE_KEYS = PHASES.map((p) => p.key);
+
+/**
+ * The phase descriptor for a key, or null.
+ *
+ * Null rather than a default, because callers that show a phase-agnostic view —
+ * the gallery's "Overall" filter, the combined status pill — must fall back to
+ * the neutral state colours rather than borrow one phase's hue.
+ */
+export const getPhase = (phase) => PHASE_MAP[phase] || null;
+
+/**
+ * The Tailwind fill class for one phase in one state.
+ *
+ * Without a phase (the combined view) this returns the neutral state colour, so
+ * one call site can serve both the per-phase bars and the overall row.
+ */
+export const phaseFill = (phase, state) => {
+  const descriptor = getPhase(phase);
+  const stateKey = getStateDescriptor(state).key;
+  return descriptor ? descriptor.fill[stateKey] : PHASE_STATE_MAP[stateKey].dot;
 };
 
 /**
- * Resolve any status string to its coarse descriptor.
- * @param {string} status - A detailed status key, alias, or unknown value.
+ * Values from the retired five-state lifecycle, folded onto the three that remain.
+ *
+ * `reviewable` and `rejected` were both really "annotation exists, nobody has signed
+ * it off" — one axis' worth of the two the phases now separate. Kept so a persisted
+ * filter choice or an in-flight response from an older client still resolves.
  */
-export const getCoarseStatus = (status) => {
-  const canonical = STATUS_ALIASES[status] || status;
-  const key = COARSE_BY_DETAILED[canonical] || 'not_started';
-  return COARSE_STATUS_MAP[key];
+const STATE_ALIASES = {
+  completed: 'finished',
+  done: 'finished',
+  reviewed: 'finished',
+  reviewable: 'in_progress',
+  rejected: 'in_progress',
 };
 
-/** An all-zero count object keyed by every known status. */
-export const emptyStatusCounts = () =>
-  Object.fromEntries(IMAGE_STATUSES.map((s) => [s.key, 0]));
+/** Resolve any state string to its descriptor, defaulting to `not_started`. */
+export const getStateDescriptor = (state) => {
+  const canonical = STATE_ALIASES[state] || state;
+  return PHASE_STATE_MAP[canonical] || PHASE_STATE_MAP.not_started;
+};
 
-/** Count images per status key. */
+/**
+ * The three phase states of an image, tolerating shapes that carry none.
+ *
+ * An image from a legacy payload has a bare `status` and no `phases`; it is spread
+ * across all three so the UI still shows something honest rather than blanks.
+ */
+export const getPhaseStatuses = (image) => {
+  const phases = image?.phases;
+  if (phases && PHASE_KEYS.every((key) => phases[key])) {
+    return Object.fromEntries(
+      PHASE_KEYS.map((key) => [key, getStateDescriptor(phases[key]).key])
+    );
+  }
+  const fallback = getImageStatus(image).key;
+  return Object.fromEntries(PHASE_KEYS.map((key) => [key, fallback]));
+};
+
+/** Descriptor for one phase of an image. */
+export const getPhaseStatus = (image, phase) =>
+  getStateDescriptor(getPhaseStatuses(image)[phase]);
+
+/**
+ * Combine three phase states into the overall one.
+ *
+ * Strict at both ends, matching `image_status.combine` on the backend: finished
+ * only once every phase is, not started only while none has been touched.
+ */
+export const combineStatuses = (phases) => {
+  const states = PHASE_KEYS.map((key) => getStateDescriptor(phases?.[key]).key);
+  if (states.every((s) => s === 'finished')) return 'finished';
+  if (states.every((s) => s === 'not_started')) return 'not_started';
+  return 'in_progress';
+};
+
+/**
+ * Resolve an image to its overall status descriptor, tolerating legacy shapes
+ * (a bare `finished` flag, a "completed" status string, or phases without a
+ * precomputed overall).
+ */
+export const getImageStatus = (image) => {
+  const raw = image?.status;
+  if (raw && (PHASE_STATE_MAP[raw] || STATE_ALIASES[raw])) return getStateDescriptor(raw);
+  if (image?.phases) return getStateDescriptor(combineStatuses(image.phases));
+  if (image?.finished) return PHASE_STATE_MAP.finished;
+  return PHASE_STATE_MAP.not_started;
+};
+
+/** An all-zero `{state: 0}` object. */
+export const emptyStateCounts = () =>
+  Object.fromEntries(PHASE_STATES.map((s) => [s.key, 0]));
+
+/** An all-zero `{phase: {state: 0}}` table, including the `overall` row. */
+export const emptyPhaseCounts = () =>
+  Object.fromEntries([...PHASE_KEYS, 'overall'].map((key) => [key, emptyStateCounts()]));
+
+/**
+ * Tally images into `{phase: {state: count}}`, with an `overall` row alongside.
+ *
+ * The gallery filter chips read one row of this at a time — whichever phase the
+ * user is currently filtering on.
+ */
 export const getImageStatusCounts = (images = []) => {
-  const counts = emptyStatusCounts();
+  const counts = emptyPhaseCounts();
   for (const image of images) {
-    const key = getImageStatus(image).key;
-    counts[key] = (counts[key] || 0) + 1;
+    const phases = getPhaseStatuses(image);
+    for (const key of PHASE_KEYS) {
+      counts[key][phases[key]] = (counts[key][phases[key]] || 0) + 1;
+    }
+    const overall = getImageStatus(image).key;
+    counts.overall[overall] = (counts.overall[overall] || 0) + 1;
   }
   return counts;
 };

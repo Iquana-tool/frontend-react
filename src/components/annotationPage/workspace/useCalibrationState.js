@@ -26,6 +26,7 @@ import {
   useSetCalibrationKinds,
   useSetCalibrationLoading,
   useSetImageScale,
+  useSetPhaseStatus,
   useSetWedgeSample,
   useSetWedgeSampling,
   useSetWedgeSamples,
@@ -64,6 +65,7 @@ export default function useCalibrationState() {
   const setError = useSetCalibrationError();
   const clearPending = useClearPendingSamples();
   const setImageScale = useSetImageScale();
+  const setPhaseStatus = useSetPhaseStatus();
   const wedge = useWedgeState();
   const setWedgeSamples = useSetWedgeSamples();
   const setWedgeSample = useSetWedgeSample();
@@ -85,6 +87,27 @@ export default function useCalibrationState() {
     }
   }, [setImageScale]);
 
+  /**
+   * Keep the workspace's Calibrate phase in step with what was just fetched.
+   *
+   * The phase states arrive with the session snapshot, so without this the pill in
+   * the toolbar would still say "not started" after the user calibrated the image
+   * in front of them. The response already carries both counts, so this needs no
+   * extra request — same rule as the backend's `calibrate_status_from_counts`.
+   */
+  const mirrorCalibratePhase = useCallback((data) => {
+    const total = data?.total_count ?? 0;
+    const calibrated = data?.calibrated_count ?? 0;
+    setPhaseStatus({
+      calibrate:
+        total === 0 || calibrated >= total
+          ? 'finished'
+          : calibrated === 0
+            ? 'not_started'
+            : 'in_progress',
+    });
+  }, [setPhaseStatus]);
+
   const refresh = useCallback(async () => {
     if (!currentImageId) return null;
     setLoading(true);
@@ -92,13 +115,15 @@ export default function useCalibrationState() {
       const data = await fetchImageCalibrations(currentImageId);
       setEntries(data.calibrations);
       mirrorScaleIntoImageState(data.calibrations);
+      mirrorCalibratePhase(data);
       setLoading(false);
       return data;
     } catch (err) {
       setError(err.message || 'Could not load calibrations.');
       return null;
     }
-  }, [currentImageId, setEntries, setLoading, setError, mirrorScaleIntoImageState]);
+  }, [currentImageId, setEntries, setLoading, setError, mirrorScaleIntoImageState,
+      mirrorCalibratePhase]);
 
   /** Report how many stored measurements a change flagged for recomputation. */
   const reportInvalidated = useCallback((result, prefix) => {

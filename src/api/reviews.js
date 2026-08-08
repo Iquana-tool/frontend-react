@@ -29,8 +29,9 @@ export const fetchRejectionReasons = async () => {
  * Send a mask back to its annotator with a reason.
  *
  * Rejecting clears `fully_annotated`, so the mask leaves the review queue and
- * reappears in the annotator's work list. Its status stays `rejected` until every
- * open rejection is resolved.
+ * reappears in the annotator's work list. Both the annotate and the review phase
+ * drop back to `in_progress` and stay there until every open rejection is
+ * resolved. Calibration is untouched.
  *
  * @param {number} maskId
  * @param {Object} rejection

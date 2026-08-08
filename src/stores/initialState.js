@@ -123,7 +123,9 @@ export const initialState = {
     currentImage: null,
     currentImageId: null,
     imageList: [],
+    // The current image's combined status, plus the three phases behind it.
     annotationStatus: 'not_started',
+    phaseStatus: { calibrate: 'not_started', annotate: 'not_started', review: 'not_started' },
     // Image loading and display state
     imageObject: null,
     imageLoading: false,

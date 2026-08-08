@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import useWorkspaceImageNav from './useWorkspaceImageNav';
 import { getImageById } from '../../../api/images';
-import { getCoarseStatus, getImageStatus } from '../../../utils/imageStatus';
+import {
+  PHASES,
+  getImageStatus,
+  getPhaseStatuses,
+  getStateDescriptor,
+} from '../../../utils/imageStatus';
 import { useToggleFilmstrip } from '../../../stores/selectors/annotationSelectors';
 
 /**
@@ -12,11 +17,10 @@ import { useToggleFilmstrip } from '../../../stores/selectors/annotationSelector
  * gallery's fixed 200ms-apart timer chain, which fired a request for every
  * image in the dataset whether or not it was ever scrolled into view.
  *
- * Tiles carry the three-state coarse status, matching the pill in the toolbar
- * above rather than the five-state lifecycle the dataset manager shows. That is
- * the model this page is meant to use — while annotating, whether a mask is
- * awaiting review or was sent back is noise against "is this image done?" — and
- * three shapes stay legible on a 62x46 thumbnail where five colours did not.
+ * Tiles carry the image's combined status, matching the pill in the toolbar above.
+ * The per-phase breakdown the dataset manager shows would need three marks on a
+ * 62x46 thumbnail; here one shape answers the question the strip is scanned for —
+ * "which images still need work?" — and the tooltip names the phase state.
  */
 const Filmstrip = () => {
   const { imageList, currentIndex, goToImage } = useWorkspaceImageNav();
@@ -99,10 +103,14 @@ const Filmstrip = () => {
       <div ref={stripRef} className="flex-1 min-w-0 flex items-center gap-[7px] overflow-x-auto py-[4px]">
         {imageList.map((image, index) => {
           const active = index === currentIndex;
-          // Resolve through the detailed status first so legacy image shapes
-          // (a bare `finished` flag, a "completed" string) are still understood.
-          const status = getCoarseStatus(getImageStatus(image).key);
-          const StatusIcon = status.icon;
+          // `getImageStatus` tolerates legacy image shapes (a bare `finished`
+          // flag, a "completed" string) and combines `phases` when present.
+          const status = getImageStatus(image);
+          const phases = getPhaseStatuses(image);
+          const StatusIcon = status.smallIcon;
+          const phaseSummary = PHASES.map(
+            (phase) => `${phase.label}: ${getStateDescriptor(phases[phase.key]).label}`
+          ).join(' · ');
           return (
             <button
               key={image.id}
@@ -116,7 +124,7 @@ const Filmstrip = () => {
               type="button"
               onClick={() => goToImage(image)}
               aria-current={active}
-              title={`${image.name} — ${status.label}`}
+              title={`${image.name} — ${status.label}\n${phaseSummary}`}
               className={`relative w-[62px] h-[46px] flex-none rounded-6 overflow-hidden transition-shadow ${
                 active
                   ? 'shadow-[0_0_0_2px_var(--accent)]'

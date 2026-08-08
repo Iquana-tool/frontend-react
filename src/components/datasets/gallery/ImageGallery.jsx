@@ -5,10 +5,16 @@ import { useImageUpload } from "../../../hooks/useImageUpload";
 import ImageThumbnail from "./ImageThumbnail";
 import UploadModal from "./UploadModal";
 import GalleryHeader from "./GalleryHeader";
-import { getImageStatus, getImageStatusCounts } from "../../../utils/imageStatus";
+import {
+  PHASE_STATES,
+  getImageStatus,
+  getImageStatusCounts,
+  getPhaseStatus,
+} from "../../../utils/imageStatus";
 import {
   useSearchTerm,
   useFilterStatus,
+  useFilterPhase,
   useShowUploadModal,
   useGalleryActions
 } from "../../../stores/selectors";
@@ -17,29 +23,34 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
   // Zustand store selectors - provides persistence across navigation
   const searchTerm = useSearchTerm();
   const filterStatus = useFilterStatus();
+  const filterPhase = useFilterPhase();
   const showUploadModal = useShowUploadModal();
   const galleryActions = useGalleryActions();
 
-  // Count images per status (across all images, so the filter chips are accurate)
+  // Count images per phase and state (across all images, so the chips are accurate)
   const statusCounts = useMemo(() => getImageStatusCounts(images), [images]);
 
-  // Filter images based on search and annotation status
+  // Filter images based on search and workflow status
   const filteredImages = useMemo(() => {
     return images.filter((image) => {
       const matchesSearch =
         image.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         image.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // "all" (or any unknown legacy value) shows everything; otherwise match
-      // the image's annotation status.
+      // "all" (or any unknown legacy value) shows everything; otherwise match the
+      // image on the selected axis — one phase, or the combined status.
+      const state =
+        filterPhase === "overall"
+          ? getImageStatus(image).key
+          : getPhaseStatus(image, filterPhase).key;
       const matchesFilter =
         filterStatus === "all" ||
-        !["not_started", "in_progress", "reviewable", "finished"].includes(filterStatus) ||
-        getImageStatus(image).key === filterStatus;
+        !PHASE_STATES.some((s) => s.key === filterStatus) ||
+        state === filterStatus;
 
       return matchesSearch && matchesFilter;
     });
-  }, [images, searchTerm, filterStatus]);
+  }, [images, searchTerm, filterStatus, filterPhase]);
 
   // Extract image IDs for lazy loading
   const imageIds = useMemo(
@@ -50,10 +61,10 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
   // Lazy load images
   const { loadedImages, imageThumbnails, resetLoadedImages } = useLazyImageLoader(imageIds);
 
-  // Reset loaded images when filter changes
+  // Reset loaded images when either half of the filter changes
   useEffect(() => {
     resetLoadedImages();
-  }, [filterStatus, resetLoadedImages]);
+  }, [filterStatus, filterPhase, resetLoadedImages]);
 
   // Image upload hook
   const {
@@ -83,6 +94,11 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
     resetLoadedImages();
   }, [galleryActions, resetLoadedImages]);
 
+  const handlePhaseChange = useCallback((newPhase) => {
+    galleryActions.setFilterPhase(newPhase);
+    resetLoadedImages();
+  }, [galleryActions, resetLoadedImages]);
+
   return (
     <div className="h-full flex flex-col bg-p1">
       <GalleryHeader
@@ -91,8 +107,10 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         statusCounts={statusCounts}
         searchTerm={searchTerm}
         filterStatus={filterStatus}
+        filterPhase={filterPhase}
         onSearchChange={handleSearchChange}
         onFilterChange={handleFilterChange}
+        onPhaseChange={handlePhaseChange}
         onAddImagesClick={() => galleryActions.setShowUploadModal(true)}
       />
 

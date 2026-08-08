@@ -279,7 +279,7 @@ const AnnotationSection = () => {
                 <Check className="w-4 h-4 text-ac mt-0.5" />
                 <div>
                   <p className="font-medium text-t1">Mark as Reviewed</p>
-                  <p className="text-sm text-t2">Mark a reviewed object as reviewed (available when annotation status is reviewable)</p>
+                  <p className="text-sm text-t2">Approve an object (available once the image's Annotate phase is finished)</p>
                 </div>
               </div>
             </div>

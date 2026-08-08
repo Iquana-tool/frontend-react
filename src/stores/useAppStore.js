@@ -61,7 +61,11 @@ const useAppStore = create()(
           
           // ImageGallery state  
           searchTerm: '',
-          filterStatus: 'all', // all, annotated, missing, generated
+          // The status filter is two coordinates now that an image has three
+          // independent phases: which phase to judge it on, and which state to
+          // keep. `filterPhase: 'overall'` judges on the combined status.
+          filterStatus: 'all', // all | not_started | in_progress | finished
+          filterPhase: 'overall', // overall | calibrate | annotate | review
           loadedImages: new Set(),
           showUploadModal: false,
           uploadProgress: { current: 0, total: 0 },
@@ -234,6 +238,10 @@ const useAppStore = create()(
           setFilterStatus: (status) => set(state => {
             state.gallery.filterStatus = status;
           }),
+
+          setFilterPhase: (phase) => set(state => {
+            state.gallery.filterPhase = phase;
+          }),
           
           addLoadedImage: (imageId) => set(state => {
             state.gallery.loadedImages = new Set([...state.gallery.loadedImages, imageId]);
@@ -328,6 +336,7 @@ const useAppStore = create()(
             state.gallery.error = null;
             state.gallery.searchTerm = '';
             state.gallery.filterStatus = 'all';
+            state.gallery.filterPhase = 'overall';
             state.gallery.loadedImages = new Set();
             state.gallery.showUploadModal = false;
             state.gallery.uploadProgress = { current: 0, total: 0 };

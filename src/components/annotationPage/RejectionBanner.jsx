@@ -81,13 +81,16 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
     }
   };
 
+  // Review-purple throughout, not red. Being sent back is a step in the review
+  // loop, not an error — the banner used `text-err` on a rose tint back when the
+  // two families were a hue apart and the distinction did not show.
   return (
     <div className="bg-revBg border-b border-revLn px-4 py-3">
       <div className="flex items-start gap-3">
-        <RotateCcw className="w-5 h-5 text-err flex-shrink-0 mt-0.5" />
+        <RotateCcw className="w-5 h-5 text-rev flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-err">
+            <p className="text-sm font-semibold text-rev">
               Sent back for rework
               {rejections.length > 1 && ` (${rejections.length} points)`}
             </p>
@@ -95,7 +98,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
               <button
                 onClick={handleResolveAll}
                 disabled={busy === 'all'}
-                className="text-xs font-medium text-err hover:text-err underline disabled:opacity-50"
+                className="text-xs font-medium text-rev hover:text-rev underline disabled:opacity-50"
               >
                 Mark all as done
               </button>
@@ -103,7 +106,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
           </div>
 
           {loading && rejections.length === 0 ? (
-            <p className="text-sm text-err mt-1 flex items-center gap-2">
+            <p className="text-sm text-rev mt-1 flex items-center gap-2">
               <Loader2 className="w-3 h-3 animate-spin" />
               Loading feedback…
             </p>
@@ -115,16 +118,16 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
                   className="flex items-start justify-between gap-3 text-sm"
                 >
                   <div className="min-w-0">
-                    <span className="font-medium text-err">
+                    <span className="font-medium text-rev">
                       {rejection.reason_label}
                     </span>
                     {rejection.contour_id && (
-                      <span className="text-err"> · object #{rejection.contour_id}</span>
+                      <span className="text-rev"> · object #{rejection.contour_id}</span>
                     )}
                     {rejection.note && (
-                      <span className="block text-err">{rejection.note}</span>
+                      <span className="block text-rev">{rejection.note}</span>
                     )}
-                    <span className="block text-xs text-err">
+                    <span className="block text-xs text-rev">
                       {rejection.created_by} ·{' '}
                       {new Date(rejection.created_at).toLocaleString()}
                     </span>
@@ -133,7 +136,7 @@ const RejectionBanner = ({ maskId, dataset, refreshKey = 0, onResolved }) => {
                     <button
                       onClick={() => handleResolve(rejection.id)}
                       disabled={busy === rejection.id}
-                      className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-err bg-p1 border border-revLn rounded hover:bg-revBg disabled:opacity-50 transition-colors"
+                      className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-rev bg-p1 border border-revLn rounded hover:bg-revBg disabled:opacity-50 transition-colors"
                       title="Mark this point as addressed"
                     >
                       {busy === rejection.id ? (

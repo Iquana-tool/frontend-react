@@ -71,8 +71,11 @@ const StatusBar = () => {
           type="button"
           onClick={() => setWorkspaceMode('calibrate')}
           title="Open the Calibrate tab"
-          className={`transition-colors duration-150 hover:text-ac ${
-            uncalibratedCount ? 'text-warn' : 'text-ok'
+          // Calibrate-blue when there is still calibration to do, so the readout
+          // points at the mode it opens; green once the phase is finished, which
+          // is the one place the phase hue gives way to the "done" semantic.
+          className={`transition-colors duration-150 hover:brightness-125 ${
+            uncalibratedCount ? 'text-cal' : 'text-ok'
           }`}
         >
           cal {calibratedCount}/{calibrationEntries.length}

@@ -21,8 +21,35 @@
  *   well / well2    inset/recessed fills
  *   tip / glass     tooltip body, and the translucent overlay surface
  *   ac / acS / acLn accent text, accent surface, accent border
- *   ok/warn/err/rev semantic states; `rev` is review-specific (sent back)
+ *   ok / warn / err  semantic states
+ *   cal / ann / rev  the three workflow phases — see the phase palette below
  *   sh1..sh4 / shAc elevation steps and the accent-tinted "primary button" shadow
+ *
+ * ## The phase palette
+ *
+ * Calibrate, Annotate and Review each own a hue, and the workspace mode, the
+ * progress bars, the gallery chips and the per-image markers all draw from it. A
+ * user in Review mode sees purple chrome around the canvas and purple in the
+ * Review bar of every dataset — the colour, not the label, is what says which of
+ * the three steps you are looking at.
+ *
+ *   cal  blue    Calibrate
+ *   ann  teal    Annotate  (the brand hue: annotating is the app's main verb)
+ *   rev  purple  Review
+ *
+ * Each phase carries three tones, which is what the three progress states map
+ * onto: `1` finished, `2` in progress, `3` not started. The ramp runs from most
+ * to least prominent against the surface, so a bar's green-ness is replaced by
+ * "how much of it is the strong tone" and a half-done phase reads as half-done in
+ * any of the three hues. The bare token (`--rev`) is the accessible text/icon
+ * tone, and `Bg` / `Bg2` / `Ln` are the tinted surface, its stronger step, and
+ * the matching border — the same shape every semantic family already had.
+ *
+ * Review was rose until the phase palette landed. It sat one hue away from `err`
+ * and the two were routinely mistaken for each other, which mattered because
+ * "sent back" is not an error. The genuinely destructive surfaces that had
+ * borrowed `rev` for a softer red (confirm dialogs, the action bar's danger
+ * variant) moved to `err`, where they belonged all along.
  *
  * The `*Ln` border/ring tokens are deliberately low-contrast — they're for
  * decorative lines on already-distinguishable surfaces (a tinted callout, a
@@ -126,11 +153,36 @@ const dark = {
   '--warnLn': 'rgba(245, 158, 11, 0.34)',
   '--err': '#fb8a8a',
   '--errBg': 'rgba(239, 68, 68, 0.12)',
+  '--errBg2': 'rgba(239, 68, 68, 0.18)',
   '--errLn': 'rgba(239, 68, 68, 0.32)',
-  '--rev': '#fb8da0',
-  '--revBg': 'rgba(244, 63, 94, 0.1)',
-  '--revBg2': 'rgba(244, 63, 94, 0.15)',
-  '--revLn': 'rgba(244, 63, 94, 0.26)',
+
+  // Phase palette. Tones run bright -> dim on dark surfaces, so `1` (finished)
+  // carries the bar. `3` (not started) still has to read as a filled segment
+  // rather than as empty track, so it stays a clear step above `--well` — the
+  // first pass sat almost on it and a bar of untouched images looked like no data.
+  '--cal': '#7db3ff',
+  '--cal1': '#6aa6ff',
+  '--cal2': '#3f6cae',
+  '--cal3': '#33486a',
+  '--calBg': 'rgba(59, 130, 246, 0.13)',
+  '--calBg2': 'rgba(59, 130, 246, 0.20)',
+  '--calLn': 'rgba(59, 130, 246, 0.34)',
+
+  '--ann': '#3ddbc7',
+  '--ann1': '#35cdb8',
+  '--ann2': '#21867c',
+  '--ann3': '#235450',
+  '--annBg': 'rgba(20, 184, 166, 0.13)',
+  '--annBg2': 'rgba(20, 184, 166, 0.20)',
+  '--annLn': 'rgba(20, 184, 166, 0.34)',
+
+  '--rev': '#c8a2fb',
+  '--rev1': '#b482f7',
+  '--rev2': '#7c58bd',
+  '--rev3': '#473a6b',
+  '--revBg': 'rgba(168, 85, 247, 0.12)',
+  '--revBg2': 'rgba(168, 85, 247, 0.19)',
+  '--revLn': 'rgba(168, 85, 247, 0.32)',
 
   // Text/icon accent, lifted off the brand fill so it clears 4.5:1 on panels.
   '--ac': '#3ddbc7',
@@ -172,11 +224,34 @@ const light = {
   '--warnLn': 'rgba(180, 83, 9, 0.32)',
   '--err': '#b3181b',
   '--errBg': 'rgba(239, 68, 68, 0.1)',
+  '--errBg2': 'rgba(239, 68, 68, 0.16)',
   '--errLn': 'rgba(185, 28, 28, 0.3)',
-  '--rev': '#b01038',
-  '--revBg': 'rgba(244, 63, 94, 0.08)',
-  '--revBg2': 'rgba(244, 63, 94, 0.13)',
-  '--revLn': 'rgba(190, 18, 60, 0.26)',
+
+  // Phase palette. The ramp inverts on light: `1` (finished) is the deepest tone,
+  // because on white it is depth rather than brightness that carries.
+  '--cal': '#1d4ed8',
+  '--cal1': '#2563eb',
+  '--cal2': '#7fa8ee',
+  '--cal3': '#d8e4fa',
+  '--calBg': 'rgba(59, 130, 246, 0.11)',
+  '--calBg2': 'rgba(59, 130, 246, 0.17)',
+  '--calLn': 'rgba(37, 99, 235, 0.32)',
+
+  '--ann': '#0b6f66',
+  '--ann1': '#0d9488',
+  '--ann2': '#6cc3ba',
+  '--ann3': '#d0ece8',
+  '--annBg': 'rgba(20, 184, 166, 0.12)',
+  '--annBg2': 'rgba(20, 184, 166, 0.18)',
+  '--annLn': 'rgba(13, 148, 136, 0.36)',
+
+  '--rev': '#6b21a8',
+  '--rev1': '#7e22ce',
+  '--rev2': '#b389e4',
+  '--rev3': '#e7dcf7',
+  '--revBg': 'rgba(168, 85, 247, 0.10)',
+  '--revBg2': 'rgba(168, 85, 247, 0.16)',
+  '--revLn': 'rgba(126, 34, 206, 0.30)',
 
   // Much darker than the brand fill: teal at full chroma cannot reach 4.5:1
   // against white, so text and icons use a deepened tone of the same hue.

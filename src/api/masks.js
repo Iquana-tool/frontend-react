@@ -42,6 +42,13 @@ export const markMaskAsUnfinished = async (maskId) => {
     }
 }
 
+/**
+ * Where the mask's image stands in the workflow.
+ *
+ * Resolves to `{ status, phases }` — the combined status plus its
+ * `calibrate` / `annotate` / `review` breakdown, each `not_started`,
+ * `in_progress` or `finished`.
+ */
 export const getMaskAnnotationStatus = async (maskId) => {
     try {
         // Validate maskId
