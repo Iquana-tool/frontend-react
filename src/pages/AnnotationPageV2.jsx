@@ -108,11 +108,15 @@ const AnnotationPageV2 = () => {
           // Clear if backend didn't return objects (just in case)
           clearObjects();
         }
-        // Set annotation status from session data (no extra REST call needed)
+        // Set workflow status from session data (no extra REST call needed)
         if (data && data.maskStatus != null) {
-          setAnnotationStatus(data.maskStatus);
+          setAnnotationStatus(data.maskStatus, data.phaseStatus);
         } else {
-          setAnnotationStatus('not_started');
+          setAnnotationStatus('not_started', {
+            calibrate: 'not_started',
+            annotate: 'not_started',
+            review: 'not_started',
+          });
         }
       },
       onSessionError: (error) => {

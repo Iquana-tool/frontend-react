@@ -15,6 +15,7 @@ import DatasetCard from "./DatasetCard";
 import { useDeleteDataset } from "../../hooks/useDeleteDataset";
 import * as api from "../../api";
 import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
+import { emptyPhaseCounts } from "../../utils/imageStatus";
 import ThemeToggle from "../ui/ThemeToggle";
 
 const DatasetsOverview = ({ onOpenDataset }) => {
@@ -87,13 +88,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               err
             );
             imagesData[dataset.id] = [];
-            statsData[dataset.id] = {
-              not_started: 0,
-              in_progress: 0,
-              reviewable: 0,
-              finished: 0,
-              total: 0,
-            };
+            statsData[dataset.id] = { ...emptyPhaseCounts(), total: 0 };
           }
         });
 
@@ -302,13 +297,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {datasets.map((dataset) => {
-              const stats = datasetStats[dataset.id] || {
-                not_started: 0,
-                in_progress: 0,
-                reviewable: 0,
-                finished: 0,
-                total: 0
-              };
+              const stats = datasetStats[dataset.id] || { ...emptyPhaseCounts(), total: 0 };
               const sampleImages = datasetImages[dataset.id] || [];
 
               return (

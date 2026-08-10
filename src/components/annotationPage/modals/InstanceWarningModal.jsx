@@ -54,7 +54,7 @@ const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
           <button
             type="button"
             onClick={onConfirm}
-            className="h-7 px-[11px] rounded-7 border border-revLn bg-revBg2 text-btn font-bold text-rev hover:brightness-110 transition-[filter]"
+            className="h-7 px-[11px] rounded-7 border border-errLn bg-errBg2 text-btn font-bold text-err hover:brightness-110 transition-[filter]"
           >
             Replace and run
           </button>

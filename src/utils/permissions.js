@@ -30,6 +30,7 @@ export const Permission = {
     IMAGE_UPLOAD: 'image.upload',
     IMAGE_DELETE: 'image.delete',
     PIXEL_SCALE_SET: 'pixel_scale.set',
+    CALIBRATION_SET: 'calibration.set',
 
     // Label space
     LABEL_READ: 'label.read',
@@ -186,6 +187,7 @@ export const PERMISSION_GROUPS = [
             [Permission.IMAGE_UPLOAD, 'Upload new images'],
             [Permission.IMAGE_DELETE, 'Delete images'],
             [Permission.PIXEL_SCALE_SET, 'Set the pixel scale (rescales every measurement)'],
+            [Permission.CALIBRATION_SET, 'Set colour and intensity calibration'],
         ],
     },
     {

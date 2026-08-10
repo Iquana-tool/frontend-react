@@ -5,6 +5,7 @@ import { useSetImageList, useSetCurrentImage } from '../../../stores/selectors/a
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { fetchImages } from '../../../api/images';
 import { fetchAnnotationQueue } from '../../../api/annotation_queue';
+import { getPhaseStatus } from '../../../utils/imageStatus';
 
 /**
  * Reorder the image list to follow the annotation queue: ids in `queueIds` come
@@ -22,7 +23,14 @@ const orderImagesByQueue = (images, queueIds) => {
   return [...inQueue, ...rest];
 };
 
-const isFinished = (img) => img?.status === 'finished' || img?.finished;
+/**
+ * Whether an image still needs annotating.
+ *
+ * Judged on the Annotate phase alone, not the combined status: this page opens
+ * the annotation tools, and an image whose objects are all drawn should not be
+ * reopened for annotation just because nobody has calibrated or reviewed it.
+ */
+const isAnnotated = (img) => getPhaseStatus(img, 'annotate').key === 'finished';
 
 const DatasetLoader = ({ children }) => {
   const navigate = useNavigate();
@@ -116,6 +124,9 @@ const DatasetLoader = ({ children }) => {
           finished: img.status === 'finished' || img.finished || false,
           generated: img.generated || false,
           status: img.status || (img.finished ? 'completed' : 'not_started'),
+          // Per-phase breakdown, which the filmstrip and the "resume here" pick
+          // below both read. Absent on legacy payloads.
+          phases: img.phases || null,
           mask_id: img.mask_id,
           isFromAPI: true,
         }));
@@ -154,7 +165,7 @@ const DatasetLoader = ({ children }) => {
         } else {
           // No specific image: start at the first image still needing work, in
           // queue order, so the annotator picks up where the queue left off.
-          const firstUnfinished = orderedImages.find(img => !isFinished(img));
+          const firstUnfinished = orderedImages.find(img => !isAnnotated(img));
           setCurrentImage(firstUnfinished || orderedImages[0]);
         }
       } else {

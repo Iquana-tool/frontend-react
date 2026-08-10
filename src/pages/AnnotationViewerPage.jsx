@@ -14,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useDataset } from '../contexts/DatasetContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { Permission } from '../utils/permissions';
-import { getCoarseStatus } from '../utils/imageStatus';
+import { getStateDescriptor } from '../utils/imageStatus';
 import { getLabelColor } from '../utils/labelColors';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import AnnotationViewerCanvas from '../components/viewer/AnnotationViewerCanvas';
@@ -236,7 +236,7 @@ const AnnotationViewerPage = () => {
               </div>
             ) : (
               images.map((image) => {
-                const coarse = getCoarseStatus(image.status);
+                const coarse = getStateDescriptor(image.status);
                 const isActive = selectedImage?.image_id === image.image_id;
                 return (
                   <button

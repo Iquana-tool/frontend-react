@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Play, FileText, Tag, BarChart3 } from "lucide-react";
-import DatasetAnnotationProgress from "../DatasetAnnotationProgress";
+import { Play, FileText, Tag } from "lucide-react";
 import EditableLabels from "./EditableLabels";
 
-const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdated }) => {
+const DatasetInfo = ({ dataset, labels, onStartAnnotation, onLabelsUpdated }) => {
   const [currentLabels, setCurrentLabels] = useState(labels);
 
   // Update current labels when props change
@@ -44,34 +43,11 @@ const DatasetInfo = ({ dataset, stats, labels, onStartAnnotation, onLabelsUpdate
         </button>
       </div>
 
-      {/* Annotation Status */}
-      <div className="mb-6">
-        <div className="flex items-center mb-3">
-          <BarChart3 className="w-5 h-5 text-ac mr-2" />
-          <h3 className="text-lg font-semibold text-t1">Annotation Status</h3>
-        </div>
-        
-        <div className="bg-well p-4 rounded-lg">
-          <DatasetAnnotationProgress stats={stats} />
-          
-          <div className="mt-4 pt-4 border-t border-ln">
-            <div className="text-sm text-t2 space-y-1">
-              <div className="flex justify-between">
-                <span>Completed:</span>
-                <span className="font-medium text-ok">
-                  {(stats.finished || 0) + (stats.reviewable || 0)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Remaining:</span>
-                <span className="font-medium text-warn">
-                  {(stats.not_started || 0) + (stats.in_progress || 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* The workflow bars used to sit here. They moved onto the Calibrate,
+          Annotate and Review cards, so each phase's number is next to the button
+          that acts on it instead of in a sidebar the eye has to travel to and
+          match up by colour. The dataset overview page still shows all three
+          together, where there are no cards to hang them on. */}
 
       {/* Labels */}
       <div className="mb-6">

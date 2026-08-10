@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Wrench, Settings, HelpCircle, Wand2 } from 'lucide-react';
+import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Ruler, Wrench, Settings, HelpCircle, Wand2 } from 'lucide-react';
 import ManagementCard from './ManagementCard';
+import PhaseProgressBar from '../PhaseProgressBar';
 import RoleBadge from '../RoleBadge';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { Permission } from '../../../utils/permissions';
+import { OVERALL_STATES, getPhase } from '../../../utils/imageStatus';
+import { useGalleryStats } from '../../../stores/selectors';
 import { fetchReviewSummary, fetchCorrectionSummary } from '../../../api/reviews';
-import { fetchAnnotationQueueSummary } from '../../../api/annotation_queue';
 
 /**
  * The sections the cards are grouped under, in display order. Each card names its
@@ -38,11 +40,16 @@ const ManagementCardsView = ({
   onBatchInferenceClick,
   onBrowseAnnotations,
   onManageAccessClick,
+  onCalibrateClick,
   onReviewClick,
   onCorrectClick,
   dataset,
 }) => {
   const { can, canAny, role } = usePermissions(dataset);
+  // Read from the store rather than taking a prop: this view is rendered as the
+  // layout's children, so the stats the layout already fetched cannot be handed
+  // down without threading them through DatasetGallery first.
+  const stats = useGalleryStats();
   const canReview = can(Permission.REVIEW_APPROVE);
   const canCorrect = can(Permission.ANNOTATION_EDIT_OWN);
 
@@ -80,30 +87,34 @@ const ManagementCardsView = ({
     };
   }, [dataset?.id, canCorrect]);
 
-  // Progress counts for the Annotation card's subcaption. Loaded here for the same
-  // reason as the review/correction summaries: a failed fetch degrades to a card
-  // without a subcaption rather than an empty tile.
   const canAnnotate = can(Permission.ANNOTATION_CREATE);
-  const [annotationSummary, setAnnotationSummary] = useState(null);
-  useEffect(() => {
-    if (!dataset?.id || !canAnnotate) return undefined;
-    let cancelled = false;
-    fetchAnnotationQueueSummary(dataset.id)
-      .then((response) => {
-        if (!cancelled && response?.success) setAnnotationSummary(response.summary);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [dataset?.id, canAnnotate]);
+  // Calibration is a curator-level capability, and the two calibration kinds are
+  // granted together, so either one is enough to make the card worth showing.
+  const canCalibrate = canAny([Permission.PIXEL_SCALE_SET, Permission.CALIBRATION_SET]);
 
-  const annotationStat =
-    annotationSummary == null
-      ? null
-      : `${annotationSummary.in_progress} image${
-          annotationSummary.in_progress === 1 ? '' : 's'
-        } in progress, ${annotationSummary.not_started} not started`;
+  // The Annotation card used to carry its own "N in progress, M not started"
+  // subcaption from the annotation-queue summary. The phase bar below now says
+  // exactly that, in the same units, so the fetch and the caption both went.
+
+  // Per-phase progress, from the same store entry the dataset overview reads.
+  // `total` is the image count and is shared by all three bars, so they compare.
+  const phaseTotal =
+    stats?.total ||
+    OVERALL_STATES.reduce((acc, state) => acc + (stats?.overall?.[state.key] || 0), 0);
+
+  /** The compact bar for a card's phase, or null for a card that has no phase. */
+  const phaseBar = (phaseKey) => {
+    const phase = phaseKey ? getPhase(phaseKey) : null;
+    if (!phase || !phaseTotal) return null;
+    return (
+      <PhaseProgressBar
+        phase={phase}
+        counts={stats?.[phase.key]}
+        total={phaseTotal}
+        compact
+      />
+    );
+  };
 
   const openRejections = correctionSummary?.open_rejections;
   const correctStat =
@@ -132,26 +143,42 @@ const ManagementCardsView = ({
 
   const cards = [
     {
+      // First card of the workflow, matching the order of the phases themselves.
+      // It opens the annotation canvas straight into its Calibrate tab rather than
+      // being a page of its own: calibrating means looking at the image, at the
+      // same zoom and pan as annotating it, which is why Calibrate is a mode there.
+      id: 'calibrate',
+      group: 'annotation',
+      phase: 'calibrate',
+      icon: Ruler,
+      title: 'Calibrate',
+      description: 'Set the scale, colour and intensity references so measurements compare across images',
+      onClick: onCalibrateClick,
+      permitted: canCalibrate,
+      color: 'calibrate',
+    },
+    {
       id: 'annotation',
       group: 'annotation',
+      phase: 'annotate',
       icon: SquarePen,
       title: 'Annotation',
       description: 'Annotate instances on images from this dataset',
-      stat: annotationStat,
       onClick: onAnnotationClick,
       permitted: canAnnotate,
-      color: 'teal',
+      color: 'annotate',
     },
     {
       id: 'review',
       group: 'annotation',
+      phase: 'review',
       icon: ClipboardCheck,
       title: 'Review',
       description: 'Go through annotated instances and approve them or send them back',
       stat: reviewStat,
       onClick: onReviewClick,
       permitted: canReview,
-      color: 'orange',
+      color: 'review',
     },
     {
       id: 'correct',
@@ -324,6 +351,7 @@ const ManagementCardsView = ({
                     onClick={card.onClick}
                     color={card.color}
                     disabled={card.disabled}
+                    progress={phaseBar(card.phase)}
                   />
                 ))}
               </div>

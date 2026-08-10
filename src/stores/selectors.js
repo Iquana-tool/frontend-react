@@ -54,6 +54,7 @@ export const useGalleryError = () => useAppStore(state => state.gallery.error);
 // ImageGallery selectors
 export const useSearchTerm = () => useAppStore(state => state.gallery.searchTerm);
 export const useFilterStatus = () => useAppStore(state => state.gallery.filterStatus);
+export const useFilterPhase = () => useAppStore(state => state.gallery.filterPhase);
 export const useLoadedImages = () => useAppStore(state => state.gallery.loadedImages);
 export const useShowUploadModal = () => useAppStore(state => state.gallery.showUploadModal);
 export const useGalleryUploadProgress = () => useAppStore(state => state.gallery.uploadProgress);

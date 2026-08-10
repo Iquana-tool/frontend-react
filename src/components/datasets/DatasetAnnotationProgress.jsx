@@ -1,107 +1,53 @@
 import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts";
-import { IMAGE_STATUSES } from "../../utils/imageStatus";
-import useThemeColors from "../../hooks/useThemeColors";
+import PhaseProgressBar from "./PhaseProgressBar";
+import { OVERALL_STATES, PHASES, emptyStateCounts } from "../../utils/imageStatus";
 
 /**
- * Breakdown of a dataset's masks by annotation status.
+ * A dataset's progress through the three workflow phases, all three bars together.
  *
- * Driven off IMAGE_STATUSES so adding a status (as `rejected` was) shows up here
- * without a second list to keep in sync.
+ * This is the at-a-glance form, for the dataset tiles on the overview page where
+ * there is no room to give each phase its own card. Inside a dataset the same bars
+ * live on the Calibrate / Annotate / Review cards instead, each next to the button
+ * that acts on it — see ManagementCardsView.
+ *
+ * It replaced a single pie of the old five-state lifecycle, which could only ever
+ * show one dimension of progress: a dataset fully annotated but never calibrated
+ * looked complete in it. Three bars also answer the question the pie was actually
+ * read for — "where is the work?" — because the phases share a scale and the
+ * bottleneck is whichever bar is least filled.
  */
 const DatasetAnnotationProgress = ({ stats }) => {
-  const { colors } = useThemeColors();
-  const rows = IMAGE_STATUSES.map((status) => ({
-    key: status.key,
-    name: status.label,
-    color: status.chart,
-    value: stats?.[status.key] || 0,
-  }));
-
-  const summed = rows.reduce((acc, row) => acc + row.value, 0);
-  const total = stats?.total || summed;
+  // `total` is the image count, which is the denominator every bar shares. Falling
+  // back to the overall row keeps this right for a payload that omits it.
+  const overall = stats?.overall || emptyStateCounts();
+  const total =
+    stats?.total ||
+    OVERALL_STATES.reduce((acc, state) => acc + (overall[state.key] || 0), 0);
 
   if (total === 0) {
-    return (
-      <p className="text-sm text-t3 mb-4">
-        No annotations yet
-      </p>
-    );
+    return <p className="text-sm text-t3 mb-4">No images yet</p>;
   }
-
-  const percent = (value) => Math.round((value / total) * 100);
-  // Only chart the statuses that actually occur, so empty slices don't clutter it.
-  const chartData = rows.filter((row) => row.value > 0);
 
   return (
     <div className="mb-4">
-      <h4 className="text-sm font-semibold text-t2 mb-4">
-        Annotation status:
-      </h4>
+      <h4 className="text-sm font-semibold text-t2 mb-3">Workflow progress:</h4>
 
-      <div className="flex items-center gap-6">
-        {/* Text Summary */}
-        <div className="flex-1 space-y-2 text-sm">
-          {rows.map((row) => (
-            <div key={row.key} className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div
-                  className="w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: row.color }}
-                ></div>
-                <span className="text-t2">{row.name}:</span>
-              </div>
-              <span className="font-medium text-t1">
-                {row.value} ({percent(row.value)}%)
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Enhanced Pie Chart */}
-        <div className="w-24 h-24 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={20}
-                outerRadius={40}
-                dataKey="value"
-                stroke={colors.p1}
-                strokeWidth={2}
-              >
-                {chartData.map((row) => (
-                  <Cell key={row.key} fill={row.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(value, name) => [`${value} (${percent(value)}%)`, name]}
-                labelStyle={{ color: colors.t2 }}
-                itemStyle={{ color: colors.t1 }}
-                contentStyle={{
-                  backgroundColor: colors.p2,
-                  border: `1px solid ${colors.ln}`,
-                  borderRadius: '8px',
-                  boxShadow: 'var(--sh2)',
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="space-y-3">
+        {PHASES.map((phase) => (
+          <PhaseProgressBar
+            key={phase.key}
+            phase={phase}
+            counts={stats?.[phase.key]}
+            total={total}
+          />
+        ))}
       </div>
 
-      {/* Total Images - Separate row */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-ln text-sm">
-        <span className="font-medium text-t2">Total images:</span>
-        <span className="font-semibold text-t1">{total}</span>
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-ln text-sm">
+        <span className="font-medium text-t2">Fully finished:</span>
+        <span className="font-semibold text-t1 tabular-nums">
+          {overall.finished || 0} / {total} images
+        </span>
       </div>
     </div>
   );

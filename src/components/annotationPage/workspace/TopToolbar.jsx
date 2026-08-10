@@ -33,10 +33,11 @@ import useWorkspaceImageNav from './useWorkspaceImageNav';
 import useImageLevelActions from './useImageLevelActions';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useAuth } from '../../../contexts/AuthContext';
-import { getCoarseStatus } from '../../../utils/imageStatus';
+import { PHASES, getStateDescriptor } from '../../../utils/imageStatus';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clampZoom } from './constants';
 import {
   useAnnotationStatus,
+  usePhaseStatus,
   useZoomLevel,
   useSetZoomLevel,
   useSetPanOffset,
@@ -55,7 +56,7 @@ import {
   useSetRightTab,
 } from '../../../stores/selectors/annotationSelectors';
 
-/** Status-pill tokens for the three coarse annotation states. */
+/** Status-pill tokens for the three workflow states. */
 const STATUS_TONE = {
   not_started: 'bg-well text-t3',
   in_progress: 'bg-warnBg text-warn',
@@ -80,7 +81,8 @@ const TopToolbar = () => {
 
   const nav = useWorkspaceImageNav();
   const annotationStatus = useAnnotationStatus();
-  const coarse = getCoarseStatus(annotationStatus);
+  const phaseStatus = usePhaseStatus();
+  const overall = getStateDescriptor(annotationStatus);
 
   const zoomLevel = useZoomLevel();
   const setZoomLevel = useSetZoomLevel();
@@ -221,13 +223,36 @@ const TopToolbar = () => {
         <span className="text-btn font-semibold text-t1 truncate max-w-[180px]">
           {nav.currentImage?.name || '—'}
         </span>
+        {/* Combined status, with the three phases behind it on hover. Three pills
+            in the breadcrumb would crowd out the image name; one plus a tooltip
+            still lets the annotator see which phase is holding the image back. */}
         <span
+          title={PHASES.map(
+            (phase) => `${phase.label}: ${getStateDescriptor(phaseStatus?.[phase.key]).label}`
+          ).join('\n')}
           className={`inline-flex items-center gap-[4px] h-[19px] px-[7px] rounded-5 text-sect font-semibold flex-none ${
-            STATUS_TONE[coarse.key] || STATUS_TONE.not_started
+            STATUS_TONE[overall.key] || STATUS_TONE.not_started
           }`}
         >
-          {coarse.key === 'finished' && <Check size={13} strokeWidth={2} />}
-          {coarse.label}
+          {overall.key === 'finished' && <Check size={13} strokeWidth={2} />}
+          {overall.label}
+        </span>
+
+        {/* Per-phase dots: the compact form of the same tooltip, so the phase a
+            reviewer sent back is visible without hovering. Each dot is a tone of
+            its own phase's hue, matching the mode tabs and the strip on the
+            gallery thumbnails — position and colour say the same thing. */}
+        <span className="inline-flex items-center gap-[3px] flex-none">
+          {PHASES.map((phase) => {
+            const state = getStateDescriptor(phaseStatus?.[phase.key]);
+            return (
+              <span
+                key={phase.key}
+                title={`${phase.label}: ${state.label}`}
+                className={`w-[6px] h-[6px] rounded-full ${phase.fill[state.key]}`}
+              />
+            );
+          })}
         </span>
       </div>
 
@@ -295,29 +320,28 @@ const TopToolbar = () => {
       {/* Calibrate / Annotate / Review.
           Three views of the same image sharing one canvas and one viewport —
           switching keeps the zoom, the pan and the selection, which is the whole
-          reason calibration is a mode here rather than a separate page. */}
+          reason calibration is a mode here rather than a separate page.
+
+          Each mode wears its phase's hue, and the ring around the canvas below
+          follows it, so the mode is legible from the stage without looking back up
+          at this control. Inactive tabs keep the hue at reduced opacity, which
+          makes the group read as a key for the colour that surrounds the image. */}
       <Group>
-        {[
-          { id: 'calibrate', label: 'Calibrate' },
-          { id: 'annotate', label: 'Annotate' },
-          { id: 'review', label: 'Review' },
-        ].map(({ id, label }) => {
-          const active = mode === id;
+        {PHASES.map((phase) => {
+          const active = mode === phase.key;
           return (
             <button
-              key={id}
+              key={phase.key}
               type="button"
-              onClick={() => setMode(id)}
+              onClick={() => setMode(phase.key)}
               aria-pressed={active}
               className={`h-[26px] px-[11px] rounded-5 text-btn font-semibold transition-colors ${
                 active
-                  ? id === 'review'
-                    ? 'bg-revBg2 text-rev'
-                    : 'bg-acS text-ac'
-                  : 'text-t2 hover:bg-hv2 hover:text-t1'
+                  ? `${phase.bg2} ${phase.text}`
+                  : `${phase.text} opacity-55 hover:opacity-100 hover:bg-hv2`
               }`}
             >
-              {label}
+              {phase.label}
             </button>
           );
         })}

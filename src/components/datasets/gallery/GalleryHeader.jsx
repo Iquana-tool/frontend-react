@@ -1,6 +1,17 @@
 import React from 'react';
 import { Search } from 'lucide-react';
-import { IMAGE_STATUSES } from '../../../utils/imageStatus';
+import { PHASES, getPhase, stateLabel, statesOfPhase } from '../../../utils/imageStatus';
+
+/**
+ * The phases you can judge an image on, plus the combined view.
+ *
+ * `overall` first because it is the default question ("what is still not done at
+ * all?"); the three phases narrow it to one axis of the workflow.
+ */
+const FILTER_PHASES = [
+  { key: 'overall', label: 'Overall', icon: null },
+  ...PHASES,
+];
 
 const GalleryHeader = ({
   imageCount,
@@ -8,20 +19,32 @@ const GalleryHeader = ({
   statusCounts = {},
   searchTerm,
   filterStatus,
+  filterPhase,
   onSearchChange,
   onFilterChange,
+  onPhaseChange,
   onAddImagesClick,
 }) => {
-  // "All" first, then one chip per status with its count.
+  // Counts for whichever phase is selected. With three phases, one flat row of
+  // chips per phase would be twelve chips; picking the axis first keeps it to four.
+  const counts = statusCounts[filterPhase] || {};
+
+  // The chips take the selected phase's hue, so choosing "Review" turns the row
+  // purple and the filter you are in is legible without reading the labels. On
+  // "Overall" there is no phase to borrow from, so the neutral state colours stand.
+  const phase = getPhase(filterPhase);
+
+  // "All" first, then one chip per state the selected phase can actually be in —
+  // only Review has a "Not reviewable yet" bucket, so only Review gets that chip.
   const filters = [
     { key: 'all', label: 'All', count: totalCount, dot: null },
-    ...IMAGE_STATUSES.map((s) => ({
+    ...statesOfPhase(filterPhase).map((s) => ({
       key: s.key,
-      label: s.label,
-      count: statusCounts[s.key] || 0,
-      dot: s.dot,
-      ring: s.ring,
-      badge: s.badge,
+      label: stateLabel(filterPhase, s.key),
+      count: counts[s.key] || 0,
+      dot: phase ? phase.fill[s.key] : s.dot,
+      ring: phase ? phase.ring : s.ring,
+      badge: phase ? `${phase.bg2} ${phase.text}` : s.badge,
     })),
   ];
 
@@ -50,6 +73,30 @@ const GalleryHeader = ({
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"
         />
+      </div>
+
+      {/* Phase selector — which axis the state chips below refer to */}
+      <div className="inline-flex items-center p-0.5 mb-2 rounded-lg bg-well">
+        {FILTER_PHASES.map((option) => {
+          const active = filterPhase === option.key;
+          const Icon = option.icon;
+          // Inactive tabs still carry their hue, faintly: the row then reads as a
+          // colour key for the strips on the thumbnails below it.
+          const tint = option.text || 'text-t1';
+          return (
+            <button
+              key={option.key}
+              onClick={() => onPhaseChange(option.key)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                active ? `bg-p1 shadow-sm ${tint}` : `${tint} opacity-60 hover:opacity-100`
+              }`}
+            >
+              {Icon && <Icon className="w-3 h-3" />}
+              {option.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Status filters */}

@@ -4,7 +4,9 @@ import Kbd from './primitives/Kbd';
 const VARIANT = {
   primary: 'bg-accent text-onAccent font-bold shadow-primary',
   ok: 'bg-ok text-[#052e13] font-bold',
-  danger: 'border border-revLn bg-revBg2 text-rev',
+  // `err`, not `rev`: this is destructive, not review. The two shared a red-ish
+  // family before the phase palette gave Review its own hue.
+  danger: 'border border-errLn bg-errBg2 text-err',
   chip: 'border border-ln2 bg-well text-t1',
   ghost: 'bg-transparent text-t2 hover:bg-hv hover:text-t1',
 };

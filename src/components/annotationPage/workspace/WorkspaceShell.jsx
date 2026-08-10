@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import TopToolbar from './TopToolbar';
 import ToolRail from './ToolRail';
 import ToolOptionsDrawer from './ToolOptionsDrawer';
@@ -18,6 +18,7 @@ import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 import { useDataset } from '../../../contexts/DatasetContext';
+import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
 import '../../../styles/workspace.css';
 import {
   useWorkspaceTheme,
@@ -28,6 +29,7 @@ import {
   useCurrentMaskId,
   useCurrentTool,
   useSetCurrentTool,
+  useSetWorkspaceMode,
   useResetWorkspaceForImage,
 } from '../../../stores/selectors/annotationSelectors';
 
@@ -53,9 +55,11 @@ const WorkspaceShell = () => {
   const maskId = useCurrentMaskId();
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
+  const setWorkspaceMode = useSetWorkspaceMode();
   const resetForImage = useResetWorkspaceForImage();
   const { datasets } = useDataset();
   const { datasetId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useAnnotationKeyboardShortcuts();
   useWorkspaceShortcuts();
@@ -80,9 +84,26 @@ const WorkspaceShell = () => {
     }
   }, [mode, currentTool, setCurrentTool]);
 
+  // `?mode=` lets a caller open the workspace on a given tab — the dataset page's
+  // Calibrate card is the one that does. It is an instruction, not state: applied
+  // once and then stripped from the URL, so a later switch to another mode is not
+  // undone the next time this effect runs.
+  useEffect(() => {
+    const requested = searchParams.get('mode');
+    if (!requested) return;
+    if (getPhase(requested)) setWorkspaceMode(requested);
+    const next = new URLSearchParams(searchParams);
+    next.delete('mode');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setWorkspaceMode]);
+
   // RejectionBanner permission-checks against the dataset the route names —
   // `currentDataset` may still be the previously opened one.
   const dataset = datasets?.find((d) => String(d.id) === String(datasetId)) || null;
+
+  // The workspace modes are the workflow phases, so the mode's colour comes
+  // straight from the phase palette rather than a second table here.
+  const modePhase = getPhase(mode) || PHASE_MAP.annotate;
 
   return (
     <div
@@ -112,6 +133,15 @@ const WorkspaceShell = () => {
           <div className="flex-1 relative overflow-hidden">
             <MainCanvas />
             <ActionBar />
+            {/* Mode ring. The stage fills the screen and the eye lives on it, so
+                the mode has to be answerable without looking back at the toolbar.
+                An inset border in the phase's hue does that at the edge of vision
+                and costs no space; `pointer-events-none` keeps it clear of every
+                canvas interaction underneath. */}
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 border-2 ${modePhase.border}`}
+            />
           </div>
 
           {filmstripOpen && <Filmstrip />}

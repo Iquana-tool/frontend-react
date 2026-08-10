@@ -19,14 +19,26 @@ export const fetchImages = async (datasetId) => {
     }
 };
 
-// Fetch list of images with specific annotation status
-export const fetchImagesWithAnnotationStatus = async (datasetId, status) => {
+/**
+ * Images of a dataset in a given workflow state.
+ *
+ * @param {number} datasetId
+ * @param {'not_started'|'in_progress'|'finished'} status
+ * @param {'calibrate'|'annotate'|'review'} [phase] - Which phase `status` refers
+ *   to. Omit to filter on the combined status.
+ *
+ * The query keys have to be the endpoint's own (`filter_for_status` /
+ * `filter_for_phase`): FastAPI ignores unknown query parameters, so the old
+ * `status=` spelling silently returned every image in the dataset.
+ */
+export const fetchImagesWithAnnotationStatus = async (datasetId, status, phase = null) => {
     try {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
         const url = buildUrl(API_BASE_URL, `/datasets/${datasetId}/images`, {
-            status: status
+            filter_for_status: status,
+            ...(phase ? { filter_for_phase: phase } : {}),
         });
         const response = await fetch(url, {
             headers: getAuthHeaders(),

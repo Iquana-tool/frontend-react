@@ -8,9 +8,8 @@ import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
 import * as api from "../../../api";
 import { 
-  useGalleryLabels, 
-  useGalleryStats, 
-  useGalleryLoadingData, 
+  useGalleryLabels,
+  useGalleryLoadingData,
   useGalleryError,
   useGalleryActions 
 } from "../../../stores/selectors";
@@ -33,7 +32,6 @@ const DatasetManagementLayout = ({ children, datasetId: propDatasetId }) => {
   
   // Zustand store selectors
   const labels = useGalleryLabels();
-  const stats = useGalleryStats();
   const loadingData = useGalleryLoadingData();
   const error = useGalleryError();
   const galleryActions = useGalleryActions();
@@ -46,18 +44,26 @@ const DatasetManagementLayout = ({ children, datasetId: propDatasetId }) => {
     galleryActions.setLabels(updatedLabels);
   }, [galleryActions]);
 
+  // Open the editor on the first image nobody has annotated yet.
+  //
+  // This asked for `not_started` on the *combined* status, which since the phase
+  // split means "not calibrated, not annotated and not reviewed" — an image that
+  // had only been calibrated no longer qualified. Annotating is what the button
+  // does, so it asks the annotate phase. (It also read `image_ids`, which this
+  // endpoint has never returned, so the lookup always fell through to the
+  // dataset-level route.)
   const handleStartAnnotation = async () => {
     if (!dataset) return;
-    
+
     try {
-      // Get the first unannotated image
-      const response = await api.fetchImagesWithAnnotationStatus(dataset.id, "not_started");
-      
-      if (response.success && response.image_ids && response.image_ids.length > 0) {
-        const firstUnannotatedImageId = response.image_ids[0];
-        navigate(`/dataset/${dataset.id}/annotate/${firstUnannotatedImageId}`);
+      const response = await api.fetchImagesWithAnnotationStatus(
+        dataset.id, "not_started", "annotate"
+      );
+      const pending = response?.success ? response.image_data || [] : [];
+      if (pending.length > 0) {
+        navigate(`/dataset/${dataset.id}/annotate/${pending[0].image_id}`);
       } else {
-        // No unannotated images, go to general annotation page
+        // Everything is annotated — go to the dataset-level editor route.
         navigate(`/dataset/${dataset.id}/annotate`);
       }
     } catch (error) {
@@ -90,9 +96,8 @@ const DatasetManagementLayout = ({ children, datasetId: propDatasetId }) => {
         <div className="max-w-full mx-auto flex h-[calc(100vh-73px)]">
           {/* Left Sidebar - Dataset Info (Persistent across all views) */}
           <div className="w-100 bg-p1 border-r border-ln flex-shrink-0">
-            <DatasetInfo 
+            <DatasetInfo
               dataset={dataset}
-              stats={stats}
               labels={labels}
               onStartAnnotation={handleStartAnnotation}
               onLabelsUpdated={handleLabelsUpdated}

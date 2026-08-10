@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import {
   useAnnotationStatus,
+  usePhaseStatus,
   useSetAnnotationStatus,
   useClearSelection,
   useClearObjects,
@@ -22,6 +23,7 @@ import * as api from '../../../api';
  */
 export default function useImageLevelActions() {
   const status = useAnnotationStatus();
+  const phases = usePhaseStatus();
   const setAnnotationStatus = useSetAnnotationStatus();
   const clearSelection = useClearSelection();
   const clearObjects = useClearObjects();
@@ -36,7 +38,7 @@ export default function useImageLevelActions() {
     if (!currentMaskId) return;
     try {
       const response = await api.getMaskAnnotationStatus(currentMaskId);
-      if (response.success) setAnnotationStatus(response.status);
+      if (response.success) setAnnotationStatus(response.status, response.phases);
     } catch (error) {
       console.error('[workspace] Failed to refresh mask status:', error);
     }
@@ -50,7 +52,10 @@ export default function useImageLevelActions() {
       if (currentMaskId) await api.deleteAllContours(currentMaskId);
       clearObjects();
       clearSelection();
-      setAnnotationStatus('not_started');
+      // Re-read rather than assuming `not_started`: emptying the mask resets the
+      // annotate and review phases, but the image may still be calibrated, in
+      // which case it is in progress overall.
+      await refreshStatus();
       addToast({ type: 'success', message: 'All annotations removed.' });
     } catch (error) {
       addToast({
@@ -60,7 +65,7 @@ export default function useImageLevelActions() {
     } finally {
       setIsProcessing(false);
     }
-  }, [currentImageId, currentMaskId, clearObjects, clearSelection, setAnnotationStatus, addToast]);
+  }, [currentImageId, currentMaskId, clearObjects, clearSelection, refreshStatus, addToast]);
 
   const markAsFullyAnnotated = useCallback(async () => {
     if (!currentMaskId) return;
@@ -98,7 +103,12 @@ export default function useImageLevelActions() {
 
   return {
     status,
-    isReviewable: status === 'reviewable' || status === 'finished',
+    phases,
+    // "Marked done" is the Annotate phase being finished — that is exactly what
+    // the toggle sets and clears. It used to be read off the combined status
+    // (`reviewable || finished`), which also swung on the review and calibration
+    // state and so could show "Unmark done" for a mask that was never submitted.
+    isReviewable: phases?.annotate === 'finished',
     isProcessing,
     hasMask: !!currentMaskId,
     removeAllAnnotations,

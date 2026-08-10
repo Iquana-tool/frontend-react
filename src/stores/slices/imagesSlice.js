@@ -1,3 +1,5 @@
+import { combineStatuses } from '../../utils/imageStatus';
+
 /**
  * Images slice - manages image state, loading, zoom, and pan
  */
@@ -49,8 +51,33 @@ export const createImagesSlice = (set) => ({
     state.images.imageList = images;
   }),
   
-  setAnnotationStatus: (status) => set((state) => {
+  /**
+   * Record where the current image stands in the workflow.
+   *
+   * @param {string} status - The combined status (`not_started` | `in_progress` |
+   *   `finished`).
+   * @param {{calibrate: string, annotate: string, review: string}} [phases] -
+   *   The per-phase breakdown. Omitted by callers that only know the combined
+   *   answer (e.g. clearing all objects), in which case the previous breakdown is
+   *   kept rather than being invented.
+   */
+  setAnnotationStatus: (status, phases) => set((state) => {
     state.images.annotationStatus = status;
+    if (phases) state.images.phaseStatus = phases;
+  }),
+
+  /**
+   * Update one or more phases and re-derive the combined status from them.
+   *
+   * Used where the client already knows a phase changed and re-asking the server
+   * would be a wasted round trip — setting a calibration, for instance, whose
+   * response already says how many kinds are now set.
+   *
+   * @param {{calibrate?: string, annotate?: string, review?: string}} phases
+   */
+  setPhaseStatus: (phases) => set((state) => {
+    state.images.phaseStatus = { ...state.images.phaseStatus, ...phases };
+    state.images.annotationStatus = combineStatuses(state.images.phaseStatus);
   }),
   
   // Image loading and display actions
