@@ -8,7 +8,7 @@ import useWebSocketObjectHandler from '../hooks/useWebSocketObjectHandler';
 import useWebSocketStatusToasts from '../hooks/useWebSocketStatusToasts';
 import useWebSocketErrorToasts from '../hooks/useWebSocketErrorToasts';
 import useModelPreloader from '../hooks/useModelPreloader';
-import { useSetObjectsFromHierarchy, useClearObjects, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels, useFetchAvailablePromptedModels, useAvailablePromptedModels } from '../stores/selectors/annotationSelectors';
+import { useSetObjectsFromHierarchy, useClearObjects, useFailObjectsLoad, useSetAnnotationStatus, useSetDatasetLabels, useDatasetLabelsMap, useDatasetLabels, useFetchAvailablePromptedModels, useAvailablePromptedModels } from '../stores/selectors/annotationSelectors';
 import { useCurrentImageId } from '../stores/selectors/annotationSelectors';
 import { useDataset } from '../contexts/DatasetContext';
 import { usePermissions } from '../hooks/usePermissions';
@@ -38,6 +38,7 @@ const AnnotationPageV2 = () => {
 
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const clearObjects = useClearObjects();
+  const failObjectsLoad = useFailObjectsLoad();
   const setAnnotationStatus = useSetAnnotationStatus();
   const setDatasetLabels = useSetDatasetLabels();
   const cachedLabelsMap = useDatasetLabelsMap();
@@ -104,10 +105,11 @@ const AnnotationPageV2 = () => {
         // Populate objects from backend provided hierarchy when available
         if (data && data.objects) {
           setHierarchyData(data.objects); // Use state setter to trigger useEffect
-        } else {
-          // Clear if backend didn't return objects (just in case)
-          clearObjects();
         }
+        // No `else` clearing the objects: the contours are not part of this reply, they
+        // follow as their own OBJECTS message. Clearing here would wipe a hierarchy that
+        // had already arrived (the server sends both back to back) and leave the canvas
+        // empty with nothing further coming.
         // Set workflow status from session data (no extra REST call needed)
         if (data && data.maskStatus != null) {
           setAnnotationStatus(data.maskStatus, data.phaseStatus);
@@ -122,6 +124,9 @@ const AnnotationPageV2 = () => {
       onSessionError: (error) => {
         console.error('[AnnotationPageV2] WebSocket session error:', error);
         clearObjects();
+        // Resolve the canvas spinner as a failure. Without this it would spin forever:
+        // the OBJECTS message that normally ends it is never coming.
+        failObjectsLoad(error?.message || 'Could not load the annotations for this image.');
       },
     }
   );
@@ -142,12 +147,14 @@ const AnnotationPageV2 = () => {
       SERVER_MESSAGE_TYPES.OBJECTS,
       (message) => {
         if (!message || !message.data) return;
-        clearObjects();
+        // No clearObjects() first: setObjectsFromHierarchy replaces the list wholesale,
+        // and clearing ahead of the awaited label lookup only opened a window in which
+        // the canvas was empty for no reason.
         loadObjectsWithLabels(message.data, currentDataset);
       }
     );
     return unsubscribe;
-  }, [currentDataset, clearObjects, loadObjectsWithLabels]);
+  }, [currentDataset, loadObjectsWithLabels]);
 
   // Preload models into backend memory when session is ready
   useModelPreloader();

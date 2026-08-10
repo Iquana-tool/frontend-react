@@ -10,9 +10,11 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import { useImageLoader } from '../../../hooks/useImageLoader';
 import { useCanvasInteractions } from '../../../hooks/useCanvasInteractions';
+import useContourLoading from '../../../hooks/useContourLoading';
 import { clampZoom, ZOOM_STEP } from '../workspace/constants';
 import CanvasContainer from './CanvasContainer';
 import LoadingState from './LoadingState';
+import ContourLoadingState from './ContourLoadingState';
 import ErrorState from './ErrorState';
 import EmptyState from './EmptyState';
 
@@ -29,6 +31,11 @@ const MainCanvas = forwardRef((props, ref) => {
 
   const { imageObject, imageLoading, imageError, loadImage } = useImageLoader(currentImage);
   const { isDragging, isPanMode } = useCanvasInteractions(containerRef);
+  const {
+    loading: contoursLoading,
+    error: contoursError,
+    retry: retryContours,
+  } = useContourLoading();
 
   const getCursorClass = () => {
     if (isDragging) return 'cursor-grabbing';
@@ -79,13 +86,20 @@ const MainCanvas = forwardRef((props, ref) => {
       )}
 
       {!imageLoading && !imageError && imageObject && (
-        <CanvasContainer
-          imageObject={imageObject}
-          currentImage={currentImage}
-          zoomLevel={zoomLevel}
-          panOffset={panOffset}
-          isDragging={isDragging}
-        />
+        <>
+          <CanvasContainer
+            imageObject={imageObject}
+            currentImage={currentImage}
+            zoomLevel={zoomLevel}
+            panOffset={panOffset}
+            isDragging={isDragging}
+          />
+          {/* Sits over the loaded image, not over the image loader: the two are separate
+              waits, and the contours regularly outlast the picture they belong to. */}
+          {(contoursLoading || contoursError) && (
+            <ContourLoadingState error={contoursError} onRetry={retryContours} />
+          )}
+        </>
       )}
 
       {!imageLoading && !imageError && !imageObject && currentImage && (

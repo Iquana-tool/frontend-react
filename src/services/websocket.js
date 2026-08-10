@@ -127,6 +127,21 @@ class WebSocketService {
   }
 
   /**
+   * Re-point the reconnect target without touching the live connection.
+   *
+   * The annotation session stays on one socket and re-targets it with messages, so the
+   * URL it was opened with goes stale as soon as the user steps to another image. An
+   * automatic reconnect would then silently resume on whichever image the session
+   * started with. Keeping this in step means a dropped connection comes back where the
+   * user actually is.
+   *
+   * @param {string} url - URL to use for the next reconnection attempt
+   */
+  setUrl(url) {
+    this.url = url;
+  }
+
+  /**
    * Disconnect from WebSocket
    */
   disconnect() {

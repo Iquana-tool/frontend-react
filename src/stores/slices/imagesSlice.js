@@ -24,6 +24,17 @@ export const createImagesSlice = (set) => ({
 
     // Clear refinement and edit mode when switching images so blue control-point overlay doesn't persist on the new image
     if (isImageChanging) {
+      // Wipe the canvas here, synchronously with the navigation itself, and mark the
+      // contours as loading. Waiting for the new hierarchy to arrive before clearing
+      // left the previous image's contours drawn over the new one for as long as the
+      // round trip took, which read as the objects belonging to the image on screen.
+      state.objects.list = [];
+      state.objects.selected = [];
+      state.objects.colors = {};
+      state.objects.labelAssignmentCounter = 0;
+      state.objects.loading = true;
+      state.objects.loadError = null;
+
       state.aiAnnotation.refinementMode.active = false;
       state.aiAnnotation.refinementMode.objectId = null;
       state.aiAnnotation.refinementMode.contourId = null;

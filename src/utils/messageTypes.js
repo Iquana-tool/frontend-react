@@ -12,6 +12,9 @@
  * Client sends these message types to the server
  */
 export const CLIENT_MESSAGE_TYPES = {
+  // Point the (per-user) session at a different image without reconnecting
+  SWITCH_IMAGE: 'switch_image',
+
   // Image Focus
   FOCUS_IMAGE: 'focus_image',
   UNFOCUS_IMAGE: 'unfocus_image',
@@ -51,6 +54,9 @@ export const CLIENT_MESSAGE_TYPES = {
 export const SERVER_MESSAGE_TYPES = {
   // Session
   SESSION_INITIALIZED: 'session_initialized',
+  // The session now points at another image; carries that image's mask id and status.
+  // The contours follow separately as an OBJECTS message.
+  IMAGE_SWITCHED: 'image_switched',
 
   // Full object hierarchy
   OBJECTS: 'objects',
@@ -102,6 +108,15 @@ const createMessage = (type, data) => ({
  * These ensure consistent message formatting
  */
 export const MessageBuilders = {
+  /**
+   * Re-target the session at another image over the existing connection
+   * @param {number|string} imageId - ID of the image to annotate next
+   */
+  switchImage: (imageId) => createMessage(
+    CLIENT_MESSAGE_TYPES.SWITCH_IMAGE,
+    { image_id: typeof imageId === 'string' ? Number(imageId) : imageId }
+  ),
+
   /**
    * Focus on a specific contour in the image
    * @param {number} contourId - ID of the contour to focus on

@@ -82,6 +82,10 @@ class AnnotationSession {
 
   /**
    * Initialize annotation session for an image
+   *
+   * The socket is opened per *user*, with the first image in the URL. Later images
+   * are reached with `switchImage`, which reuses this same connection.
+   *
    * @param {number|string} imageId - Image ID
    * @param {string} userId - Username for display (optional; identity comes from the token)
    * @returns {Promise<Object>} Session initialization data
@@ -101,8 +105,7 @@ class AnnotationSession {
         throw new Error('You must be signed in to open an annotation session.');
       }
 
-      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}` +
-        `/${this.currentImageId}?token=${encodeURIComponent(token)}`;
+      const wsUrl = this._buildUrl(this.currentImageId, token);
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
@@ -184,23 +187,95 @@ class AnnotationSession {
   }
 
   /**
-   * Switch to a different image (close current session and open new one)
+   * Point the session at a different image.
+   *
+   * Sends a `switch_image` message over the existing socket rather than closing and
+   * reopening it. A reconnect meant re-authenticating, re-running three backend health
+   * checks and re-selecting every model before the new image's contours could even be
+   * asked for — all of which the server already has loaded and can keep.
+   *
+   * If the socket is not up (first image, or it dropped), this falls back to opening one.
+   *
    * @param {number|string} newImageId - New image ID
-   * @returns {Promise<Object>} New session initialization data
+   * @returns {Promise<Object>} Session data for the new image
    */
   async switchImage(newImageId) {
-    if (this.currentImageId === newImageId) {
+    if (this.currentImageId === newImageId && this.isReady()) {
       return {
         running: this.runningServices,
         failed: this.failedServices,
       };
     }
 
-    // Close current session (don't mark as finished when switching)
-    await this.close(false);
+    if (!websocketService.isConnected()) {
+      // No live connection to switch on — open one pointed at the new image.
+      await this.close(false);
+      return this.initialize(newImageId, this.currentUserId);
+    }
 
-    // Initialize new session
-    return this.initialize(newImageId, this.currentUserId);
+    this._updateSessionState(SessionState.INITIALIZING);
+
+    try {
+      const response = await websocketService.send(
+        MessageBuilders.switchImage(newImageId),
+        true
+      );
+
+      this.currentImageId = newImageId;
+      // Keep the reconnect target in step, so a dropped connection comes back on the
+      // image the user is looking at rather than the one the socket was opened with.
+      const token = getAuthToken();
+      if (token) {
+        websocketService.setUrl(this._buildUrl(newImageId, token));
+      }
+      // The backend re-reports its services with every switch, so a backend that came
+      // up (or went down) since connecting is reflected without a reconnect.
+      this.runningServices = response?.data?.running || this.runningServices;
+      this.failedServices = response?.data?.failed || this.failedServices;
+      this._updateSessionState(
+        this.runningServices.length > 0 ? SessionState.READY : SessionState.ERROR
+      );
+
+      return {
+        running: this.runningServices,
+        failed: this.failedServices,
+        // Contours are not in this reply — they arrive as a separate OBJECTS message,
+        // so the canvas can show the image immediately and the object list can fill in
+        // behind its own spinner.
+        objects: null,
+        maskId: response?.data?.mask_id ?? null,
+        maskStatus: response?.data?.mask_status ?? null,
+        phaseStatus: response?.data?.phase_status ?? null,
+      };
+    } catch (error) {
+      console.error('[AnnotationSession] switch_image failed:', error);
+      this._updateSessionState(SessionState.ERROR);
+      throw error;
+    }
+  }
+
+  /**
+   * Ask the server to re-send the current image's contours.
+   *
+   * Backs the "Retry" on the contour spinner. Re-switching to the image we are already
+   * on is the cheapest way to do it — the server treats it as any other switch and
+   * follows the reply with a fresh OBJECTS message.
+   *
+   * @returns {Promise<Object>} Session data for the (unchanged) image
+   */
+  async reloadObjects() {
+    if (this.currentImageId == null) {
+      throw new Error('No image to reload.');
+    }
+    const imageId = this.currentImageId;
+    // Clear it first so switchImage does not short-circuit on "already on this image".
+    this.currentImageId = null;
+    try {
+      return await this.switchImage(imageId);
+    } catch (error) {
+      this.currentImageId = imageId;
+      throw error;
+    }
   }
 
   // ==================== AI SEGMENTATION OPERATIONS ====================
@@ -581,6 +656,24 @@ class AnnotationSession {
   }
 
   // ==================== PRIVATE METHODS ====================
+
+  /**
+   * Build the session URL for an image.
+   *
+   * The image rides in the path even though the socket is per-user: it is what an
+   * automatic reconnect replays, and the server pre-selects it so the reconnected
+   * session comes back with the right contours and needs no follow-up switch.
+   *
+   * @private
+   * @param {number|string|null} imageId - Image to open on, or null for no image
+   * @param {string} token - Bearer token (browsers cannot set handshake headers)
+   * @returns {string} The WebSocket URL
+   */
+  _buildUrl(imageId, token) {
+    const imageSegment = imageId != null ? `/${imageId}` : '';
+    return `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}` +
+      `${imageSegment}?token=${encodeURIComponent(token)}`;
+  }
 
   /**
    * Ensure session is ready

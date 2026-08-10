@@ -149,13 +149,38 @@ export const createObjectsSlice = (set) => ({
     state.objects.list = list;
     state.objects.selected = [];
     state.objects.colors = colors;
+    // The hierarchy is the answer the spinner was waiting for, whether or not it is empty.
+    state.objects.loading = false;
+    state.objects.loadError = null;
   }),
-  
+
   clearObjects: () => set((state) => {
     state.objects.list = [];
     state.objects.selected = [];
     state.objects.colors = {};
     state.objects.labelAssignmentCounter = 0;
+  }),
+
+  /**
+   * Wipe the canvas for an incoming image and put it into the loading state.
+   *
+   * One action rather than `clearObjects()` + `setObjectsLoading(true)` so the canvas
+   * can never render the gap between them: an emptied list that does not yet know it is
+   * waiting looks exactly like an image with no annotations.
+   */
+  beginObjectsLoad: () => set((state) => {
+    state.objects.list = [];
+    state.objects.selected = [];
+    state.objects.colors = {};
+    state.objects.labelAssignmentCounter = 0;
+    state.objects.loading = true;
+    state.objects.loadError = null;
+  }),
+
+  /** Give up on the current load and show `error` in place of the spinner. */
+  failObjectsLoad: (error) => set((state) => {
+    state.objects.loading = false;
+    state.objects.loadError = error || 'Could not load the annotations for this image.';
   }),
   
   removeObject: (id) => set((state) => {
