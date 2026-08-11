@@ -1,3 +1,5 @@
+import { endSession, getSessionId } from '../services/telemetrySession';
+
 // Function to get auth token from storage
 export const getAuthToken = () => {
     try {
@@ -13,11 +15,20 @@ export const getAuthHeaders = (additionalHeaders = {}) => {
     const headers = {
         ...additionalHeaders,
     };
-    
+
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
+    // Tells the backend which study session this request belongs to, so events it
+    // emits itself (request timings, AI latency) land in the same session as the
+    // client-side events around them. Without it those rows have a null
+    // session_id and cannot be joined to the participant's timeline.
+    const telemetrySession = getSessionId();
+    if (telemetrySession) {
+        headers['X-Telemetry-Session'] = telemetrySession;
+    }
+
     return headers;
 };
 
@@ -71,6 +82,10 @@ export const handleApiError = async (response) => {
             try {
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('auth_user');
+                // An expired or rejected token ends the study session just as a
+                // logout does; leaving it set would attribute the next person's
+                // events to the participant who timed out.
+                endSession();
                 // Trigger a custom event that components can listen to
                 window.dispatchEvent(new CustomEvent('auth:unauthorized'));
             } catch (error) {

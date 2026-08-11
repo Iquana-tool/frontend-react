@@ -1,4 +1,4 @@
-import { handleApiError, buildUrl } from "./util";
+import { getAuthHeaders, handleApiError, buildUrl } from "./util";
 import { API_BASE_URL } from "./config";
 
 /**
@@ -55,10 +55,17 @@ export const login = async (username, password) => {
  */
 export const getCurrentUser = async (token) => {
     try {
+        // Built on getAuthHeaders rather than a bare Authorization header so the
+        // request carries X-Telemetry-Session like every other call. Without it
+        // the `/auth/me` timings landed with a null session_id and showed up as a
+        // phantom "no session id" row in the study log.
+        // The explicit token still wins: this is called during login with a token
+        // that has not been written to storage yet.
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
             method: "GET",
             headers: {
-                Authorization: `Bearer ${token}`,
+                ...getAuthHeaders(),
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
         });
         return handleApiError(response);

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as authApi from '../../api/auth';
 import { trackNavigation } from '../../services/telemetry';
+import { endSession, startSession } from '../../services/telemetrySession';
 
 const TOKEN_STORAGE_KEY = 'auth_token';
 const USER_STORAGE_KEY = 'auth_user';
@@ -75,8 +76,10 @@ export const useAuthStore = create((set, get) => ({
               isLoading: false,
               error: null,
             });
-            // The backend also records a session.login; this one carries the
-            // client's session_id, which ties every later client event to it.
+            // A study session is one login. Start it before the first event so
+            // `session.login` is already inside the session it opens, and so
+            // every request from here on carries the id on its header.
+            startSession();
             trackNavigation('session.login');
             return { success: true, user };
           } else {
@@ -115,8 +118,11 @@ export const useAuthStore = create((set, get) => ({
 
       logout: () => {
         // Emitted before the token is cleared, so the event is still attributed
-        // to the participant who is leaving rather than to nobody.
+        // to the participant who is leaving rather than to nobody. `endSession`
+        // comes after it for the same reason: `session.logout` is the last event
+        // of the session, so it has to carry that session's id.
         trackNavigation('session.logout');
+        endSession();
         setStoredToken(null);
         setStoredUser(null);
         set({

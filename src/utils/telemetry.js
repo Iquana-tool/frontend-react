@@ -78,3 +78,13 @@ export const formatPayload = (payload) => {
     return payload;
   }
 };
+
+/** Indented form for the expanded row, where there is room to read it properly. */
+export const formatPayloadPretty = (payload) => {
+  if (!payload) return '';
+  try {
+    return JSON.stringify(JSON.parse(payload), null, 2);
+  } catch {
+    return payload;
+  }
+};

@@ -1,9 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, RefreshCw, ShieldCheck } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  ClipboardList,
+  RefreshCw,
+  ShieldCheck,
+  User,
+  UserCog,
+} from 'lucide-react';
 import * as api from '../api';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { usePermissions } from '../hooks/usePermissions';
+import AuthButtons from '../components/auth/AuthButtons';
+import ReportBugLink from '../components/ui/ReportBugLink';
+import ThemeToggle from '../components/ui/ThemeToggle';
 import CaptureControls from '../components/admin/CaptureControls';
 import EventTable from '../components/admin/EventTable';
 import SessionList from '../components/admin/SessionList';
@@ -23,7 +35,8 @@ const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', 
  */
 const StudyLogsPage = () => {
   const navigate = useNavigate();
-  const { canManageTelemetry } = usePermissions();
+  const { user } = useAuth();
+  const { canManageTelemetry, canManageUsers } = usePermissions();
   const { addToast } = useToast();
 
   const [config, setConfig] = useState(null);
@@ -39,9 +52,17 @@ const StudyLogsPage = () => {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [offset, setOffset] = useState(0);
 
+  //: The component switches as last *intended*, which runs ahead of `config`
+  //: while a request is in flight. See `handleToggleComponent`.
+  const desiredComponents = useRef(null);
+  //: Identifies the newest config request, so a slower earlier response cannot
+  //: overwrite the state a later one already established.
+  const requestSeq = useRef(0);
+
   const loadConfig = useCallback(async () => {
     const next = await api.fetchTelemetryConfig();
     setConfig(next);
+    desiredComponents.current = next?.components ?? null;
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -108,16 +129,26 @@ const StudyLogsPage = () => {
   }
 
   const applyConfigUpdate = async (key, update, message) => {
+    const seq = ++requestSeq.current;
+    const isLatest = () => seq === requestSeq.current;
     setBusy(key);
     setError(null);
     try {
       const response = await api.updateTelemetryConfig(update);
-      setConfig(response.config ?? null);
+      // Adopt the server's view only if no newer toggle has been made since.
+      // Otherwise this response describes a state the user has already moved on
+      // from, and applying it would flick the switch back.
+      if (isLatest()) {
+        setConfig(response.config ?? null);
+        desiredComponents.current = response.config?.components ?? null;
+      }
       addToast({ message, type: 'success' });
     } catch (err) {
       setError(readableError(err, 'Could not change the capture settings.'));
+      // The switch already moved optimistically; put it back where the server says.
+      if (isLatest()) await loadConfig();
     } finally {
-      setBusy(null);
+      if (isLatest()) setBusy(null);
     }
   };
 
@@ -129,8 +160,15 @@ const StudyLogsPage = () => {
     );
 
   const handleToggleComponent = (name, next) => {
-    const enabled = Object.entries(config?.components || {})
-      .filter(([component, on]) => (component === name ? next : on))
+    // Build on the last *intended* state, not on `config`. Two switches flipped
+    // in quick succession both render before either response lands, so deriving
+    // the list from state would make the second request undo the first.
+    const merged = { ...(desiredComponents.current || config?.components || {}), [name]: next };
+    desiredComponents.current = merged;
+    // Move the switch now; the response only confirms it.
+    setConfig((current) => (current ? { ...current, components: merged } : current));
+    const enabled = Object.entries(merged)
+      .filter(([, on]) => on)
       .map(([component]) => component);
     return applyConfigUpdate(
       `component:${name}`,
@@ -161,12 +199,23 @@ const StudyLogsPage = () => {
     setBusy('purge');
     setError(null);
     try {
-      // An unfiltered delete needs confirm=true server-side; the button already
-      // took an explicit confirmation, so pass it only when nothing narrows it.
-      const scoped = filters.session_id || filters.username;
+      // Every active filter goes through, not just session_id/username: the
+      // modal describes the scope from the same filters, and a purge that
+      // silently ignored the component or date range would delete more than it
+      // told the admin it would. `confirm` only matters when nothing narrows the
+      // request at all -- the backend requires it there so a stray click cannot
+      // wipe every session ever captured.
+      const scoped = filters.session_id || filters.username
+        || filters.component || filters.start || filters.end;
       const response = await api.purgeTelemetryEvents(
         scoped
-          ? { session_id: filters.session_id, username: filters.username }
+          ? {
+              session_id: filters.session_id,
+              username: filters.username,
+              component: filters.component,
+              start: filters.start,
+              end: filters.end,
+            }
           : { confirm: true }
       );
       addToast({ message: `Deleted ${response.deleted} event(s).`, type: 'success' });
@@ -188,38 +237,80 @@ const StudyLogsPage = () => {
   return (
     <div className="min-h-screen bg-well">
       <div className="bg-p1 border-b border-ln">
-        <div className="max-w-7xl mx-auto px-4 py-6 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="w-6 h-6 text-ac" />
-            <h1 className="text-2xl font-semibold tracking-tight text-t1">Study logs</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={refresh}
-              disabled={loadingEvents || loadingSessions}
-              className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4
-                rounded-lg transition-colors duration-150 motion-reduce:transition-none
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-ac
-                disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${
-                  loadingEvents || loadingSessions
-                    ? 'animate-spin motion-reduce:animate-none'
-                    : ''
-                }`}
-              />
-              Refresh
-            </button>
-            <button
-              onClick={() => navigate('/datasets')}
-              className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4
-                rounded-lg transition-colors duration-150 motion-reduce:transition-none
-                focus:outline-none focus-visible:ring-2 focus-visible:ring-ac"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Datasets
-            </button>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/datasets')}
+                className="flex items-center gap-[7px] text-t2 hover:text-ac
+                  transition-colors duration-150 motion-reduce:transition-none
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ac rounded-6"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                <span className="text-sm">Back</span>
+              </button>
+              <div className="h-6 w-px bg-ln" aria-hidden="true" />
+              <ClipboardList className="w-6 h-6 text-ac" aria-hidden="true" />
+              <h1
+                className="text-2xl font-semibold tracking-tight text-t1 cursor-pointer
+                  hover:text-ac transition-colors duration-150"
+                onClick={() => navigate('/')}
+              >
+                Study logs
+              </h1>
+            </div>
+
+            {/* Same utility row every interior page carries -- an admin tool is
+                still a page in the app, not a separate surface that drops the
+                theme toggle or the way back to the docs. */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {user && (
+                <div className="flex items-center gap-[6px] px-3 py-1.5 text-sm text-t3">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{user.username}</span>
+                </div>
+              )}
+              <button
+                onClick={refresh}
+                disabled={loadingEvents || loadingSessions}
+                className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4
+                  rounded-lg transition-colors duration-150 motion-reduce:transition-none
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ac
+                  disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 ${
+                    loadingEvents || loadingSessions
+                      ? 'animate-spin motion-reduce:animate-none'
+                      : ''
+                  }`}
+                />
+                Refresh
+              </button>
+              {canManageUsers && (
+                <button
+                  onClick={() => navigate('/admin/users')}
+                  className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4
+                    rounded-lg transition-colors duration-150 motion-reduce:transition-none
+                    focus:outline-none focus-visible:ring-2 focus-visible:ring-ac"
+                >
+                  <UserCog className="w-4 h-4" />
+                  Users
+                </button>
+              )}
+              <button
+                onClick={() => navigate('/docs')}
+                className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4
+                  rounded-lg transition-colors duration-150 motion-reduce:transition-none
+                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ac"
+              >
+                <BookOpen className="w-4 h-4" />
+                Documentation
+              </button>
+              <ThemeToggle />
+              <ReportBugLink />
+              <AuthButtons showLogoutOnly={true} />
+            </div>
           </div>
         </div>
       </div>

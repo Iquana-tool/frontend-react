@@ -10,6 +10,7 @@ import websocketService from './websocket';
 import { getAuthToken } from '../api/util';
 import { MessageBuilders, SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import telemetry, { TelemetryComponent } from './telemetry';
+import { getSessionId } from './telemetrySession';
 
 /**
  * Session states
@@ -102,8 +103,14 @@ class AnnotationSession {
         throw new Error('You must be signed in to open an annotation session.');
       }
 
+      // A WebSocket handshake cannot carry custom headers, so the study session
+      // travels as a query parameter instead of the `X-Telemetry-Session` header
+      // the HTTP calls use. Without it the events this socket emits server-side
+      // (ws_open, ws.message, AI latency) could not be joined to the session.
+      const telemetrySession = getSessionId();
       const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}` +
-        `/${this.currentImageId}?token=${encodeURIComponent(token)}`;
+        `/${this.currentImageId}?token=${encodeURIComponent(token)}` +
+        (telemetrySession ? `&telemetry_session=${encodeURIComponent(telemetrySession)}` : '');
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {

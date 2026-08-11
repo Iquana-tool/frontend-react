@@ -22,6 +22,7 @@ import {
     fetchTelemetryConfig,
     sendTelemetryBatch,
 } from "../api/telemetry";
+import { getSessionId } from "./telemetrySession";
 
 /** Must match TelemetryComponent in the backend's app/services/telemetry/config.py. */
 export const TelemetryComponent = {
@@ -31,7 +32,6 @@ export const TelemetryComponent = {
     API: "api",
 };
 
-const SESSION_STORAGE_KEY = "telemetry_session_id";
 /** Hard ceiling on the buffer, so a backend outage cannot grow it without bound. */
 const MAX_BUFFER = 500;
 
@@ -40,30 +40,10 @@ const randomId = () => {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-/**
- * One id per browser tab, surviving reloads but not a new tab.
- *
- * That is the unit a study session actually maps to: a participant working
- * through a task in one tab, including any refresh they do along the way.
- */
-const resolveSessionId = () => {
-    try {
-        const existing = sessionStorage.getItem(SESSION_STORAGE_KEY);
-        if (existing) return existing;
-        const created = randomId();
-        sessionStorage.setItem(SESSION_STORAGE_KEY, created);
-        return created;
-    } catch (error) {
-        // Private mode, or storage disabled: fall back to a per-load id.
-        return randomId();
-    }
-};
-
 class TelemetryClient {
     constructor() {
         this.config = null;
         this.buffer = [];
-        this.sessionId = null;
         this.timer = null;
         this.initPromise = null;
         this.listenersBound = false;
@@ -81,7 +61,6 @@ class TelemetryClient {
         this.initPromise = fetchTelemetryConfig().then((config) => {
             this.config = config;
             if (this.isEnabled()) {
-                this.sessionId = resolveSessionId();
                 this.bindListeners();
                 this.startTimer();
             } else {
@@ -130,7 +109,10 @@ class TelemetryClient {
             ts: new Date().toISOString(),
             component,
             event_type: eventType,
-            session_id: this.sessionId,
+            // Read per event, not cached at init: a login or logout part-way through
+            // the page's life starts or ends the session, and the very next event
+            // must already carry the new value.
+            session_id: getSessionId(),
             dataset_id: detail.datasetId ?? null,
             image_id: detail.imageId ?? null,
             duration_ms: detail.durationMs ?? null,
@@ -232,7 +214,6 @@ class TelemetryClient {
         this.timer = null;
         this.config = null;
         this.buffer = [];
-        this.sessionId = null;
         this.initPromise = null;
         this.dropped = 0;
     }

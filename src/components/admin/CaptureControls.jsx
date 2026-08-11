@@ -1,5 +1,6 @@
 import React from 'react';
 import { Loader2, Lock } from 'lucide-react';
+import Switch from '../ui/Switch';
 import { COMPONENTS, COMPONENT_META } from '../../utils/telemetry';
 
 /**
@@ -74,41 +75,45 @@ const CaptureControls = ({ config, busy, onToggleCapture, onToggleComponent }) =
         </button>
       </div>
 
-      <fieldset className="mt-5 pt-4 border-t border-ln" disabled={!capturing}>
-        <legend className="sr-only">Capture components</legend>
-        <p className="text-xs font-medium text-t2 mb-2">
-          Components
-          {!capturing && <span className="ml-2 text-t3 font-normal">(capture is paused)</span>}
+      <section className="mt-5 pt-4 border-t border-ln">
+        <h3 className="text-sm font-semibold text-t1">Control what is captured</h3>
+        <p className="mt-0.5 text-sm text-t2">
+          {capturing
+            ? 'Each component records a different kind of action. Changes apply immediately.'
+            : 'These take effect once capture is running again.'}
         </p>
-        <div className="flex flex-wrap gap-2">
+
+        <ul className="mt-3 grid gap-x-8 gap-y-1 sm:grid-cols-2">
           {COMPONENTS.map((name) => {
             const { label, Icon, hint } = COMPONENT_META[name];
-            const on = config.components?.[name];
+            const on = Boolean(config.components?.[name]);
             const pending = busy === `component:${name}`;
+            const labelId = `capture-${name}-label`;
+            const hintId = `capture-${name}-hint`;
             return (
-              <button
+              <li
                 key={name}
-                type="button"
-                onClick={() => onToggleComponent(name, !on)}
-                disabled={pending || !capturing}
-                aria-pressed={Boolean(on)}
-                title={hint}
-                className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border
-                  transition-colors duration-150 motion-reduce:transition-none
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ac
-                  disabled:opacity-50 disabled:cursor-not-allowed ${
-                    on
-                      ? 'bg-acS border-acLn text-ac'
-                      : 'bg-well border-ln2 text-t3 hover:text-t2 hover:bg-hv'
-                  }`}
+                className="flex items-center gap-3 py-2 border-b border-ln last:border-b-0
+                  sm:[&:nth-last-child(2):nth-child(odd)]:border-b-0"
               >
-                {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon className="w-4 h-4" />}
-                {label}
-              </button>
+                <Icon className={`w-4 h-4 shrink-0 ${on ? 'text-ac' : 'text-t3'}`} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span id={labelId} className="block text-sm font-medium text-t1">{label}</span>
+                  <span id={hintId} className="block text-xs text-t3">{hint}</span>
+                </span>
+                <Switch
+                  checked={on}
+                  pending={pending}
+                  disabled={!capturing}
+                  labelledBy={labelId}
+                  describedBy={hintId}
+                  onChange={(next) => onToggleComponent(name, next)}
+                />
+              </li>
             );
           })}
-        </div>
-      </fieldset>
+        </ul>
+      </section>
     </section>
   );
 };

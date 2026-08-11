@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, ShieldCheck, UserCog } from 'lucide-react';
+import { ArrowLeft, ClipboardList, Loader2, ShieldCheck, UserCog } from 'lucide-react';
 import * as api from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -106,13 +106,22 @@ const AdminUsersPage = () => {
             <UserCog className="w-6 h-6 text-ac" />
             <h1 className="text-2xl font-semibold tracking-tight text-t1">User administration</h1>
           </div>
-          <button
-            onClick={() => navigate('/datasets')}
-            className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Datasets
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/admin/study-logs')}
+              className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
+            >
+              <ClipboardList className="w-4 h-4" />
+              Study logs
+            </button>
+            <button
+              onClick={() => navigate('/datasets')}
+              className="flex items-center gap-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Datasets
+            </button>
+          </div>
         </div>
       </div>
 
