@@ -256,6 +256,60 @@ export const prepareComparisonDataFromSummary = (metricsByLabelId, labelIdToName
   return chartData;
 };
 
+/**
+ * Bar-chart rows for one metric when the summary is grouped by an image-metadata key.
+ *
+ * Recharts draws a grouped bar chart from one row per category with one dataKey per
+ * series, so the shape flips relative to the ungrouped case: label on the x axis, one
+ * field per group value. A label/group pair with no data simply has no field, and
+ * recharts leaves a gap rather than drawing a zero — which is the honest rendering,
+ * since "no objects of this label at this site" is not "an area of zero".
+ *
+ * @param {Object} groups - `{groupValue: {labelId: {metricKey: {components: [...]}}}}`
+ * @param {string} metricKey
+ * @param {Object} labelIdToName
+ * @param {string[]} groupValues - Display order, from the server.
+ * @returns {Array} One row per label: `{label, labelId, [groupValue]: mean, ...}`.
+ */
+export const prepareGroupedComparisonData = (
+  groups,
+  metricKey,
+  labelIdToName,
+  groupValues = []
+) => {
+  if (!groups) return [];
+  const rowsByLabel = new Map();
+
+  groupValues.forEach((groupValue) => {
+    const labelMetrics = groups[groupValue] || {};
+    Object.entries(labelMetrics).forEach(([labelId, metrics]) => {
+      if (labelId === "null") return;
+      const component = metrics?.[metricKey]?.components?.[0];
+      if (!component || typeof component.mean !== "number") return;
+
+      if (!rowsByLabel.has(labelId)) {
+        rowsByLabel.set(labelId, {
+          labelId,
+          label: labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`,
+        });
+      }
+      const row = rowsByLabel.get(labelId);
+      row[groupValue] = component.mean;
+      row[`${groupValue}__count`] = component.count;
+    });
+  });
+
+  return [...rowsByLabel.values()];
+};
+
+/** Which group values actually carry data for a metric, in the server's display order. */
+export const groupValuesWithData = (groups, metricKey, groupValues = []) =>
+  groupValues.filter((groupValue) =>
+    Object.values(groups?.[groupValue] || {}).some(
+      (metrics) => typeof metrics?.[metricKey]?.components?.[0]?.mean === "number"
+    )
+  );
+
 // Which scalar metric keys are present anywhere in the summary (for generic chart series).
 export const collectScalarMetricKeys = (metricsByLabelId, catalogMap = {}) => {
   const keys = new Set();

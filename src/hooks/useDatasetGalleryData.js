@@ -23,6 +23,9 @@ export const normalizeImage = (img) => ({
   // payloads, which `getPhaseStatuses` falls back to the overall status for.
   phases: img.phases || null,
   mask_id: img.mask_id,
+  // Grouping key/values, shipped with the listing so the gallery can filter on a
+  // subgroup without a second request. Empty object for an untagged image.
+  metadata: img.metadata || {},
   thumbnail: null,
   isFromAPI: true,
 });

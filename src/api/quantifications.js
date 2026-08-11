@@ -83,6 +83,9 @@ export const getQuantificationSummary = async (
         // quantification page flips these via its include toggles to surface in-progress work.
         excludeNotFullyAnnotated = true,
         excludeUnreviewed = true,
+        // An image-metadata key to break the results down by (site, treatment, ...).
+        // Only groupable key types are accepted; the server answers 422 otherwise.
+        groupBy = null,
     } = {}
 ) => {
     const params = new URLSearchParams();
@@ -96,6 +99,9 @@ export const getQuantificationSummary = async (
     params.append("exclude_unreviewed", excludeUnreviewed);
     if (profileId !== null && profileId !== undefined) {
         params.append("profile_id", profileId);
+    }
+    if (groupBy) {
+        params.append("group_by", groupBy);
     }
     const url = `${API_BASE_URL}/datasets/${datasetId}/quantification/summary?${params.toString()}`;
     return fetch(url, { headers: getAuthHeaders() }).then(handleApiError);

@@ -1,36 +1,75 @@
-import React, { useEffect, useMemo, useCallback } from "react";
-import { Search, Image as ImageIcon } from "lucide-react";
+import React, { useEffect, useMemo, useCallback, useState } from "react";
+import { Search, Image as ImageIcon, Tag, Trash2, X } from "lucide-react";
 import { useLazyImageLoader } from "../../../hooks/useLazyImageLoader";
 import { useImageUpload } from "../../../hooks/useImageUpload";
+import { usePermissions, Permission } from "../../../hooks/usePermissions";
 import ImageThumbnail from "./ImageThumbnail";
+import ImageMetadataModal from "./ImageMetadataModal";
+import MetadataImportModal from "./MetadataImportModal";
+import MetadataKeysModal from "./MetadataKeysModal";
 import UploadModal from "./UploadModal";
 import GalleryHeader from "./GalleryHeader";
+import { useDatasetMetadata } from "../../../hooks/useDatasetMetadata";
 import {
   getImageStatus,
   getImageStatusCounts,
   getPhaseStatus,
   statesOfPhase,
 } from "../../../utils/imageStatus";
+import { isUntagged, matchesMetadataFilters } from "../../../utils/imageMetadata";
 import {
   useSearchTerm,
   useFilterStatus,
   useFilterPhase,
+  useMetadataFilters,
+  useMetadataOnlyUntagged,
   useShowUploadModal,
   useGalleryActions
 } from "../../../stores/selectors";
 
-const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated }) => {
+/**
+ * @param {Function} [onBulkDelete] - Called with the selected image objects when
+ *   the viewer asks to delete them. Optional: the caller passes it only where
+ *   deleting is allowed, and the bulk bar hides the button without it.
+ */
+const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated, onBulkDelete }) => {
   // Zustand store selectors - provides persistence across navigation
   const searchTerm = useSearchTerm();
   const filterStatus = useFilterStatus();
   const filterPhase = useFilterPhase();
+  const metadataFilters = useMetadataFilters();
+  const metadataOnlyUntagged = useMetadataOnlyUntagged();
   const showUploadModal = useShowUploadModal();
   const galleryActions = useGalleryActions();
+  const { can } = usePermissions(dataset);
+  const canEditMetadata = can(Permission.IMAGE_METADATA_WRITE);
+  // Selecting is worth offering as soon as *some* bulk action is available, so a
+  // curator who may delete but not tag still gets checkboxes.
+  const canSelect = canEditMetadata || Boolean(onBulkDelete);
+
+  // Which images the metadata editor is open on. Empty means closed; selection
+  // for the bulk edit is separate, so an editor opened from one tile's tag
+  // button does not disturb a selection in progress.
+  const [editingImages, setEditingImages] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showKeysModal, setShowKeysModal] = useState(false);
 
   // Count images per phase and state (across all images, so the chips are accurate)
   const statusCounts = useMemo(() => getImageStatusCounts(images), [images]);
 
-  // Filter images based on search and workflow status
+  // The metadata vocabulary, fetched rather than derived: a key's declared type
+  // decides which filter control it gets, and that cannot be recovered from its
+  // values. Refetches whenever the image list is replaced, which is what an edit
+  // or an import triggers.
+  const {
+    facets: metadataFacets,
+    typesByKey,
+    untaggedCount,
+    refresh: refreshMetadata,
+  } = useDatasetMetadata(dataset?.id, images);
+
+  // Filter images based on search, workflow status and metadata subgroup
   const filteredImages = useMemo(() => {
     return images.filter((image) => {
       const matchesSearch =
@@ -49,9 +88,14 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         !statesOfPhase(filterPhase).some((s) => s.key === filterStatus) ||
         state === filterStatus;
 
-      return matchesSearch && matchesFilter;
+      const matchesMetadata = metadataOnlyUntagged
+        ? isUntagged(image)
+        : matchesMetadataFilters(image, metadataFilters, typesByKey);
+
+      return matchesSearch && matchesFilter && matchesMetadata;
     });
-  }, [images, searchTerm, filterStatus, filterPhase]);
+  }, [images, searchTerm, filterStatus, filterPhase, metadataFilters,
+      metadataOnlyUntagged, typesByKey]);
 
   // Extract image IDs for lazy loading
   const imageIds = useMemo(
@@ -105,6 +149,46 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
     resetLoadedImages();
   }, [galleryActions, resetLoadedImages, filterStatus]);
 
+  const toggleSelected = useCallback((imageId) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(imageId)) next.delete(imageId);
+      else next.add(imageId);
+      return next;
+    });
+  }, []);
+
+  const selectedImages = useMemo(
+    () => images.filter((image) => selectedIds.has(image.id)),
+    [images, selectedIds]
+  );
+
+  // Images that leave the listing — deleted, most obviously — must leave the
+  // selection with it, or the bulk bar keeps counting rows that no longer exist.
+  useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.size === 0) return current;
+      const live = new Set(images.map((image) => image.id));
+      const next = new Set([...current].filter((id) => live.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [images]);
+
+  // Selecting "all" means all *filtered* images: the filters are how a subgroup
+  // is picked out in the first place, so "everything from reef A that is still
+  // unreviewed, tag it" is one gesture rather than forty clicks.
+  const selectAllFiltered = useCallback(() => {
+    setSelectedIds(new Set(filteredImages.map((image) => image.id)));
+  }, [filteredImages]);
+
+  const handleMetadataSaved = useCallback(() => {
+    setSelectedIds(new Set());
+    // Refreshing the images also re-triggers the facet fetch, so the chips and
+    // the grid never disagree about what was just written.
+    onImagesUpdated?.();
+    refreshMetadata();
+  }, [onImagesUpdated, refreshMetadata]);
+
   return (
     <div className="h-full flex flex-col bg-p1">
       <GalleryHeader
@@ -118,7 +202,60 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         onFilterChange={handleFilterChange}
         onPhaseChange={handlePhaseChange}
         onAddImagesClick={() => galleryActions.setShowUploadModal(true)}
+        onImportMetadataClick={canEditMetadata ? () => setShowImportModal(true) : undefined}
+        metadataFacets={metadataFacets}
+        metadataFilters={metadataFilters}
+        metadataOnlyUntagged={metadataOnlyUntagged}
+        untaggedCount={untaggedCount}
+        onToggleMetadataValue={galleryActions.toggleMetadataFilterValue}
+        onSetMetadataCondition={galleryActions.setMetadataCondition}
+        onToggleUntagged={galleryActions.setMetadataOnlyUntagged}
+        onClearMetadataFilters={galleryActions.clearMetadataFilters}
+        onManageMetadataKeys={canEditMetadata ? () => setShowKeysModal(true) : undefined}
       />
+
+      {/* Bulk bar. Only present while something is selected, so the gallery does
+          not carry a permanently empty toolbar. */}
+      {canSelect && selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-3 sm:px-4 py-2 border-b border-ln bg-acS">
+          <span className="text-sm font-medium text-ac">
+            {selectedIds.size} selected
+          </span>
+          {canEditMetadata && (
+            <button
+              onClick={() => setEditingImages(selectedImages)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent text-onAccent text-xs font-medium hover:brightness-110 transition-colors"
+            >
+              <Tag className="w-3.5 h-3.5" />
+              Edit metadata
+            </button>
+          )}
+          {onBulkDelete && (
+            <button
+              onClick={() => onBulkDelete(selectedImages)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-err text-onAccent text-xs font-medium hover:brightness-110 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete selected
+            </button>
+          )}
+          {selectedIds.size < filteredImages.length && (
+            <button
+              onClick={selectAllFiltered}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium text-ac hover:bg-hv transition-colors"
+            >
+              Select all {filteredImages.length} shown
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-t2 hover:bg-hv transition-colors"
+          >
+            <X className="w-3.5 h-3.5" />
+            Clear selection
+          </button>
+        </div>
+      )}
 
       {/* Image Grid */}
       <div className="flex-1 overflow-y-auto p-2 sm:p-3 lg:p-4">
@@ -152,6 +289,9 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
                 isLoaded={loadedImages.has(image.id)}
                 onImageClick={onImageClick}
                 onDeleteImage={onDeleteImage}
+                onEditMetadata={canEditMetadata ? (img) => setEditingImages([img]) : undefined}
+                selected={selectedIds.has(image.id)}
+                onToggleSelect={canSelect ? toggleSelected : undefined}
               />
             ))}
           </div>
@@ -171,6 +311,29 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         onRemoveFile={removeFile}
         onUpload={handleUpload}
         onClear={clearFiles}
+      />
+
+      <ImageMetadataModal
+        isOpen={editingImages.length > 0}
+        images={editingImages}
+        facets={metadataFacets}
+        onClose={() => setEditingImages([])}
+        onSaved={handleMetadataSaved}
+      />
+
+      <MetadataImportModal
+        isOpen={showImportModal}
+        dataset={dataset}
+        onClose={() => setShowImportModal(false)}
+        onImported={handleMetadataSaved}
+      />
+
+      <MetadataKeysModal
+        isOpen={showKeysModal}
+        dataset={dataset}
+        facets={metadataFacets}
+        onClose={() => setShowKeysModal(false)}
+        onChanged={handleMetadataSaved}
       />
     </div>
   );

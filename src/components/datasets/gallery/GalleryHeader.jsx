@@ -1,6 +1,7 @@
 import React from 'react';
-import { Search } from 'lucide-react';
+import { FileSpreadsheet, Search } from 'lucide-react';
 import { PHASES, getPhase, stateLabel, statesOfPhase } from '../../../utils/imageStatus';
+import MetadataFilterBar from './MetadataFilterBar';
 
 /**
  * The phases you can judge an image on, plus the combined view.
@@ -24,6 +25,16 @@ const GalleryHeader = ({
   onFilterChange,
   onPhaseChange,
   onAddImagesClick,
+  onImportMetadataClick,
+  metadataFacets = [],
+  metadataFilters = {},
+  metadataOnlyUntagged = false,
+  untaggedCount = 0,
+  onToggleMetadataValue,
+  onSetMetadataCondition,
+  onToggleUntagged,
+  onClearMetadataFilters,
+  onManageMetadataKeys,
 }) => {
   // Counts for whichever phase is selected. With three phases, one flat row of
   // chips per phase would be twelve chips; picking the axis first keeps it to four.
@@ -55,12 +66,27 @@ const GalleryHeader = ({
           Images ({imageCount})
         </h2>
 
-        <button
-          onClick={onAddImagesClick}
-          className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors text-xs sm:text-sm font-medium"
-        >
-          + Add Images
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Bulk tagging is a spreadsheet job, so the import sits next to the
+              upload rather than behind the per-image editor. */}
+          {onImportMetadataClick && (
+            <button
+              onClick={onImportMetadataClick}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 border border-ln rounded-lg text-t1 hover:bg-hv transition-colors text-xs sm:text-sm font-medium"
+              title="Import image metadata from a CSV"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Import metadata</span>
+              <span className="sm:hidden">CSV</span>
+            </button>
+          )}
+          <button
+            onClick={onAddImagesClick}
+            className="flex items-center px-2.5 sm:px-3 py-1.5 sm:py-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors text-xs sm:text-sm font-medium"
+          >
+            + Add Images
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -122,6 +148,21 @@ const GalleryHeader = ({
           );
         })}
       </div>
+
+      {/* Subgroup filters. A second, independent axis to the workflow chips
+          above: "not yet reviewed" and "from reef A" are questions people ask
+          together, so they compose rather than replace each other. */}
+      <MetadataFilterBar
+        facets={metadataFacets}
+        filters={metadataFilters}
+        onlyUntagged={metadataOnlyUntagged}
+        untaggedCount={untaggedCount}
+        onToggleValue={onToggleMetadataValue}
+        onSetCondition={onSetMetadataCondition}
+        onToggleUntagged={onToggleUntagged}
+        onClear={onClearMetadataFilters}
+        onManageKeys={onManageMetadataKeys}
+      />
     </div>
   );
 };
