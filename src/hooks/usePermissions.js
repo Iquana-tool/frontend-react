@@ -27,6 +27,7 @@ import { GlobalRole, Permission, hasPermission } from '../utils/permissions';
  *   canAll: (permissions: string[]) => boolean,
  *   canCreateDatasets: boolean,
  *   canManageUsers: boolean,
+ *   canManageTelemetry: boolean,
  * }}
  */
 export function usePermissions(datasetOrId) {
@@ -92,6 +93,8 @@ export function usePermissions(datasetOrId) {
         // Global permissions are answered by the account, not by any dataset.
         canCreateDatasets: isAdmin || globalRole === GlobalRole.MEMBER,
         canManageUsers: isAdmin,
+        // Mirrors Permission.TELEMETRY_MANAGE, which only the admin bundle carries.
+        canManageTelemetry: isAdmin,
     };
 }
 

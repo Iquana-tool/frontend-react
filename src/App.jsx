@@ -6,6 +6,7 @@ import { ToastProvider } from "./contexts/ToastContext";
 import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import useDocumentTheme from "./hooks/useDocumentTheme";
+import { useRouteTelemetry, useTelemetryInit } from "./hooks/useTelemetry";
 import Login from "./components/auth/Login";
 import LandingPage from "./pages/LandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
@@ -19,17 +20,31 @@ import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import StudyLogsPage from "./pages/StudyLogsPage";
 import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
 
+/**
+ * Records route changes for telemetry. Rendered inside <Router> because
+ * `useLocation` is only available under a router context; it draws nothing.
+ */
+function TelemetryRouteTracker() {
+  useRouteTelemetry();
+  return null;
+}
+
 function App() {
   useDocumentTheme();
+  // Fetches the capture config once. On a deployment with telemetry off this
+  // resolves to "capture nothing" and every track() call downstream is a no-op.
+  useTelemetryInit();
 
   return (
     <AuthProvider>
       <ToastProvider>
       <DatasetProvider>
         <Router basename={process.env.PUBLIC_URL || ""}>
+          <TelemetryRouteTracker />
           <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -52,6 +67,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AdminUsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/study-logs"
+              element={
+                <ProtectedRoute>
+                  <StudyLogsPage />
                 </ProtectedRoute>
               }
             />

@@ -11,6 +11,7 @@
  * from "every Nth dense point" to "the control vertices".
  */
 import { simplifyClosedContour, densifyClosedVertices } from '../../utils/contourEditing';
+import { trackAnnotation } from '../../services/telemetry';
 
 /** Recompute the dense draft outline from the current control vertices. */
 const syncDraftFromVertices = (state) => {
@@ -22,6 +23,13 @@ const syncDraftFromVertices = (state) => {
 export const createEditModeSlice = (set) => ({
   enterEditMode: (objectId, contourId, originalX, originalY) => set((state) => {
     const vertices = simplifyClosedContour(originalX, originalY);
+    // Entering and leaving are tracked, and so are structural changes (adding or
+    // removing a control point). `moveVertex` deliberately is not: it fires on
+    // every pointer frame of a drag, which would bury the session in thousands of
+    // near-identical rows. The vertex count at exit captures the same outcome.
+    trackAnnotation('contour.edit_start', {
+      payload: { vertex_count: vertices.x.length },
+    });
     state.editMode.active = true;
     state.editMode.objectId = objectId;
     state.editMode.contourId = contourId;
@@ -51,6 +59,9 @@ export const createEditModeSlice = (set) => ({
     vertices.y.splice(at, 0, newY);
     syncDraftFromVertices(state);
     state.editMode.isDirty = true;
+    trackAnnotation('contour.vertex_insert', {
+      payload: { vertex_count: vertices.x.length },
+    });
   }),
 
   /** Remove one control vertex. A closed shape needs at least three. */
@@ -62,6 +73,9 @@ export const createEditModeSlice = (set) => ({
     vertices.y.splice(index, 1);
     syncDraftFromVertices(state);
     state.editMode.isDirty = true;
+    trackAnnotation('contour.vertex_delete', {
+      payload: { vertex_count: vertices.x.length },
+    });
   }),
 
   resetDraft: () => set((state) => {
@@ -70,6 +84,9 @@ export const createEditModeSlice = (set) => ({
     state.editMode.vertices = { x: [...initialVertices.x], y: [...initialVertices.y] };
     syncDraftFromVertices(state);
     state.editMode.isDirty = false;
+    // A discarded edit is a strong signal that the tool did not do what the
+    // participant expected -- worth as much to a study as a successful one.
+    trackAnnotation('contour.edit_reset');
   }),
 
   /**
@@ -89,6 +106,14 @@ export const createEditModeSlice = (set) => ({
   }),
 
   exitEditMode: () => set((state) => {
+    if (state.editMode.active) {
+      trackAnnotation('contour.edit_end', {
+        payload: {
+          dirty: state.editMode.isDirty,
+          vertex_count: state.editMode.vertices?.x?.length ?? null,
+        },
+      });
+    }
     state.editMode.active = false;
     state.editMode.objectId = null;
     state.editMode.contourId = null;
@@ -105,6 +130,7 @@ export const createEditModeSlice = (set) => ({
    * the two ways of reshaping a contour are mutually exclusive.
    */
   startLineEdit: (objectId, contourId, x, y) => set((state) => {
+    trackAnnotation('contour.line_edit_start');
     state.editMode.active = false;
     state.editMode.objectId = null;
     state.editMode.contourId = null;

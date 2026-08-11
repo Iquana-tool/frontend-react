@@ -9,6 +9,7 @@
 import websocketService from './websocket';
 import { getAuthToken } from '../api/util';
 import { MessageBuilders, SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
+import telemetry, { TelemetryComponent } from './telemetry';
 
 /**
  * Session states
@@ -330,7 +331,15 @@ class AnnotationSession {
   async runSegmentation(modelIdentifier, prompts) {
     this._ensureReady();
     const message = MessageBuilders.runSegmentation(modelIdentifier, prompts);
-    return websocketService.send(message, true);
+    // Timed client-side as well as server-side: the backend measures the model
+    // call, this measures the wait the participant actually sat through, which
+    // includes the round trip and is what perceived-latency questions are about.
+    return telemetry.trackDuration(
+      TelemetryComponent.AI,
+      'ai.prompted.request',
+      () => websocketService.send(message, true),
+      { imageId: this.currentImageId, payload: { model: modelIdentifier } },
+    );
   }
 
   // ==================== OBJECT OPERATIONS ====================
@@ -451,7 +460,15 @@ class AnnotationSession {
     }
     
     const message = MessageBuilders.runSuggestion(seedContourIds, modelKey, labelId);
-    return websocketService.send(message, true);
+    return telemetry.trackDuration(
+      TelemetryComponent.AI,
+      'ai.suggestion.request',
+      () => websocketService.send(message, true),
+      {
+        imageId: this.currentImageId,
+        payload: { model: modelKey, seed_count: seedContourIds?.length ?? 0 },
+      },
+    );
   }
 
   // ==================== INSTANCE SEGMENTATION ====================
@@ -470,7 +487,12 @@ class AnnotationSession {
     }
 
     const message = MessageBuilders.runInstance(modelKey);
-    return websocketService.send(message, true);
+    return telemetry.trackDuration(
+      TelemetryComponent.AI,
+      'ai.instance.request',
+      () => websocketService.send(message, true),
+      { imageId: this.currentImageId, payload: { model: modelKey } },
+    );
   }
 
   // ==================== SESSION MANAGEMENT ====================

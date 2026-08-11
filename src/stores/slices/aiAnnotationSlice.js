@@ -1,6 +1,8 @@
 /**
  * AI Annotation slice - manages AI annotation prompts and undo/redo
  */
+import { trackAnnotation } from '../../services/telemetry';
+
 export const createAIAnnotationSlice = (set) => ({
   addPointPrompt: (x, y, label) => set((state) => {
     // Save current state for undo
@@ -17,6 +19,11 @@ export const createAIAnnotationSlice = (set) => ({
       type: 'point',
       coords: { x, y },
       label, // 'positive' or 'negative'
+    });
+    // Coordinates stay out of the event: how a participant prompted is the
+    // measure, and the resulting annotation is already in the database.
+    trackAnnotation('prompt.add', {
+      payload: { kind: 'point', polarity: label, prompt_count: state.aiAnnotation.prompts.length },
     });
   }),
   
@@ -42,6 +49,13 @@ export const createAIAnnotationSlice = (set) => ({
       freehand: !!options.freehand,
       coords: {
         points: points.map((p) => ({ x: p.x, y: p.y })),
+      },
+    });
+    trackAnnotation('prompt.add', {
+      payload: {
+        kind: options.freehand ? 'freehand' : 'polygon',
+        vertex_count: points.length,
+        prompt_count: state.aiAnnotation.prompts.length,
       },
     });
   }),
@@ -74,6 +88,9 @@ export const createAIAnnotationSlice = (set) => ({
         y2: Math.max(y1, y2) 
       },
     });
+    trackAnnotation('prompt.add', {
+      payload: { kind: 'box', prompt_count: state.aiAnnotation.prompts.length },
+    });
   }),
   
   removeLastPrompt: () => set((state) => {
@@ -88,6 +105,9 @@ export const createAIAnnotationSlice = (set) => ({
       
       // Remove last prompt
       state.aiAnnotation.prompts.pop();
+      trackAnnotation('prompt.remove_last', {
+        payload: { prompt_count: state.aiAnnotation.prompts.length },
+      });
     }
   }),
   
@@ -101,6 +121,9 @@ export const createAIAnnotationSlice = (set) => ({
     state.aiAnnotation.redoStack = [];
     
     // Clear all prompts
+    trackAnnotation('prompt.clear_all', {
+      payload: { prompt_count: currentPrompts.length },
+    });
     state.aiAnnotation.prompts = [];
     state.aiAnnotation.activePreview = null;
   }),
@@ -128,6 +151,9 @@ export const createAIAnnotationSlice = (set) => ({
       // Restore previous state
       const previousState = state.aiAnnotation.undoStack.pop();
       state.aiAnnotation.prompts = previousState;
+      trackAnnotation('prompt.undo', {
+        payload: { prompt_count: previousState.length },
+      });
     }
   }),
   
@@ -142,11 +168,15 @@ export const createAIAnnotationSlice = (set) => ({
       // Restore next state
       const nextState = state.aiAnnotation.redoStack.pop();
       state.aiAnnotation.prompts = nextState;
+      trackAnnotation('prompt.redo', {
+        payload: { prompt_count: nextState.length },
+      });
     }
   }),
   
   // Refinement mode actions
   enterRefinementMode: (objectId, contourId) => set((state) => {
+    trackAnnotation('refinement.enter');
     state.aiAnnotation.refinementMode.active = true;
     state.aiAnnotation.refinementMode.objectId = objectId;
     state.aiAnnotation.refinementMode.contourId = contourId;
@@ -158,6 +188,7 @@ export const createAIAnnotationSlice = (set) => ({
   }),
   
   exitRefinementMode: () => set((state) => {
+    if (state.aiAnnotation.refinementMode.active) trackAnnotation('refinement.exit');
     state.aiAnnotation.refinementMode.active = false;
     state.aiAnnotation.refinementMode.objectId = null;
     state.aiAnnotation.refinementMode.contourId = null;

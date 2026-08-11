@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as authApi from '../../api/auth';
+import { trackNavigation } from '../../services/telemetry';
 
 const TOKEN_STORAGE_KEY = 'auth_token';
 const USER_STORAGE_KEY = 'auth_user';
@@ -74,6 +75,9 @@ export const useAuthStore = create((set, get) => ({
               isLoading: false,
               error: null,
             });
+            // The backend also records a session.login; this one carries the
+            // client's session_id, which ties every later client event to it.
+            trackNavigation('session.login');
             return { success: true, user };
           } else {
             throw new Error(response.message || 'Login failed');
@@ -110,6 +114,9 @@ export const useAuthStore = create((set, get) => ({
       },
 
       logout: () => {
+        // Emitted before the token is cleared, so the event is still attributed
+        // to the participant who is leaving rather than to nobody.
+        trackNavigation('session.logout');
         setStoredToken(null);
         setStoredUser(null);
         set({

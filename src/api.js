@@ -16,3 +16,4 @@ export * from "./api/reviews";
 export * from "./api/annotation_queue";
 export * from "./api/admin";
 export * from "./api/scale";
+export * from "./api/telemetry";

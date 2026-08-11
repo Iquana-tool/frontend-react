@@ -1,10 +1,21 @@
 /**
  * UI slice - manages UI state (tool, sidebars, Annotation Overview)
  */
-export const createUISlice = (set) => ({
-  setCurrentTool: (tool) => set((state) => {
-    state.ui.currentTool = tool;
-  }),
+import { trackAnnotation } from '../../services/telemetry';
+
+export const createUISlice = (set, get) => ({
+  setCurrentTool: (tool) => {
+    // Which tool a participant reaches for, and how often they switch, is one of
+    // the primary measures a user study is after. Read before the set so the
+    // event carries what they moved *from*.
+    const previous = get().ui.currentTool;
+    if (previous !== tool) {
+      trackAnnotation('tool.switch', { payload: { from: previous, to: tool } });
+    }
+    set((state) => {
+      state.ui.currentTool = tool;
+    });
+  },
   
   // Sidebar actions
   setLeftSidebarCollapsed: (collapsed) => set((state) => {
