@@ -69,6 +69,10 @@ export const useDeselectObject = () => useAnnotationStore(state => state.deselec
 export const useClearSelection = () => useAnnotationStore(state => state.clearSelection);
 export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => state.setObjectsFromHierarchy);
 export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
+export const useBeginObjectsLoad = () => useAnnotationStore(state => state.beginObjectsLoad);
+export const useFailObjectsLoad = () => useAnnotationStore(state => state.failObjectsLoad);
+export const useObjectsLoading = () => useAnnotationStore(state => state.objects.loading);
+export const useObjectsLoadError = () => useAnnotationStore(state => state.objects.loadError);
 
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
 export const useSetSuggestionModel = () => useAnnotationStore(state => state.setSuggestionModel);

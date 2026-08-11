@@ -220,6 +220,14 @@ export const initialState = {
     },
     colors: {},
     labelAssignmentCounter: 0, // Global counter to track label assignment order
+    /**
+     * True from the moment an image switch wipes the canvas until its contours arrive
+     * (or fail to). The canvas shows a spinner over the new image while it is set, so an
+     * empty object list reads as "still loading" rather than "this image has no objects".
+     */
+    loading: false,
+    /** When the contours could not be loaded — the message shown in place of the spinner. */
+    loadError: null,
   },
   
   // WebSocket State
