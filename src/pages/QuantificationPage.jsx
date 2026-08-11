@@ -13,6 +13,8 @@ import ComparisonCharts from "../components/quantification/ComparisonCharts";
 import SummaryCards from "../components/quantification/SummaryCards";
 import SummaryMetricCard from "../components/quantification/SummaryMetricCard";
 import ProfileSelector from "../components/quantification/ProfileSelector";
+import GroupBySelector from "../components/quantification/GroupBySelector";
+import { fetchDatasetMetadata } from "../api/image_metadata";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
 import {
   createLabelIdToNameMap,
@@ -61,6 +63,11 @@ const QuantificationPage = () => {
   // exclude_* filter, so in-progress annotation work shows up in the quantifications.
   const [includeInProgress, setIncludeInProgress] = useState(false);
   const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
+  // Image-metadata key to break the results down by. Metadata behaves as an image-wide
+  // label every object on the image inherits, so this is a second categorical axis on the
+  // same aggregation rather than a different set of numbers.
+  const [groupBy, setGroupBy] = useState(null);
+  const [metadataFacets, setMetadataFacets] = useState([]);
 
   const catalogMap = buildMetricCatalogMap(catalog);
 
@@ -88,6 +95,15 @@ const QuantificationPage = () => {
     loadMeta();
   }, [datasetId]);
 
+  // The dataset's metadata vocabulary, for the group-by picker. Non-fatal: without it the
+  // picker simply does not render and the page behaves as it did before grouping existed.
+  useEffect(() => {
+    if (!datasetId) return;
+    fetchDatasetMetadata(parseInt(datasetId))
+      .then((response) => setMetadataFacets(response.facets || []))
+      .catch((err) => console.error("Could not load metadata facets:", err));
+  }, [datasetId]);
+
   // Load the aggregated summary whenever the dataset, active profile or plot type changes.
   // Box/violin request the (heavier) server-side distribution stats; bar does not, so a
   // plot-type change only re-fetches to add/drop the distribution payload.
@@ -104,6 +120,7 @@ const QuantificationPage = () => {
           includeDistribution: needsDistribution,
           excludeNotFullyAnnotated: !includeInProgress,
           excludeUnreviewed: !includeUnreviewed,
+          groupBy,
         });
         setData(response);
         const labelsToExpand = getLabelsToAutoExpandFromSummary(
@@ -120,7 +137,7 @@ const QuantificationPage = () => {
       }
     };
     loadData();
-  }, [datasetId, activeProfileId, plotType, includeInProgress, includeUnreviewed]);
+  }, [datasetId, activeProfileId, plotType, includeInProgress, includeUnreviewed, groupBy]);
 
   const reloadProfiles = useCallback(
     async (selectId = null) => {
@@ -267,6 +284,11 @@ const QuantificationPage = () => {
                 onProfilesChanged={reloadProfiles}
               />
               <div className="flex items-center gap-4">
+                <GroupBySelector
+                  facets={metadataFacets}
+                  value={groupBy}
+                  onChange={setGroupBy}
+                />
                 {/* Inclusion toggles: by default only finalized work (fully-annotated masks
                     + reviewed objects) is quantified; these surface in-progress work. */}
                 <div className="flex items-center gap-3">
@@ -336,6 +358,10 @@ const QuantificationPage = () => {
             onPlotTypeChange={setPlotType}
             distributionData={data.distribution || null}
             distributionLoading={distributionLoading}
+            groups={data.groups || null}
+            groupBy={data.group_by || null}
+            groupValues={data.group_values || []}
+            labelIdToName={labelIdToName}
           />
 
           {/* Label Hierarchy and Metrics */}

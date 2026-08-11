@@ -29,6 +29,7 @@ export const Permission = {
     IMAGE_READ: 'image.read',
     IMAGE_UPLOAD: 'image.upload',
     IMAGE_DELETE: 'image.delete',
+    IMAGE_METADATA_WRITE: 'image.metadata_write',
     PIXEL_SCALE_SET: 'pixel_scale.set',
     CALIBRATION_SET: 'calibration.set',
 
@@ -186,6 +187,7 @@ export const PERMISSION_GROUPS = [
             [Permission.IMAGE_READ, 'View images and thumbnails'],
             [Permission.IMAGE_UPLOAD, 'Upload new images'],
             [Permission.IMAGE_DELETE, 'Delete images'],
+            [Permission.IMAGE_METADATA_WRITE, 'Edit image metadata (the subgroups the dataset is compared across)'],
             [Permission.PIXEL_SCALE_SET, 'Set the pixel scale (rescales every measurement)'],
             [Permission.CALIBRATION_SET, 'Set colour and intensity calibration'],
         ],

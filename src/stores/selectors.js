@@ -55,6 +55,14 @@ export const useGalleryError = () => useAppStore(state => state.gallery.error);
 export const useSearchTerm = () => useAppStore(state => state.gallery.searchTerm);
 export const useFilterStatus = () => useAppStore(state => state.gallery.filterStatus);
 export const useFilterPhase = () => useAppStore(state => state.gallery.filterPhase);
+// The whole store is persisted, so a session rehydrated from before these fields
+// existed has no value for them. A shared frozen default keeps the selector's
+// identity stable — returning a fresh `{}` would re-render on every store change.
+const NO_METADATA_FILTERS = Object.freeze({});
+export const useMetadataFilters = () =>
+    useAppStore(state => state.gallery.metadataFilters || NO_METADATA_FILTERS);
+export const useMetadataOnlyUntagged = () =>
+    useAppStore(state => state.gallery.metadataOnlyUntagged || false);
 export const useLoadedImages = () => useAppStore(state => state.gallery.loadedImages);
 export const useShowUploadModal = () => useAppStore(state => state.gallery.showUploadModal);
 export const useGalleryUploadProgress = () => useAppStore(state => state.gallery.uploadProgress);
