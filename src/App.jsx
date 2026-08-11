@@ -1,5 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BASE_PATH } from "./api/config";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DatasetProvider } from "./contexts/DatasetContext";
 import { ToastProvider } from "./contexts/ToastContext";
@@ -30,7 +31,7 @@ function App() {
     <AuthProvider>
       <ToastProvider>
       <DatasetProvider>
-        <Router basename={process.env.PUBLIC_URL || ""}>
+        <Router basename={BASE_PATH}>
           <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />

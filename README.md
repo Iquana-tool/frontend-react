@@ -13,8 +13,8 @@ This is the frontend application for the Coral Segmentation project. It provides
 
 ## Prerequisites
 
-- Node.js (v14 or higher)
-- npm or yarn
+- Node.js (v20.19+ or v22.12+, required by Vite 8)
+- bun (the package manager of record; `bun.lock` is the committed lockfile)
 - Backend server running (see backend setup)
 
 ## Setup
@@ -27,30 +27,34 @@ This is the frontend application for the Coral Segmentation project. It provides
 
 2. **Install dependencies**
    ```bash
-   npm install
-   # or
-   yarn install
+   bun install
    ```
 
 3. **Configure API endpoint**
-   
-   Edit `src/api.js` to point to your backend server:
-   ```javascript
-   const API_BASE_URL = 'http://localhost:8000';
+
+   Copy `env.example` to `.env` and set the backend URL. Only variables
+   prefixed `VITE_` are exposed to client code:
+   ```
+   VITE_API_BASE_URL=http://localhost:8000
    ```
 
 4. **Start the development server**
    ```bash
-   npm start
-   # or
-   yarn start
+   bun run dev
    ```
 
 5. **Build for production**
    ```bash
-   npm run build
-   # or
-   yarn build
+   bun run build
+   ```
+
+   Output lands in `build/`. Preview that bundle with `bun run preview`.
+   To serve the app from a path prefix behind the reverse proxy, set
+   `PUBLIC_URL` (e.g. `PUBLIC_URL=/iquana bun run build`).
+
+6. **Run tests**
+   ```bash
+   bun run test
    ```
 
 ## Backend Integration

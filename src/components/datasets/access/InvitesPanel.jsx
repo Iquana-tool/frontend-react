@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Copy, Link2, Loader2, Trash2 } from 'lucide-react';
 import { DATASET_ROLE_LABELS, ASSIGNABLE_DATASET_ROLES } from '../../../utils/permissions';
+import { BASE_PATH } from '../../../api/config';
 import RoleBadge from '../RoleBadge';
 
 const EXPIRY_OPTIONS = [
@@ -38,7 +39,7 @@ const InvitesPanel = ({ access }) => {
     });
     if (!response) return;
     setFreshInvite({
-      url: `${window.location.origin}${process.env.PUBLIC_URL || ''}/invites/${response.token}`,
+      url: `${window.location.origin}${BASE_PATH}/invites/${response.token}`,
       role: response.invite?.role,
     });
     setCopied(false);

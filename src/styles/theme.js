@@ -1,12 +1,16 @@
 /**
  * The single source of truth for the application's colour palette.
  *
- * CommonJS rather than ESM because `tailwind.config.js` has to `require()` this
- * at build time to generate two things from one definition: the utility class
- * names (`bg-p1`, `text-t2`) and the CSS variable declarations those utilities
- * resolve against. Webpack's interop lets `src/` import it with ESM syntax, so
- * runtime consumers that cannot use a CSS class — the Konva and canvas 2D
- * renderers, and Recharts' colour props — read the same values from here.
+ * Read at build time by `tailwind.config.mjs`, which generates two things from
+ * this one definition: the utility class names (`bg-p1`, `text-t2`) and the CSS
+ * variable declarations those utilities resolve against. Runtime consumers that
+ * cannot use a CSS class — the Konva and canvas 2D renderers, and Recharts'
+ * colour props — import the same values directly.
+ *
+ * This file was CommonJS under webpack, whose interop let `src/` import it with
+ * ESM syntax anyway. Vite serves `src/` as native ESM and does not transform
+ * CommonJS there, so it is a real ES module now and the Tailwind config is
+ * `.mjs` in order to import it.
  *
  * Changing the site's colours means editing this file and nothing else.
  *
@@ -302,7 +306,7 @@ const resolve = (themeName = DEFAULT_THEME) => {
   );
 };
 
-module.exports = {
+export {
   ACCENT,
   CLASS_PALETTE,
   CLASS_PALETTE_LIGHT,
