@@ -6,10 +6,14 @@ services:
     build: .
     ports:
       - "3000:3000"
+    # Note: these are read at *build* time (the bundle is baked, then served by
+    # nginx), so they only take effect via build args. Listing them here has
+    # never configured the production image; the CI pipeline passes the real
+    # values as build-args. Kept as-is to avoid changing deploy behaviour.
     environment:
       - NODE_ENV=production
-      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
-      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000}
     restart: unless-stopped
     labels:
       - "authors=dev-team"
@@ -25,10 +29,12 @@ services:
       - "3001:3000"
     environment:
       - NODE_ENV=development
-      - REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-http://localhost:8000}
-      - REACT_APP_WS_URL=${REACT_APP_WS_URL:-ws://localhost:8000}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      - VITE_WS_URL=${VITE_WS_URL:-ws://localhost:8000}
+      # Bind-mounted source on a non-Linux host does not deliver inotify events;
+      # vite.config.mjs turns this into server.watch.usePolling. WATCHPACK_POLLING
+      # is gone with webpack.
       - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
     volumes:
       - .:/app
       - /app/node_modules

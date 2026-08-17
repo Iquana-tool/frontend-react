@@ -45,12 +45,12 @@ const getUserId = () => {
 };
 
 const getWsBaseUrl = () => {
-  const wsEnv = process.env.REACT_APP_WS_URL;
+  const wsEnv = import.meta.env.VITE_WS_URL;
   if (wsEnv && wsEnv.trim()) {
     return wsEnv.trim().replace(/\/$/, '');
   }
 
-  const apiEnv = process.env.REACT_APP_API_BASE_URL;
+  const apiEnv = import.meta.env.VITE_API_BASE_URL;
   if (apiEnv && apiEnv.trim()) {
     const apiBase = apiEnv.trim().replace(/\/$/, '');
     if (apiBase.startsWith('https://')) {
