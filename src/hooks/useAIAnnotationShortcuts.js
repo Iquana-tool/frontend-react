@@ -2,24 +2,23 @@ import { useEffect } from 'react';
 import {
   useClearAllPrompts,
   useCurrentTool,
-  useUndoLastAction,
-  useRedoLastAction,
 } from '../stores/selectors/annotationSelectors';
 
 /**
  * Custom hook to handle keyboard shortcuts for AI annotation (modifier-based).
  * Delete/Backspace and Enter/1/2/3 are handled by useAnnotationKeyboardShortcuts.
  *
+ * Undo and redo used to live here too, bound to the prompt stack. They moved to
+ * useAnnotationHistory, which owns the single Ctrl+Z: with the prompt stack and
+ * the server-side object history both undoable, two listeners on the same key
+ * would race, and the user would get whichever one happened to be mounted.
+ *
  * Shortcuts:
- * - Ctrl/Cmd+Z: Undo last action
- * - Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y: Redo
  * - Ctrl/Cmd+Shift+C: Clear all prompts
  */
 const useAIAnnotationShortcuts = () => {
   const currentTool = useCurrentTool();
   const clearAllPrompts = useClearAllPrompts();
-  const undoLastAction = useUndoLastAction();
-  const redoLastAction = useRedoLastAction();
 
   useEffect(() => {
     if (currentTool !== 'ai_annotation') return;
@@ -35,16 +34,7 @@ const useAIAnnotationShortcuts = () => {
 
       const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 
-      if (isCtrlOrCmd && !e.shiftKey && e.key.toLowerCase() === 'z') {
-        e.preventDefault();
-        undoLastAction();
-      } else if (
-        (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'z') ||
-        (isCtrlOrCmd && e.key.toLowerCase() === 'y')
-      ) {
-        e.preventDefault();
-        redoLastAction();
-      } else if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'c') {
+      if (isCtrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         if (window.confirm('Clear all prompts?')) {
           clearAllPrompts();
@@ -54,7 +44,7 @@ const useAIAnnotationShortcuts = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentTool, clearAllPrompts, undoLastAction, redoLastAction]);
+  }, [currentTool, clearAllPrompts]);
 };
 
 export default useAIAnnotationShortcuts;

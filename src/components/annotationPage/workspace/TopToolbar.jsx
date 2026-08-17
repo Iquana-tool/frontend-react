@@ -49,12 +49,12 @@ import {
   useToggleLeftDrawer,
   useRightPanelOpen,
   useToggleRightPanel,
-  useUndoLastAction,
-  useRedoLastAction,
-  useAIPrompts,
+  useUndoActionLabel,
+  useRedoActionLabel,
   useSetShortcutSheetOpen,
   useSetRightTab,
 } from '../../../stores/selectors/annotationSelectors';
+import useAnnotationHistory from '../../../hooks/useAnnotationHistory';
 
 /** Status-pill tokens for the three workflow states. */
 const STATUS_TONE = {
@@ -99,12 +99,24 @@ const TopToolbar = () => {
   const setRightTab = useSetRightTab();
   const setShortcutSheetOpen = useSetShortcutSheetOpen();
 
-  // Undo/redo operate on the AI prompt stack — the only undoable history the
-  // client keeps. Object mutations are persisted server-side as they happen and
-  // have no client-side inverse, so the buttons disable outside prompting.
-  const undo = useUndoLastAction();
-  const redo = useRedoLastAction();
-  const prompts = useAIPrompts();
+  // Undo/redo covers two stacks. Unsubmitted prompt dots are undone on the client
+  // (they never reached the server); everything the annotator has actually done to
+  // the objects is undone through the server's action history, which is the only
+  // place a deleted object can be brought back with its own id and children.
+  // useAnnotationHistory decides which of the two a press means — see the hook.
+  const history = useAnnotationHistory();
+
+  // Naming the step makes the button honest about what it will revert — "Undo
+  // delete object" reads very differently from a generic "Undo" when the thing
+  // you are about to lose is a suggestion run.
+  const nextUndo = useUndoActionLabel();
+  const nextRedo = useRedoActionLabel();
+  const undoLabel = history.undoSource === 'prompt'
+    ? 'Undo prompt'
+    : (history.undoSource ? `Undo ${nextUndo || 'last action'}` : 'Nothing to undo');
+  const redoLabel = history.redoSource === 'prompt'
+    ? 'Redo prompt'
+    : (history.redoSource ? `Redo ${nextRedo || 'last action'}` : 'Nothing to redo');
 
   const imageActions = useImageLevelActions();
 
@@ -282,12 +294,18 @@ const TopToolbar = () => {
       <Group>
         <ToolbarButton
           icon={Undo2}
-          label="Undo prompt"
+          label={undoLabel}
           shortcut="⌘Z"
-          disabled={prompts.length === 0}
-          onClick={undo}
+          disabled={!history.canUndo || history.busy}
+          onClick={history.undo}
         />
-        <ToolbarButton icon={Redo2} label="Redo prompt" shortcut="⇧⌘Z" onClick={redo} />
+        <ToolbarButton
+          icon={Redo2}
+          label={redoLabel}
+          shortcut="⇧⌘Z"
+          disabled={!history.canRedo || history.busy}
+          onClick={history.redo}
+        />
       </Group>
 
       <Group>

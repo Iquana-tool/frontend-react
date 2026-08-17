@@ -105,6 +105,27 @@ export const createAIAnnotationSlice = (set) => ({
     state.aiAnnotation.activePreview = null;
   }),
   
+  /**
+   * Clear prompts because they were SUBMITTED, not because the user discarded them.
+   *
+   * The difference matters to undo. `clearAllPrompts` is a user action and is
+   * therefore itself undoable — it pushes onto the undo stack. But prompts that
+   * have been turned into an object are spent: the object is now the thing on
+   * screen, and the meaningful undo is "remove that object", not "put the box
+   * outline back". Leaving them on the stack made Ctrl+Z hand back the prompt
+   * that produced the object and never reach the object itself, because the
+   * prompt stack stayed non-empty for the rest of the session.
+   *
+   * So this drops both stacks rather than pushing to them, which hands the next
+   * Ctrl+Z to the annotation history where it belongs.
+   */
+  consumePrompts: () => set((state) => {
+    state.aiAnnotation.prompts = [];
+    state.aiAnnotation.activePreview = null;
+    state.aiAnnotation.undoStack = [];
+    state.aiAnnotation.redoStack = [];
+  }),
+
   setActivePreview: (preview) => set((state) => {
     state.aiAnnotation.activePreview = preview;
   }),
