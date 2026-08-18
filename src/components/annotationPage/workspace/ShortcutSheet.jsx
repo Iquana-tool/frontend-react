@@ -44,8 +44,10 @@ const GROUPS = [
   {
     title: 'History',
     items: [
-      { keys: '⌘Z', label: 'Undo the last prompt' },
-      { keys: '⇧⌘Z', label: 'Redo the last prompt' },
+      // One key, two stacks: prompts on the canvas first, then the annotation
+      // history. Spelled out here because the difference is invisible otherwise.
+      { keys: '⌘Z', label: 'Undo — the last prompt, or your last annotation action' },
+      { keys: '⇧⌘Z', label: 'Redo the last undone step' },
       { keys: '⌘⇧C', label: 'Clear all prompts' },
     ],
   },

@@ -5,7 +5,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import {
   useAIPrompts,
   useImageObject,
-  useClearAllPrompts,
+  useConsumePrompts,
   useFocusedParentContourId,
 } from '../../../stores/selectors/annotationSelectors';
 
@@ -37,7 +37,9 @@ const promptToContour = (prompt) => {
 export default function useAddShapesAsObjects() {
   const prompts = useAIPrompts();
   const imageObject = useImageObject();
-  const clearAllPrompts = useClearAllPrompts();
+  // These shapes just became objects, so they are spent rather than discarded:
+  // the next Ctrl+Z should remove the object, not redraw the outline.
+  const consumePrompts = useConsumePrompts();
   const parentContourId = useFocusedParentContourId();
   const { addToast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
@@ -72,7 +74,7 @@ export default function useAddShapesAsObjects() {
         added += 1;
       }
 
-      clearAllPrompts();
+      consumePrompts();
       addToast({
         type: 'success',
         message: added === 1 ? 'Added 1 annotation as an object' : `Added ${added} annotations as objects`,
@@ -83,7 +85,7 @@ export default function useAddShapesAsObjects() {
     } finally {
       setIsAdding(false);
     }
-  }, [imageObject, shapePrompts, isAdding, parentContourId, clearAllPrompts, addToast]);
+  }, [imageObject, shapePrompts, isAdding, parentContourId, consumePrompts, addToast]);
 
   return { shapeCount: shapePrompts.length, isAdding, addShapes };
 }

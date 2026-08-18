@@ -141,11 +141,28 @@ export const useSetPromptMode = () => useAnnotationStore(state => state.setPromp
 export const useSetManualDrawMode = () => useAnnotationStore(state => state.setManualDrawMode);
 export const useRemoveLastPrompt = () => useAnnotationStore(state => state.removeLastPrompt);
 export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
+// For prompts that became an object. Not interchangeable with the above — see the slice.
+export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
 export const useToggleInstantSegmentation = () => useAnnotationStore(state => state.toggleInstantSegmentation);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
+// Depths, not the arrays: Ctrl+Z routing only needs to know whether each prompt
+// stack has anything left, and a length never re-renders on prompt content changes.
+export const usePromptUndoDepth = () => useAnnotationStore(state => state.aiAnnotation.undoStack?.length ?? 0);
+export const usePromptRedoDepth = () => useAnnotationStore(state => state.aiAnnotation.redoStack?.length ?? 0);
+
+// Annotation history (server-side undo/redo of objects — distinct from the prompt
+// stack above, which only covers unsubmitted prompt dots on the AI canvas).
+export const useCanUndoAction = () => useAnnotationStore(state => state.history.canUndo);
+export const useCanRedoAction = () => useAnnotationStore(state => state.history.canRedo);
+export const useUndoActionLabel = () => useAnnotationStore(state => state.history.undoLabel);
+export const useRedoActionLabel = () => useAnnotationStore(state => state.history.redoLabel);
+export const useHistoryBusy = () => useAnnotationStore(state => state.history.busy);
+export const useSetHistoryStatus = () => useAnnotationStore(state => state.setHistoryStatus);
+export const useSetHistoryBusy = () => useAnnotationStore(state => state.setHistoryBusy);
+export const useClearHistoryStatus = () => useAnnotationStore(state => state.clearHistoryStatus);
 
 // Refinement mode actions
 export const useEnterRefinementMode = () => useAnnotationStore(state => state.enterRefinementMode);

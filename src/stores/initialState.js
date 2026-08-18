@@ -76,6 +76,18 @@ export const initialState = {
     },
   },
   
+  // Undo/redo history for the current image. The stack is the backend's; this is
+  // only what the toolbar needs to render it. See slices/historySlice.js.
+  history: {
+    canUndo: false,
+    canRedo: false,
+    /** Short name of the next step ("delete object"), for the button tooltip. */
+    undoLabel: null,
+    redoLabel: null,
+    /** True while an undo/redo request is in flight, so it cannot be double-fired. */
+    busy: false,
+  },
+
   // Segmentation State (needed for canvas components)
   segmentation: {
     currentMask: null,

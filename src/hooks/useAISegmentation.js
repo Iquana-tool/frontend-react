@@ -5,7 +5,7 @@ import {
   useAIPrompts,
   usePromptedModel,
   useCurrentImage,
-  useClearAllPrompts,
+  useConsumePrompts,
   useSetIsSubmittingAI,
   useImageObject,
   useAddObject,
@@ -47,7 +47,8 @@ const useAISegmentation = () => {
   const objectsList = useObjectsList();
 
   // Store actions
-  const clearAllPrompts = useClearAllPrompts();
+  // Prompts that produced an object are spent, not discarded — see the slice.
+  const consumePrompts = useConsumePrompts();
   const setIsSubmitting = useSetIsSubmittingAI();
   const addObject = useAddObject();
   const updateObject = useUpdateObject();
@@ -254,12 +255,12 @@ const useAISegmentation = () => {
           }
         }
         // For refinement (object_modified): stay in refinement mode so user can refine again or exit via "Exit Refinement"
-        clearAllPrompts();
+        consumePrompts();
         return { success: true, mask };
       }
       // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
       if (response && response.success !== false && response.type === 'object_added') {
-        clearAllPrompts();
+        consumePrompts();
         if (refinementModeActive) {
           try {
             await annotationSession.unselectRefinementObject();
@@ -273,7 +274,7 @@ const useAISegmentation = () => {
 
       // Other success response we couldn't parse (e.g. hierarchy); treat as success
       if (response && response.success !== false) {
-        clearAllPrompts();
+        consumePrompts();
         return { success: true, mask: null };
       }
 
@@ -294,7 +295,7 @@ const useAISegmentation = () => {
     objectsList,
     setIsSubmitting,
     transformResponseToMask,
-    clearAllPrompts,
+    consumePrompts,
     addObject,
     updateObject,
     refinementModeActive,
