@@ -1,5 +1,7 @@
-const plugin = require('tailwindcss/plugin');
-const { shared, themes, DEFAULT_THEME } = require('./src/styles/theme');
+// ESM (and hence `.mjs`) so it can import src/styles/theme.js directly. That
+// file has to be a real ES module for Vite, which serves src/ as native ESM.
+import plugin from 'tailwindcss/plugin';
+import { shared, themes, DEFAULT_THEME } from './src/styles/theme.js';
 
 /**
  * Emits the palette from src/styles/theme.js as CSS variables.
@@ -21,7 +23,7 @@ const themeVariables = plugin(({ addBase }) => {
 });
 
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   // Tied to the same [data-theme] attribute the token plugin reads, not a
   // `.dark` class, so `dark:` variants track the real theme switch. Only used
   // for the handful of literal brand gradients (landing hero, parallax orbs)
@@ -219,3 +221,4 @@ module.exports = {
   },
   plugins: [themeVariables],
 }
+

@@ -1,19 +1,18 @@
-# Use an official Node runtime as a parent image
-FROM node:22-alpine
+# Development image. Bun is the package manager of record for this repo, so this
+# matches the production Dockerfile rather than keeping a parallel npm setup.
+FROM oven/bun:1-alpine
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy manifest and lockfile first so the install layer caches independently of
+# source changes.
+COPY package.json bun.lock ./
 
-# Install dependencies
-RUN npm install --silent --force --legacy-peer-deps
-RUN npm install ajv ajv-keywords --force
-RUN npm install -g react-scripts
+RUN bun install --frozen-lockfile
 
 # Make port 3000 available to the world outside this container
 EXPOSE 3000
 
-# Define the command to run the app in development mode
-CMD ["npm", "start"]
+# vite.config.mjs sets `host: true`, which is what makes the dev server bind
+# beyond loopback and so be reachable from outside the container.
+CMD ["bun", "run", "dev"]

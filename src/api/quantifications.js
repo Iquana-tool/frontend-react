@@ -149,6 +149,52 @@ export const deleteQuantificationProfile = async (datasetId, profileId) => {
     }).then(handleApiError);
 };
 
+/**
+ * The per-contour export as row objects — the same rows the CSV download contains.
+ *
+ * This is the raw table the explore surfaces are built on, so it deliberately reads the
+ * *export* endpoint rather than `/quantification`: only this one accepts `profile_id`,
+ * and the profile shape is the one worth having. It emits a column per profile
+ * metric/component instead of the four legacy geometry columns, and — the reason it
+ * matters over the wire — it omits `coords_x`/`coords_y` entirely, which the legacy shape
+ * emits as full normalized polygon arrays that are useless in a table and dwarf every
+ * other column. The page always has a profile (the server auto-creates a default on first
+ * listing), so the coordinate arrays never reach us.
+ *
+ * `Content-Disposition: attachment` on the response only affects a browser navigation, not
+ * an XHR, so reading the body here is fine.
+ *
+ * Two response shapes have to be told apart: normally an array of row objects, but an
+ * empty dataframe short-circuits to `{success: false, message}` — a JSON *object*. Handing
+ * that to a table would be a confusing crash far from its cause, so it is normalised here
+ * into an explicit empty result the caller can render an explanation for.
+ *
+ * Note this endpoint computes metrics on demand (`only_stale=True` per profile tier)
+ * before building the frame, so a first call on a large or newly-changed dataset can be
+ * slow. That is compute, not transfer.
+ *
+ * @returns {Promise<{rows: Object[], empty: boolean, message: string|null}>}
+ */
+export const fetchQuantificationRows = async (
+    datasetId,
+    { profileId = null, excludeNotFullyAnnotated = true, excludeUnreviewed = true } = {}
+) => {
+    const url = buildQuantificationDownloadUrl(datasetId, {
+        profileId,
+        fileFormat: "json",
+        excludeNotFullyAnnotated,
+        excludeUnreviewed,
+    });
+    const payload = await fetch(url, { headers: getAuthHeaders() }).then(handleApiError);
+
+    if (Array.isArray(payload)) {
+        return { rows: payload, empty: payload.length === 0, message: null };
+    }
+    // The no-data shape. `success` is false here; anything else unexpected is treated the
+    // same way, since an empty table is a truthful rendering of "we got no rows".
+    return { rows: [], empty: true, message: payload?.message || null };
+};
+
 // Build the download URL for the quantification export, optionally scoped to a profile.
 // The exclude_* flags mirror the summary so the export matches whatever the page shows.
 export const buildQuantificationDownloadUrl = (
