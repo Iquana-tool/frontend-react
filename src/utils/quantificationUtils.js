@@ -230,97 +230,12 @@ export const getLabelsToAutoExpandFromSummary = (metricsByLabelId, childCountsPe
   return labelsToExpand;
 };
 
-// Prepare comparison-chart rows generically from the aggregated summary. For each label,
-// emits one field per single-component (value_dim 1) metric holding its mean, plus a
-// `${key}_count`. Multi-component metrics (e.g. color) are skipped in the bar charts.
-export const prepareComparisonDataFromSummary = (metricsByLabelId, labelIdToName, catalogMap = {}) => {
-  if (!metricsByLabelId) return [];
-  const chartData = [];
-  Object.entries(metricsByLabelId).forEach(([labelId, labelMetrics]) => {
-    if (labelId === "null") return;
-    const labelName =
-      labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`;
-    const row = { label: labelName, labelId };
-    Object.entries(labelMetrics).forEach(([metricKey, metric]) => {
-      const catalog = catalogMap[metricKey];
-      const valueDim = catalog?.value_dim ?? metric.components?.length ?? 1;
-      if (valueDim !== 1) return; // charts are for scalar metrics only
-      const comp = metric.components?.[0];
-      if (comp && typeof comp.mean === "number") {
-        row[metricKey] = comp.mean;
-        row[`${metricKey}_count`] = comp.count;
-      }
-    });
-    if (Object.keys(row).length > 2) chartData.push(row);
-  });
-  return chartData;
-};
-
-/**
- * Bar-chart rows for one metric when the summary is grouped by an image-metadata key.
- *
- * Recharts draws a grouped bar chart from one row per category with one dataKey per
- * series, so the shape flips relative to the ungrouped case: label on the x axis, one
- * field per group value. A label/group pair with no data simply has no field, and
- * recharts leaves a gap rather than drawing a zero — which is the honest rendering,
- * since "no objects of this label at this site" is not "an area of zero".
- *
- * @param {Object} groups - `{groupValue: {labelId: {metricKey: {components: [...]}}}}`
- * @param {string} metricKey
- * @param {Object} labelIdToName
- * @param {string[]} groupValues - Display order, from the server.
- * @returns {Array} One row per label: `{label, labelId, [groupValue]: mean, ...}`.
- */
-export const prepareGroupedComparisonData = (
-  groups,
-  metricKey,
-  labelIdToName,
-  groupValues = []
-) => {
-  if (!groups) return [];
-  const rowsByLabel = new Map();
-
-  groupValues.forEach((groupValue) => {
-    const labelMetrics = groups[groupValue] || {};
-    Object.entries(labelMetrics).forEach(([labelId, metrics]) => {
-      if (labelId === "null") return;
-      const component = metrics?.[metricKey]?.components?.[0];
-      if (!component || typeof component.mean !== "number") return;
-
-      if (!rowsByLabel.has(labelId)) {
-        rowsByLabel.set(labelId, {
-          labelId,
-          label: labelIdToName[labelId] || labelIdToName[String(labelId)] || `Label ${labelId}`,
-        });
-      }
-      const row = rowsByLabel.get(labelId);
-      row[groupValue] = component.mean;
-      row[`${groupValue}__count`] = component.count;
-    });
-  });
-
-  return [...rowsByLabel.values()];
-};
-
-/** Which group values actually carry data for a metric, in the server's display order. */
-export const groupValuesWithData = (groups, metricKey, groupValues = []) =>
-  groupValues.filter((groupValue) =>
-    Object.values(groups?.[groupValue] || {}).some(
-      (metrics) => typeof metrics?.[metricKey]?.components?.[0]?.mean === "number"
-    )
-  );
-
-// Which scalar metric keys are present anywhere in the summary (for generic chart series).
-export const collectScalarMetricKeys = (metricsByLabelId, catalogMap = {}) => {
-  const keys = new Set();
-  Object.values(metricsByLabelId || {}).forEach((labelMetrics) => {
-    Object.entries(labelMetrics).forEach(([metricKey, metric]) => {
-      const valueDim = catalogMap[metricKey]?.value_dim ?? metric.components?.length ?? 1;
-      if (valueDim === 1) keys.add(metricKey);
-    });
-  });
-  return Array.from(keys);
-};
+// The recharts-shaped chart-prep helpers that used to live here
+// (prepareComparisonDataFromSummary, prepareGroupedComparisonData, groupValuesWithData,
+// collectScalarMetricKeys) went with ComparisonCharts. Reshaping a pre-aggregated summary
+// into one-row-per-category / one-series-per-group was a workaround for charts that could
+// only read that shape; Perspective pivots the raw per-contour rows itself, so the summary
+// no longer needs to be re-pivoted client-side at all.
 
 // Annotation insights from the aggregated summary. Object count per label uses the count
 // of the first present metric's first component (all geometry metrics share the same

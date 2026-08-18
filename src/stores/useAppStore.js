@@ -49,6 +49,18 @@ const useAppStore = create()(
           uploadErrors: []
         },
         
+        // Quantification explore surfaces.
+        quantification: {
+          // Saved Perspective viewer configurations — a config is a saved analysis
+          // (pivot, filters, sort, chart type), so losing it on a tab switch or a
+          // re-render throws away the user's actual work.
+          //
+          // Keyed by dataset and profile. The profile decides which metric columns exist
+          // at all, so a config saved under one profile names columns that another does
+          // not have, and restoring it there would fail or silently drop them.
+          viewerConfigs: {}
+        },
+
         // Gallery and Image Management State
         gallery: {
           // DatasetGallery state
@@ -90,6 +102,27 @@ const useAppStore = create()(
           maxCacheSize: 500
         },
         
+        quantificationActions: {
+          /** Stable key for the saved analysis of one dataset/profile pair. */
+          viewerConfigKey: (datasetId, profileId) =>
+            `${datasetId}:${profileId ?? 'none'}`,
+
+          setViewerConfig: (key, config) => set(state => {
+            state.quantification.viewerConfigs[key] = config;
+          }),
+
+          getViewerConfig: (key) => get().quantification.viewerConfigs[key] || null,
+
+          // Used when a profile's metrics are edited: the columns just changed underneath
+          // every saved config for that dataset, so they are dropped rather than left to
+          // fail a restore against columns that no longer exist.
+          clearViewerConfigsForDataset: (datasetId) => set(state => {
+            Object.keys(state.quantification.viewerConfigs)
+              .filter(key => key.startsWith(`${datasetId}:`))
+              .forEach(key => { delete state.quantification.viewerConfigs[key]; });
+          })
+        },
+
         // Actions grouped by domain
         datasetActions: {
           setDatasets: (datasets) => set(state => {
