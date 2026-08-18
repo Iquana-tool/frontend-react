@@ -20,15 +20,33 @@ import {
 } from "../api";
 import useThemeColors from "../hooks/useThemeColors";
 
-const TERMINAL = new Set(["SUCCESS", "FAILED", "CANCELLED"]);
+const TERMINAL = new Set(["SUCCESS", "FAILED", "CANCELLED", "TIMED_OUT"]);
+
+const STATE_LABEL = {
+  STARTING: "Starting",
+  PROGRESS: "In progress",
+  SUCCESS: "Completed",
+  FAILED: "Failed",
+  CANCELLED: "Cancelled",
+  TIMED_OUT: "Timed out",
+  starting: "Starting",
+};
 
 const STATE_STYLE = {
+  STARTING: "bg-well text-t2",
   PROGRESS: "bg-acS text-ac",
   SUCCESS: "bg-okBg text-ok",
   FAILED: "bg-errBg text-err",
   CANCELLED: "bg-warnBg text-warn",
+  TIMED_OUT: "bg-errBg text-err",
   starting: "bg-well text-t2",
 };
+
+const STARTING_WARNING_AFTER_MS = 60_000;
+const STARTING_WARNING_TEXT =
+  "This is taking longer than usual. Training will be cancelled if a worker does not become available in time.";
+const FALLBACK_TIMEOUT_MESSAGE =
+  "Training did not start before the queue deadline.";
 
 const fmtTime = (ms) => (ms ? new Date(ms).toLocaleString() : "—");
 const lastLoss = (snap) => (snap?.loss?.length ? snap.loss[snap.loss.length - 1].value : null);
@@ -54,7 +72,10 @@ const mergeRunSnapshot = (run, snapshot) => ({
   validation_metrics_unavailable: snapshot.validation_metrics_unavailable
     ?? run.validation_metrics_unavailable,
   start_time: snapshot.start_time ?? run.start_time,
+  queued_at: snapshot.queued_at ?? run.queued_at,
+  start_deadline: snapshot.start_deadline ?? run.start_deadline,
 });
+
 
 const getRunNameError = (value) => {
   if (value.length === 0) return null;
@@ -66,6 +87,9 @@ const getRunNameError = (value) => {
 };
 
 function RunCard({ run, selected, onClick }) {
+  const displayLabel = STATE_LABEL[run.state] || run.state || "Unknown";
+  const badgeStyle = STATE_STYLE[run.state] || STATE_STYLE.STARTING;
+
   return (
     <button
       onClick={onClick}
@@ -74,8 +98,8 @@ function RunCard({ run, selected, onClick }) {
       }`}
     >
       <div className="flex items-center justify-between mb-1">
-        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${STATE_STYLE[run.state] || STATE_STYLE.starting}`}>
-          {run.state}
+        <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeStyle}`}>
+          {displayLabel}
         </span>
         <span className="text-[11px] text-t3 flex items-center gap-1">
           <Clock size={11} /> {fmtTime(run.start_time)}
@@ -197,22 +221,79 @@ function ProgressPanel({ snapshot, labels, onStop, isStopping }) {
   const percent = total ? Math.min(100, Math.round((current / total) * 100)) : 0;
   const lossData = (snapshot.loss || []).map((d) => ({ epoch: d.epoch, loss: d.value }));
   const trainingParameters = snapshot.training_parameters || {};
-  const isActive = !TERMINAL.has(snapshot.state) && snapshot.state !== "starting";
+
+  const isTerminal = TERMINAL.has(snapshot.state);
+  const isStarting = snapshot.state === "STARTING" || snapshot.state === "starting";
+  const canStop = !isTerminal && Boolean(snapshot.task_id);
+
+  const displayLabel = STATE_LABEL[snapshot.state] || snapshot.state || "Unknown";
+  const badgeStyle = STATE_STYLE[snapshot.state] || STATE_STYLE.STARTING;
+
+  // Delayed-start warning interval: updates every second while in STARTING state
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isStarting) return;
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isStarting]);
+
+  const queuedMs = snapshot.queued_at != null
+    ? snapshot.queued_at * 1000
+    : snapshot.start_time;
+  const elapsedMs = queuedMs != null ? now - queuedMs : 0;
+  const showSlowStartWarning = isStarting && elapsedMs >= STARTING_WARNING_AFTER_MS;
+
+  // Terminal message resolution
+  let terminalMessage = null;
+  if (snapshot.state === "TIMED_OUT") {
+    terminalMessage = snapshot.message || FALLBACK_TIMEOUT_MESSAGE;
+  } else if (snapshot.state === "FAILED") {
+    terminalMessage = snapshot.message || "Training failed.";
+  } else if (snapshot.state === "CANCELLED") {
+    terminalMessage = snapshot.message || "Training cancelled.";
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-t2">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATE_STYLE[snapshot.state] || STATE_STYLE.starting}`}>
-          {snapshot.state}
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeStyle}`}>
+          {displayLabel}
         </span>
-        {snapshot.state === "starting" ? (
-          <span className="flex items-center gap-1"><Loader2 className="w-4 h-4 animate-spin" /> Waiting for worker…</span>
-        ) : (
+        {isStarting ? (
+          <span className="flex items-center gap-1">
+            <Loader2 className="w-4 h-4 animate-spin" /> Waiting for worker…
+          </span>
+        ) : snapshot.state === "PROGRESS" ? (
           <span className="flex items-center gap-1">
             <Cpu className="w-4 h-4 text-ac" /> Epoch {current}{total ? ` / ${total}` : ""}
           </span>
-        )}
+        ) : null}
       </div>
+
+      {showSlowStartWarning && (
+        <div
+          role="status"
+          className="flex items-center gap-2 p-3 bg-warnBg border border-warnLn rounded-lg text-sm text-warn"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{STARTING_WARNING_TEXT}</span>
+        </div>
+      )}
+
+      {isTerminal && terminalMessage && (
+        <div
+          role={snapshot.state === "FAILED" || snapshot.state === "TIMED_OUT" ? "alert" : "status"}
+          className={`p-3 rounded-lg border text-sm ${
+            snapshot.state === "CANCELLED"
+              ? "bg-warnBg border-warnLn text-warn"
+              : "bg-errBg border-errLn text-err"
+          }`}
+        >
+          <p className="font-medium">{terminalMessage}</p>
+        </div>
+      )}
 
       {Object.keys(trainingParameters).length > 0 && (
         <div className="p-3 rounded-lg border border-ln bg-well">
@@ -277,7 +358,7 @@ function ProgressPanel({ snapshot, labels, onStop, isStopping }) {
         </p>
       ) : null}
 
-      {isActive && (
+      {canStop && (
         <button
           onClick={onStop}
           disabled={isStopping}
@@ -316,6 +397,7 @@ export default function ModelTrainingPage() {
   const [modelRunName, setModelRunName] = useState("");
 
   const streamRef = useRef(null);
+  const restoredDatasetIdRef = useRef(null);
 
   const selectedModel = useMemo(
     () => models.find((m) => m.registry_key === modelKey) || null,
@@ -326,6 +408,10 @@ export default function ModelTrainingPage() {
     try {
       const res = await getInstanceTrainingRuns(datasetId);
       const serverRuns = Array.isArray(res?.runs) ? res.runs : [];
+      const sortedServerRuns = [...serverRuns].sort(
+        (a, b) => (b.start_time || 0) - (a.start_time || 0)
+      );
+
       setRuns((currentRuns) => {
         const serverTaskIds = new Set(serverRuns.map((run) => run.task_id).filter(Boolean));
         const pendingLocalRuns = currentRuns.filter(
@@ -334,6 +420,19 @@ export default function ModelTrainingPage() {
         return [...serverRuns, ...pendingLocalRuns]
           .sort((a, b) => (b.start_time || 0) - (a.start_time || 0));
       });
+
+      // Restore active run only once per dataset load
+      if (restoredDatasetIdRef.current !== datasetId) {
+        restoredDatasetIdRef.current = datasetId;
+        const newestActiveRun = sortedServerRuns.find(
+          (run) => !TERMINAL.has(run.state) && Boolean(run.task_id)
+        );
+        if (newestActiveRun) {
+          setMode("run");
+          setSelectedRun(newestActiveRun);
+          setActiveTaskId(newestActiveRun.task_id);
+        }
+      }
     } catch (e) {
       // non-fatal
     }
@@ -342,6 +441,7 @@ export default function ModelTrainingPage() {
   // Initial load: labels, models, runs.
   useEffect(() => {
     if (!datasetId) return;
+    restoredDatasetIdRef.current = null;
     setModels([]);
     setModelKey("");
     setModelLoadStatus("loading");
@@ -449,7 +549,9 @@ export default function ModelTrainingPage() {
       const optimisticRun = {
         task_id: res.task_id,
         run_id: null,
-        state: "starting",
+        state: "STARTING",
+        training_state: "starting",
+        queued_at: Date.now() / 1000,
         epoch: 0,
         total_epochs: hyperValues.epochs ? Number(hyperValues.epochs) : null,
         loss: [],
@@ -474,10 +576,11 @@ export default function ModelTrainingPage() {
   };
 
   const handleStop = async () => {
-    if (!activeTaskId) return;
+    const targetTaskId = activeTaskId || selectedRun?.task_id;
+    if (!targetTaskId) return;
     setIsStopping(true);
     try {
-      const snapshot = await cancelInstanceTraining(activeTaskId);
+      const snapshot = await cancelInstanceTraining(targetTaskId);
       setSelectedRun((currentRun) => (currentRun ? mergeRunSnapshot(currentRun, snapshot) : snapshot));
     } catch (err) {
       setError(err.message || "Failed to stop training.");
@@ -495,6 +598,7 @@ export default function ModelTrainingPage() {
     // Keep streaming a still-running run; otherwise show its static snapshot.
     setActiveTaskId(!TERMINAL.has(run.state) && run.task_id ? run.task_id : null);
   };
+
 
   const handleNewTraining = () => {
     setActiveTaskId(null);
@@ -544,7 +648,12 @@ export default function ModelTrainingPage() {
                 <RunCard
                   key={run.run_id || run.task_id}
                   run={run}
-                  selected={mode === "run" && selectedRun && (selectedRun.run_id === run.run_id)}
+                  selected={
+                    mode === "run" &&
+                    selectedRun &&
+                    ((selectedRun.run_id && selectedRun.run_id === run.run_id) ||
+                      (selectedRun.task_id && selectedRun.task_id === run.task_id))
+                  }
                   onClick={() => handleSelectRun(run)}
                 />
               ))}
