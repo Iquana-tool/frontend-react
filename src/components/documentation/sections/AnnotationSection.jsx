@@ -7,8 +7,8 @@ const AnnotationSection = () => {
       <div>
         <h3 className="text-lg font-semibold text-t1 mb-3">Annotation Interface Overview</h3>
         <p className="text-t2 mb-4">
-          The IQuana annotation interface provides a comprehensive set of features for marking, 
-          segmenting, and analyzing coral regions in your images. The sidebar allows you to select 
+          The IQUANA annotation interface provides a comprehensive set of features for marking, 
+          segmenting, and analyzing regions of interest in your images. The sidebar allows you to select 
           models for prompted segmentation and suggestion segmentation. You can use point and box 
           prompts to guide AI segmentation, manage objects with a review workflow, and use advanced 
           features like focus mode and refinement mode for precise annotation.

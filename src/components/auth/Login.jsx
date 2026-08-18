@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Database, LogIn, ArrowRight } from 'lucide-react';
+import Wordmark from '../Wordmark';
 
 /**
  * Where to send the user after signing in.
@@ -68,7 +69,7 @@ const Login = () => {
               <Database className="w-[22px] h-[22px] text-onAccent" />
             </div>
             <span className="text-2xl font-semibold tracking-tight text-t1">
-              I<span className="text-ac">Quana</span>
+              <Wordmark />
             </span>
           </div>
 

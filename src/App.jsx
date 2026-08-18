@@ -8,7 +8,7 @@ import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import useDocumentTheme from "./hooks/useDocumentTheme";
 import Login from "./components/auth/Login";
-import LandingPage from "./pages/LandingPage";
+import InstanceLandingPage from "./pages/InstanceLandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
@@ -35,7 +35,7 @@ function App() {
           <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<InstanceLandingPage />} />
             <Route path="/docs" element={<DocumentationPage />} />
             <Route path="/models" element={<ModelZooPage />} />
             <Route

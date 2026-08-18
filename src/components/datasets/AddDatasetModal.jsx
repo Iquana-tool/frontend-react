@@ -3,6 +3,7 @@ import { useDataset } from '../../contexts/DatasetContext';
 import { X, Upload, File, Image } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { uploadImage } from '../../api';
+import Wordmark from '../Wordmark';
 
 const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurrentProgress, setDataSetInfo}) => {
   const { createDataset, fetchDatasets } = useDataset();
@@ -152,7 +153,7 @@ const AddDatasetModal = ({ isOpen, onClose, isCreating, setIsCreating, setCurren
         {/* Header */}
         <div className="bg-p2 border-b border-ln text-t1 p-6 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold">IQuana</h2>
+            <h2 className="text-2xl font-bold"><Wordmark /></h2>
             <button
               onClick={onClose}
               className="text-t3 hover:text-t1 transition-colors duration-150"
