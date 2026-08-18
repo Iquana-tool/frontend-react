@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import AuthButtons from '../../auth/AuthButtons';
 import ReportBugLink from '../../ui/ReportBugLink';
 import ThemeToggle from '../../ui/ThemeToggle';
+import Wordmark from '../../Wordmark';
 
 const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation }) => {
             className="text-2xl font-bold cursor-pointer hover:text-ac transition-colors duration-150"
             onClick={() => navigate('/')}
           >
-            IQuana
+            <Wordmark />
           </h1>
           <div className="h-6 w-px bg-ln"></div>
           <span className="text-lg font-medium">{datasetName}</span>

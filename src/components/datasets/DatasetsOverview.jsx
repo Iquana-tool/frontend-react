@@ -17,6 +17,7 @@ import * as api from "../../api";
 import { extractLabelsFromResponse } from "../../utils/labelHierarchy";
 import { emptyPhaseCounts } from "../../utils/imageStatus";
 import ThemeToggle from "../ui/ThemeToggle";
+import Wordmark from '../Wordmark';
 
 const DatasetsOverview = ({ onOpenDataset }) => {
   const navigate = useNavigate();
@@ -192,7 +193,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 className="text-2xl font-semibold tracking-tight text-t1 cursor-pointer hover:text-ac transition-colors duration-150"
                 onClick={() => navigate('/')}
               >
-                IQuana
+                <Wordmark />
               </h1>
             </div>
             <div className="flex items-center space-x-4">

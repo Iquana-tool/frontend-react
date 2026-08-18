@@ -4,11 +4,11 @@ const GettingStartedSection = () => {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-t1 mb-2 sm:mb-3">Welcome to IQuana</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-t1 mb-2 sm:mb-3">Welcome to IQUANA</h3>
         <p className="text-t2 mb-3 sm:mb-4 text-sm sm:text-base">
-          IQuana is a tool for coral analysis, combining AI-powered segmentation 
-          with manual annotation capabilities. This application helps researchers and marine biologists 
-          analyze coral images efficiently.
+          IQUANA — Intelligent QUANtification, Annotation and Analysis — combines AI-assisted 
+          segmentation with manual annotation and reproducible measurement. It helps research groups 
+          annotate scientific image datasets and get defensible numbers out of them.
         </p>
       </div>
 

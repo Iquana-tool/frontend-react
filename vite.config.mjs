@@ -23,9 +23,13 @@ export default defineConfig({
   base: process.env.PUBLIC_URL || "/",
 
   server: {
-    // Matches the port CRA used, which the deployment scripts and the
+    // PORT is exported by iquana.sh from the port chosen during installation;
+    // CRA read it natively, Vite does not, so it is wired through explicitly.
+    // Without this the installer's frontend-port question had no effect and
+    // iquana.sh would wait for a port the dev server never bound.
+    // Falls back to the port CRA used, which the deployment scripts and the
     // docker-compose dev service both assume.
-    port: 3000,
+    port: Number(process.env.PORT) || 3000,
     // Bind on all interfaces so the dev container is reachable from the host.
     host: true,
     // webpack-dev-server picked CHOKIDAR_USEPOLLING up on its own; Vite needs it

@@ -15,7 +15,7 @@ const DocumentationHeader = () => {
           </div>
         </div>
         <p className="text-t2 text-lg max-w-4xl">
-          Comprehensive guide to using the IQuana application for dataset management, 
+          Comprehensive guide to using IQUANA for dataset management, 
           AI-powered segmentation, and quantification analysis.
         </p>
       </div>

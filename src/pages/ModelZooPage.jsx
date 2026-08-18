@@ -20,6 +20,7 @@ import {
 import { getModelFavorites, setModelFavorite, clearModelFavorite } from "../api/models";
 import { TASK_ORDER, getTaskMeta } from "../constants/tasks";
 import ThemeToggle from "../components/ui/ThemeToggle";
+import Wordmark from '../components/Wordmark';
 
 // The toolbox serves `tags` as a dict (e.g. { domain: "general" }), but older
 // payloads may use an array or comma string. Normalize all three into
@@ -557,7 +558,7 @@ const ModelZooPage = () => {
                 className="text-2xl font-semibold tracking-tight cursor-pointer hover:text-ac transition-colors duration-150"
                 onClick={() => navigate("/")}
               >
-                IQuana
+                <Wordmark />
               </h1>
             </div>
             <div className="flex items-center space-x-4">

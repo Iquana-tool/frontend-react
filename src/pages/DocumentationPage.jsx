@@ -16,6 +16,8 @@ import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
 import ThemeToggle from '../components/ui/ThemeToggle';
 
+import Wordmark from '../components/Wordmark';
+
 import {
   DocumentationNavigation,
   SectionHeader,
@@ -155,7 +157,7 @@ const DocumentationPage = () => {
               onClick={() => navigate("/")}
               className="text-lg font-bold hover:text-ac transition-colors duration-150 cursor-pointer"
             >
-              IQuana
+              <Wordmark />
             </button>
             {isAuthenticated && user && (
               <div className="flex items-center gap-[5px] px-2 py-1.5 text-xs text-t3">
@@ -192,7 +194,7 @@ const DocumentationPage = () => {
                 onClick={() => navigate("/")}
                 className="text-2xl font-bold hover:text-ac transition-colors duration-150 cursor-pointer"
               >
-                IQuana
+                <Wordmark />
               </button>
               <div className="h-6 w-px bg-ln"></div>
               {isAuthenticated && user && (
@@ -232,7 +234,7 @@ const DocumentationPage = () => {
             </div>
           </div>
           <p className="text-t2 text-base sm:text-lg max-w-4xl">
-          A complete guide to use the IQuana application for efficient dataset management, AI-driven image segmentation, and quantification analysis.
+          A complete guide to using IQUANA for efficient dataset management, AI-driven image segmentation, and quantification analysis.
           </p>
         </div>
       </div>

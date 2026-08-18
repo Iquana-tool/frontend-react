@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "./auth/AuthButtons";
 import ReportBugLink from "./ui/ReportBugLink";
 import ThemeToggle from "./ui/ThemeToggle";
+import Wordmark from './Wordmark';
 
 // Nav items are uniform, so the active/idle treatment lives in one place rather
 // than being repeated per button.
@@ -43,7 +44,7 @@ const Navbar = () => {
                 navigate('/');
               }}
             >
-              I<span className="text-ac">Quana</span>
+              <Wordmark />
             </span>
           </div>
 
