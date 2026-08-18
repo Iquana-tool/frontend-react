@@ -1,13 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 import InstanceWarningModal from './InstanceWarningModal';
 
 describe('InstanceWarningModal', () => {
   test('offers patch as the safe default and passes patch mode', () => {
-    const onConfirm = jest.fn();
+    const onConfirm = vi.fn();
 
     render(
-      <InstanceWarningModal isOpen onClose={jest.fn()} onConfirm={onConfirm} />
+      <InstanceWarningModal isOpen onClose={vi.fn()} onConfirm={onConfirm} />
     );
 
     expect(
@@ -20,10 +21,10 @@ describe('InstanceWarningModal', () => {
   });
 
   test('clearly warns before passing override mode', () => {
-    const onConfirm = jest.fn();
+    const onConfirm = vi.fn();
 
     render(
-      <InstanceWarningModal isOpen onClose={jest.fn()} onConfirm={onConfirm} />
+      <InstanceWarningModal isOpen onClose={vi.fn()} onConfirm={onConfirm} />
     );
 
     expect(

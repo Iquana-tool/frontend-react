@@ -398,6 +398,9 @@ export default function ModelTrainingPage() {
 
   const streamRef = useRef(null);
   const restoredDatasetIdRef = useRef(null);
+  const currentDatasetIdRef = useRef(datasetId);
+  const activeTaskDatasetIdRef = useRef(null);
+  currentDatasetIdRef.current = datasetId;
 
   const selectedModel = useMemo(
     () => models.find((m) => m.registry_key === modelKey) || null,
@@ -407,6 +410,7 @@ export default function ModelTrainingPage() {
   const loadRuns = useCallback(async () => {
     try {
       const res = await getInstanceTrainingRuns(datasetId);
+      if (currentDatasetIdRef.current !== datasetId) return;
       const serverRuns = Array.isArray(res?.runs) ? res.runs : [];
       const sortedServerRuns = [...serverRuns].sort(
         (a, b) => (b.start_time || 0) - (a.start_time || 0)
@@ -430,6 +434,7 @@ export default function ModelTrainingPage() {
         if (newestActiveRun) {
           setMode("run");
           setSelectedRun(newestActiveRun);
+          activeTaskDatasetIdRef.current = datasetId;
           setActiveTaskId(newestActiveRun.task_id);
         }
       }
@@ -441,7 +446,16 @@ export default function ModelTrainingPage() {
   // Initial load: labels, models, runs.
   useEffect(() => {
     if (!datasetId) return;
+    streamRef.current?.abort();
+    streamRef.current = null;
     restoredDatasetIdRef.current = null;
+    setRuns([]);
+    setMode("config");
+    setSelectedRun(null);
+    activeTaskDatasetIdRef.current = null;
+    setActiveTaskId(null);
+    setIsStarting(false);
+    setIsStopping(false);
     setModels([]);
     setModelKey("");
     setModelLoadStatus("loading");
@@ -499,7 +513,7 @@ export default function ModelTrainingPage() {
 
   // Stream progress for the active task; tear down on change/unmount.
   useEffect(() => {
-    if (!activeTaskId) return;
+    if (!activeTaskId || activeTaskDatasetIdRef.current !== datasetId) return;
     const controller = streamInstanceTrainingProgress(
       activeTaskId,
       (snap) => {
@@ -514,6 +528,7 @@ export default function ModelTrainingPage() {
           ));
         });
         if (TERMINAL.has(snap.state)) {
+          activeTaskDatasetIdRef.current = null;
           setActiveTaskId(null);
           loadRuns();
         }
@@ -522,7 +537,7 @@ export default function ModelTrainingPage() {
     );
     streamRef.current = controller;
     return () => controller.abort();
-  }, [activeTaskId, loadRuns]);
+  }, [activeTaskId, datasetId, loadRuns]);
 
   const setHyper = (key, value) => setHyperValues((prev) => ({ ...prev, [key]: value }));
 
@@ -566,6 +581,7 @@ export default function ModelTrainingPage() {
       ]);
       setMode("run");
       setSelectedRun(optimisticRun);
+      activeTaskDatasetIdRef.current = datasetId;
       setActiveTaskId(res.task_id);
       loadRuns();
     } catch (err) {
@@ -588,6 +604,7 @@ export default function ModelTrainingPage() {
     } finally {
       setIsStopping(false);
     }
+    activeTaskDatasetIdRef.current = null;
     setActiveTaskId(null);
     loadRuns();
   };
@@ -596,11 +613,14 @@ export default function ModelTrainingPage() {
     setMode("run");
     setSelectedRun(run);
     // Keep streaming a still-running run; otherwise show its static snapshot.
-    setActiveTaskId(!TERMINAL.has(run.state) && run.task_id ? run.task_id : null);
+    const nextTaskId = !TERMINAL.has(run.state) && run.task_id ? run.task_id : null;
+    activeTaskDatasetIdRef.current = nextTaskId ? datasetId : null;
+    setActiveTaskId(nextTaskId);
   };
 
 
   const handleNewTraining = () => {
+    activeTaskDatasetIdRef.current = null;
     setActiveTaskId(null);
     setSelectedRun(null);
     setMode("config");

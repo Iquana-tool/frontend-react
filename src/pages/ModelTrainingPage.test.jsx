@@ -1,5 +1,6 @@
 import React from "react";
 import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
+import { vi } from "vitest";
 import ModelTrainingPage from "./ModelTrainingPage";
 import {
   cancelInstanceTraining,
@@ -11,33 +12,43 @@ import {
   streamInstanceTrainingProgress,
 } from "../api";
 
-jest.mock("react-router-dom", () => ({
-  useParams: () => ({ datasetId: "42" }),
-}), { virtual: true });
+const { mockRoute } = vi.hoisted(() => ({
+  mockRoute: { datasetId: "42" },
+}));
 
-jest.mock("../contexts/DatasetContext", () => ({
+vi.mock("react-router-dom", () => ({
+  useParams: () => ({ datasetId: mockRoute.datasetId }),
+}));
+
+vi.mock("../contexts/DatasetContext", () => ({
   useDataset: () => ({ currentDataset: { name: "Test dataset" } }),
 }));
 
-jest.mock("../components/datasets/gallery/DatasetManagementLayout", () => ({ children }) => (
-  <div>{children}</div>
-));
-
-jest.mock("../components/datasets/training/DynamicHyperParameter", () => () => null);
-
-jest.mock("../api", () => ({
-  cancelInstanceTraining: jest.fn(),
-  fetchLabels: jest.fn(),
-  getInstanceLabelAnnotationCounts: jest.fn(),
-  getInstanceModels: jest.fn(),
-  getInstanceTrainingRuns: jest.fn(),
-  startInstanceTraining: jest.fn(),
-  streamInstanceTrainingProgress: jest.fn(),
+vi.mock("../components/datasets/gallery/DatasetManagementLayout", () => ({
+  default: ({ children }) => <div>{children}</div>,
 }));
+
+vi.mock("../components/datasets/training/DynamicHyperParameter", () => ({
+  default: () => null,
+}));
+
+vi.mock("../api", () => ({
+  cancelInstanceTraining: vi.fn(),
+  fetchLabels: vi.fn(),
+  getInstanceLabelAnnotationCounts: vi.fn(),
+  getInstanceModels: vi.fn(),
+  getInstanceTrainingRuns: vi.fn(),
+  startInstanceTraining: vi.fn(),
+  streamInstanceTrainingProgress: vi.fn(),
+}));
+
+beforeEach(() => {
+  mockRoute.datasetId = "42";
+});
 
 describe("ModelTrainingPage model loading", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     fetchLabels.mockResolvedValue({ labels: { id_to_label_object: {} } });
     getInstanceLabelAnnotationCounts.mockResolvedValue({
       success: true,
@@ -46,7 +57,7 @@ describe("ModelTrainingPage model loading", () => {
     getInstanceTrainingRuns.mockResolvedValue({ runs: [] });
     cancelInstanceTraining.mockResolvedValue({});
     startInstanceTraining.mockResolvedValue({ task_id: "task-1" });
-    streamInstanceTrainingProgress.mockReturnValue({ abort: jest.fn() });
+    streamInstanceTrainingProgress.mockReturnValue({ abort: vi.fn() });
   });
 
   it("keeps the configuration unavailable while models are loading", async () => {
@@ -109,7 +120,7 @@ describe("ModelTrainingPage model loading", () => {
 
 describe("Task 3: Frontend lifecycle presentation normalization", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     fetchLabels.mockResolvedValue({
       labels: {
         id_to_label_object: { 1: { id: 1, name: "cell" } },
@@ -125,7 +136,7 @@ describe("Task 3: Frontend lifecycle presentation normalization", () => {
     });
     cancelInstanceTraining.mockResolvedValue({});
     startInstanceTraining.mockResolvedValue({ task_id: "task-start-123" });
-    streamInstanceTrainingProgress.mockReturnValue({ abort: jest.fn() });
+    streamInstanceTrainingProgress.mockReturnValue({ abort: vi.fn() });
   });
 
   it("renders friendly display labels for all canonical lifecycle states", async () => {
@@ -212,7 +223,7 @@ describe("Task 3: Frontend lifecycle presentation normalization", () => {
 
 describe("Task 4: Active run restoration after refresh", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     fetchLabels.mockResolvedValue({
       labels: { id_to_label_object: { 1: { id: 1, name: "cell" } } },
     });
@@ -224,7 +235,7 @@ describe("Task 4: Active run restoration after refresh", () => {
       success: true,
       result: [{ registry_key: "mask2former", name: "Mask2Former", trainable: true, training_parameters: [] }],
     });
-    streamInstanceTrainingProgress.mockReturnValue({ abort: jest.fn() });
+    streamInstanceTrainingProgress.mockReturnValue({ abort: vi.fn() });
   });
 
   it("restores an active STARTING run on page load and starts progress streaming", async () => {
@@ -296,7 +307,7 @@ describe("Task 4: Active run restoration after refresh", () => {
   });
 
   it("aborts active stream controller on unmount", async () => {
-    const abortMock = jest.fn();
+    const abortMock = vi.fn();
     streamInstanceTrainingProgress.mockReturnValue({ abort: abortMock });
 
     const runs = [
@@ -310,11 +321,41 @@ describe("Task 4: Active run restoration after refresh", () => {
     unmount();
     expect(abortMock).toHaveBeenCalled();
   });
+
+  it("clears the active run and aborts its stream when the dataset changes", async () => {
+    const abortMock = vi.fn();
+    streamInstanceTrainingProgress.mockReturnValue({ abort: abortMock });
+    getInstanceTrainingRuns.mockImplementation((datasetId) => Promise.resolve({
+      runs: datasetId === "42"
+        ? [{
+            task_id: "task-dataset-42",
+            run_id: "run-dataset-42",
+            state: "STARTING",
+            start_time: 5000,
+            label_ids: [1],
+          }]
+        : [],
+    }));
+
+    const { rerender } = render(<ModelTrainingPage />);
+
+    await waitFor(() => expect(streamInstanceTrainingProgress).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Waiting for worker…")).toBeInTheDocument();
+
+    mockRoute.datasetId = "43";
+    rerender(<ModelTrainingPage />);
+
+    await waitFor(() => expect(getInstanceTrainingRuns).toHaveBeenCalledWith("43"));
+    await waitFor(() => expect(abortMock).toHaveBeenCalled());
+    expect(streamInstanceTrainingProgress).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Waiting for worker…")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /start training/i })).toBeInTheDocument();
+  });
 });
 
 describe("Task 5: Slow-start warning and terminal messages", () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     fetchLabels.mockResolvedValue({
       labels: { id_to_label_object: { 1: { id: 1, name: "cell" } } },
     });
@@ -331,20 +372,20 @@ describe("Task 5: Slow-start warning and terminal messages", () => {
       state: "CANCELLED",
       message: "Training cancelled by user.",
     });
-    streamInstanceTrainingProgress.mockReturnValue({ abort: jest.fn() });
+    streamInstanceTrainingProgress.mockReturnValue({ abort: vi.fn() });
   });
 
   it("shows slow-start warning only after 60 seconds of STARTING and removes it on PROGRESS", async () => {
     let streamCallback;
     streamInstanceTrainingProgress.mockImplementation((taskId, onSnap) => {
       streamCallback = onSnap;
-      return { abort: jest.fn() };
+      return { abort: vi.fn() };
     });
 
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     try {
       const baseTime = 1000000;
-      jest.setSystemTime(baseTime);
+      vi.setSystemTime(baseTime);
 
       const startingRun = {
         task_id: "task-slow",
@@ -367,13 +408,13 @@ describe("Task 5: Slow-start warning and terminal messages", () => {
 
       // At 59 seconds: no warning
       act(() => {
-        jest.advanceTimersByTime(59000);
+        vi.advanceTimersByTime(59000);
       });
       expect(screen.queryByText(/This is taking longer than usual/i)).not.toBeInTheDocument();
 
       // At 60 seconds: warning is shown
       act(() => {
-        jest.advanceTimersByTime(1000);
+        vi.advanceTimersByTime(1000);
       });
       expect(screen.getByText(/This is taking longer than usual/i)).toBeInTheDocument();
 
@@ -389,7 +430,7 @@ describe("Task 5: Slow-start warning and terminal messages", () => {
       });
       expect(screen.queryByText(/This is taking longer than usual/i)).not.toBeInTheDocument();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 
@@ -436,7 +477,7 @@ describe("Task 5: Slow-start warning and terminal messages", () => {
     let streamCallback;
     streamInstanceTrainingProgress.mockImplementation((taskId, onSnap) => {
       streamCallback = onSnap;
-      return { abort: jest.fn() };
+      return { abort: vi.fn() };
     });
 
     const runs = [
