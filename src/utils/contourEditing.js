@@ -269,3 +269,129 @@ export function mergeLineIntoContour(contour, line) {
   // Replace b→a; keep a→b. Walk the kept arc a→b, then back along the reversed line.
   return [...collectArc(contour, a, b), ...[...line].reverse()];
 }
+
+// -- Splitting --------------------------------------------------------------
+//
+// Cut one contour in two by drawing an open line across it (GitHub #43). The
+// snapping and arc bookkeeping are the ones `mergeLineIntoContour` already does:
+// it collects *both* arcs between the snapped endpoints and throws one away. A
+// split keeps both — each arc, closed with the drawn line, is one half.
+
+/** Shoelace area of a closed polygon; sign carries the winding. */
+export function polygonArea(points) {
+  let sum = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    sum += a.x * b.y - b.x * a.y;
+  }
+  return sum / 2;
+}
+
+/** Ramer–Douglas–Peucker on an open polyline; exported for the union tracer. */
+export function simplifyPolyline(points, epsilon) {
+  return rdp(points, epsilon);
+}
+
+/** Ray-casting point-in-polygon on {x,y} points. */
+function pointInPolygon(pt, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i];
+    const pj = polygon[j];
+    if ((pi.y > pt.y) !== (pj.y > pt.y) &&
+        pt.x < ((pj.x - pi.x) * (pt.y - pi.y)) / (pj.y - pi.y) + pi.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Walk the drawn line and count how often it enters or leaves the contour.
+ *
+ * Sampled rather than solved as segment intersections: a hand-drawn line whose
+ * end lands exactly on a boundary vertex has no *proper* crossing there, so an
+ * intersection count reads a clean cut across a shape as "never entered it".
+ */
+function traceLineAgainstContour(contour, line) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of contour) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const step = Math.hypot(maxX - minX, maxY - minY) / 400 || 1;
+
+  let previous = null;
+  let transitions = 0;
+  let anyInside = false;
+  for (let i = 0; i < line.length - 1; i++) {
+    const a = line[i];
+    const b = line[i + 1];
+    const samples = Math.max(1, Math.min(2000, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step)));
+    for (let k = i === 0 ? 0 : 1; k <= samples; k++) {
+      const t = k / samples;
+      const inside = pointInPolygon({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, contour);
+      if (inside) anyInside = true;
+      if (previous !== null && inside !== previous) transitions++;
+      previous = inside;
+    }
+  }
+  return { transitions, anyInside };
+}
+
+/** A half smaller than this fraction of the original is a mis-snap, not a split. */
+const MIN_HALF_AREA_FRACTION = 0.001;
+
+/**
+ * Split a closed contour into two along an open drawn line.
+ *
+ * Both ends of the line snap to their nearest contour vertex, exactly as
+ * `mergeLineIntoContour` does; the two boundary arcs between those vertices,
+ * each closed with the line, are the two halves.
+ *
+ * This models a line that passes through the interior once. A line that leaves
+ * and re-enters a concave shape would need real polygon clipping, so it is
+ * refused (`crossings`) rather than silently mis-split.
+ *
+ * @param {Array<{x:number,y:number}>} contour - closed contour (no repeated point)
+ * @param {Array<{x:number,y:number}>} line - the drawn open polyline (>= 2 points)
+ * @returns {{halves: Array<Array<{x:number,y:number}>>}|{error: string}} the two
+ *   halves, largest first, or a refusal code: `contour` / `line` (unusable input),
+ *   `crossings` (line re-enters the shape), `outside` (line misses the object),
+ *   `ends` (both ends snap to the same vertex), `degenerate` (a half has no area).
+ */
+export function splitContourByLine(contour, line) {
+  if (!Array.isArray(contour) || contour.length < 3) return { error: 'contour' };
+  if (!Array.isArray(line) || line.length < 2) return { error: 'line' };
+
+  const { transitions, anyInside } = traceLineAgainstContour(contour, line);
+  // In and out again is one clean cut. More than that means the line re-entered a
+  // concave shape, which the two-arc model cannot express.
+  if (transitions > 2) return { error: 'crossings' };
+  // No transition at all is fine for a line drawn wholly inside the object (its
+  // ends snap outward to the boundary) but not for one drawn past it entirely.
+  if (!anyInside) return { error: 'outside' };
+
+  const a = nearestIndex(contour, line[0]);
+  const b = nearestIndex(contour, line[line.length - 1]);
+  if (a === b) return { error: 'ends' };
+
+  const halves = [
+    [...line, ...collectArc(contour, b, a)],
+    [...collectArc(contour, a, b), ...[...line].reverse()],
+  ];
+
+  const whole = Math.abs(polygonArea(contour));
+  for (const half of halves) {
+    if (half.length < 3) return { error: 'degenerate' };
+    if (Math.abs(polygonArea(half)) <= whole * MIN_HALF_AREA_FRACTION) return { error: 'degenerate' };
+  }
+
+  // Largest first: the caller keeps the original contour id on halves[0], so the
+  // children and the rejection history stay with the part that is still "the" object.
+  halves.sort((p, q) => Math.abs(polygonArea(q)) - Math.abs(polygonArea(p)));
+  return { halves };
+}

@@ -22,6 +22,7 @@ import {
   useEnterEditMode,
   useStartLineEdit,
   useSelectObject,
+  useCurrentMaskId,
 } from '../../../stores/selectors/annotationSelectors';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
@@ -32,6 +33,8 @@ import { useSuggestionSegmentation } from '../../../hooks/useSuggestionSegmentat
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import { mergeObjects } from '../../../utils/contourOperations';
+import { useToast } from '../../../contexts/ToastContext';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
@@ -68,10 +71,13 @@ const ObjectContextMenu = () => {
   const enterEditMode = useEnterEditMode();
   const startLineEdit = useStartLineEdit();
   const selectObject = useSelectObject();
+  const maskId = useCurrentMaskId();
+  const { addToast } = useToast();
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
-  
+
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
+  const [isMerging, setIsMerging] = useState(false);
   
   // Get all selected objects (targets for batch operations)
   const targetObjects = React.useMemo(() => {
@@ -414,7 +420,7 @@ const ObjectContextMenu = () => {
     await runSuggestion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
   };
 
-  const handleLineEditContour = () => {
+  const handleLineEditContour = (lineMode = 'reshape') => {
     if (isMultiSelect) return;
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
     if (!targetObject || targetObject.contour_id == null ||
@@ -432,7 +438,7 @@ const ObjectContextMenu = () => {
 
     selectObject(targetObject.id);
     setCurrentTool('selection');
-    startLineEdit(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
+    startLineEdit(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y, lineMode);
 
     // Frame the instance so there is room to draw the line.
     if (imageObject && targetObject.x.length > 0) {
@@ -450,6 +456,34 @@ const ObjectContextMenu = () => {
     }
 
     hideContextMenu();
+  };
+
+  /**
+   * Merge the selection into one object (#44).
+   *
+   * Only touching or overlapping outlines can be merged: their union is a single
+   * ring, which is what a contour already is. A disjoint selection is refused by
+   * `mergeObjects` rather than quietly producing a shape that spans the gap.
+   */
+  const handleMergeObjects = async () => {
+    if (!isMultiSelect || isMerging) return;
+
+    setIsMerging(true);
+    hideContextMenu();
+    try {
+      const result = await mergeObjects({
+        objects: targetObjects,
+        objectsList,
+        imageObject,
+        maskId,
+        updateObject,
+      });
+      addToast({ type: result.success ? 'success' : 'error', message: result.message });
+    } catch (error) {
+      addToast({ type: 'error', message: error.message || 'Could not merge those objects.' });
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   const handleEditContour = () => {
@@ -585,13 +619,43 @@ const ObjectContextMenu = () => {
 
       {/* Reshape by Line Option - draw a line that is merged into the boundary */}
       <ContextMenuItem
-        onClick={handleLineEditContour}
+        onClick={() => handleLineEditContour('reshape')}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Reshape is disabled for multiple selections' : 'Draw a line across the boundary to cut off or add a region'}
         label="Reshape by Line"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20l6-6m0 0l4-4 6-6M10 14l4 4m-4-4l-2-2" />
+          </svg>
+        }
+      />
+
+      {/* Split Option - draw a line across the object to cut it in two */}
+      <ContextMenuItem
+        onClick={() => handleLineEditContour('split')}
+        disabled={isMultiSelect}
+        title={isMultiSelect ? 'Split works on one object at a time' : 'Draw a line across this object to cut it into two objects'}
+        label="Split Object"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v18M6 7l-3 5 3 5m12-10l3 5-3 5" />
+          </svg>
+        }
+      />
+
+      {/* Merge Option - union of a touching or overlapping selection */}
+      <ContextMenuItem
+        onClick={handleMergeObjects}
+        disabled={!isMultiSelect || isMerging}
+        title={
+          !isMultiSelect
+            ? 'Select two or more touching objects to merge them'
+            : 'Merge the selected objects into one'
+        }
+        label={isMerging ? 'Merging…' : (isMultiSelect ? `Merge ${targetObjects.length} Objects` : 'Merge Objects')}
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h5a3 3 0 013 3v6a3 3 0 003 3h5m0-12h-5a3 3 0 00-3 3" />
           </svg>
         }
       />

@@ -249,6 +249,7 @@ export const useLineEditActive = () => useAnnotationStore(state => state.lineEdi
 export const useLineEditObjectId = () => useAnnotationStore(state => state.lineEdit.objectId);
 export const useLineEditContourId = () => useAnnotationStore(state => state.lineEdit.contourId);
 export const useLineEditOriginal = () => useAnnotationStore(state => state.lineEdit.original);
+export const useLineEditMode = () => useAnnotationStore(state => state.lineEdit.mode);
 
 // Line-edit Mode actions
 export const useStartLineEdit = () => useAnnotationStore(state => state.startLineEdit);

@@ -15,12 +15,16 @@ import {
   useLineEditObjectId,
   useLineEditContourId,
   useLineEditOriginal,
+  useLineEditMode,
   useStopLineEdit,
   useUpdateObject,
+  useObjectsList,
+  useCurrentMaskId,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { pixelArrayToNormalized } from '../../../utils/coordinateUtils';
 import { mergeLineIntoContour } from '../../../utils/contourEditing';
+import { splitObjectByLine } from '../../../utils/contourOperations';
 import { useToast } from '../../../contexts/ToastContext';
 import useCanvasViewport from '../../../hooks/useCanvasViewport';
 import usePromptDrawing from '../../../hooks/usePromptDrawing';
@@ -29,12 +33,19 @@ import DrawingPreview from './prompts/DrawingPreview';
 /**
  * Line-edit Canvas
  *
- * Reshape a contour by drawing an open line near its boundary — freehand
- * (press-drag) or polygon (click points, double-click / Enter to finish). On
- * completion the line's ends snap to the closest points on the contour and the
- * nearest boundary arc is replaced by the line (`mergeLineIntoContour`): draw just
- * outside to add a region, just inside to cut one off. The result is saved via
- * `modifyObject`. The faint dashed outline is the contour being reshaped.
+ * Draw an open line across or near a contour — freehand (press-drag) or polygon
+ * (click points, double-click / Enter to finish) — and do one of two things with it,
+ * chosen by `lineEdit.mode`:
+ *
+ * - **reshape**: the line's ends snap to the closest points on the contour and the
+ *   nearest boundary arc is replaced by the line (`mergeLineIntoContour`) — draw just
+ *   outside to add a region, just inside to cut one off. Saved via `modifyObject`.
+ * - **split**: both arcs between the snapped ends are kept, cutting the object in two
+ *   (`splitObjectByLine`). One half stays on this contour, the other becomes a new
+ *   object beside it.
+ *
+ * The two share every part of the interaction except that last step, which is why they
+ * share this canvas. The faint dashed outline is the contour being edited.
  *
  * Rendered at full container resolution with zoom applied to coordinates (via
  * `useCanvasViewport`), so the drawing stays crisp at any zoom. Only mounted while
@@ -52,9 +63,13 @@ const LineEditCanvas = () => {
   const objectId = useLineEditObjectId();
   const contourId = useLineEditContourId();
   const original = useLineEditOriginal();
+  const editMode = useLineEditMode();
   const stopLineEdit = useStopLineEdit();
   const updateObject = useUpdateObject();
+  const objectsList = useObjectsList();
+  const maskId = useCurrentMaskId();
   const { addToast } = useToast();
+  const isSplit = editMode === 'split';
 
   const mode = useManualDrawMode();
   const setMode = useSetManualDrawMode();
@@ -112,12 +127,34 @@ const LineEditCanvas = () => {
   const handleDrawFinalize = useCallback(async (points, { freehand }) => {
     if (!imageObject || points.length < 2 || contourId == null || !original) return;
 
+    const linePixel = points.map((p) => ({ x: p.x, y: p.y }));
+
+    if (isSplit) {
+      const target = objectsList.find((obj) => obj.id === objectId);
+      if (!target) {
+        addToast({ type: 'error', message: 'That object is no longer on the canvas.' });
+        stopLineEdit();
+        return;
+      }
+      const result = await splitObjectByLine({
+        object: target,
+        objectsList,
+        imageObject,
+        linePixel,
+        maskId,
+        updateObject,
+      });
+      // A refusal changed nothing, so stay in the tool and let them redraw the line.
+      if (!result.refused) stopLineEdit();
+      addToast({ type: result.success ? 'success' : 'error', message: result.message });
+      return;
+    }
+
     // Merge in pixel space (avoids the x/y aspect skew of normalized coordinates).
     const contourPixel = original.x.map((x, i) => ({
       x: x * imageObject.width,
       y: original.y[i] * imageObject.height,
     }));
-    const linePixel = points.map((p) => ({ x: p.x, y: p.y }));
     const merged = mergeLineIntoContour(contourPixel, linePixel);
 
     if (merged === contourPixel || merged.length < 3) {
@@ -148,7 +185,8 @@ const LineEditCanvas = () => {
       updateObject(objectId, { x: original.x, y: original.y, path: null });
       addToast({ type: 'error', message: err.message || 'Could not reshape the outline. Reverted.' });
     }
-  }, [imageObject, contourId, objectId, original, updateObject, stopLineEdit, addToast]);
+  }, [imageObject, contourId, objectId, original, updateObject, stopLineEdit, addToast,
+      isSplit, objectsList, maskId]);
 
   const {
     polygonPoints,
@@ -255,9 +293,13 @@ const LineEditCanvas = () => {
 
       {/* Instruction */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-scrim text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none text-center">
-        {mode === 'polygon'
-          ? 'Click a line across the boundary · double-click or Enter to finish · outside adds, inside cuts'
-          : 'Drag a line across the boundary · release to finish · outside adds a region, inside cuts one off'}
+        {isSplit
+          ? (mode === 'polygon'
+            ? 'Click a line straight across the object · double-click or Enter to finish · it becomes two objects'
+            : 'Drag a line straight across the object · release to finish · it becomes two objects')
+          : (mode === 'polygon'
+            ? 'Click a line across the boundary · double-click or Enter to finish · outside adds, inside cuts'
+            : 'Drag a line across the boundary · release to finish · outside adds a region, inside cuts one off')}
       </div>
 
       <Stage
