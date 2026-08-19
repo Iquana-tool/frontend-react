@@ -206,6 +206,54 @@ const ActionBar = () => {
     advanceReview();
   };
 
+  const rejectCurrent = async () => {
+    if (!reviewTarget) return;
+    try {
+      await actions.remove(reviewTarget);
+    } catch {
+      // The action has already toasted; stay on the instance that failed.
+      return;
+    }
+    advanceReview();
+  };
+
+  /**
+   * `R` rejects the instance under review.
+   *
+   * This one key is bound here rather than in useWorkspaceShortcuts because the
+   * review cursor is local state on this bar — the hook would have to duplicate
+   * it to know what "the current instance" is. The rail no longer claims `R`,
+   * so there is nothing to arbitrate against.
+   */
+  useEffect(() => {
+    if (bar.state !== 'review') return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key.toUpperCase() !== 'R') return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      // Open overlays own the keyboard, and a field is being typed into.
+      if (picker || sendBackFor) return;
+      const target = event.target;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      if (!reviewTarget) return;
+      event.preventDefault();
+      rejectCurrent();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+    // `rejectCurrent` is recreated each render; the target it acts on is the dep
+    // that matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bar.state, picker, sendBackFor, reviewTarget?.id, bar.reviewQueue.length]);
+
   if (bar.state === 'editing') return null;
 
   // ---------------------------------------------------------------- contents
@@ -409,7 +457,7 @@ const ActionBar = () => {
           shortcut="R"
           variant="danger"
           disabled={!reviewTarget}
-          onClick={() => reviewTarget && actions.remove(reviewTarget).then(advanceReview)}
+          onClick={rejectCurrent}
         />
         <BarButton
           icon={Check}
