@@ -12,6 +12,7 @@ import {
   useSetInstanceRunRequested,
   useInstanceWarningModalOpen,
   useRefinementModeActive,
+  useWorkspaceMode,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import { useSuggestionSegmentation } from './useSuggestionSegmentation';
@@ -24,7 +25,9 @@ import { getContourId } from '../utils/objectUtils';
  * Tool selection, panel toggles, zoom and image navigation live in
  * useWorkspaceShortcuts; this hook owns the keys that trigger annotation work.
  *
- * - Enter: Run primary action (AI segmentation when in AI tool with prompts)
+ * - Enter: Run primary action (AI segmentation when in AI tool with prompts).
+ *   Not in review mode — there the primary action is approving the instance
+ *   under review, which the action bar owns along with the review cursor.
  * - 1: Run Prompted Segmentation
  * - 2: Run Instance Suggestion (suggestion) with selected objects as seeds
  * - 3: Open Instance Segmentation (warning modal)
@@ -47,6 +50,7 @@ export default function useAnnotationKeyboardShortcuts() {
   const setInstanceRunRequested = useSetInstanceRunRequested();
   const instanceWarningModalOpen = useInstanceWarningModalOpen();
   const refinementModeActive = useRefinementModeActive();
+  const mode = useWorkspaceMode();
 
   const { runSegmentation } = useAISegmentation();
   const { runSuggestion, isRunning: isRunningSuggestion } = useSuggestionSegmentation();
@@ -87,7 +91,7 @@ export default function useAnnotationKeyboardShortcuts() {
 
       switch (e.key) {
         case 'Enter': {
-          if (canRunPrompted) {
+          if (canRunPrompted && mode !== 'review') {
             e.preventDefault();
             runSegmentation();
           }
@@ -150,6 +154,7 @@ export default function useAnnotationKeyboardShortcuts() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     canRunPrompted,
+    mode,
     runSegmentation,
     selectedObjects,
     runSuggestion,

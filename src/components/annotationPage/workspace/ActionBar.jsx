@@ -202,7 +202,12 @@ const ActionBar = () => {
       setPicker('label');
       return;
     }
-    await labelling.markReviewed(reviewTarget);
+    try {
+      await labelling.markReviewed(reviewTarget);
+    } catch {
+      // Already toasted; stay on the instance the server refused to approve.
+      return;
+    }
     advanceReview();
   };
 
@@ -218,20 +223,24 @@ const ActionBar = () => {
   };
 
   /**
-   * `R` rejects the instance under review.
+   * The review verdict keys: `R` rejects the instance, `⏎` accepts it.
    *
-   * This one key is bound here rather than in useWorkspaceShortcuts because the
-   * review cursor is local state on this bar — the hook would have to duplicate
-   * it to know what "the current instance" is. The rail no longer claims `R`,
-   * so there is nothing to arbitrate against.
+   * They are bound here rather than in one of the shortcut hooks because the
+   * review cursor is local state on this bar — a hook would have to duplicate it
+   * to know what "the current instance" is. Neither key is contested while
+   * reviewing: the rail no longer claims `R`, and useAnnotationKeyboardShortcuts
+   * stands down from `⏎` in this mode.
    */
   useEffect(() => {
     if (bar.state !== 'review') return undefined;
 
     const handleKeyDown = (event) => {
-      if (event.key.toUpperCase() !== 'R') return;
+      const isReject = event.key.toUpperCase() === 'R';
+      const isAccept = event.key === 'Enter';
+      if (!isReject && !isAccept) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
-      // Open overlays own the keyboard, and a field is being typed into.
+      // Open overlays own the keyboard — the picker's own Enter would otherwise
+      // both choose a label and approve.
       if (picker || sendBackFor) return;
       const target = event.target;
       if (
@@ -244,12 +253,13 @@ const ActionBar = () => {
       }
       if (!reviewTarget) return;
       event.preventDefault();
-      rejectCurrent();
+      if (isReject) rejectCurrent();
+      else acceptCurrent();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-    // `rejectCurrent` is recreated each render; the target it acts on is the dep
+    // The handlers are recreated each render; the target they act on is the dep
     // that matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bar.state, picker, sendBackFor, reviewTarget?.id, bar.reviewQueue.length]);
