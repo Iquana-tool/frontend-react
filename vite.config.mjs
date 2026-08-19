@@ -30,8 +30,28 @@ export default defineConfig({
     // Falls back to the port CRA used, which the deployment scripts and the
     // docker-compose dev service both assume.
     port: Number(process.env.PORT) || 3000,
-    // Bind on all interfaces so the dev container is reachable from the host.
+    // Bind on all interfaces so the dev container -- and other machines on the
+    // network -- can reach the dev server.
     host: true,
+    // Vite refuses any request whose Host header is not an IP address, localhost
+    // or a listed name, as protection against DNS rebinding. Reaching the tool
+    // from another PC by hostname therefore returned a bare 403 ("Blocked
+    // request. This host is not allowed.") even though the port was bound on
+    // every interface -- the same URL by IP worked, which is what made the
+    // failure look like DNS rather than Vite.
+    //
+    // ALLOWED_HOSTS is a comma-separated list, read in Node at config time (so
+    // it stays unprefixed, like PORT and PUBLIC_URL above); the defaults are
+    // this host's DFKI names. Set ALLOWED_HOSTS=true to accept any name --
+    // convenient behind a reverse proxy that already terminates the hostname,
+    // but it gives up the rebinding check, so prefer listing names.
+    allowedHosts:
+      process.env.ALLOWED_HOSTS === "true"
+        ? true
+        : (process.env.ALLOWED_HOSTS)
+            .split(",")
+            .map((h) => h.trim())
+            .filter(Boolean),
     // webpack-dev-server picked CHOKIDAR_USEPOLLING up on its own; Vite needs it
     // wired explicitly. The docker-compose dev service sets it because a
     // bind-mounted volume delivers no inotify events from a non-Linux host.
