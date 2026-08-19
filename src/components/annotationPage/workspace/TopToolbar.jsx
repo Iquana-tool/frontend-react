@@ -195,7 +195,7 @@ const TopToolbar = () => {
             onClick={() => {
               setAppMenuOpen(false);
               window.open(
-                'https://github.com/yapat-app/AquaMorph/issues',
+                'https://github.com/Iquana-tool/iquana-tool/issues',
                 '_blank',
                 'noopener,noreferrer'
               );

@@ -31,7 +31,7 @@ const ReportBugLink = ({
 
   return (
     <a
-      href="https://github.com/yapat-app/AquaMorph/issues"
+      href="https://github.com/Iquana-tool/iquana-tool/issues"
       target="_blank"
       rel="noopener noreferrer"
       className={finalClassName}
