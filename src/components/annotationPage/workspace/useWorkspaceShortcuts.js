@@ -21,6 +21,7 @@ import {
   useWorkspaceMode,
   useFocusModeActive,
   useExitFocusMode,
+  useCycleChipMode,
 } from '../../../stores/selectors/annotationSelectors';
 
 /** Typing in a field must never trigger a tool change. */
@@ -59,6 +60,7 @@ export default function useWorkspaceShortcuts() {
   const mode = useWorkspaceMode();
   const focusModeActive = useFocusModeActive();
   const exitFocusMode = useExitFocusMode();
+  const cycleChipMode = useCycleChipMode();
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -84,10 +86,7 @@ export default function useWorkspaceShortcuts() {
 
       const upper = event.key.toUpperCase();
 
-      // In review mode `R` rejects rather than picking the scale tool, matching
-      // the design's review keymap.
-      const railTool =
-        upper === 'R' && mode === 'review' ? undefined : RAIL_TOOL_BY_KEY[upper];
+      const railTool = RAIL_TOOL_BY_KEY[upper];
 
       // A shortcut must not reach a tool the current mode's rail does not offer —
       // otherwise `P` would arm the point tool in Calibrate mode, where the rail
@@ -108,6 +107,12 @@ export default function useWorkspaceShortcuts() {
             event.preventDefault();
             toggleAssist();
           }
+          break;
+        case 'T':
+          // Label chips: all → selected only → off. Available in every mode,
+          // since a crowded canvas is just as unreadable while reviewing.
+          event.preventDefault();
+          cycleChipMode();
           break;
         case 'L':
           if (selectedIds.length > 0) {
@@ -186,6 +191,7 @@ export default function useWorkspaceShortcuts() {
     actions,
     focusModeActive,
     exitFocusMode,
+    cycleChipMode,
     zoomLevel,
     setZoomLevel,
     setPanOffset,

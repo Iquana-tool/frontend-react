@@ -48,6 +48,8 @@ export const initialState = {
     rootOrder: null,
     /** Live cursor position in image pixels, for the status bar. */
     cursor: null,
+    /** Canvas label chips: 'all' | 'minimal' (hover/selection only) | 'off'. */
+    chipMode: 'all',
   },
 
   // Canvas State (needed for canvas components)

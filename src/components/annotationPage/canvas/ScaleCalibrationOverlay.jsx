@@ -16,6 +16,9 @@ import ScaleInputModal from '../modals/ScaleInputModal';
 /**
  * SVG overlay that handles drawing the two-point calibration line.
  *
+ * Calibrate mode only — it is mounted by CanvasContainer for that mode alone,
+ * and hands the tool back to 'pan', which is Calibrate's default.
+ *
  * The overlay is rendered outside the zoom/pan transform (identical to
  * SegmentationOverlay) so it occupies the full canvas container and uses the
  * same imageDimensions geometry to convert between container-relative clicks
@@ -128,7 +131,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'Escape' && isCalibrating) {
       cancelCalibration();
-      setCurrentTool('ai_annotation');
+      setCurrentTool('pan');
       setShowModal(false);
       setMousePos(null);
     }
@@ -153,7 +156,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
       setImageScale(result.scale_x, result.scale_y, result.unit);
       setShowModal(false);
       cancelCalibration();
-      setCurrentTool('ai_annotation');
+      setCurrentTool('pan');
     } catch (err) {
       console.error('Failed to set scale:', err);
     } finally {
@@ -164,7 +167,7 @@ const ScaleCalibrationOverlay = ({ canvasRef, zoomLevel, panOffset }) => {
   const handleModalCancel = () => {
     setShowModal(false);
     cancelCalibration();
-    setCurrentTool('ai_annotation');
+    setCurrentTool('pan');
     setMousePos(null);
   };
 

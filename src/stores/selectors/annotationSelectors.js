@@ -306,6 +306,9 @@ export const useRightPanelOpen = () => useAnnotationStore(state => state.workspa
 export const useRightTab = () => useAnnotationStore(state => state.workspace.rightTab);
 export const useFilmstripOpen = () => useAnnotationStore(state => state.workspace.filmstripOpen);
 export const useShowApproved = () => useAnnotationStore(state => state.workspace.showApproved);
+export const useChipMode = () => useAnnotationStore(state => state.workspace.chipMode);
+export const useSetChipMode = () => useAnnotationStore(state => state.setChipMode);
+export const useCycleChipMode = () => useAnnotationStore(state => state.cycleChipMode);
 export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
 export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
 export const usePicker = () => useAnnotationStore(state => state.workspace.picker);

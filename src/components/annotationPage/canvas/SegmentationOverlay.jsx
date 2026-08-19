@@ -26,6 +26,7 @@ import {
   useSetHoveredObjectId,
   useWorkspaceMode,
   useShowApproved,
+  useChipMode,
   useHiddenObjectIds,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
@@ -33,6 +34,11 @@ import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
+import {
+  CHIP_GAP_PX,
+  CHIP_HEIGHT_PX,
+  planChipLayout,
+} from './chipLayout';
 import {
   getPolygonStyle,
   getChipLabel,
@@ -86,6 +92,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const setHoveredObjectId = useSetHoveredObjectId();
   const workspaceMode = useWorkspaceMode();
   const showApproved = useShowApproved();
+  const chipMode = useChipMode();
   const hiddenObjectIds = useHiddenObjectIds();
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
@@ -182,6 +189,78 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
     return filtered;
   }, [objectsList, hiddenObjectIds, visibility, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
+
+  /**
+   * Which objects get a chip, and where.
+   *
+   * Chips are laid out in screen pixels (hence the `* zoomLevel`) because they
+   * are counter-scaled against the zoom when rendered — a chip is the same size
+   * on screen at 100% as at 800%, which is what makes zooming in a real way out
+   * of a crowded cluster. planChipLayout then drops whatever would still
+   * overlap. See chipLayout.js.
+   */
+  const chipPlan = useMemo(() => {
+    if (chipMode === 'off' || imageDimensions.width <= 0) {
+      return { candidates: [], visible: new Set() };
+    }
+
+    const candidates = [];
+    for (const object of visibleObjects) {
+      if (focusModeActive && focusedObjectId === object.id) continue;
+      // Approved instances are noise while reviewing what is left.
+      if (workspaceMode === 'review' && !showApproved && getObjectState(object) === 'approved') {
+        continue;
+      }
+
+      const centroid = getCentroid(object);
+      if (!centroid) continue;
+
+      const pinned = selectedObjects.includes(object.id) || hoveredObjectId === object.id;
+      // 'minimal' is the escape hatch for a dense image: only what you are
+      // pointing at or working on is named.
+      if (chipMode === 'minimal' && !pinned) continue;
+
+      // A chip centred on the centroid fully covers objects shorter than its own
+      // rendered height — exactly what happens with a small annotation nested
+      // inside a larger one. Once the object's own bbox can't contain the chip,
+      // anchor it just above the shape instead of on top of it.
+      const bbox = getBoundingBox(object);
+      const bboxHeightPx = bbox
+        ? ((bbox.maxY - bbox.minY) / 100) * imageDimensions.height * zoomLevel
+        : Infinity;
+      const above = !!bbox && bboxHeightPx < CHIP_HEIGHT_PX * 1.4;
+      const anchorX = above ? (bbox.minX + bbox.maxX) / 2 : centroid.x;
+      const anchorY = above ? bbox.minY : centroid.y;
+
+      candidates.push({
+        id: object.id,
+        object,
+        text: getChipLabel(object, { detailed: pinned }),
+        // Screen-space anchor. The overlay's own offset is common to every chip
+        // and so cancels out of the overlap tests; only the scale matters.
+        x: (imageDimensions.x + (anchorX / 100) * imageDimensions.width) * zoomLevel,
+        y: (imageDimensions.y + (anchorY / 100) * imageDimensions.height) * zoomLevel,
+        anchorX,
+        anchorY,
+        above,
+        pinned,
+        area: bbox ? (bbox.maxX - bbox.minX) * (bbox.maxY - bbox.minY) : 0,
+      });
+    }
+
+    return { candidates, visible: planChipLayout(candidates) };
+  }, [
+    chipMode,
+    visibleObjects,
+    imageDimensions,
+    zoomLevel,
+    selectedObjects,
+    hoveredObjectId,
+    focusModeActive,
+    focusedObjectId,
+    workspaceMode,
+    showApproved,
+  ]);
 
   /**
    * Save the current edit-mode draft to backend and exit edit mode.
@@ -576,67 +655,53 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         </defs>
       </svg>
 
-      {/* Object chips at each centroid. Purely informational, so they never take
-          pointer events — clicks belong to the polygon underneath. */}
-      {imageDimensions.width > 0 &&
-        visibleObjects.map((object) => {
-          if (focusModeActive && focusedObjectId === object.id) return null;
-          // Approved instances are noise while reviewing what is left.
-          if (workspaceMode === 'review' && !showApproved && getObjectState(object) === 'approved') {
-            return null;
-          }
-          const centroid = getCentroid(object);
-          if (!centroid) return null;
+      {/* Object chips. Purely informational, so they never take pointer events —
+          clicks belong to the polygon underneath. Which of them survive the
+          declutter is decided in chipPlan above. */}
+      {chipPlan.candidates.map((candidate) => {
+        if (!chipPlan.visible.has(candidate.id)) return null;
 
-          const isSelected = selectedObjects.includes(object.id);
-          const color =
-            getObjectState(object) === 'unlabelled' ? UNLABELLED_COLOR : object.color;
+        const { object } = candidate;
+        const color =
+          getObjectState(object) === 'unlabelled' ? UNLABELLED_COLOR : object.color;
 
-          // A chip centered on the centroid fully covers objects shorter than
-          // its own rendered height (~24px: 10px text + padding + border) —
-          // exactly what happens with a small annotation nested inside a
-          // larger one. Once the object's own bbox can't contain the chip,
-          // anchor it just above the shape instead of on top of it.
-          const bbox = getBoundingBox(object);
-          const bboxHeightPx = bbox
-            ? ((bbox.maxY - bbox.minY) / 100) * imageDimensions.height
-            : Infinity;
-          const CHIP_HEIGHT_PX = 24;
-          const isSmall = bbox && bboxHeightPx < CHIP_HEIGHT_PX * 1.4;
-          const anchorX = isSmall ? (bbox.minX + bbox.maxX) / 2 : centroid.x;
-          const anchorY = isSmall ? bbox.minY : centroid.y;
-
-          return (
-            <div
-              key={`chip-${object.id}`}
-              className="absolute pointer-events-none select-none"
+        return (
+          <div
+            key={`chip-${object.id}`}
+            className="absolute pointer-events-none select-none"
+            style={{
+              left: `${imageDimensions.x + (candidate.anchorX / 100) * imageDimensions.width}px`,
+              top: `${imageDimensions.y + (candidate.anchorY / 100) * imageDimensions.height}px`,
+              // The 1/zoom keeps the chip a constant size on screen inside the
+              // zoomed overlay, so zooming in separates crowded chips instead of
+              // magnifying them along with the shapes. `top left` puts the
+              // transform's origin on the anchor, so the translate that follows
+              // still lands the chip where it belongs.
+              transformOrigin: 'top left',
+              transform: candidate.above
+                ? `scale(${1 / zoomLevel}) translate(-50%, calc(-100% - ${CHIP_GAP_PX}px))`
+                : `scale(${1 / zoomLevel}) translate(-50%, -50%)`,
+              zIndex: 35,
+            }}
+          >
+            <span
+              className="inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap"
               style={{
-                left: `${imageDimensions.x + (anchorX / 100) * imageDimensions.width}px`,
-                top: `${imageDimensions.y + (anchorY / 100) * imageDimensions.height}px`,
-                transform: isSmall
-                  ? 'translate(-50%, calc(-100% - 6px))'
-                  : 'translate(-50%, -50%)',
-                zIndex: 35,
+                background: `rgba(10,12,14,${candidate.pinned ? 0.94 : 0.74})`,
+                color: '#eef1f3',
+                border: getChipBorder(object, color),
+                boxShadow: '0 3px 12px rgba(0,0,0,.35)',
               }}
             >
               <span
-                className="inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap"
-                style={{
-                  background: `rgba(10,12,14,${isSelected ? 0.94 : 0.74})`,
-                  color: '#eef1f3',
-                  border: getChipBorder(object, color),
-                  boxShadow: '0 3px 12px rgba(0,0,0,.35)',
-                }}
-              >
-                <span
-                  className="w-[6px] h-[6px] rounded-full"
-                  style={{ background: color }}
-                />
-                {getChipLabel(object)}
-              </span>
-            </div>
-          );
-        })}
+                className="w-[6px] h-[6px] rounded-full"
+                style={{ background: color }}
+              />
+              {candidate.text}
+            </span>
+          </div>
+        );
+      })}
 
       {/* Final Objects Masks */}
       {imageDimensions.width > 0 && visibleObjects.map((object) => {

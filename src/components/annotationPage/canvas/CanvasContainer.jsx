@@ -117,7 +117,11 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
           the first render; otherwise it stays 0×0 and swallows clicks. */}
       {lineEditActive && <LineEditCanvas />}
 
-      <ScaleCalibrationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+      {/* Setting the scale is a calibration, so its overlay only exists in
+          Calibrate mode — never over the annotation canvas. */}
+      {!annotating && (
+        <ScaleCalibrationOverlay canvasRef={canvasRef} zoomLevel={zoomLevel} panOffset={panOffset} />
+      )}
       <PatchPickOverlay canvasRef={canvasRef} />
       <ScaleBarIndicator canvasRef={canvasRef} zoomLevel={zoomLevel} />
       <InferenceScanOverlay containerRef={containerRef} />

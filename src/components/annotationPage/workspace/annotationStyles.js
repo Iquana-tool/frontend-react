@@ -66,9 +66,18 @@ export const getPolygonStyle = (object, { hovered, selected, reviewMode, color }
 };
 
 /** Chip caption under an object's centroid. */
-export const getChipLabel = (object) => {
+/**
+ * Chip text.
+ *
+ * The canvas gets the name alone: the id is in the Objects panel, and the state
+ * is already carried by the chip border and the polygon stroke, so spelling both
+ * out only made every chip wider — and chip width is what buries a dense image.
+ * `detailed` restores them for the one object being pointed at or worked on.
+ */
+export const getChipLabel = (object, { detailed = false } = {}) => {
   const state = getObjectState(object);
   if (state === 'unlabelled') return 'unlabelled';
+  if (!detailed) return object.label;
   if (state === 'pending') return `${object.label} #${object.id} · pending`;
   return `${object.label} #${object.id}`;
 };
