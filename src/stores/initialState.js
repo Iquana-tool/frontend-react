@@ -127,6 +127,7 @@ export const initialState = {
   // adding one). An alternative to dragging the outline's control points.
   lineEdit: {
     active: false,
+    mode: 'reshape', // 'reshape' merges the line into the boundary; 'split' cuts along it
     objectId: null, // store object id being reshaped
     contourId: null, // backend contour id for the modify call
     original: null, // { x: [], y: [] } normalized — the contour being reshaped

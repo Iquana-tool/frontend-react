@@ -421,11 +421,12 @@ class AnnotationSession {
    * @param {string|null} label - Object label
    * @param {number|null} parentId - Parent contour ID
    * @param {number} confidence - Confidence score
+   * @param {number|null} labelId - Label the new object is created with (optional)
    * @returns {Promise<Object>} Response with added objects
    */
-  async addObject(x, y, label = null, parentId = null, confidence = 1.0) {
+  async addObject(x, y, label = null, parentId = null, confidence = 1.0, labelId = null) {
     this._ensureReady();
-    const message = MessageBuilders.addObject(x, y, label, parentId, confidence);
+    const message = MessageBuilders.addObject(x, y, label, parentId, confidence, labelId);
     return websocketService.send(message, true);
   }
 

@@ -216,13 +216,17 @@ export const MessageBuilders = {
    * @param {string|null} label - Object label
    * @param {number|null} parentId - Parent contour ID
    * @param {number} confidence - Confidence score (0-1)
+   * @param {number|null} labelId - Label to create the object with. The backend
+   *   validates a Contour, whose label field is `label_id`; a freshly drawn object
+   *   has none, but a half produced by splitting inherits the original's.
    */
-  addObject: (x, y, label = null, parentId = null, confidence = 1.0) => createMessage(
+  addObject: (x, y, label = null, parentId = null, confidence = 1.0, labelId = null) => createMessage(
     CLIENT_MESSAGE_TYPES.OBJECT_ADD_MANUAL,
     {
       x,
       y,
       label,
+      label_id: labelId,
       parent_id: parentId,
       confidence,
     }

@@ -103,8 +103,13 @@ export const createEditModeSlice = (set) => ({
    * Enter line-edit mode: the user draws an open line near the boundary that gets
    * merged into this contour (cut/add). Any point-editing session is closed first —
    * the two ways of reshaping a contour are mutually exclusive.
+   *
+   * `mode` picks what the finished line does. 'reshape' replaces the boundary arc
+   * nearest the line; 'split' keeps both arcs and cuts the object in two (#43).
+   * They share this state because they share the whole drawing interaction — only
+   * the geometry at the end of the stroke differs.
    */
-  startLineEdit: (objectId, contourId, x, y) => set((state) => {
+  startLineEdit: (objectId, contourId, x, y, mode = 'reshape') => set((state) => {
     state.editMode.active = false;
     state.editMode.objectId = null;
     state.editMode.contourId = null;
@@ -114,6 +119,7 @@ export const createEditModeSlice = (set) => ({
     state.editMode.originalCoordinates = null;
     state.editMode.isDirty = false;
     state.lineEdit.active = true;
+    state.lineEdit.mode = mode === 'split' ? 'split' : 'reshape';
     state.lineEdit.objectId = objectId;
     state.lineEdit.contourId = contourId;
     state.lineEdit.original = (Array.isArray(x) && Array.isArray(y))
@@ -123,6 +129,7 @@ export const createEditModeSlice = (set) => ({
 
   stopLineEdit: () => set((state) => {
     state.lineEdit.active = false;
+    state.lineEdit.mode = 'reshape';
     state.lineEdit.objectId = null;
     state.lineEdit.contourId = null;
     state.lineEdit.original = null;
