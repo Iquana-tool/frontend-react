@@ -126,6 +126,18 @@ export const createWorkspaceSlice = (set) => ({
     state.workspace.showApproved = !state.workspace.showApproved;
   }),
 
+  setChipMode: (mode) => set((state) => {
+    state.workspace.chipMode = mode;
+  }),
+
+  // Cycled rather than toggled: on a dense image the useful middle setting is
+  // "only what I am pointing at", and a two-state switch would skip it.
+  cycleChipMode: () => set((state) => {
+    const order = ['all', 'minimal', 'off'];
+    const next = order[(order.indexOf(state.workspace.chipMode) + 1) % order.length];
+    state.workspace.chipMode = next;
+  }),
+
   setActiveLabelId: (labelId) => set((state) => {
     // Clicking the armed label again disarms it.
     state.workspace.activeLabelId =

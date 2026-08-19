@@ -20,6 +20,7 @@ import {
   Redo2,
   Settings,
   Sun,
+  Tag,
   Trash2,
   Undo2,
   User,
@@ -35,11 +36,14 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import { useAuth } from '../../../contexts/AuthContext';
 import { PHASES, getStateDescriptor } from '../../../utils/imageStatus';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clampZoom } from './constants';
+import { CHIP_MODE_LABELS } from '../canvas/chipLayout';
 import {
   useAnnotationStatus,
   usePhaseStatus,
   useZoomLevel,
   useSetZoomLevel,
+  useChipMode,
+  useCycleChipMode,
   useSetPanOffset,
   useWorkspaceMode,
   useSetWorkspaceMode,
@@ -86,6 +90,8 @@ const TopToolbar = () => {
 
   const zoomLevel = useZoomLevel();
   const setZoomLevel = useSetZoomLevel();
+  const chipMode = useChipMode();
+  const cycleChipMode = useCycleChipMode();
   const setPanOffset = useSetPanOffset();
 
   const mode = useWorkspaceMode();
@@ -333,6 +339,15 @@ const TopToolbar = () => {
           onClick={() => zoomTo(zoomLevel * ZOOM_STEP)}
         />
         <ToolbarButton icon={Maximize} label="Reset view" onClick={resetView} />
+        {/* Sits with zoom because it is the same job: making a crowded image
+            readable. Cycles all → selected only → off. */}
+        <ToolbarButton
+          icon={Tag}
+          label={CHIP_MODE_LABELS[chipMode]}
+          shortcut="T"
+          active={chipMode !== 'all'}
+          onClick={cycleChipMode}
+        />
       </Group>
 
       {/* Calibrate / Annotate / Review.

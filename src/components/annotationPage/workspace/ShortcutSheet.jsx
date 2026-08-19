@@ -37,6 +37,7 @@ const GROUPS = [
       { keys: '0', label: 'Fit to screen' },
       { keys: '⌥1', label: 'Toggle the tool-options drawer' },
       { keys: '⌥2', label: 'Toggle the side panel' },
+      { keys: 'T', label: 'Label chips — all / selected only / off' },
       { keys: 'space', label: 'Hold to pan' },
       { keys: '?', label: 'This sheet' },
     ],
