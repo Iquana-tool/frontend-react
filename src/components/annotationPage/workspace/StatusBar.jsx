@@ -18,16 +18,16 @@ import {
 /**
  * Monospace status bar under the filmstrip.
  *
- * Reports the active tool and label, the scale calibration (clicking it
- * re-opens calibration, replacing the old ScaleControl button), the wider
- * calibration state, zoom, cursor position, object count and session health.
+ * Reports the active tool and label, the scale calibration (clicking it opens
+ * the Calibrate tab, which is where a scale is set), the wider calibration
+ * state, zoom, cursor position, object count and session health.
  *
  * The calibration readout is what keeps the Calibrate tab from having to be a
  * gate: most sessions open the image to annotate, so the tab is where you go
  * when something is wrong or new, and this is what tells you that it is.
  */
 const StatusBar = () => {
-  const { railTool, setRailTool } = useRailTools();
+  const { railTool } = useRailTools();
   const activeLabelId = useActiveLabelId();
   const labels = useDatasetLabels();
   const zoomLevel = useZoomLevel();
@@ -59,8 +59,8 @@ const StatusBar = () => {
 
       <button
         type="button"
-        onClick={() => setRailTool('scale')}
-        title="Draw a line on the image to set the physical scale"
+        onClick={() => setWorkspaceMode('calibrate')}
+        title="Open the Calibrate tab to set the physical scale"
         className="hover:text-ac transition-colors duration-150"
       >
         {calibrated ? `1px = ${scale.scaleX.toFixed(4)} ${scale.unit}` : 'uncalibrated'}

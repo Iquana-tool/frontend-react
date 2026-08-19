@@ -8,7 +8,6 @@ import {
   useSetManualDrawMode,
   useAiAssist,
   useSetAiAssist,
-  useStartCalibration,
   useCancelCalibration,
 } from '../../../stores/selectors/annotationSelectors';
 import {
@@ -21,9 +20,9 @@ import {
  * Bridges the single-axis rail selection to the three-axis tool state in the
  * store (see toolModel.js for the mapping and its rationale).
  *
- * Calibration is a side effect of the scale tool rather than part of the
- * mapping: selecting it starts a calibration, and moving away cancels any
- * in-progress one — otherwise the calibration overlay keeps eating clicks.
+ * A scale measurement is started from the Calibrate tab, not from the rail, but
+ * it puts the store in 'set_scale' — so picking any rail tool cancels an
+ * in-progress one, otherwise the calibration overlay keeps eating clicks.
  */
 export default function useRailTools() {
   const currentTool = useCurrentTool();
@@ -35,7 +34,6 @@ export default function useRailTools() {
   const setPromptMode = useSetPromptMode();
   const setManualDrawMode = useSetManualDrawMode();
   const setAiAssist = useSetAiAssist();
-  const startCalibration = useStartCalibration();
   const cancelCalibration = useCancelCalibration();
 
   const railTool = railToolFromStore({ currentTool, promptMode, manualDrawMode });
@@ -53,22 +51,11 @@ export default function useRailTools() {
 
   const setRailTool = useCallback(
     (nextRailTool) => {
-      if (currentTool === 'set_scale' && nextRailTool !== 'scale') {
-        cancelCalibration();
-      }
-
-      // Re-picking the scale tool cancels calibration and falls back to points,
-      // matching the old ScaleControl toggle behaviour.
-      if (nextRailTool === 'scale' && currentTool === 'set_scale') {
-        cancelCalibration();
-        applyStoreState(storeStateForRailTool('point', aiAssist));
-        return;
-      }
+      if (currentTool === 'set_scale') cancelCalibration();
 
       applyStoreState(storeStateForRailTool(nextRailTool, aiAssist));
-      if (nextRailTool === 'scale') startCalibration();
     },
-    [currentTool, aiAssist, applyStoreState, cancelCalibration, startCalibration]
+    [currentTool, aiAssist, applyStoreState, cancelCalibration]
   );
 
   const toggleAssist = useCallback(() => {

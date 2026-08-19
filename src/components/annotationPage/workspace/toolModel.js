@@ -23,7 +23,6 @@
  * - `pan`      → 'pan'. Persistent drag-to-pan; the space-bar shortcut still
  *                works in every other tool.
  * - `zoom`     → 'zoom'. Click zooms in, alt/⌥-click zooms out.
- * - `scale`    → 'set_scale' and opens calibration, as before.
  * - `brush`    → no implementation exists in the client or the session
  *                protocol, so it renders disabled rather than silently missing.
  */
@@ -44,8 +43,18 @@ export const RAIL_TOOLS = [
   },
   { id: 'pan', name: 'Pan', key: 'H', icon: 'Hand' },
   { id: 'zoom', name: 'Zoom', key: 'Z', icon: 'ZoomIn' },
-  { id: 'scale', name: 'Set scale', key: 'R', icon: 'Ruler' },
 ];
+
+/**
+ * Scale measurement is not a rail tool.
+ *
+ * Setting the physical scale is a calibration, so it belongs to Calibrate mode
+ * and is started from that calibration's drawer button — not from the annotation
+ * rail, where it invited an annotator to recalibrate the image mid-annotation.
+ * It still needs a name, because the store's `set_scale` tool is live while a
+ * measurement is being drawn and the status bar reports whatever tool is active.
+ */
+export const MEASURE_SCALE_TOOL = { id: 'scale', name: 'Measure scale', icon: 'Ruler' };
 
 /**
  * The rail in Calibrate mode.
@@ -111,7 +120,6 @@ export const railToolFromStore = ({ currentTool, promptMode, manualDrawMode }) =
  */
 export const storeStateForRailTool = (railTool, aiAssist) => {
   if (railTool === 'select') return { currentTool: 'selection' };
-  if (railTool === 'scale') return { currentTool: 'set_scale' };
   if (railTool === 'pan') return { currentTool: 'pan' };
   if (railTool === 'zoom') return { currentTool: 'zoom' };
 
@@ -142,4 +150,7 @@ export const RAIL_TOOL_BY_KEY = RAIL_TOOLS.reduce((acc, tool) => {
   return acc;
 }, {});
 
-export const getRailTool = (id) => RAIL_TOOLS.find((tool) => tool.id === id) || RAIL_TOOLS[0];
+export const getRailTool = (id) => (
+  RAIL_TOOLS.find((tool) => tool.id === id)
+  || (id === MEASURE_SCALE_TOOL.id ? MEASURE_SCALE_TOOL : RAIL_TOOLS[0])
+);

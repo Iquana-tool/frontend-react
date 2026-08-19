@@ -84,10 +84,7 @@ export default function useWorkspaceShortcuts() {
 
       const upper = event.key.toUpperCase();
 
-      // In review mode `R` rejects rather than picking the scale tool, matching
-      // the design's review keymap.
-      const railTool =
-        upper === 'R' && mode === 'review' ? undefined : RAIL_TOOL_BY_KEY[upper];
+      const railTool = RAIL_TOOL_BY_KEY[upper];
 
       // A shortcut must not reach a tool the current mode's rail does not offer —
       // otherwise `P` would arm the point tool in Calibrate mode, where the rail
