@@ -146,6 +146,7 @@ const ReviewPage = () => {
         ) : queue ? (
           <ReviewSession
             queue={queue}
+            labels={labels}
             labelsById={labelsById}
             onExit={handleExitSession}
           />

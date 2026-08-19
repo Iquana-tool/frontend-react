@@ -2,56 +2,108 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   CheckCircle2,
+  CornerUpLeft,
   Loader2,
-  MessageSquarePlus,
   ScanEye,
   SkipForward,
+  Tag,
+  Trash2,
   Undo2,
 } from 'lucide-react';
 import * as api from '../../api';
-import { getContoursOfMask } from '../../api/masks';
-import { markContourAsReviewed } from '../../api/contours';
+import { getContoursOfMask, editContourLabel } from '../../api/masks';
+import { deleteContour, markContourAsReviewed } from '../../api/contours';
+import { undoAnnotationAction } from '../../api/annotationHistory';
 import { approveMask, rejectMask } from '../../api/reviews';
 import { useToast } from '../../contexts/ToastContext';
+import { getChildLabels } from '../../utils/labelHierarchy';
 import { getLabelColor } from '../../utils/labelColors';
+import Kbd from '../annotationPage/workspace/primitives/Kbd';
+import LabelPicker from '../annotationPage/workspace/LabelPicker';
 import AnnotationViewerCanvas from '../viewer/AnnotationViewerCanvas';
 
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
 
 /**
- * The reject buttons of the queue. The wording is the reviewer's, the values are
- * the backend's `RejectionReason` vocabulary — kept as a fixed map here (rather
- * than the `/reviews/reasons` catalog) because the queue offers a deliberate
- * subset with queue-specific phrasing.
+ * The send-back reasons of the queue, in shortcut order — 1 sends the first one.
+ *
+ * The wording is the reviewer's, the values are the backend's `RejectionReason`
+ * vocabulary — kept as a fixed map here (rather than the `/reviews/reasons`
+ * catalog) because the queue offers a deliberate subset with queue-specific
+ * phrasing, and because the shortcut number has to be stable no matter what the
+ * catalog grows. The free-text reason is not in this list: it is the note field
+ * below the buttons, which sends `other` on Enter.
  */
-const REJECT_ACTIONS = [
-  { reason: 'bad_outline', label: 'Bad outlines', instanceLabel: 'Bad outline' },
-  { reason: 'missing_objects', label: 'Missed instances', instanceLabel: 'Missed instances' },
-  { reason: 'wrong_label', label: 'Wrong labels', instanceLabel: 'Wrong label' },
-  { reason: 'wrong_hierarchy', label: 'Hierarchy wrong', instanceLabel: 'Hierarchy wrong' },
+const SEND_BACK_REASONS = [
+  {
+    reason: 'bad_outline',
+    title: 'Bad outline',
+    imageTitle: 'Bad outlines',
+    description: 'Under- or oversegmented; the outline does not represent the true object outline.',
+  },
+  {
+    reason: 'wrong_label',
+    title: 'Wrong label',
+    imageTitle: 'Wrong labels',
+    description: 'This is not the correct label for this object.',
+  },
+  {
+    reason: 'merged_objects',
+    title: 'Merged objects',
+    imageTitle: 'Merged objects',
+    description: 'This should be multiple objects.',
+  },
+  {
+    reason: 'missing_parts',
+    title: 'Parts are missing',
+    imageTitle: 'Parts are missing',
+    description:
+      'Only partially the target object — other parts are missing because another object overlaps this one.',
+  },
 ];
+
+/** The shortcut number of the free-text reason, one past the listed ones. */
+const CUSTOM_REASON_KEY = String(SEND_BACK_REASONS.length + 1);
 
 /**
  * Plays a review queue one item at a time.
  *
  * Image items show the whole mask; instance items show one contour plus its
- * immediate children, framed. Accepting approves (the mask's pending contours,
- * or the one instance); rejecting records a rejection with the chosen reason and
- * sends the mask back to its annotator — which also invalidates every other
- * queued item on that mask, so those are dropped from the queue on the spot.
+ * immediate children, framed. The reviewer has four verdicts:
+ *
+ *   * **Accept** (Enter) — approves the mask's pending contours, or the one instance.
+ *   * **Send back** (1–5) — records a rejection with the chosen reason and returns
+ *     the mask to its annotator, which also invalidates every other queued item on
+ *     that mask, so those are dropped from the queue on the spot.
+ *   * **Reject** (R) — the object is not a real object at all (a model hallucinated
+ *     it); it is deleted outright rather than handed back for someone to fix. The
+ *     delete goes through the annotation history, so the banner's Undo can restore it.
+ *   * **Relabel** (L) — the outline is right but the label is wrong; fix it here
+ *     instead of sending it back. The backend records the relabel as an approval
+ *     for callers who may review, so a relabelled instance is a settled one.
+ *
+ * Reject and Relabel act on one object, so in image mode they need one picked on
+ * the canvas; in instance mode they act on the queued instance.
  */
-const ReviewSession = ({ queue, labelsById, onExit }) => {
+const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
   const { addToast } = useToast();
   const isImageMode = queue.granularity === 'images';
 
   // The queue is state, not a constant: a rejection removes the sibling items of
-  // the same mask (they went back to the annotator along with it).
+  // the same mask (they went back to the annotator along with it), and a reject
+  // removes the items pointing at the objects it deleted.
   const [items, setItems] = useState(() =>
     isImageMode ? queue.images : queue.instances
   );
   const [index, setIndex] = useState(0);
-  const [tally, setTally] = useState({ accepted: 0, rejected: 0, skipped: 0 });
+  const [tally, setTally] = useState({
+    accepted: 0,
+    relabelled: 0,
+    rejected: 0,
+    discarded: 0,
+    skipped: 0,
+  });
 
   const [imageSrc, setImageSrc] = useState(null);
   const [contours, setContours] = useState([]);
@@ -59,10 +111,17 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [note, setNote] = useState('');
-  const [showNote, setShowNote] = useState(false);
   const [zoomTarget, setZoomTarget] = useState(null);
   const [selectedContourId, setSelectedContourId] = useState(null);
+  const [showRelabel, setShowRelabel] = useState(false);
+  const [labelQuery, setLabelQuery] = useState('');
+  // The last delete, while it is still the caller's newest history entry on that
+  // image — see `handleReject`.
+  const [undoable, setUndoable] = useState(null);
+  // Bumped to re-run the loader after an action changed the mask behind our back.
+  const [reloadToken, setReloadToken] = useState(0);
 
+  const noteRef = useRef(null);
   // Consecutive queue items often share an image/mask (hierarchy order groups
   // them); the caches make advancing through those instant.
   const imageCache = useRef(new Map());
@@ -124,7 +183,7 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
     return () => {
       cancelled = true;
     };
-  }, [current, isImageMode]);
+  }, [current, isImageMode, reloadToken]);
 
   // -- Derived display state --------------------------------------------------
 
@@ -153,6 +212,32 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
     [contours, current, isImageMode]
   );
 
+  /**
+   * The object Reject and Relabel act on: the queued instance, or — in image
+   * mode, where the item is the whole mask — whatever the reviewer picked on the
+   * canvas.
+   */
+  const targetContourId = isImageMode ? selectedContourId : current?.contour_id ?? null;
+
+  const targetContour = useMemo(
+    () => contours.find((contour) => contour.id === targetContourId) || null,
+    [contours, targetContourId]
+  );
+
+  /**
+   * The labels valid for the target object: the children of its parent object's
+   * label, the same rule the annotation editor applies. Falls back to the whole
+   * label space when that level is empty, so a relabel is never a dead end.
+   */
+  const relabelItems = useMemo(() => {
+    if (!targetContour) return [];
+    const parent = targetContour.parent_id
+      ? contours.find((contour) => contour.id === targetContour.parent_id)
+      : null;
+    const level = getChildLabels(labels, parent?.label_id ?? null);
+    return level.length > 0 ? level : labels;
+  }, [contours, labels, targetContour]);
+
   const labelNameFor = useCallback(
     (labelId) => labelsById[labelId]?.name || 'Unlabelled',
     [labelsById]
@@ -166,28 +251,43 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
   // -- Advancing ---------------------------------------------------------------
 
   const advance = useCallback(
-    (outcome, { dropMaskId = null } = {}) => {
+    (outcome, { dropMaskId = null, dropContourIds = null } = {}) => {
       setTally((current_) => ({ ...current_, [outcome]: current_[outcome] + 1 }));
       setNote('');
-      setShowNote(false);
+      setShowRelabel(false);
+      setLabelQuery('');
       setItems((currentItems) => {
-        if (dropMaskId == null) return currentItems;
-        // A rejected mask went back to the annotator: its other queued items are
-        // stale now, so drop everything after the current position that points
-        // at it. The contour cache entry is stale too.
-        contourCache.current.delete(dropMaskId);
-        return currentItems.filter(
-          (item, itemIndex) => itemIndex <= index || item.mask_id !== dropMaskId
-        );
+        if (dropMaskId != null) {
+          // A rejected mask went back to the annotator: its other queued items
+          // are stale now, so drop everything after the current position that
+          // points at it. The contour cache entry is stale too.
+          contourCache.current.delete(dropMaskId);
+          return currentItems.filter(
+            (item, itemIndex) => itemIndex <= index || item.mask_id !== dropMaskId
+          );
+        }
+        if (dropContourIds?.length) {
+          // Deleted objects: their queue items would 404 on load.
+          const gone = new Set(dropContourIds);
+          return currentItems.filter(
+            (item, itemIndex) => itemIndex <= index || !gone.has(item.contour_id)
+          );
+        }
+        return currentItems;
       });
       setIndex((currentIndex) => currentIndex + 1);
     },
     [index]
   );
 
+  /** Any mutating action invalidates the standing Undo — it only ever offers the
+   *  caller's newest history entry, which this action just became. */
+  const clearUndo = () => setUndoable(null);
+
   const handleAccept = async () => {
     if (!current || busy) return;
     setBusy(true);
+    clearUndo();
     try {
       if (isImageMode) {
         // The Accept must cover exactly what this queue considers open, so the
@@ -214,13 +314,14 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
     }
   };
 
-  const handleReject = async (reason) => {
+  const handleSendBack = async (reason, noteText = note) => {
     if (!current || busy) return;
     setBusy(true);
+    clearUndo();
     try {
       await rejectMask(current.mask_id, {
         reason,
-        note: note.trim() || null,
+        note: noteText.trim() || null,
         contourId: isImageMode ? null : current.contour_id,
       });
       advance('rejected', { dropMaskId: current.mask_id });
@@ -231,19 +332,159 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
     }
   };
 
+  /** Enter in the free-text field: send back with `other` and that text. */
+  const handleCustomSendBack = () => {
+    if (!note.trim()) {
+      setError('Describe what is wrong before sending it back with a custom reason.');
+      return;
+    }
+    handleSendBack('other');
+  };
+
+  /**
+   * Delete the object outright — the "this is not an object at all" verdict, for
+   * a prediction that has no business being in the dataset. Distinct from a send
+   * back, which asks the annotator to fix something that is basically there.
+   */
+  const handleReject = async () => {
+    if (!current || !targetContourId || busy) return;
+    const maskId = current.mask_id;
+    const imageId = current.image_id;
+    const name = labelNameFor(targetContour?.label_id);
+    setBusy(true);
+    try {
+      const response = await deleteContour(targetContourId);
+      // Descendants go with the CASCADE; the backend reports every id it removed.
+      const deletedIds = response?.deleted_ids?.length
+        ? response.deleted_ids
+        : [targetContourId];
+      contourCache.current.delete(maskId);
+      setUndoable({ imageId, maskId, contourId: targetContourId, name });
+
+      if (isImageMode) {
+        // The item is the whole image and there is more of it to review, so stay
+        // put and just drop the object from the view.
+        const gone = new Set(deletedIds);
+        const remaining = contours.filter((contour) => !gone.has(contour.id));
+        contourCache.current.set(maskId, remaining);
+        setContours(remaining);
+        setSelectedContourId(null);
+        setTally((current_) => ({ ...current_, discarded: current_.discarded + 1 }));
+      } else {
+        advance('discarded', { dropContourIds: deletedIds });
+      }
+    } catch (err) {
+      setError(readableError(err, 'Could not reject this object.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Restore the object the last Reject deleted, while it is still the newest
+   *  entry on the caller's history stack for that image. */
+  const handleUndoReject = async () => {
+    if (!undoable || busy) return;
+    setBusy(true);
+    try {
+      await undoAnnotationAction(undoable.imageId);
+      contourCache.current.delete(undoable.maskId);
+      setUndoable(null);
+      setTally((current_) => ({ ...current_, discarded: Math.max(current_.discarded - 1, 0) }));
+      setReloadToken((token) => token + 1);
+      addToast({ message: `Restored ${undoable.name} #${undoable.contourId}.` });
+    } catch (err) {
+      setError(readableError(err, 'Could not restore that object.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Fix the label here instead of handing the object back for it. The backend
+   * records an approval alongside the change for callers who hold `review.approve`,
+   * so a relabelled instance counts as reviewed and the queue moves on.
+   */
+  const handleRelabel = async (label) => {
+    if (!current || !targetContourId || busy) return;
+    const maskId = current.mask_id;
+    setShowRelabel(false);
+    setLabelQuery('');
+    setBusy(true);
+    clearUndo();
+    try {
+      await editContourLabel(targetContourId, label.id);
+      contourCache.current.delete(maskId);
+      if (isImageMode) {
+        const relabelled = contours.map((contour) =>
+          contour.id === targetContourId ? { ...contour, label_id: label.id } : contour
+        );
+        contourCache.current.set(maskId, relabelled);
+        setContours(relabelled);
+        setTally((current_) => ({ ...current_, relabelled: current_.relabelled + 1 }));
+        addToast({ message: `Relabelled #${targetContourId} to ${label.name}.` });
+      } else {
+        advance('relabelled');
+      }
+    } catch (err) {
+      setError(readableError(err, 'Could not change the label.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleSkip = () => {
     if (!current || busy) return;
+    clearUndo();
     advance('skipped');
   };
 
-  // Keyboard: A accepts, S skips — but never while typing the note.
+  // Keyboard. Never fires while the reviewer is typing (the note field, the label
+  // search), so Enter can mean "accept" out here and "commit what I typed" in there.
   useEffect(() => {
     const onKey = (event) => {
       if (done || busy) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = event.target?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-      if (event.key === 'a' || event.key === 'A') handleAccept();
-      if (event.key === 's' || event.key === 'S') handleSkip();
+      // The picker owns the keyboard while it is open; it closes on Escape itself.
+      if (showRelabel) return;
+
+      const key = event.key || '';
+      const reasonIndex = SEND_BACK_REASONS.findIndex(
+        (_, position) => key === String(position + 1)
+      );
+      if (reasonIndex >= 0) {
+        event.preventDefault();
+        handleSendBack(SEND_BACK_REASONS[reasonIndex].reason);
+        return;
+      }
+      if (key === CUSTOM_REASON_KEY) {
+        // The free-text field is always on screen; the shortcut only puts the
+        // cursor in it, and Enter in there does the sending.
+        event.preventDefault();
+        noteRef.current?.focus();
+        return;
+      }
+      switch (key.toLowerCase()) {
+        case 'enter':
+          event.preventDefault();
+          handleAccept();
+          break;
+        case 'a':
+          handleAccept();
+          break;
+        case 'r':
+          handleReject();
+          break;
+        case 'l':
+          if (targetContourId) setShowRelabel(true);
+          break;
+        case 's':
+          handleSkip();
+          break;
+        default:
+          break;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -257,7 +498,8 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
         <CheckCircle2 className="w-12 h-12 text-ac mb-4" />
         <h2 className="text-2xl font-bold text-t1 mb-2">Session finished</h2>
         <p className="text-t2 mb-6">
-          {tally.accepted} accepted · {tally.rejected} sent back · {tally.skipped} skipped
+          {tally.accepted} accepted · {tally.relabelled} relabelled · {tally.rejected} sent
+          back · {tally.discarded} rejected · {tally.skipped} skipped
         </p>
         <button
           onClick={onExit}
@@ -293,7 +535,7 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
       </main>
 
       {/* Action panel */}
-      <aside className="w-80 border-l border-ln bg-p1 flex flex-col flex-shrink-0">
+      <aside className="relative w-80 border-l border-ln bg-p1 flex flex-col flex-shrink-0">
         <div className="px-4 py-3 border-b border-ln">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-t3">
@@ -322,6 +564,19 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
                 {current.pending_instances} of {current.total_instances} instances awaiting{' '}
                 {queue.include_reviewed ? 'your review' : 'review'}
               </div>
+              <div className="text-t3">
+                {targetContour ? (
+                  <>
+                    Picked:{' '}
+                    <span className="font-medium text-t2">
+                      {labelNameFor(targetContour.label_id)} #{targetContour.id}
+                    </span>{' '}
+                    — Reject and Relabel act on it.
+                  </>
+                ) : (
+                  'Click an object on the canvas to reject or relabel just that one.'
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -334,7 +589,9 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
                       : '#94a3b8',
                   }}
                 />
-                <span className="font-medium">{labelNameFor(current.label_id)}</span>
+                <span className="font-medium">
+                  {labelNameFor(targetContour?.label_id ?? current.label_id)}
+                </span>
                 <span className="text-t3">#{current.contour_id}</span>
               </div>
               <div className="text-t3">
@@ -366,6 +623,39 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
           </div>
         )}
 
+        {undoable && (
+          <div className="px-4 py-2 border-b border-ln flex items-center justify-between gap-2 bg-well">
+            <span className="text-xs text-t2 min-w-0 truncate">
+              Rejected {undoable.name} #{undoable.contourId}
+            </span>
+            <button
+              onClick={handleUndoReject}
+              disabled={busy}
+              className="flex items-center gap-1 text-xs font-semibold text-ac hover:underline disabled:text-t3 flex-shrink-0"
+            >
+              <CornerUpLeft className="w-3.5 h-3.5" />
+              Undo
+            </button>
+          </div>
+        )}
+
+        {showRelabel && targetContourId && (
+          <div className="absolute left-1/2 -translate-x-1/2 top-32 z-30">
+            <LabelPicker
+              items={relabelItems}
+              query={labelQuery}
+              onQueryChange={setLabelQuery}
+              onSelect={handleRelabel}
+              onClose={() => {
+                setShowRelabel(false);
+                setLabelQuery('');
+              }}
+              caption={`New label for #${targetContourId}`}
+              emptyMessage="No labels valid at this level"
+            />
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
           <button
@@ -375,39 +665,91 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
           >
             {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
             Accept
+            <Kbd tone="solid">⏎</Kbd>
           </button>
 
-          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-t3">
-            Send back
+          <div className="flex gap-2">
+            <button
+              onClick={handleReject}
+              disabled={busy || loading || !targetContourId}
+              title={
+                targetContourId
+                  ? 'Delete this object — it is not a real object at all'
+                  : 'Pick an object on the canvas first'
+              }
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-errLn text-err font-semibold hover:bg-errBg disabled:border-ln disabled:text-t3 transition-colors text-sm"
+            >
+              <Trash2 className="w-4 h-4" />
+              Reject
+              <Kbd>R</Kbd>
+            </button>
+            <button
+              onClick={() => setShowRelabel(true)}
+              disabled={busy || loading || !targetContourId}
+              title={
+                targetContourId
+                  ? 'Give this object the right label instead of sending it back'
+                  : 'Pick an object on the canvas first'
+              }
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-ln2 text-t1 font-semibold hover:bg-hv disabled:border-ln disabled:text-t3 transition-colors text-sm"
+            >
+              <Tag className="w-4 h-4" />
+              Relabel
+              <Kbd>L</Kbd>
+            </button>
           </div>
-          {REJECT_ACTIONS.map(({ reason, label, instanceLabel }) => (
+          <p className="text-xs text-t3">
+            Reject deletes the object outright — for a prediction that is not the object at
+            all. Relabel fixes the label on the spot and counts as your approval.
+          </p>
+
+          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-t3">
+            Send back to the annotator
+          </div>
+          {SEND_BACK_REASONS.map(({ reason, title, imageTitle, description }, position) => (
             <button
               key={reason}
-              onClick={() => handleReject(reason)}
+              onClick={() => handleSendBack(reason)}
               disabled={busy || loading}
-              className="w-full text-left px-4 py-2.5 rounded-lg border border-errLn text-err hover:bg-errBg disabled:border-ln disabled:text-t3 transition-colors text-sm font-medium"
+              className="w-full text-left px-3 py-2.5 rounded-lg border border-errLn text-err hover:bg-errBg disabled:border-ln disabled:text-t3 transition-colors"
             >
-              {isImageMode ? label : instanceLabel}
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <Kbd>{position + 1}</Kbd>
+                {isImageMode ? imageTitle : title}
+              </span>
+              <span className="block mt-1 text-xs text-t3">{description}</span>
             </button>
           ))}
 
-          {showNote ? (
-            <textarea
+          {/* The free-text reason is the field itself: no button to press first,
+              and Enter in it sends the object back with what was typed. It doubles
+              as the optional note on the reasons above. */}
+          <div className="rounded-lg border border-ln2 px-3 py-2.5">
+            <span className="flex items-center gap-2 text-sm font-medium text-t1">
+              <Kbd>{CUSTOM_REASON_KEY}</Kbd>
+              Custom reason
+            </span>
+            <input
+              ref={noteRef}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Optional note for the annotator…"
-              rows={3}
-              className="w-full mt-2 border border-ln2 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ac focus:border-ac"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleCustomSendBack();
+                } else if (e.key === 'Escape') {
+                  e.currentTarget.blur();
+                }
+              }}
+              disabled={busy || loading}
+              placeholder="Something else is wrong…"
+              className="w-full mt-1.5 bg-transparent border-b border-ln2 pb-1 text-sm text-t1 placeholder:text-t3 focus:border-ac focus:outline-none disabled:text-t3"
             />
-          ) : (
-            <button
-              onClick={() => setShowNote(true)}
-              className="flex items-center gap-1.5 text-t3 hover:text-t1 text-xs font-medium mt-2"
-            >
-              <MessageSquarePlus className="w-3.5 h-3.5" />
-              Add a note to the next send-back
-            </button>
-          )}
+            <span className="block mt-1 text-xs text-t3">
+              Enter sends the object back with this text. Typed here, it also rides along
+              as the note on the reasons above.
+            </span>
+          </div>
         </div>
 
         <div className="px-4 py-3 border-t border-ln">
@@ -417,7 +759,8 @@ const ReviewSession = ({ queue, labelsById, onExit }) => {
             className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-ln2 text-t2 hover:bg-hv disabled:text-t3 transition-colors text-sm font-medium"
           >
             <SkipForward className="w-4 h-4" />
-            Skip (S) — Accept with (A)
+            Skip
+            <Kbd>S</Kbd>
           </button>
         </div>
       </aside>

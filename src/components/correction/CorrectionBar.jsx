@@ -35,8 +35,10 @@ import {
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
 
-/** Reasons whose fix is a re-outline, so the canvas drops straight into point editing. */
-const OUTLINE_REASONS = new Set(['bad_outline']);
+/** Reasons whose fix is a re-outline, so the canvas drops straight into point editing.
+ *  `missing_parts` is one of them: "only part of the object is outlined" is fixed by
+ *  dragging the outline out over the rest of it, not by drawing a second object. */
+const OUTLINE_REASONS = new Set(['bad_outline', 'missing_parts']);
 
 /**
  * Drives a correction session from inside the annotation editor.
