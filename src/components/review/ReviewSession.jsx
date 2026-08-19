@@ -63,14 +63,19 @@ const SEND_BACK_REASONS = [
   },
 ];
 
+/** Shared empty set for the modes that have no subject/context split. */
+const EMPTY_IDS = new Set();
+
 /** The shortcut number of the free-text reason, one past the listed ones. */
 const CUSTOM_REASON_KEY = String(SEND_BACK_REASONS.length + 1);
 
 /**
  * Plays a review queue one item at a time.
  *
- * Image items show the whole mask; instance items show one contour plus its
- * immediate children, framed. The reviewer has four verdicts:
+ * Image items show the whole mask; instance items frame one contour plus its
+ * immediate children, with the rest of the image drawn around it as context —
+ * "is this a duplicate?" and "was the thing overlapping it already annotated?"
+ * are unanswerable from one outline in isolation. The reviewer has four verdicts:
  *
  *   * **Accept** (Enter) — approves the mask's pending contours, or the one instance.
  *   * **Send back** (1–5) — records a rejection with the chosen reason and returns
@@ -114,6 +119,9 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
   const [zoomTarget, setZoomTarget] = useState(null);
   const [selectedContourId, setSelectedContourId] = useState(null);
   const [showRelabel, setShowRelabel] = useState(false);
+  // Instance review draws the rest of the image as context; a dense mask can
+  // still be easier to judge with it off.
+  const [showContext, setShowContext] = useState(true);
   const [labelQuery, setLabelQuery] = useState('');
   // The last delete, while it is still the caller's newest history entry on that
   // image — see `handleReject`.
@@ -187,14 +195,39 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
 
   // -- Derived display state --------------------------------------------------
 
-  /** Image mode shows everything; instance mode the instance and its children. */
-  const visibleContours = useMemo(() => {
-    if (isImageMode || !current) return contours;
-    return contours.filter(
-      (contour) =>
-        contour.id === current.contour_id || contour.parent_id === current.contour_id
-    );
+  /**
+   * The queued instance and its immediate children — what the item is actually
+   * about. Empty in image mode, where the whole mask is the subject.
+   */
+  const subjectIds = useMemo(() => {
+    if (isImageMode || !current) return EMPTY_IDS;
+    const ids = new Set([current.contour_id]);
+    contours.forEach((contour) => {
+      if (contour.parent_id === current.contour_id) ids.add(contour.id);
+    });
+    return ids;
   }, [contours, current, isImageMode]);
+
+  /**
+   * Everything else on the image. Instance review used to hide these, which made
+   * the very questions review exists to answer unanswerable: whether an object is
+   * a duplicate of its neighbour, or whether the thing overlapping it was already
+   * annotated, cannot be judged from a single outline in isolation. They are drawn
+   * as context (see `AnnotationViewerCanvas`) rather than as equals, and stay
+   * clickable so a duplicate can be rejected on the spot.
+   */
+  const contextIds = useMemo(() => {
+    if (isImageMode || !current) return EMPTY_IDS;
+    return new Set(
+      contours.filter((contour) => !subjectIds.has(contour.id)).map((contour) => contour.id)
+    );
+  }, [contours, current, isImageMode, subjectIds]);
+
+  /** All of it, unless the reviewer turned the surroundings off for a busy image. */
+  const visibleContours = useMemo(() => {
+    if (isImageMode || showContext) return contours;
+    return contours.filter((contour) => subjectIds.has(contour.id));
+  }, [contours, isImageMode, showContext, subjectIds]);
 
   const instanceContour = useMemo(
     () =>
@@ -213,11 +246,17 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
   );
 
   /**
-   * The object Reject and Relabel act on: the queued instance, or — in image
-   * mode, where the item is the whole mask — whatever the reviewer picked on the
-   * canvas.
+   * The object Reject and Relabel act on: whatever is picked on the canvas, which
+   * the loader pre-sets to the queued instance. Clicking a neighbour retargets
+   * them at it — that is how a duplicate spotted in the context gets dealt with
+   * without leaving the item.
    */
-  const targetContourId = isImageMode ? selectedContourId : current?.contour_id ?? null;
+  const targetContourId =
+    selectedContourId ?? (isImageMode ? null : current?.contour_id ?? null);
+
+  /** Whether the acted-on object is the one this queue item is about: only then
+   *  does dealing with it settle the item and move the queue on. */
+  const targetIsSubject = !isImageMode && targetContourId === current?.contour_id;
 
   const targetContour = useMemo(
     () => contours.find((contour) => contour.id === targetContourId) || null,
@@ -361,17 +400,18 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
       contourCache.current.delete(maskId);
       setUndoable({ imageId, maskId, contourId: targetContourId, name });
 
-      if (isImageMode) {
-        // The item is the whole image and there is more of it to review, so stay
-        // put and just drop the object from the view.
+      if (targetIsSubject) {
+        advance('discarded', { dropContourIds: deletedIds });
+      } else {
+        // A whole-image item, or a neighbour rejected out of the context: what
+        // the queue asked about is still open, so stay put and just drop the
+        // object from the view.
         const gone = new Set(deletedIds);
         const remaining = contours.filter((contour) => !gone.has(contour.id));
         contourCache.current.set(maskId, remaining);
         setContours(remaining);
-        setSelectedContourId(null);
+        setSelectedContourId(isImageMode ? null : current.contour_id);
         setTally((current_) => ({ ...current_, discarded: current_.discarded + 1 }));
-      } else {
-        advance('discarded', { dropContourIds: deletedIds });
       }
     } catch (err) {
       setError(readableError(err, 'Could not reject this object.'));
@@ -414,7 +454,9 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
     try {
       await editContourLabel(targetContourId, label.id);
       contourCache.current.delete(maskId);
-      if (isImageMode) {
+      if (targetIsSubject) {
+        advance('relabelled');
+      } else {
         const relabelled = contours.map((contour) =>
           contour.id === targetContourId ? { ...contour, label_id: label.id } : contour
         );
@@ -422,8 +464,6 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
         setContours(relabelled);
         setTally((current_) => ({ ...current_, relabelled: current_.relabelled + 1 }));
         addToast({ message: `Relabelled #${targetContourId} to ${label.name}.` });
-      } else {
-        advance('relabelled');
       }
     } catch (err) {
       setError(readableError(err, 'Could not change the label.'));
@@ -530,6 +570,7 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
             onSelect={setSelectedContourId}
             zoomTarget={zoomTarget}
             colorFor={colorFor}
+            contextIds={contextIds}
           />
         )}
       </main>
@@ -606,13 +647,44 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
                   confirm, send back to overrule (withdraws your own approval).
                 </div>
               )}
-              <button
-                onClick={() => instanceContour && setZoomTarget({ ...instanceContour })}
-                className="flex items-center gap-1.5 text-ac hover:text-ac text-xs font-medium"
-              >
-                <ScanEye className="w-3.5 h-3.5" />
-                Re-frame instance
-              </button>
+              {!targetIsSubject && targetContour && (
+                <div className="text-t2">
+                  Picked{' '}
+                  <span className="font-medium">
+                    {labelNameFor(targetContour.label_id)} #{targetContour.id}
+                  </span>{' '}
+                  from the surroundings — Reject and Relabel act on it, Accept and the
+                  send-backs still apply to #{current.contour_id}.
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2 pt-0.5">
+                <button
+                  onClick={() => {
+                    if (!instanceContour) return;
+                    setSelectedContourId(instanceContour.id);
+                    setZoomTarget({ ...instanceContour });
+                  }}
+                  className="flex items-center gap-1.5 text-ac hover:text-ac text-xs font-medium"
+                >
+                  <ScanEye className="w-3.5 h-3.5" />
+                  Back to this instance
+                </button>
+                <label className="flex items-center gap-1.5 text-xs text-t3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showContext}
+                    // Blurred on change: the keyboard handler stands down while
+                    // a form control has focus, so leaving it focused would kill
+                    // every shortcut until the reviewer clicked elsewhere.
+                    onChange={(e) => {
+                      setShowContext(e.target.checked);
+                      e.target.blur();
+                    }}
+                    className="accent-current w-3 h-3"
+                  />
+                  Surroundings
+                </label>
+              </div>
             </>
           )}
         </div>
