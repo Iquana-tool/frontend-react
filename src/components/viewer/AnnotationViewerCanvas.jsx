@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Maximize2, Minus, Plus } from 'lucide-react';
 
+/** Shared empty set, so the default prop does not remount the paths each render. */
+const EMPTY_IDS = new Set();
+
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 12;
 const ZOOM_STEP = 1.3;
@@ -55,6 +58,10 @@ const pathFor = (contour, width, height) => {
  * @param {Function} props.onSelect - Called with a contour id (or null) on click.
  * @param {Object|null} props.zoomTarget - Contour to frame; changing it re-frames.
  * @param {Function} props.colorFor - contour -> CSS color.
+ * @param {Set<number>} [props.contextIds] - Contours drawn as surroundings rather
+ *   than as the subject: dashed hairline, barely any fill. They stay clickable —
+ *   the point of showing them is that the viewer can act on one. Empty by default,
+ *   which renders every contour as a subject exactly as before.
  */
 const AnnotationViewerCanvas = ({
   imageSrc,
@@ -63,6 +70,7 @@ const AnnotationViewerCanvas = ({
   onSelect,
   zoomTarget = null,
   colorFor,
+  contextIds = EMPTY_IDS,
 }) => {
   const containerRef = useRef(null);
   const [natural, setNatural] = useState({ width: 0, height: 0 });
@@ -250,17 +258,25 @@ const AnnotationViewerCanvas = ({
               >
                 {drawableContours.map(({ contour, d }) => {
                   const isSelected = contour.id === selectedId;
+                  // Three tiers, not two: the selection, the other subjects, and
+                  // the surroundings. Context needs to be readable enough to spot
+                  // a duplicate against without competing with the subject, so it
+                  // gets a dashed hairline and almost no fill.
+                  const isContext = !isSelected && contextIds.has(contour.id);
                   const color = colorFor ? colorFor(contour) : '#38bdf8';
                   return (
                     <path
                       key={contour.id}
                       d={d}
                       fill={color}
-                      fillOpacity={isSelected ? 0.4 : 0.18}
+                      fillOpacity={isSelected ? 0.4 : isContext ? 0.05 : 0.18}
                       stroke={color}
+                      strokeOpacity={isContext ? 0.6 : 1}
                       // Keep the outline a constant width on screen however far
-                      // the user has zoomed in.
-                      strokeWidth={(isSelected ? 3 : 1.5) / zoom}
+                      // the user has zoomed in. Same for the dash pattern, which
+                      // would otherwise turn solid at high zoom.
+                      strokeWidth={(isSelected ? 3 : isContext ? 1 : 1.5) / zoom}
+                      strokeDasharray={isContext ? `${5 / zoom} ${4 / zoom}` : undefined}
                       className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
