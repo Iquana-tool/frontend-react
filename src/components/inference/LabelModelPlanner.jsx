@@ -189,7 +189,7 @@ function ModelRow({ label, step, models, strategies, onChange }) {
 
                     {/* Dedicated Conditioning Section (when kind !== 'none') */}
                     {condSpec && condSpec.kind !== "none" && (
-                        <div className="p-2.5 rounded-lg bg-well/60 border border-ln/60 space-y-2">
+                        <div className="p-2.5 rounded-lg bg-well/60 border border-ln space-y-2">
                             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-ac uppercase tracking-wider">
                                 <Sparkles size={12} className="text-ac" />
                                 <span>Conditioning &amp; Exemplars ({condSpec.kind === "reference_images" ? "Reference Images" : condSpec.kind === "instances" ? "Instances" : condSpec.kind === "concept_text" ? "Text Prompt" : condSpec.kind})</span>
