@@ -45,9 +45,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
   const workspaceMode = useWorkspaceMode();
 
   // Calibrate mode borrows the canvas for measuring, not for annotating. The
-  // drawing surfaces are gated on the mode rather than only on the tool because
-  // stepping to another image resets the tool to 'ai_annotation', which would
-  // otherwise put the prompt canvas back over the calibration overlays.
+  // drawing surfaces are gated on the mode rather than only on the tool, so a
+  // drawing tool left armed in Annotate cannot put its canvas over the
+  // calibration overlays.
   const annotating = workspaceMode !== 'calibrate';
 
   useAIAnnotationShortcuts();
@@ -147,7 +147,14 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
       )}
 
       {annotating && currentTool === 'manual_drawing' && (
-        <div className="absolute inset-0 pointer-events-auto">
+        <div
+          className="absolute inset-0 pointer-events-auto"
+          /* Same lift the prompt canvas gets: focus mode dims everything at z40,
+             and an outline being traced under the dim is barely visible. Drawing
+             a child contour by hand inside a focused parent is a supported
+             flow — ManualDrawCanvas nests what it commits under it. */
+          style={{ zIndex: focusModeActive ? 45 : undefined }}
+        >
           <ManualDrawCanvas />
         </div>
       )}

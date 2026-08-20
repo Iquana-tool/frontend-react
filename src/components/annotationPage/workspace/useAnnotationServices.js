@@ -149,7 +149,6 @@ export default function useAnnotationServices() {
       selectedModel: promptedModel,
       setSelectedModel: setPromptedModel,
       isRunning: false,
-      hasInstantMode: true,
     },
     {
       key: 'suggestion',

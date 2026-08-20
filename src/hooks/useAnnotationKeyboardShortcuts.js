@@ -91,7 +91,9 @@ export default function useAnnotationKeyboardShortcuts() {
 
       switch (e.key) {
         case 'Enter': {
-          if (canRunPrompted && mode !== 'review') {
+          // Shift+Enter belongs to the action bar's "Add this object"; running
+          // the model here as well would do both at once.
+          if (canRunPrompted && mode !== 'review' && !e.shiftKey) {
             e.preventDefault();
             runSegmentation();
           }

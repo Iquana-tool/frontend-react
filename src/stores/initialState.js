@@ -22,8 +22,13 @@ export const initialState = {
     // The workspace tab. All three share one canvas and one viewport; they differ
     // in the rail's tools and which side panel is in front. See setWorkspaceMode.
     mode: 'annotate',           // 'calibrate' | 'annotate' | 'review'
-    /** When false, drawn shapes are committed as-is instead of becoming model prompts. */
-    aiAssist: true,
+    /**
+     * What happens when a prompt is placed - see PROMPT_ACTIONS in toolModel.js.
+     * 'nothing' leaves it for the action bar's two buttons, 'ai' runs the model
+     * at once (what the instant-mode switch used to do), 'manual' adds an
+     * outline as an object at once.
+     */
+    promptAction: 'nothing',    // 'nothing' | 'ai' | 'manual'
     leftDrawerOpen: true,
     rightPanelOpen: true,
     rightTab: 'objects',        // 'objects' | 'labels'
@@ -63,11 +68,12 @@ export const initialState = {
     prompts: [],
     activePreview: null,
     isSubmitting: false,
-    instantSegmentation: false, // Auto-trigger segmentation when prompt is added
     // Active drawing mode for prompts: 'point' | 'box' | 'polygon' | 'freehand'
     promptMode: 'point',
-    // Active drawing mode for the manual-drawing tool: 'polygon' | 'freehand'
-    manualDrawMode: 'polygon',
+    // Active drawing mode for the manual-drawing tool: 'polygon' | 'freehand'.
+    // Freehand by default, because that is what the rail's Freedraw tool
+    // promises; polygon is one keypress away on the canvas (G).
+    manualDrawMode: 'freehand',
     undoStack: [],
     redoStack: [],
     // Refinement mode

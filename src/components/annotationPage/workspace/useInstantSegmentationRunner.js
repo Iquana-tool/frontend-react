@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import {
   useCurrentTool,
-  useInstantSegmentation,
+  usePromptAction,
   useAIPrompts,
   usePromptedModel,
   useIsSubmitting,
@@ -17,7 +17,8 @@ import {
 const REFINEMENT_READY_MS = 200;
 
 /**
- * Instant mode: run segmentation as soon as a prompt is placed.
+ * Run segmentation as soon as a prompt is placed — the rail's "Run AI
+ * immediately" prompt action, which replaced the instant-mode switch.
  *
  * Lifted out of CanvasContainer, where it sat as two effects tangled into the
  * render tree. Behaviour is unchanged, including the delay: a plain run waits
@@ -30,7 +31,7 @@ const REFINEMENT_READY_MS = 200;
  */
 export default function useInstantSegmentationRunner() {
   const currentTool = useCurrentTool();
-  const instant = useInstantSegmentation();
+  const instant = usePromptAction() === 'ai';
   const prompts = useAIPrompts();
   const promptedModel = usePromptedModel();
   const isSubmitting = useIsSubmitting();

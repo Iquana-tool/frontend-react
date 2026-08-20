@@ -124,7 +124,6 @@ export const useSetInstanceWarningModalOpen = () => useAnnotationStore(state => 
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
-export const useInstantSegmentation = () => useAnnotationStore(state => state.aiAnnotation.instantSegmentation);
 export const usePromptMode = () => useAnnotationStore(state => state.aiAnnotation.promptMode);
 export const useManualDrawMode = () => useAnnotationStore(state => state.aiAnnotation.manualDrawMode);
 
@@ -145,7 +144,6 @@ export const useClearAllPrompts = () => useAnnotationStore(state => state.clearA
 export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
-export const useToggleInstantSegmentation = () => useAnnotationStore(state => state.toggleInstantSegmentation);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
 // Depths, not the arrays: Ctrl+Z routing only needs to know whether each prompt
@@ -301,7 +299,7 @@ export const useClearWedge = () => useAnnotationStore(state => state.clearWedge)
 // Workspace shell selectors
 export const useWorkspaceTheme = () => useAnnotationStore(state => state.workspace.theme);
 export const useWorkspaceMode = () => useAnnotationStore(state => state.workspace.mode);
-export const useAiAssist = () => useAnnotationStore(state => state.workspace.aiAssist);
+export const usePromptAction = () => useAnnotationStore(state => state.workspace.promptAction);
 export const useLeftDrawerOpen = () => useAnnotationStore(state => state.workspace.leftDrawerOpen);
 export const useRightPanelOpen = () => useAnnotationStore(state => state.workspace.rightPanelOpen);
 export const useRightTab = () => useAnnotationStore(state => state.workspace.rightTab);
@@ -324,8 +322,7 @@ export const useCursorPosition = () => useAnnotationStore(state => state.workspa
 export const useSetTheme = () => useAnnotationStore(state => state.setTheme);
 export const useToggleTheme = () => useAnnotationStore(state => state.toggleTheme);
 export const useSetWorkspaceMode = () => useAnnotationStore(state => state.setWorkspaceMode);
-export const useSetAiAssist = () => useAnnotationStore(state => state.setAiAssist);
-export const useToggleAiAssist = () => useAnnotationStore(state => state.toggleAiAssist);
+export const useSetPromptAction = () => useAnnotationStore(state => state.setPromptAction);
 export const useToggleLeftDrawer = () => useAnnotationStore(state => state.toggleLeftDrawer);
 export const useSetLeftDrawerOpen = () => useAnnotationStore(state => state.setLeftDrawerOpen);
 export const useToggleRightPanel = () => useAnnotationStore(state => state.toggleRightPanel);

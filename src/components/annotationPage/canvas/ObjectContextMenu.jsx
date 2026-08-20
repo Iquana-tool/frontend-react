@@ -12,6 +12,7 @@ import {
   useUpdateObject,
   useRemoveObject,
   useEnterRefinementMode,
+  useCurrentTool,
   useSetCurrentTool,
   useRefinementModeActive,
   useFocusModeActive,
@@ -54,6 +55,7 @@ const ObjectContextMenu = () => {
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
   const enterRefinementMode = useEnterRefinementMode();
+  const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
   const refinementModeActive = useRefinementModeActive();
   const focusModeActive = useFocusModeActive();
@@ -205,8 +207,9 @@ const ObjectContextMenu = () => {
   const handleLabelSelectBase = useLabelSelection(
     updateObject,
     () => {
-      // onSuccess: switch tool and hide menu
-      setCurrentTool('ai_annotation');
+      // onSuccess: switch tool and hide menu. Manual drawing stays put —
+      // labelling the outline you just drew should not end the drawing session.
+      if (currentTool !== 'manual_drawing') setCurrentTool('ai_annotation');
       hideContextMenu();
     },
     (error) => {
@@ -331,8 +334,9 @@ const ObjectContextMenu = () => {
         await deleteObject(targetObject, removeObject);
       }
       
-      // Switch to AI assisted annotation tool
-      setCurrentTool('ai_annotation');
+      // Switch to AI assisted annotation tool, unless the user is drawing by
+      // hand — deleting an object is no reason to put their tool back.
+      if (currentTool !== 'manual_drawing') setCurrentTool('ai_annotation');
       
       hideContextMenu();
     } catch (error) {

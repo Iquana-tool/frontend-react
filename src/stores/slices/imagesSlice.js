@@ -51,10 +51,17 @@ export const createImagesSlice = (set) => ({
       state.lineEdit.contourId = null;
       state.lineEdit.original = null;
 
-      // Reset calibration/tool state for the new image so the scale button
-      // shows "Set Scale" instead of "Cancel Calibration".
+      // Reset calibration state for the new image so the scale button shows
+      // "Set Scale" instead of "Cancel Calibration".
       state.images.scale = { scaleX: 1, scaleY: 1, unit: 'px', isCalibrating: false, calibrationPoints: null };
-      state.ui.currentTool = 'ai_annotation';
+      // Only the calibration tool is per-image; the drawing tool is the user's
+      // choice and stepping through a dataset must not keep taking it away.
+      // Resetting it unconditionally dropped an annotator out of manual drawing
+      // on every image, which is most of why drawing contours by hand read as
+      // missing.
+      if (state.ui.currentTool === 'set_scale') {
+        state.ui.currentTool = 'ai_annotation';
+      }
     }
   }),
   
