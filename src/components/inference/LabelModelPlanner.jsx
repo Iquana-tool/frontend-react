@@ -142,7 +142,7 @@ function ModelRow({ label, step, models, strategies, onChange }) {
             </div>
 
             {step && selected && contract && (
-                <div className="px-3 pb-3 pt-0.5 space-y-2.5 border-t border-ln/40 bg-p2/30">
+                <div className="px-3 pb-3 pt-0.5 space-y-2.5 border-t border-ln bg-p2/30">
                     {/* Meta / Capabilities banner */}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                         {selected.trained_on_dataset && (
