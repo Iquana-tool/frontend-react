@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Ban,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -24,8 +25,10 @@ import useActionBarState from './useActionBarState';
 import useObjectActions from './useObjectActions';
 import useLabelAssignment from './useLabelAssignment';
 import useAddShapesAsObjects from './useAddShapesAsObjects';
+import useSupportedPromptTypes from './useSupportedPromptTypes';
 import useSuggestSimilar from './useSuggestSimilar';
 import useRailTools from './useRailTools';
+import { getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
 import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
@@ -40,9 +43,6 @@ import {
   useAvailablePromptedModels,
   usePromptedModel,
   useSetPromptedModel,
-  useInstantSegmentation,
-  useToggleInstantSegmentation,
-  useAiAssist,
   usePicker,
   useSetPicker,
   useImageScale,
@@ -53,6 +53,9 @@ import {
   useUpdateObject,
   useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
+
+/** Icons for the three prompt actions, keyed as PROMPT_ACTIONS names them. */
+const ACTION_ICONS = { Ban, Sparkles, Pencil };
 
 const RUN_COPY = {
   segment: 'Segmenting…',
@@ -85,8 +88,9 @@ const ActionBar = () => {
   const actions = useObjectActions();
   const labelling = useLabelAssignment();
   const suggest = useSuggestSimilar();
-  const { shapeCount, isAdding, addShapes } = useAddShapesAsObjects();
-  const { toggleAssist } = useRailTools();
+  const { isAdding, addShapes } = useAddShapesAsObjects();
+  const supportedPromptTypes = useSupportedPromptTypes();
+  const { promptAction, cyclePromptAction } = useRailTools();
   const { runSegmentation } = useAISegmentation();
   const { addToast } = useToast();
 
@@ -97,8 +101,6 @@ const ActionBar = () => {
   const availableModels = useAvailablePromptedModels();
   const promptedModel = usePromptedModel();
   const setPromptedModel = useSetPromptedModel();
-  const instant = useInstantSegmentation();
-  const toggleInstant = useToggleInstantSegmentation();
   const picker = usePicker();
   const setPicker = useSetPicker();
   const scale = useImageScale();
@@ -108,7 +110,6 @@ const ActionBar = () => {
   const objects = useObjectsList();
   const updateObject = useUpdateObject();
   const refinementActive = useRefinementModeActive();
-  const isAssist = useAiAssist();
 
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
@@ -116,6 +117,26 @@ const ActionBar = () => {
 
   const modelName =
     availableModels.find((model) => model.id === promptedModel)?.name || promptedModel || 'no model';
+
+  /**
+   * Whether the model can take what is on the canvas.
+   *
+   * This is where a model's declared prompt types belong now: the rail keeps
+   * every shape available, because a polygon may be headed for "Add this
+   * object" rather than for the model, and it is only this button that a
+   * point/box-only model can actually refuse.
+   */
+  const unsupportedPrompt = useMemo(() => {
+    if (!supportedPromptTypes) return null;
+    const rejected = prompts.find((prompt) => supportedPromptTypes[prompt.type] === false);
+    return rejected
+      ? `${supportedPromptTypes.modelName} doesn’t accept ${rejected.type} prompts`
+      : null;
+  }, [prompts, supportedPromptTypes]);
+
+  const runAIBlockedReason = !promptedModel ? 'Select a model first' : unsupportedPrompt;
+  const canRunAI = !runAIBlockedReason;
+  const addLabel = bar.addableCount > 1 ? `Add ${bar.addableCount} objects` : 'Add this object';
 
   const single = bar.selection.length === 1 ? bar.selection[0] : null;
   const reviewTarget = bar.reviewQueue[reviewIndex] || null;
@@ -264,6 +285,37 @@ const ActionBar = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bar.state, picker, sendBackFor, reviewTarget?.id, bar.reviewQueue.length]);
 
+  /**
+   * `⇧⏎` commits the outlines on the canvas.
+   *
+   * Bound here because `addShapes` lives on this bar, and kept off plain `⏎` so
+   * the two actions the bar offers keep distinct keys —
+   * useAnnotationKeyboardShortcuts owns `⏎` for running the model.
+   */
+  useEffect(() => {
+    if (bar.state !== 'prompt' || !bar.addableCount) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Enter' || !event.shiftKey) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (picker) return;
+      const target = event.target;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      event.preventDefault();
+      addShapes();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [bar.state, bar.addableCount, picker, addShapes]);
+
   if (bar.state === 'editing') return null;
 
   // ---------------------------------------------------------------- contents
@@ -290,46 +342,35 @@ const ActionBar = () => {
         </span>
       </>
     );
-    sub = modelName;
+    sub = canRunAI ? modelName : runAIBlockedReason;
     buttons = (
       <>
         <BarButton icon={Eraser} label="Clear" shortcut="⌫" onClick={clearAllPrompts} />
+        {bar.addableCount > 0 && (
+          <BarButton
+            icon={Shapes}
+            label={isAdding ? 'Adding…' : addLabel}
+            shortcut="⇧⏎"
+            variant={canRunAI ? undefined : 'primary'}
+            disabled={isAdding}
+            title="Save the outline exactly as drawn, without running a model"
+            onClick={addShapes}
+          />
+        )}
         <BarButton
           icon={Sparkles}
-          label={refinementActive ? 'Refine object' : 'Run segmentation'}
+          label={refinementActive ? 'Refine object' : 'Run AI'}
           shortcut="⏎"
-          variant="primary"
-          disabled={!promptedModel}
-          title={!promptedModel ? 'Select a model first' : undefined}
+          variant={canRunAI ? 'primary' : undefined}
+          disabled={!canRunAI}
+          title={runAIBlockedReason || undefined}
           onClick={runSegmentation}
         />
       </>
     );
-    if (instant) hint = 'Instant mode is on — segmentation runs as soon as you place a prompt.';
-  } else if (bar.state === 'shapes') {
-    context = (
-      <>
-        <Dot className="bg-white" />
-        <span className="text-btn font-bold text-t1">
-          {shapeCount} {shapeCount === 1 ? 'shape' : 'shapes'} drawn
-        </span>
-      </>
-    );
-    sub = 'AI assist off';
-    buttons = (
-      <>
-        <BarButton icon={Eraser} label="Discard" shortcut="⌫" onClick={clearAllPrompts} />
-        <BarButton
-          icon={Shapes}
-          label={isAdding ? 'Adding…' : 'Add as object'}
-          shortcut="⏎"
-          variant="primary"
-          disabled={isAdding}
-          onClick={addShapes}
-        />
-      </>
-    );
-    hint = 'Saved exactly as drawn, without running a model.';
+    if (promptAction === 'ai') {
+      hint = 'Every prompt runs the model as soon as it is placed.';
+    }
   } else if (bar.state === 'object' && single) {
     const state = getObjectState(single);
     const area = formatArea(single, scale);
@@ -480,38 +521,31 @@ const ActionBar = () => {
       </>
     );
   } else {
+    const action = getPromptAction(promptAction);
+    const ActionIcon = ACTION_ICONS[action.icon] || Sparkles;
     context = (
       <>
-        <Dot className={isAssist ? 'bg-ac' : 'bg-t3'} />
-        <span className="text-btn font-bold text-t1">
-          {isAssist ? 'AI assist on' : 'Manual drawing'}
-        </span>
+        <Dot className={promptAction === 'nothing' ? 'bg-t3' : 'bg-ac'} />
+        <span className="text-btn font-bold text-t1">Ready to annotate</span>
       </>
     );
-    sub = isAssist ? modelName : 'shapes are saved as drawn';
+    sub = action.short;
     buttons = (
       <>
-        {isAssist && (
-          <>
-            <BarButton
-              icon={Sparkles}
-              label={modelName}
-              variant="chip"
-              disabled={availableModels.length === 0}
-              onClick={() => setPicker('model')}
-            />
-            <BarButton
-              label={instant ? 'Instant on' : 'Instant off'}
-              onClick={toggleInstant}
-            />
-          </>
-        )}
         <BarButton
           icon={Sparkles}
-          label={isAssist ? 'AI assist on' : 'AI assist off'}
+          label={modelName}
+          variant="chip"
+          disabled={availableModels.length === 0}
+          onClick={() => setPicker('model')}
+        />
+        <BarButton
+          icon={ActionIcon}
+          label={action.name}
           shortcut="A"
-          variant={isAssist ? 'primary' : 'chip'}
-          onClick={toggleAssist}
+          variant="chip"
+          title={action.hint}
+          onClick={cyclePromptAction}
         />
       </>
     );

@@ -2,7 +2,12 @@ import { useEffect } from 'react';
 import useRailTools from './useRailTools';
 import useWorkspaceImageNav from './useWorkspaceImageNav';
 import useObjectActions from './useObjectActions';
-import { RAIL_TOOL_BY_KEY, getRailTool, railToolsForMode } from './toolModel';
+import {
+  RAIL_TOOL_BY_KEY,
+  getRailTool,
+  railToolsForMode,
+  shapeUnavailableForAction,
+} from './toolModel';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './constants';
 import annotationSession from '../../../services/annotationSession';
 import {
@@ -41,7 +46,7 @@ const isTypingTarget = (target) =>
  * so the arrows are handled exactly once.
  */
 export default function useWorkspaceShortcuts() {
-  const { setRailTool, toggleAssist } = useRailTools();
+  const { setRailTool, promptAction, cyclePromptAction } = useRailTools();
   const nav = useWorkspaceImageNav();
   const actions = useObjectActions();
 
@@ -94,7 +99,11 @@ export default function useWorkspaceShortcuts() {
       const inThisMode = railTool
         && railToolsForMode(mode).some((tool) => tool.id === railTool);
 
-      if (inThisMode && !getRailTool(railTool).unavailable) {
+      // A shape the current prompt action does not offer is disabled on the
+      // rail; its shortcut must not be a back door to the same dead end.
+      const offered = !railTool || !shapeUnavailableForAction(railTool, promptAction);
+
+      if (inThisMode && offered && !getRailTool(railTool).unavailable) {
         event.preventDefault();
         setRailTool(railTool);
         return;
@@ -102,10 +111,10 @@ export default function useWorkspaceShortcuts() {
 
       switch (upper) {
         case 'A':
-          // AI assist has nothing to act on while calibrating.
+          // The prompt action has nothing to act on while calibrating.
           if (mode !== 'calibrate') {
             event.preventDefault();
-            toggleAssist();
+            cyclePromptAction();
           }
           break;
         case 'T':
@@ -183,8 +192,9 @@ export default function useWorkspaceShortcuts() {
     picker,
     instanceModalOpen,
     mode,
+    promptAction,
     setRailTool,
-    toggleAssist,
+    cyclePromptAction,
     setPicker,
     selectedIds,
     objects,

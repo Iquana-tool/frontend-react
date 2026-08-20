@@ -102,6 +102,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const focusedObjectId = useFocusModeObjectId();
   const refinementModeActive = useRefinementModeActive();
   const refinementModeObjectId = useRefinementModeObjectId();
+  // While drawing by hand, the objects already on the image must let the stroke
+  // through. Their paths sit at z-30, above the manual drawing canvas, so a
+  // freehand stroke that starts over an existing contour used to select that
+  // contour instead of drawing — which on a densely annotated image, or inside
+  // a focused parent, is every stroke.
+  const manualDrawingActive = currentTool === 'manual_drawing';
+  const pathsInert = refinementModeActive || manualDrawingActive;
   const enterRefinementMode = useEnterRefinementMode();
   const setCurrentTool = useSetCurrentTool();
   const exitFocusMode = useExitFocusMode();
@@ -847,9 +854,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               }
               style={{ 
                 transition: 'all 0.2s ease-in-out',
-                cursor: refinementModeActive ? 'default' : 'pointer',
-                // In refinement mode, disable pointer events so clicks pass through to canvas
-                pointerEvents: refinementModeActive ? 'none' : 'auto',
+                cursor: pathsInert ? 'default' : 'pointer',
+                // In refinement mode and while drawing manually, disable pointer
+                // events so clicks pass through to the canvas below.
+                pointerEvents: pathsInert ? 'none' : 'auto',
                 transitionProperty: 'fill-opacity, stroke-width',
                 animation: normalStyle?.marchingAnts
                   ? `dash-${object.id} 1.6s linear infinite`

@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Ban,
   Check,
   Crosshair,
   Hand,
@@ -7,6 +8,7 @@ import {
   MousePointer2,
   Paintbrush,
   Palette,
+  Pencil,
   Ruler,
   Settings2,
   SlidersHorizontal,
@@ -17,7 +19,12 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
-import { CALIBRATION_KIND_ICONS, railToolsForMode } from './toolModel';
+import {
+  CALIBRATION_KIND_ICONS,
+  PROMPT_ACTIONS,
+  railToolsForMode,
+  shapeUnavailableForAction,
+} from './toolModel';
 import useRailTools from './useRailTools';
 import useSupportedPromptTypes from './useSupportedPromptTypes';
 import {
@@ -47,6 +54,9 @@ const ICONS = {
   Ruler,
   Palette,
   SlidersHorizontal,
+  Ban,
+  Sparkles,
+  Pencil,
 };
 
 const RailButton = ({ tool, active, unsupportedReason, onSelect }) => {
@@ -120,9 +130,9 @@ const CalibrationRailButton = ({ entry, active, onSelect }) => {
 /**
  * The 46px tool rail.
  *
- * Holds shapes only; whether a shape becomes a model prompt or is committed as
- * drawn is decided by the AI-assist switch below the divider. See toolModel.js
- * for how a rail selection maps onto the store's tool state.
+ * Holds shapes only; what happens once one is placed — nothing, run the model,
+ * or add it as an object — is decided by the three buttons below the divider.
+ * See toolModel.js for how the two map onto the store's tool state.
  *
  * Calibrate mode replaces the shape tools with one button per calibration kind
  * and drops the AI-assist switch. Selecting a calibration opens its controls in
@@ -131,7 +141,7 @@ const CalibrationRailButton = ({ entry, active, onSelect }) => {
  * side rather than in the panel that lists what has been annotated.
  */
 const ToolRail = () => {
-  const { railTool, setRailTool, aiAssist, toggleAssist } = useRailTools();
+  const { railTool, setRailTool, promptAction, changePromptAction } = useRailTools();
   const supported = useSupportedPromptTypes();
   const leftDrawerOpen = useLeftDrawerOpen();
   const toggleLeftDrawer = useToggleLeftDrawer();
@@ -169,9 +179,13 @@ const ToolRail = () => {
             tool={tool}
             active={railTool === tool.id}
             unsupportedReason={
-              supported && supported[tool.id] === false
+              shapeUnavailableForAction(tool.id, promptAction)
+              // The model can only veto a tool where drawing with it runs the
+              // model. Otherwise the shape may be destined for "Add this
+              // object", and the Run AI button is the one that says no.
+              || (promptAction === 'ai' && supported && supported[tool.id] === false
                 ? `${supported.modelName} doesn’t accept ${tool.name.toLowerCase()} prompts`
-                : null
+                : null)
             }
             onSelect={setRailTool}
           />
@@ -196,29 +210,39 @@ const ToolRail = () => {
         <>
           <div className="w-[22px] h-px bg-ln2 my-[6px]" />
 
-          <Tooltip
-            label={
-              aiAssist
-                ? 'AI assist on — shapes become model prompts'
-                : 'AI assist off — shapes are saved as drawn'
-            }
-            shortcut="A"
+          {/* What happens when a prompt is placed. This replaces the instant-mode
+              switch: "run it now" is one of three answers, not a boolean, and the
+              third — add it as an object now — had no control at all. `A` cycles
+              them; the drawer spells the same three out with labels. */}
+          <div
+            role="radiogroup"
+            aria-label="What happens when a prompt is placed"
+            className="flex flex-col items-center gap-[3px]"
           >
-            <button
-              type="button"
-              onClick={toggleAssist}
-              aria-pressed={aiAssist}
-              aria-label="Toggle AI assist"
-              className={`w-8 h-8 flex items-center justify-center rounded-8 border transition-[background-color,color,border-color] duration-[140ms]
-                ${
-                  aiAssist
-                    ? 'bg-acS border-acLn text-ac'
-                    : 'border-transparent text-t2 hover:bg-hv hover:text-t1'
-                }`}
-            >
-              <Sparkles size={17} strokeWidth={aiAssist ? 2 : 1.7} />
-            </button>
-          </Tooltip>
+            {PROMPT_ACTIONS.map((action) => {
+              const Icon = ICONS[action.icon];
+              const active = promptAction === action.id;
+              return (
+                <Tooltip key={action.id} label={`${action.name} — ${action.hint}`} shortcut="A">
+                  <button
+                    type="button"
+                    role="radio"
+                    onClick={() => changePromptAction(action.id)}
+                    aria-checked={active}
+                    aria-label={action.name}
+                    className={`w-8 h-8 flex items-center justify-center rounded-8 border transition-[background-color,color,border-color] duration-[140ms]
+                      ${
+                        active
+                          ? 'bg-acS border-acLn text-ac'
+                          : 'border-transparent text-t2 hover:bg-hv hover:text-t1'
+                      }`}
+                  >
+                    {Icon && <Icon size={17} strokeWidth={active ? 2 : 1.7} />}
+                  </button>
+                </Tooltip>
+              );
+            })}
+          </div>
         </>
       )}
 

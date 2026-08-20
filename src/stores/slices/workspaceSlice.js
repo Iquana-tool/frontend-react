@@ -83,12 +83,8 @@ export const createWorkspaceSlice = (set) => ({
     }
   }),
 
-  setAiAssist: (on) => set((state) => {
-    state.workspace.aiAssist = !!on;
-  }),
-
-  toggleAiAssist: () => set((state) => {
-    state.workspace.aiAssist = !state.workspace.aiAssist;
+  setPromptAction: (action) => set((state) => {
+    state.workspace.promptAction = action;
   }),
 
   toggleLeftDrawer: () => set((state) => {

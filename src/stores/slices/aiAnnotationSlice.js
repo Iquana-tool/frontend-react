@@ -118,9 +118,15 @@ export const createAIAnnotationSlice = (set) => ({
    *
    * So this drops both stacks rather than pushing to them, which hands the next
    * Ctrl+Z to the annotation history where it belongs.
+   *
+   * @param {Function} [predicate] - Consume only the prompts it matches. "Add
+   *   this object" passes one, because a box on the canvas is still a prompt
+   *   waiting to be run and must survive the outlines being committed.
    */
-  consumePrompts: () => set((state) => {
-    state.aiAnnotation.prompts = [];
+  consumePrompts: (predicate) => set((state) => {
+    state.aiAnnotation.prompts = predicate
+      ? state.aiAnnotation.prompts.filter((prompt) => !predicate(prompt))
+      : [];
     state.aiAnnotation.activePreview = null;
     state.aiAnnotation.undoStack = [];
     state.aiAnnotation.redoStack = [];
@@ -132,10 +138,6 @@ export const createAIAnnotationSlice = (set) => ({
   
   setIsSubmitting: (isSubmitting) => set((state) => {
     state.aiAnnotation.isSubmitting = isSubmitting;
-  }),
-  
-  toggleInstantSegmentation: () => set((state) => {
-    state.aiAnnotation.instantSegmentation = !state.aiAnnotation.instantSegmentation;
   }),
   
   // Custom undo action

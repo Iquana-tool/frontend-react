@@ -1,6 +1,5 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Stage, Layer } from 'react-konva';
-import { Hexagon, Spline } from 'lucide-react';
 import {
   useCurrentTool,
   useImageObject,
@@ -11,7 +10,6 @@ import {
   useSetZoomLevel,
   useSetPanOffset,
   useManualDrawMode,
-  useSetManualDrawMode,
   useFocusedParentContourId,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
@@ -28,17 +26,17 @@ import DrawingPreview from './prompts/DrawingPreview';
  * object via the OBJECT_ADD_MANUAL WebSocket message (no model involved). The
  * resulting object comes back over OBJECT_ADDED and is rendered by
  * SegmentationOverlay like any other object. Only active when currentTool is
- * 'manual_drawing'.
+ * 'manual_drawing', which is the rail's polygon or freehand tool in the
+ * "Manual adding" assist mode.
+ *
+ * Which of the two it draws is the rail's business, not this canvas's: it used
+ * to carry its own polygon/freehand switcher, which said the same thing twice
+ * and in two places.
  */
-const MODES = [
-  { id: 'polygon', label: 'Polygon', icon: Hexagon, hotkey: 'G' },
-  { id: 'freehand', label: 'Freehand', icon: Spline, hotkey: 'F' },
-];
 
 const ManualDrawCanvas = () => {
   const stageRef = useRef(null);
   const mode = useManualDrawMode();
-  const setMode = useSetManualDrawMode();
   const [statusMessage, setStatusMessage] = useState(null); // { text, error }
   const statusTimerRef = useRef(null);
 
@@ -116,6 +114,7 @@ const ManualDrawCanvas = () => {
   const {
     polygonPoints,
     cursorImagePt,
+    resetDrawing,
     handleMouseDown: drawMouseDown,
     handleMouseMove: drawMouseMove,
     handleMouseUp: drawMouseUp,
@@ -127,6 +126,12 @@ const ManualDrawCanvas = () => {
     getScale,
     onFinalize: handleDrawFinalize,
   });
+
+  // The tool now survives stepping to the next image, so a half-drawn outline
+  // must not: its points are in the previous image's coordinate space.
+  useEffect(() => {
+    resetDrawing();
+  }, [imageObject, resetDrawing]);
 
   const handleMouseDown = useCallback((e) => {
     if (!active) return;
@@ -166,15 +171,10 @@ const ManualDrawCanvas = () => {
         e.stopPropagation();
         return;
       }
-      const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
-      if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
-      const key = e.key.toLowerCase();
-      if (key === 'g') { e.preventDefault(); setMode('polygon'); }
-      else if (key === 'f') { e.preventDefault(); setMode('freehand'); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [active, drawKeyDown, setMode]);
+  }, [active, drawKeyDown]);
 
   if (!active) return null;
 
@@ -213,39 +213,11 @@ const ManualDrawCanvas = () => {
         </div>
       )}
 
-      {/* Drawing-mode selector (polygon / freehand) */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-1 bg-p1 backdrop-blur-sm border border-ln rounded-xl shadow-lg p-1">
-        {MODES.map(({ id, label, icon: Icon, hotkey }) => {
-          const isActive = mode === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setMode(id)}
-              title={`${label} drawing (${hotkey})`}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                isActive ? 'bg-accent text-onAccent shadow-sm' : 'text-t2 hover:bg-hv'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{label}</span>
-              <kbd
-                className={`hidden md:inline text-[10px] font-semibold leading-none px-1 py-0.5 rounded border ${
-                  isActive ? 'border-white/40 text-white/90' : 'border-ln2 text-t3'
-                }`}
-              >
-                {hotkey}
-              </kbd>
-            </button>
-          );
-        })}
-      </div>
-
       {/* Drawing instructions */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-scrim text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg z-40 pointer-events-none">
         {mode === 'polygon'
-          ? 'Click to add points · double-click or Enter to close · right-click undoes a point · Esc cancels'
-          : 'Press and drag to trace an outline · release to close'}
+          ? 'Click to add points · double-click or Enter to save · right-click undoes a point · Esc cancels'
+          : 'Press and drag to trace an outline · release to save it'}
       </div>
 
       <Stage

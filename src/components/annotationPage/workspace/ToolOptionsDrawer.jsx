@@ -1,23 +1,25 @@
 import React from 'react';
-import { ChevronLeft, Sparkles } from 'lucide-react';
-import Switch from './primitives/Switch';
+import { Ban, ChevronLeft, Pencil, Sparkles } from 'lucide-react';
 import ServiceCard from './ServiceCard';
 import useAnnotationServices from './useAnnotationServices';
 import useRailTools from './useRailTools';
-import { getRailTool } from './toolModel';
+import { PROMPT_ACTIONS, getPromptAction, getRailTool } from './toolModel';
 import InstanceWarningModal from '../modals/InstanceWarningModal';
 import { useToggleLeftDrawer } from '../../../stores/selectors/annotationSelectors';
+
+const ACTION_ICONS = { Ban, Sparkles, Pencil };
 
 /**
  * Contextual options drawer to the right of the tool rail.
  *
- * Hosts the AI-assist switch (which decides whether drawn shapes become model
- * prompts or are committed as drawn) and the three annotation services that
- * used to fill the left sidebar.
+ * Hosts the three prompt actions — what happens once a prompt is placed — and
+ * the annotation services that used to fill the left sidebar. The rail shows the
+ * same three as icons; here they carry their names, because "Nothing" versus
+ * "Add immediately" is a distinction an icon cannot make on its own.
  */
 const ToolOptionsDrawer = () => {
   const toggleDrawer = useToggleLeftDrawer();
-  const { railTool, aiAssist, toggleAssist } = useRailTools();
+  const { railTool, promptAction, changePromptAction } = useRailTools();
   const { services, showInstanceWarning, closeInstanceWarning, confirmInstanceRun } =
     useAnnotationServices();
 
@@ -41,19 +43,49 @@ const ToolOptionsDrawer = () => {
 
       <div className="flex-1 min-h-0 overflow-y-auto p-[10px] flex flex-col gap-[12px]">
         <div>
-          <div className="flex items-center gap-[8px] px-[10px] py-[9px] rounded-9 border border-ln2 bg-well">
-            <Sparkles size={14} className="text-ac flex-none" />
-            <span className="flex-1 text-row font-bold text-t1">AI assist</span>
-            <Switch checked={aiAssist} onChange={toggleAssist} label="AI assist" />
+          <span className="block mb-[6px] text-sect font-bold tracking-[.09em] uppercase text-t3">
+            When a prompt is placed
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="What happens when a prompt is placed"
+            className="flex items-center gap-[2px] p-[2px] rounded-9 border border-ln2 bg-well"
+          >
+            {PROMPT_ACTIONS.map((action) => {
+              const Icon = ACTION_ICONS[action.icon];
+              const active = promptAction === action.id;
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  aria-label={action.name}
+                  onClick={() => changePromptAction(action.id)}
+                  title={action.hint}
+                  className={`flex-1 flex items-center justify-center gap-[5px] px-[6px] py-[6px] rounded-8 text-sect font-bold transition-colors duration-150 ${
+                    active ? 'bg-acS text-ac' : 'text-t3 hover:bg-hv hover:text-t1'
+                  }`}
+                >
+                  {Icon && <Icon size={13} strokeWidth={active ? 2.1 : 1.8} className="flex-none" />}
+                  <span className="truncate">{action.tab}</span>
+                </button>
+              );
+            })}
           </div>
           <p className="mt-[6px] text-sect leading-[1.5] text-t3">
-            {aiAssist
-              ? 'Shapes you draw become prompts for the selected model.'
-              : 'Shapes you draw are saved as objects exactly as drawn, with no model involved.'}
+            {getPromptAction(promptAction).hint}
           </p>
           {railTool === 'point' && (
             <p className="mt-[6px] text-sect leading-[1.5] text-t3">
               Click to drop a point · drag to draw a box · right-click for a negative point.
+            </p>
+          )}
+          {promptAction === 'manual' && (railTool === 'freehand' || railTool === 'polygon') && (
+            <p className="mt-[6px] text-sect leading-[1.5] text-t3">
+              {railTool === 'freehand'
+                ? 'Press and drag to trace an outline · release to close and save it.'
+                : 'Click to add points · double-click or Enter to close and save it.'}
             </p>
           )}
         </div>

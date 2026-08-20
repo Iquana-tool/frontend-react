@@ -13,12 +13,13 @@ const GROUPS = [
     items: RAIL_TOOLS.map((tool) => ({
       keys: tool.key,
       label: tool.unavailable ? `${tool.name} (unavailable)` : tool.name,
-    })).concat([{ keys: 'A', label: 'Toggle AI assist' }]),
+    })).concat([{ keys: 'A', label: 'On prompt: Nothing / Run AI / Add' }]),
   },
   {
     title: 'Actions',
     items: [
-      { keys: '⏎', label: 'Primary action — run, add, or accept' },
+      { keys: '⏎', label: 'Run AI on the placed prompts, or accept' },
+      { keys: '⇧⏎', label: 'Add the drawn outlines as objects' },
       { keys: '1', label: 'Run prompted segmentation' },
       { keys: '2', label: 'Suggest similar instances' },
       { keys: '3', label: 'Run instance segmentation' },

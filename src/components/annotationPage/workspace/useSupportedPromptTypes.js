@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import {
   useAvailablePromptedModels,
   usePromptedModel,
-  useAiAssist,
 } from '../../../stores/selectors/annotationSelectors';
 
 /** Canonical singular keys, so "points"/"Point" both normalise to "point". */
@@ -15,10 +14,12 @@ const normalise = (type) =>
 /**
  * Which shape tools the active prompted model accepts.
  *
- * This gating used to live in the in-canvas PromptModeToolbar, which the
- * redesign removes. It now applies to the rail instead — but only while AI
- * assist is on: with assist off a shape is committed as drawn and no model is
- * involved, so every shape stays available.
+ * This is a fact about the model, so it is reported unconditionally and each
+ * caller decides what to do with it. The action bar disables "Run AI" over a
+ * prompt the model cannot take; the rail only greys the tool out when placing
+ * the shape *is* running the model, because otherwise the shape may well be
+ * headed for "Add this object" instead. Greying it out regardless is what made
+ * a point/box-only model look as though it had removed manual adding.
  *
  * Point and box are always offered, and a model that declares no prompt types
  * at all is treated as supporting everything rather than being unusable.
@@ -26,11 +27,8 @@ const normalise = (type) =>
 export default function useSupportedPromptTypes() {
   const models = useAvailablePromptedModels();
   const promptedModel = usePromptedModel();
-  const aiAssist = useAiAssist();
 
   return useMemo(() => {
-    if (!aiAssist) return null; // null means "no restriction"
-
     const model = models.find((candidate) => candidate.id === promptedModel);
     const declared = model?.supported_prompt_types;
     if (!Array.isArray(declared) || declared.length === 0) return null;
@@ -43,5 +41,5 @@ export default function useSupportedPromptTypes() {
       freehand: supported.has('polygon'),
       modelName: model?.name || promptedModel,
     };
-  }, [models, promptedModel, aiAssist]);
+  }, [models, promptedModel]);
 }

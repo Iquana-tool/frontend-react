@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Loader2, Play, Star } from 'lucide-react';
-import Switch from './primitives/Switch';
 import Tooltip from './primitives/Tooltip';
 import { getPromptTypeInfo } from '../../../utils/promptTypes';
 import {
-  useInstantSegmentation,
-  useToggleInstantSegmentation,
   useModelFavorites,
   useSetFavoriteModel,
   useClearFavoriteModel,
@@ -56,7 +53,7 @@ const PromptTypeChips = ({ types }) => {
  * One annotation service in the tool-options drawer.
  *
  * Carries everything the old sidebar card did: status dot, model select,
- * favourite star, supported prompt types, usage hint, instant-mode switch, the
+ * favourite star, supported prompt types, usage hint, the
  * explicit Run button (instance segmentation only) and the collapsible model
  * description + tags.
  */
@@ -64,8 +61,6 @@ const ServiceCard = ({ service }) => {
   const [open, setOpen] = useState(service.key === 'prompted');
   const [infoOpen, setInfoOpen] = useState(false);
 
-  const instantSegmentation = useInstantSegmentation();
-  const toggleInstantSegmentation = useToggleInstantSegmentation();
   const favorites = useModelFavorites();
   const setFavorite = useSetFavoriteModel();
   const clearFavorite = useClearFavoriteModel();
@@ -166,16 +161,10 @@ const ServiceCard = ({ service }) => {
                 )}
                 {service.isRunning ? 'Running…' : 'Run'}
               </button>
-            ) : service.hasInstantMode ? (
-              <label className="flex items-center gap-[7px] cursor-pointer">
-                <Switch
-                  checked={instantSegmentation}
-                  onChange={toggleInstantSegmentation}
-                  label="Instant mode"
-                />
-                <span className="text-row font-semibold text-t2">Instant mode</span>
-              </label>
             ) : (
+              /* Instant mode used to live here as a switch. It is now one of the
+                 three prompt actions in the drawer's tab group above, where it
+                 sits beside the two other things a placed prompt can do. */
               <span />
             )}
 

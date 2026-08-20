@@ -6,19 +6,21 @@ import {
   useSetPromptMode,
   useManualDrawMode,
   useSetManualDrawMode,
-  useAiAssist,
-  useSetAiAssist,
+  usePromptAction,
+  useSetPromptAction,
   useCancelCalibration,
 } from '../../../stores/selectors/annotationSelectors';
 import {
   railToolFromStore,
   storeStateForRailTool,
-  storeStateForAssistChange,
+  storeStateForActionChange,
+  nextPromptAction,
 } from './toolModel';
 
 /**
- * Bridges the single-axis rail selection to the three-axis tool state in the
- * store (see toolModel.js for the mapping and its rationale).
+ * Bridges the rail's two-axis selection — a shape and a prompt action — to the
+ * three-axis tool state in the store (see toolModel.js for the mapping and its
+ * rationale).
  *
  * A scale measurement is started from the Calibrate tab, not from the rail, but
  * it puts the store in 'set_scale' — so picking any rail tool cancels an
@@ -28,12 +30,12 @@ export default function useRailTools() {
   const currentTool = useCurrentTool();
   const promptMode = usePromptMode();
   const manualDrawMode = useManualDrawMode();
-  const aiAssist = useAiAssist();
+  const promptAction = usePromptAction();
 
   const setCurrentTool = useSetCurrentTool();
   const setPromptMode = useSetPromptMode();
   const setManualDrawMode = useSetManualDrawMode();
-  const setAiAssist = useSetAiAssist();
+  const setPromptAction = useSetPromptAction();
   const cancelCalibration = useCancelCalibration();
 
   const railTool = railToolFromStore({ currentTool, promptMode, manualDrawMode });
@@ -41,28 +43,35 @@ export default function useRailTools() {
   const applyStoreState = useCallback(
     (next) => {
       if (!next) return;
-      if (next.aiAssist !== undefined) setAiAssist(next.aiAssist);
       if (next.promptMode) setPromptMode(next.promptMode);
       if (next.manualDrawMode) setManualDrawMode(next.manualDrawMode);
       setCurrentTool(next.currentTool);
     },
-    [setAiAssist, setPromptMode, setManualDrawMode, setCurrentTool]
+    [setPromptMode, setManualDrawMode, setCurrentTool]
   );
 
   const setRailTool = useCallback(
     (nextRailTool) => {
       if (currentTool === 'set_scale') cancelCalibration();
 
-      applyStoreState(storeStateForRailTool(nextRailTool, aiAssist));
+      applyStoreState(storeStateForRailTool(nextRailTool, promptAction));
     },
-    [currentTool, aiAssist, applyStoreState, cancelCalibration]
+    [currentTool, promptAction, applyStoreState, cancelCalibration]
   );
 
-  const toggleAssist = useCallback(() => {
-    const next = !aiAssist;
-    setAiAssist(next);
-    applyStoreState(storeStateForAssistChange(railTool, next));
-  }, [aiAssist, railTool, setAiAssist, applyStoreState]);
+  const changePromptAction = useCallback(
+    (nextAction) => {
+      if (nextAction === promptAction) return;
+      setPromptAction(nextAction);
+      applyStoreState(storeStateForActionChange(railTool, nextAction));
+    },
+    [promptAction, railTool, setPromptAction, applyStoreState]
+  );
 
-  return { railTool, setRailTool, aiAssist, toggleAssist };
+  const cyclePromptAction = useCallback(
+    () => changePromptAction(nextPromptAction(promptAction)),
+    [promptAction, changePromptAction]
+  );
+
+  return { railTool, setRailTool, promptAction, changePromptAction, cyclePromptAction };
 }

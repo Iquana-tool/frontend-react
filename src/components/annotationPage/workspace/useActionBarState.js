@@ -5,7 +5,6 @@ import {
   useSelectedObjects,
   useObjectsList,
   useWorkspaceMode,
-  useAiAssist,
   useIsRunningSuggestion,
   useIsRunningInstance,
   useRefinementModeActive,
@@ -13,6 +12,7 @@ import {
   useLineEditActive,
 } from '../../../stores/selectors/annotationSelectors';
 import { isReviewed } from './objectViewModel';
+import { ADDABLE_PROMPT_TYPES } from './toolModel';
 
 /**
  * Derives which state the action bar is in.
@@ -23,9 +23,8 @@ import { isReviewed } from './objectViewModel';
  * A note on `draft`: the mockup shows a draft-mask state between the model
  * returning and the object being committed. This backend has no such stage —
  * `runSegmentation` persists the contour server-side and it arrives over the
- * socket already committed. The equivalent real state is drawing with AI assist
- * off, where shapes wait to be committed by "Add as object"; that is what
- * `shapes` represents here.
+ * socket already committed. The nearest real state is `prompt`, where drawn
+ * shapes wait for either of the bar's two actions.
  */
 export default function useActionBarState() {
   const prompts = useAIPrompts();
@@ -35,7 +34,6 @@ export default function useActionBarState() {
   const selectedIds = useSelectedObjects();
   const objects = useObjectsList();
   const mode = useWorkspaceMode();
-  const aiAssist = useAiAssist();
   const refinementActive = useRefinementModeActive();
   const editActive = useEditModeActive();
   const lineEditActive = useLineEditActive();
@@ -68,17 +66,18 @@ export default function useActionBarState() {
       return { state: 'review', selection, reviewQueue };
     }
 
-    const shapePrompts = prompts.filter(
-      (prompt) => prompt.type === 'box' || prompt.type === 'polygon'
-    );
-
+    // One prompt state, two possible actions: the bar offers Run AI always and
+    // "Add this object" whenever an outline is among the prompts. There is no
+    // separate `shapes` state any more — deciding for the user which of the two
+    // they meant is exactly what the AI-assist switch used to get wrong.
     if (prompts.length > 0) {
-      // With assist off only committable shapes matter; a stray point prompt
-      // cannot be saved as an object, so it still counts as a model prompt.
-      if (!aiAssist && shapePrompts.length === prompts.length) {
-        return { state: 'shapes', selection, reviewQueue, shapeCount: shapePrompts.length };
-      }
-      return { state: 'prompt', selection, reviewQueue, promptCount: prompts.length };
+      return {
+        state: 'prompt',
+        selection,
+        reviewQueue,
+        promptCount: prompts.length,
+        addableCount: prompts.filter((prompt) => ADDABLE_PROMPT_TYPES.has(prompt.type)).length,
+      };
     }
 
     if (selection.length === 1) return { state: 'object', selection, reviewQueue };
@@ -93,7 +92,6 @@ export default function useActionBarState() {
     selectedIds,
     objects,
     mode,
-    aiAssist,
     refinementActive,
     editActive,
     lineEditActive,

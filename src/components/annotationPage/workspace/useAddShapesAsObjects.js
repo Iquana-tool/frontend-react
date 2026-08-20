@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import annotationSession from '../../../services/annotationSession';
 import { pixelArrayToNormalized } from '../../../utils/coordinateUtils';
 import { useToast } from '../../../contexts/ToastContext';
+import { ADDABLE_PROMPT_TYPES } from './toolModel';
 import {
   useAIPrompts,
   useImageObject,
@@ -10,26 +11,23 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 
 /**
- * Converts a drawn prompt into image-space contour arrays.
- * Points cannot become a contour and are skipped.
+ * Converts a drawn outline into image-space contour arrays.
+ *
+ * Freehand strokes are stored as polygon prompts, so this covers both. Points
+ * and boxes are not outlines and never reach here — see ADDABLE_PROMPT_TYPES.
  */
 const promptToContour = (prompt) => {
-  if (prompt.type === 'box') {
-    const { x1, y1, x2, y2 } = prompt.coords;
-    return { x: [x1, x2, x2, x1], y: [y1, y1, y2, y2] };
-  }
-  if (prompt.type === 'polygon') {
-    const points = prompt.coords.points || [];
-    if (points.length < 3) return null;
-    return { x: points.map((p) => p.x), y: points.map((p) => p.y) };
-  }
-  return null;
+  const points = prompt.coords.points || [];
+  if (points.length < 3) return null;
+  return { x: points.map((p) => p.x), y: points.map((p) => p.y) };
 };
 
 /**
- * Commits drawn shapes straight to objects, bypassing the model — the
- * behaviour the old "Add as object" button provided, and what AI assist being
- * off now means for a box drawn on the prompt canvas.
+ * Commits drawn outlines straight to objects, bypassing the model.
+ *
+ * This backs the action bar's "Add this object", which stands beside "Run AI"
+ * whenever an outline is on the canvas: the two are alternatives offered at the
+ * same time rather than modes chosen in advance.
  *
  * When a contour is focused, new objects are nested under it, which is how
  * nested labelling works everywhere else in the editor.
@@ -45,7 +43,7 @@ export default function useAddShapesAsObjects() {
   const [isAdding, setIsAdding] = useState(false);
 
   const shapePrompts = useMemo(
-    () => prompts.filter((prompt) => prompt.type === 'box' || prompt.type === 'polygon'),
+    () => prompts.filter((prompt) => ADDABLE_PROMPT_TYPES.has(prompt.type)),
     [prompts]
   );
 
@@ -74,7 +72,10 @@ export default function useAddShapesAsObjects() {
         added += 1;
       }
 
-      consumePrompts();
+      // Only the outlines are spent. A box or a point on the canvas is still a
+      // prompt waiting for Run AI, and clearing it here would delete work the
+      // user never asked to discard.
+      consumePrompts((prompt) => ADDABLE_PROMPT_TYPES.has(prompt.type));
       addToast({
         type: 'success',
         message: added === 1 ? 'Added 1 annotation as an object' : `Added ${added} annotations as objects`,
