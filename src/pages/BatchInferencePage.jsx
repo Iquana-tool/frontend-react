@@ -46,6 +46,20 @@ const SCOPE_OPTIONS = [
 
 const RUN_NAME_PATTERN = /^[\p{L}\p{N}_\-\s]{1,80}$/u;
 
+const LEGACY_STEP_KEYS = new Set(["retrieval_strategy", "top_k"]);
+
+// Retrieval fields remain local mirrors for old persisted plans, but canonical requests carry
+// conditioning through inputs. min_confidence is different: it is a gateway-owned post-filter
+// and remains valid alongside canonical model inputs.
+const stepsForRequest = (steps) =>
+    steps.map((step) =>
+        step.inputs
+            ? Object.fromEntries(
+                  Object.entries(step).filter(([key]) => !LEGACY_STEP_KEYS.has(key))
+              )
+            : step
+    );
+
 const formatTime = (value) => (value ? new Date(value).toLocaleString() : "—");
 
 function JobCard({ job, selected, onClick }) {
@@ -122,7 +136,7 @@ export default function BatchInferencePage() {
         (confirmReplace = false) => ({
             dataset_id: Number(datasetId),
             name: runName.trim() || undefined,
-            steps,
+            steps: stepsForRequest(steps),
             image_selection: imageSelection,
             options,
             confirm_replace: confirmReplace,
