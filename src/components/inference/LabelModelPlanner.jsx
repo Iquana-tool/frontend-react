@@ -240,7 +240,7 @@ function ModelRow({ label, step, models, strategies, onChange }) {
                                         />
                                     </label>
                                 ) : (condSpec.kind === "reference_images" || condSpec.kind === "instances") ? (
-                                    <span className="text-[11px] text-t3 bg-p1 px-2 py-0.5 rounded border border-ln/60">
+                                    <span className="text-[11px] text-t3 bg-p1 px-2 py-0.5 rounded border border-ln">
                                         {(() => {
                                             const count = step.inputs?.conditioning?.count ?? condSpec.max_units ?? condSpec.min_units ?? 1;
                                             const unit = condSpec.unit || (condSpec.kind === "reference_images" ? "reference image" : "instance");
