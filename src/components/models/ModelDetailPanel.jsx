@@ -33,6 +33,7 @@ import {
   formatVram,
   formatResolution,
 } from "./modelStats";
+import { filterDisplayableModelTags } from "./modelTags";
 
 const TASK_VISUAL = {
   "prompted-segmentation": { Icon: MousePointerClick, tile: "bg-acS text-ac" },
@@ -100,7 +101,7 @@ const ModelDetailPanel = ({ model, isFavorite = false, onToggleFavorite, onActio
   const showFinetuning = model.trainable === true;
   const perf = model.performance || {};
 
-  const tags = (Array.isArray(model.tags) ? model.tags : []).filter((t) => {
+  const tags = filterDisplayableModelTags(model.tags).filter((t) => {
     const key = String(t.key || "").toLowerCase();
     return key !== "task" && key !== "tasks" && !key.startsWith("task_")
       && !["publisher", "trained_label_names", "trained_on_dataset_id", "trained_on_dataset_name", "dataset_id", "dataset_name"]

@@ -16,6 +16,7 @@ import {
   Star,
 } from "lucide-react";
 import { getTaskMeta, TASK_ORDER } from "../../constants/tasks";
+import { filterDisplayableModelTags } from "./modelTags";
 
 // A model is model-centric now: it can serve several tasks. The header tile is
 // keyed by the model's first (primary) task; the capability chips below list
@@ -45,7 +46,7 @@ const ModelCard = ({ model, isFavorite = false, onToggleFavorite, onAction }) =>
 
   // Descriptor chips are metadata that isn't a task or an action. Drop the raw
   // "task"/"tasks" tags (the capability chips already convey them).
-  const tags = (Array.isArray(model.tags) ? model.tags : []).filter((t) => {
+  const tags = filterDisplayableModelTags(model.tags).filter((t) => {
     const key = String(t.key || "").toLowerCase();
     return key !== "task" && key !== "tasks" && !key.startsWith("task_");
   });

@@ -42,6 +42,30 @@ describe("ModelDetailPanel trained-model provenance", () => {
     expect(screen.queryByText("facebook, dfki")).not.toBeInTheDocument();
   });
 
+  it("hides structured input contracts while keeping ordinary tags", () => {
+    const rawContract = JSON.stringify({
+      task: "instance-segmentation",
+      conditioning: { kind: "none" },
+      parameters: [{ key: "threshold", default_value: 0.5 }],
+    });
+
+    render(
+      <ModelDetailPanel
+        model={{
+          ...baseModel,
+          tags: [
+            { key: "input_contracts", value: rawContract },
+            { key: "domain", value: "cell biology" },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.queryByText(rawContract)).not.toBeInTheDocument();
+    expect(screen.getByText("domain")).toBeInTheDocument();
+    expect(screen.getByText("cell biology")).toBeInTheDocument();
+  });
+
   it("does not show IDs when readable provenance names are unavailable", () => {
     render(
       <ModelDetailPanel

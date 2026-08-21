@@ -182,7 +182,7 @@ describe("DynamicHyperParameter", () => {
     expect(onChange).toHaveBeenCalledWith("tag", "staging");
   });
 
-  it("renders description text when present", () => {
+  it("renders description text inline and in the info tooltip", () => {
     const param = {
       key: "lr",
       label: "Learning Rate",
@@ -193,6 +193,6 @@ describe("DynamicHyperParameter", () => {
 
     render(<DynamicHyperParameter param={param} value={0.001} onChange={jest.fn()} />);
 
-    expect(screen.getByText("Initial learning rate for optimizer")).toBeInTheDocument();
+    expect(screen.getAllByText("Initial learning rate for optimizer")).toHaveLength(2);
   });
 });
