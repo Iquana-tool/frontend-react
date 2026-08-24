@@ -14,6 +14,7 @@ import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
 import DocumentationPage from "./pages/DocumentationPage";
 import QuantificationPage from "./pages/QuantificationPage";
+import ImageQuantificationPage from "./pages/ImageQuantificationPage";
 import ModelZooPage from "./pages/ModelZooPage";
 import ModelTrainingPage from "./pages/ModelTrainingPage";
 import BatchInferencePage from "./pages/BatchInferencePage";
@@ -149,6 +150,25 @@ function App() {
               element={
                 <ProtectedRoute>
                   <QuantificationPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Per-image quantification inspection: the same measurements as above,
+                scoped to one image and shown next to it. The id-less form lands on the
+                first image, so an entry point that has no image in mind can link here. */}
+            <Route
+              path="/dataset/:datasetId/quantifications/image"
+              element={
+                <ProtectedRoute>
+                  <ImageQuantificationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dataset/:datasetId/quantifications/image/:imageId"
+              element={
+                <ProtectedRoute>
+                  <ImageQuantificationPage />
                 </ProtectedRoute>
               }
             />

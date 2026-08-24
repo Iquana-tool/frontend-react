@@ -9,6 +9,8 @@ import AnnotationQueueModal from "./gallery/AnnotationQueueModal";
 import DatasetManagementLayout from "./gallery/DatasetManagementLayout";
 import * as api from "../../api";
 import { normalizeImage } from "../../hooks/useDatasetGalleryData";
+import { usePermissions } from "../../hooks/usePermissions";
+import { Permission } from "../../utils/permissions";
 import { 
   useGalleryImages,
   useGalleryLabels,
@@ -28,6 +30,8 @@ const DatasetGallery = () => {
 
   const [showCocoModal, setShowCocoModal] = useState(false);
   const [showQueueModal, setShowQueueModal] = useState(false);
+
+  const { can } = usePermissions(currentDataset);
 
   // Derive current view from URL path so refresh preserves the view
   const pathname = location.pathname;
@@ -132,6 +136,13 @@ const DatasetGallery = () => {
     navigate(`/dataset/${datasetId}/quantifications`);
   };
 
+  // The second entry point into per-image inspection (issue #15): from Data Management,
+  // where the image itself is what the viewer is already looking at. The other one is a
+  // surface on the dataset quantification page, for someone who arrived from the numbers.
+  const handleImageQuantificationsClick = (image) => {
+    navigate(`/dataset/${datasetId}/quantifications/image/${image.id}`);
+  };
+
   const handleLabelManagementClick = () => {
     navigate(`/dataset/${datasetId}/datamanagement/labels`);
   };
@@ -187,6 +198,11 @@ const DatasetGallery = () => {
             onBack={() => navigate(`/dataset/${datasetId}/datamanagement`)}
             onImageClick={handleImageClick}
             onImagesUpdated={refreshImages}
+            onShowQuantifications={
+              can(Permission.EXPORT_QUANTIFICATION)
+                ? handleImageQuantificationsClick
+                : undefined
+            }
           />
         ) : currentView === "labelManagement" ? (
           <LabelManagementView

@@ -4,7 +4,7 @@ import ImageGallery from "./ImageGallery";
 import { usePermissions, Permission } from "../../../hooks/usePermissions";
 import * as api from "../../../api";
 
-const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpdated }) => {
+const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpdated, onShowQuantifications }) => {
   // The selection itself lives in the gallery, next to the checkboxes and the
   // bulk bar; this view only owns the confirmation step and the delete calls.
   const [pendingDelete, setPendingDelete] = useState([]);
@@ -107,6 +107,7 @@ const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpd
           onDeleteImage={handleDeleteSingle}
           onImagesUpdated={onImagesUpdated}
           onBulkDelete={canDelete ? setPendingDelete : undefined}
+          onShowQuantifications={onShowQuantifications}
         />
       </div>
 

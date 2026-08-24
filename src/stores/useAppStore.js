@@ -104,8 +104,13 @@ const useAppStore = create()(
         
         quantificationActions: {
           /** Stable key for the saved analysis of one dataset/profile pair. */
-          viewerConfigKey: (datasetId, profileId) =>
-            `${datasetId}:${profileId ?? 'none'}`,
+          // `scope` separates viewers that show the same dataset+profile through different
+          // defaults — the dataset-wide explorer and the per-image pivot. Without it they
+          // share one saved analysis, and opening one would overwrite the other's layout
+          // with a grouping that makes no sense there. Kept as a suffix so the
+          // `${datasetId}:` prefix scan in clearViewerConfigsForDataset still finds both.
+          viewerConfigKey: (datasetId, profileId, scope = null) =>
+            `${datasetId}:${profileId ?? 'none'}${scope ? `:${scope}` : ''}`,
 
           setViewerConfig: (key, config) => set(state => {
             state.quantification.viewerConfigs[key] = config;

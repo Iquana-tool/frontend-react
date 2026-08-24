@@ -62,6 +62,11 @@ const pathFor = (contour, width, height) => {
  *   than as the subject: dashed hairline, barely any fill. They stay clickable —
  *   the point of showing them is that the viewer can act on one. Empty by default,
  *   which renders every contour as a subject exactly as before.
+ * @param {Function} [props.onNaturalSize] - Called with `{width, height}` once the
+ *   bitmap has decoded. The size is measured here anyway (the viewBox is derived
+ *   from it), so a caller that needs the image's real pixel dimensions — the
+ *   per-image quantification page, to say what fraction of the frame the objects
+ *   cover — can have them without decoding the image a second time.
  */
 const AnnotationViewerCanvas = ({
   imageSrc,
@@ -71,6 +76,7 @@ const AnnotationViewerCanvas = ({
   zoomTarget = null,
   colorFor,
   contextIds = EMPTY_IDS,
+  onNaturalSize,
 }) => {
   const containerRef = useRef(null);
   const [natural, setNatural] = useState({ width: 0, height: 0 });
@@ -240,12 +246,14 @@ const AnnotationViewerCanvas = ({
               src={imageSrc}
               alt="Annotated"
               draggable={false}
-              onLoad={(e) =>
-                setNatural({
+              onLoad={(e) => {
+                const size = {
                   width: e.target.naturalWidth,
                   height: e.target.naturalHeight,
-                })
-              }
+                };
+                setNatural(size);
+                onNaturalSize?.(size);
+              }}
               style={{ display: 'block', width: '100%', height: '100%' }}
             />
 

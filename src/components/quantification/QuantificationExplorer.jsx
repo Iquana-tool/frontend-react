@@ -24,7 +24,22 @@ import {
 /** How long to let a burst of viewer edits settle before saving the configuration. */
 const SAVE_DEBOUNCE_MS = 500;
 
-const QuantificationExplorer = ({ datasetId, profileId, dataKey, rows, theme = "light" }) => {
+/**
+ * @param {string} [configScope] - Distinguishes this viewer's saved analysis from another
+ *   viewer over the same dataset and profile (the per-image pivot vs the dataset-wide
+ *   explorer). Omit for the dataset-wide one, whose saved configs predate the parameter.
+ * @param {Function} [buildDefault] - `(columns, theme) => config` for the configuration
+ *   this viewer opens with, and returns to on Reset. Defaults to the plain table.
+ */
+const QuantificationExplorer = ({
+    datasetId,
+    profileId,
+    dataKey,
+    rows,
+    theme = "light",
+    configScope = null,
+    buildDefault = defaultViewerConfig,
+}) => {
     const hostRef = useRef(null);
     // The `<perspective-viewer>` element, created imperatively rather than rendered as JSX.
     // The host freezes its plugin list the moment the first one is instantiated, so it
@@ -37,7 +52,7 @@ const QuantificationExplorer = ({ datasetId, profileId, dataKey, rows, theme = "
     const { viewerConfigKey, setViewerConfig, getViewerConfig } = useAppStore(
         (state) => state.quantificationActions
     );
-    const configKey = viewerConfigKey(datasetId, profileId);
+    const configKey = viewerConfigKey(datasetId, profileId, configScope);
 
     // Read inside effects without making them depend on it: a theme toggle must restyle the
     // viewer, not tear down and rebuild the table it is showing.
@@ -45,8 +60,8 @@ const QuantificationExplorer = ({ datasetId, profileId, dataKey, rows, theme = "
     themeRef.current = theme;
 
     const buildDefaultConfig = useCallback(
-        (columns) => defaultViewerConfig(columns, perspectiveTheme(themeRef.current)),
-        []
+        (columns) => buildDefault(columns, perspectiveTheme(themeRef.current)),
+        [buildDefault]
     );
 
     // Create the viewer element, once, after the engine has registered every plugin.

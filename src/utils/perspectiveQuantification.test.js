@@ -1,6 +1,7 @@
 import {
   buildColumnarTable,
   defaultViewerConfig,
+  perImageViewerConfig,
   detectSwatchMetrics,
   orderColumnsForDisplay,
   parseCssRgb,
@@ -235,5 +236,42 @@ describe('perspectiveTheme', () => {
     // on [data-theme] — so there is no second theme to pick between.
     expect(perspectiveTheme('dark')).toBe('Iquana');
     expect(perspectiveTheme('light')).toBe('Iquana');
+  });
+});
+
+describe('perImageViewerConfig', () => {
+  const columns = [
+    'file_name', 'meta_site', 'label', 'label_id', 'contour_id',
+    'parent_id', 'parent_label', 'area', 'perimeter',
+  ];
+
+  test('opens grouped by the parent, so children sit under what contains them', () => {
+    // Label before id: the id alone is not something a person can read a group header from.
+    expect(perImageViewerConfig(columns, 'Iquana').group_by).toEqual(['parent_label', 'parent_id']);
+  });
+
+  test('drops the columns that are constant on a single image', () => {
+    const { columns: shown } = perImageViewerConfig(columns, 'Iquana');
+    expect(shown).not.toContain('file_name');
+    expect(shown).not.toContain('meta_site');
+    // The grouping columns are the row headers, so listing them again is pure width.
+    expect(shown).not.toContain('parent_id');
+    expect(shown).not.toContain('parent_label');
+    // The measurements and the object's own identity stay.
+    expect(shown).toEqual(expect.arrayContaining(['contour_id', 'label', 'area', 'perimeter']));
+  });
+
+  test('does not group by a hierarchy column the table lacks', () => {
+    // An export taken before parent_id existed would otherwise restore a config naming a
+    // column that is not there, and fall back to the plain table.
+    const legacy = ['label', 'contour_id', 'area'];
+    expect(perImageViewerConfig(legacy, 'Iquana').group_by).toEqual([]);
+  });
+
+  test('is otherwise the plain table', () => {
+    const config = perImageViewerConfig(columns, 'Iquana');
+    expect(config.plugin).toBe(defaultViewerConfig(columns, 'Iquana').plugin);
+    expect(config.filter).toEqual([]);
+    expect(config.settings).toBe(true);
   });
 });

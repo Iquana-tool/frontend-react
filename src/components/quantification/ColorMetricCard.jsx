@@ -8,7 +8,7 @@ import { opencvLabToRgbCss } from "../../utils/quantificationUtils";
 // The swatch is always built from an RGB triple: for `mean_color_rgb` the component means
 // are the RGB fill directly; for `mean_color_lab` (opencv 8-bit LAB) we convert to display
 // sRGB via opencvLabToRgbCss. Numeric channel means are shown alongside.
-const ColorMetricCard = ({ metric, catalog }) => {
+const ColorMetricCard = ({ metric, catalog, footer }) => {
   const components = metric?.components || [];
   if (components.length < 3) return null;
 
@@ -50,6 +50,7 @@ const ColorMetricCard = ({ metric, catalog }) => {
           CIELAB values use opencv 8-bit scaling (L,a,b each 0–255). Swatch is converted to sRGB.
         </p>
       )}
+      {footer}
     </div>
   );
 };
