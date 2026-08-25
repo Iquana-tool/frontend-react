@@ -6,7 +6,7 @@ const GettingStartedSection = () => {
       <div>
         <h3 className="text-base sm:text-lg font-semibold text-t1 mb-2 sm:mb-3">Welcome to IQUANA</h3>
         <p className="text-t2 mb-3 sm:mb-4 text-sm sm:text-base">
-          IQUANA — Intelligent QUANtification, Annotation and Analysis — combines AI-assisted 
+          IQUANA — Intelligent QUantification, ANnotation and Analysis — combines AI-assisted 
           segmentation with manual annotation and reproducible measurement. It helps research groups 
           annotate scientific image datasets and get defensible numbers out of them.
         </p>

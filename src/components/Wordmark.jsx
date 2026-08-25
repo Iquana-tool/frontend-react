@@ -8,7 +8,7 @@ import React from 'react';
  * "I<accent>Quana</accent>" — and a brand that renders differently on the
  * navbar, the login screen and the dataset header reads as three products.
  *
- * The accent sits on "IQ": the intelligence half of *Intelligent QUANtification,
+ * The accent sits on "IQ": the intelligence half of *Intelligent QUantification,
  * Annotation and Analysis*, and the one part of the name that says what the tool
  * is rather than what it is called.
  *
