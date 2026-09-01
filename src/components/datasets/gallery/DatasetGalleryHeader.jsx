@@ -1,6 +1,6 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Play, BookOpen, User } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { BookOpen, User } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import AuthButtons from '../../auth/AuthButtons';
 import ReportBugLink from '../../ui/ReportBugLink';
@@ -9,39 +9,63 @@ import Wordmark from '../../Wordmark';
 import DatasetNav from './DatasetNav';
 
 /**
- * The top bar every dataset management page sits under.
+ * The top bar every dataset page sits under.
  *
- * Two rows: the instance-level one (where you are, who you are, log out), and
- * below it the dataset's own section navigation. That second row replaces the
- * left sidebar — the pages are wide enough as it is, and a sidebar that only
- * repeated the dataset name and the label list was paying for itself in pixels
- * rather than in navigation.
+ * One row, and every part of it is navigation: the wordmark goes up to the
+ * dataset list, the dataset name goes to this dataset's overview, and the menus
+ * after it reach every page within it. That is what the left sidebar used to
+ * stand in for — badly, since it only repeated the dataset name and the label
+ * list while taking a fixed 25rem from every page.
+ *
+ * Rendered by `DatasetManagementLayout` and, directly, by the dataset pages that
+ * bring their own layout (Review, Correct, Manage Access). The annotation canvas
+ * is deliberately not one of them: it owns the whole viewport and has its own
+ * chrome, and a second bar over it would take space from the image.
  */
-const DatasetGalleryHeader = ({ dataset, datasetName, onStartAnnotation, density = "default" }) => {
+const DatasetGalleryHeader = ({ dataset, density = "default" }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useAuth();
   const isCompact = density === "compact";
 
+  const overviewPath = dataset?.id ? `/dataset/${dataset.id}/datamanagement` : null;
+  const onOverview = location.pathname === overviewPath;
+
   return (
     <nav className="bg-p1 text-t1 border-b border-ln sticky top-0 z-50">
-      <div className={`max-w-full mx-auto px-4 ${isCompact ? "py-1.5" : "py-3"} flex items-center justify-between`}>
-        <div className={`flex items-center ${isCompact ? "space-x-3" : "space-x-4"}`}>
+      {/* Wraps rather than overflows: Manage Access is reachable below the
+          1024px cutoff the management pages set, and this bar shows there too. */}
+      <div
+        className={`max-w-full mx-auto px-4 ${isCompact ? "py-1.5" : "py-2.5"} flex flex-wrap items-center justify-between gap-y-2 gap-x-4`}
+      >
+        <div className={`flex flex-wrap items-center gap-y-2 ${isCompact ? "gap-x-3" : "gap-x-4"}`}>
           <button
             onClick={() => navigate("/datasets")}
-            className={`flex items-center ${isCompact ? "space-x-1.5 text-xs text-t2" : "space-x-2"} hover:text-ac transition-colors duration-150`}
-          >
-            <ArrowLeft size={isCompact ? 16 : 20} />
-            <span>Back to Datasets</span>
-          </button>
-          <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
-          <h1
-            className={`${isCompact ? "text-xl" : "text-2xl"} font-bold cursor-pointer hover:text-ac transition-colors duration-150`}
-            onClick={() => navigate('/')}
+            title="All datasets"
+            className={`${isCompact ? "text-xl" : "text-2xl"} font-bold hover:text-ac transition-colors duration-150`}
           >
             <Wordmark />
-          </h1>
+          </button>
+
           <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
-          <span className={`${isCompact ? "text-sm text-t2" : "text-lg"} font-medium`}>{datasetName}</span>
+
+          {/* The dataset's name is its overview link — the one page the sections
+              below all hang off. It carries the active tint when you are on it,
+              so the bar still says where you are. */}
+          <button
+            onClick={() => overviewPath && navigate(overviewPath)}
+            aria-current={onOverview ? "page" : undefined}
+            title="Dataset overview"
+            className={`${isCompact ? "text-sm px-2 py-0.5" : "text-lg px-2.5 py-1"} font-medium rounded-lg transition-colors ${
+              onOverview ? "bg-acS text-ac" : "text-t2 hover:bg-hv hover:text-t1"
+            }`}
+          >
+            {dataset?.name}
+          </button>
+
+          <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
+
+          <DatasetNav dataset={dataset} datasetId={dataset?.id} compact={isCompact} />
         </div>
 
         <div className={`flex items-center ${isCompact ? "space-x-3" : "space-x-4"}`}>
@@ -63,26 +87,6 @@ const DatasetGalleryHeader = ({ dataset, datasetName, onStartAnnotation, density
 
           <AuthButtons showLogoutOnly={true} />
         </div>
-      </div>
-
-      {/* Section navigation. Every dataset page is reachable from every other
-          one, which is what the sidebar never did. */}
-      <div
-        className={`max-w-full mx-auto px-4 ${isCompact ? "pb-1.5" : "pb-2"} flex items-center justify-between gap-4 border-t border-ln pt-1.5`}
-      >
-        <DatasetNav dataset={dataset} datasetId={dataset?.id} compact={isCompact} />
-
-        {onStartAnnotation && (
-          <button
-            onClick={onStartAnnotation}
-            className={`flex items-center gap-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors font-medium shrink-0 ${
-              isCompact ? "px-3 py-1 text-xs" : "px-4 py-1.5 text-sm"
-            }`}
-          >
-            <Play size={isCompact ? 14 : 16} />
-            <span>Start Annotation</span>
-          </button>
-        )}
       </div>
     </nav>
   );

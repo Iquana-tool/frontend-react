@@ -9,7 +9,6 @@ import {
   Database,
   Eye,
   GraduationCap,
-  LayoutGrid,
   Ruler,
   SquarePen,
   Tag,
@@ -177,16 +176,14 @@ const NAV_GROUPS = [
   },
 ];
 
-/** The overview grid itself, which belongs to no group. */
-const overviewPath = (datasetId) => `/dataset/${datasetId}/datamanagement`;
-
 /**
  * Is `item` the page currently open?
  *
- * Paths are compared exactly, so the overview (`/datamanagement`) does not light
- * up on `/datamanagement/images`. Pages that take a trailing id — the editor and
- * the read-only viewer — also match their sub-paths. Calibrating is the
- * annotation route with `?mode=calibrate`, so those two split on the query.
+ * Paths are compared exactly, so `/datamanagement/images` does not also light up
+ * whatever else lives under `/datamanagement`. Pages that take a trailing id —
+ * the editor and the read-only viewer — also match their sub-paths. Calibrating
+ * is the annotation route with `?mode=calibrate`, so those two split on the
+ * query.
  */
 export const isItemActive = (item, datasetId, location) => {
   const [targetPath, targetQuery] = item.path(datasetId).split("?");
@@ -202,6 +199,9 @@ export const isItemActive = (item, datasetId, location) => {
 
 /**
  * The dataset's section navigation, shown in the top bar.
+ *
+ * The overview itself is not a menu here: the dataset's name in the bar beside
+ * this is the link to it, and two controls for one destination is one too many.
  *
  * Destinations the current role cannot use are left out entirely, the same way
  * the overview cards leave them out: a reviewer cannot grant themselves upload
@@ -248,29 +248,16 @@ const DatasetNav = ({ dataset, datasetId, compact = false }) => {
     navigate(item.path(id), state ? { state } : undefined);
   };
 
-  const overviewActive = location.pathname === overviewPath(id);
   const buttonPadding = compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
 
   return (
     <nav
       ref={containerRef}
       aria-label="Dataset sections"
-      className="flex items-center gap-1"
+      // Wraps rather than scrolls: an `overflow-x` here would clip the menus,
+      // which hang below the bar.
+      className="flex flex-wrap items-center gap-1"
     >
-      <button
-        onClick={() => {
-          setOpenGroup(null);
-          navigate(overviewPath(id));
-        }}
-        aria-current={overviewActive ? "page" : undefined}
-        className={`inline-flex items-center gap-1.5 rounded-lg font-medium transition-colors ${buttonPadding} ${
-          overviewActive ? "bg-acS text-ac" : "text-t2 hover:bg-hv hover:text-t1"
-        }`}
-      >
-        <LayoutGrid className={compact ? "w-3.5 h-3.5" : "w-4 h-4"} />
-        <span>Overview</span>
-      </button>
-
       {groups.map((group) => {
         const open = openGroup === group.id;
         const groupActive = group.items.some((item) =>

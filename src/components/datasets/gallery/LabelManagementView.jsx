@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { ArrowLeft, Sparkles, ListTree, Plus, Edit2, Trash2 } from "lucide-react";
+import { Sparkles, ListTree, Plus, Edit2, Trash2 } from "lucide-react";
 import * as api from "../../../api";
 import EditableLabels from "./EditableLabels";
 import DescribeLabelSpaceModal from "./DescribeLabelSpaceModal";
 import { extractLabelsFromResponse } from "../../../utils/labelHierarchy";
 
-const LabelManagementView = ({ dataset, labels, onBack, onLabelsUpdated }) => {
+const LabelManagementView = ({ dataset, labels, onLabelsUpdated }) => {
   const [showDescribeModal, setShowDescribeModal] = useState(false);
 
   // Re-fetch labels after the assistant applies a generated hierarchy so the
@@ -21,20 +21,9 @@ const LabelManagementView = ({ dataset, labels, onBack, onLabelsUpdated }) => {
       {/* Header */}
       <div className="p-3 sm:p-4 border-b border-ln bg-p1 sticky top-0 z-10">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center space-x-2 sm:space-x-3 lg:space-x-4">
-            <button
-              onClick={onBack}
-              className="flex items-center space-x-1.5 sm:space-x-2 text-t2 hover:text-t1 transition-colors text-sm sm:text-base"
-            >
-              <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Back to Overview</span>
-              <span className="sm:hidden">Back</span>
-            </button>
-            <div className="h-5 sm:h-6 w-px bg-ln2"></div>
-            <h2 className="text-lg sm:text-xl font-bold text-t1">
-              Label Management
-            </h2>
-          </div>
+          <h2 className="text-lg sm:text-xl font-bold text-t1">
+            Label Management
+          </h2>
 
           <button
             onClick={() => setShowDescribeModal(true)}

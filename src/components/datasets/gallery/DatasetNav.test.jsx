@@ -66,17 +66,20 @@ describe("DatasetNav", () => {
 
         expect(screen.getByText("Artificial Intelligence").closest("button"))
             .toHaveClass("text-ac");
-        expect(screen.getByText("Overview").closest("button"))
+        expect(screen.getByText("Data & Analysis").closest("button"))
             .not.toHaveClass("text-ac");
     });
 
-    it("marks Overview as current only on the overview path", () => {
-        renderNav();
+    it("marks the open item within a menu as current", () => {
+        renderNav("/dataset/7/training");
 
-        expect(screen.getByText("Overview").closest("button")).toHaveAttribute(
+        fireEvent.click(screen.getByText("Artificial Intelligence"));
+        expect(screen.getByText("Model Training").closest("button")).toHaveAttribute(
             "aria-current",
             "page"
         );
+        expect(screen.getByText("Batch Inference").closest("button"))
+            .not.toHaveAttribute("aria-current");
     });
 
     it("leaves out destinations the role cannot reach", () => {
