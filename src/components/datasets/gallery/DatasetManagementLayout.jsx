@@ -24,12 +24,10 @@ import { useDatasetGalleryData } from "../../../hooks/useDatasetGalleryData";
  * @param {Object} props
  * @param {React.ReactNode} props.children - Content to display in the main area
  * @param {string|number} [props.datasetId] - Optional dataset ID (if not in URL params)
- * @param {string} [props.headerDensity="default"] - Header density ("default" | "compact")
  */
 const DatasetManagementLayout = ({
   children,
   datasetId: propDatasetId,
-  headerDensity = "default",
 }) => {
   const { datasetId: paramDatasetId } = useParams();
   const { loading } = useDataset();
@@ -59,7 +57,7 @@ const DatasetManagementLayout = ({
 
       {/* Large Screen Content - Show dataset management layout on screens 1024px and above */}
       <div className="hidden lg:flex lg:flex-col lg:h-screen">
-        <DatasetGalleryHeader dataset={dataset} density={headerDensity} />
+        <DatasetGalleryHeader dataset={dataset} />
 
         {/* Main Content */}
         <div className="max-w-full mx-auto flex flex-1 min-h-0 w-full">

@@ -208,7 +208,7 @@ export const isItemActive = (item, datasetId, location) => {
  * rights, so a greyed-out "Data Management" entry would only be noise.
  * Everything is still re-checked server-side.
  */
-const DatasetNav = ({ dataset, datasetId, compact = false }) => {
+const DatasetNav = ({ dataset, datasetId }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const permissions = usePermissions(dataset);
@@ -248,7 +248,7 @@ const DatasetNav = ({ dataset, datasetId, compact = false }) => {
     navigate(item.path(id), state ? { state } : undefined);
   };
 
-  const buttonPadding = compact ? "px-2.5 py-1 text-xs" : "px-3 py-1.5 text-sm";
+  const buttonPadding = "px-3 py-1.5 text-sm";
 
   return (
     <nav
@@ -279,7 +279,7 @@ const DatasetNav = ({ dataset, datasetId, compact = false }) => {
             >
               <span>{group.label}</span>
               <ChevronDown
-                className={`${compact ? "w-3 h-3" : "w-3.5 h-3.5"} transition-transform ${
+                className={`w-3.5 h-3.5 transition-transform ${
                   open ? "rotate-180" : ""
                 }`}
               />

@@ -119,7 +119,7 @@ const CorrectionPage = () => {
 
   return (
     <div className="h-screen flex flex-col bg-well">
-      <DatasetGalleryHeader dataset={dataset} density="compact" />
+      <DatasetGalleryHeader dataset={dataset} />
 
       <div className="bg-p1 border-b border-ln flex-shrink-0">
         <div className="px-4 py-3 flex items-center justify-between gap-4">

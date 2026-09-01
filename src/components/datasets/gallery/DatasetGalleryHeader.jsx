@@ -17,16 +17,20 @@ import DatasetNav from './DatasetNav';
  * stand in for — badly, since it only repeated the dataset name and the label
  * list while taking a fixed 25rem from every page.
  *
+ * One size, too. There used to be a `density` prop, and the pages that asked for
+ * "compact" made the bar visibly change height and type size as you navigated
+ * between them — chrome that moves is chrome you have to re-read. It bought back
+ * a few pixels when this was two rows; at one row it is not worth the flicker.
+ *
  * Rendered by `DatasetManagementLayout` and, directly, by the dataset pages that
  * bring their own layout (Review, Correct, Manage Access). The annotation canvas
  * is deliberately not one of them: it owns the whole viewport and has its own
  * chrome, and a second bar over it would take space from the image.
  */
-const DatasetGalleryHeader = ({ dataset, density = "default" }) => {
+const DatasetGalleryHeader = ({ dataset }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
-  const isCompact = density === "compact";
 
   const overviewPath = dataset?.id ? `/dataset/${dataset.id}/datamanagement` : null;
   const onOverview = location.pathname === overviewPath;
@@ -35,19 +39,17 @@ const DatasetGalleryHeader = ({ dataset, density = "default" }) => {
     <nav className="bg-p1 text-t1 border-b border-ln sticky top-0 z-50">
       {/* Wraps rather than overflows: Manage Access is reachable below the
           1024px cutoff the management pages set, and this bar shows there too. */}
-      <div
-        className={`max-w-full mx-auto px-4 ${isCompact ? "py-1.5" : "py-2.5"} flex flex-wrap items-center justify-between gap-y-2 gap-x-4`}
-      >
-        <div className={`flex flex-wrap items-center gap-y-2 ${isCompact ? "gap-x-3" : "gap-x-4"}`}>
+      <div className="max-w-full mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-y-2 gap-x-4">
+        <div className="flex flex-wrap items-center gap-y-2 gap-x-4">
           <button
             onClick={() => navigate("/datasets")}
             title="All datasets"
-            className={`${isCompact ? "text-xl" : "text-2xl"} font-bold hover:text-ac transition-colors duration-150`}
+            className="text-2xl font-bold hover:text-ac transition-colors duration-150"
           >
             <Wordmark />
           </button>
 
-          <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
+          <div className="h-6 w-px bg-ln"></div>
 
           {/* The dataset's name is its overview link — the one page the sections
               below all hang off. It carries the active tint when you are on it,
@@ -56,30 +58,30 @@ const DatasetGalleryHeader = ({ dataset, density = "default" }) => {
             onClick={() => overviewPath && navigate(overviewPath)}
             aria-current={onOverview ? "page" : undefined}
             title="Dataset overview"
-            className={`${isCompact ? "text-sm px-2 py-0.5" : "text-lg px-2.5 py-1"} font-medium rounded-lg transition-colors ${
+            className={`text-lg px-2.5 py-1 font-medium rounded-lg transition-colors ${
               onOverview ? "bg-acS text-ac" : "text-t2 hover:bg-hv hover:text-t1"
             }`}
           >
             {dataset?.name}
           </button>
 
-          <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
+          <div className="h-6 w-px bg-ln"></div>
 
-          <DatasetNav dataset={dataset} datasetId={dataset?.id} compact={isCompact} />
+          <DatasetNav dataset={dataset} datasetId={dataset?.id} />
         </div>
 
-        <div className={`flex items-center ${isCompact ? "space-x-3" : "space-x-4"}`}>
+        <div className="flex items-center space-x-4">
           {isAuthenticated && user && (
-            <div className={`flex items-center ${isCompact ? "space-x-1.5 px-2 py-1 text-xs" : "space-x-2 px-3 py-1.5 text-sm"} text-t3`}>
-              <User className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+            <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3">
+              <User className="w-4 h-4" />
               <span className="font-medium">{user.username}</span>
             </div>
           )}
           <button
             onClick={() => navigate("/docs")}
-            className={`flex items-center ${isCompact ? "space-x-1.5 py-1 px-3 rounded-md text-xs" : "space-x-2 py-2 px-4 rounded-lg"} bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors`}
+            className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors"
           >
-            <BookOpen className={isCompact ? "w-3.5 h-3.5" : "w-4 h-4"} />
+            <BookOpen className="w-4 h-4" />
             <span>Documentation</span>
           </button>
           <ThemeToggle />
