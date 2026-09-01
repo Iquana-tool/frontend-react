@@ -225,11 +225,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               )}
               {canManageUsers && (
                 <button
-                  onClick={() => navigate("/admin/users")}
+                  onClick={() => navigate("/admin")}
+                  title="Accounts and instance settings"
                   className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
                 >
                   <UserCog className="w-4 h-4" />
-                  <span>Users</span>
+                  <span>Admin</span>
                 </button>
               )}
               <DocsLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />

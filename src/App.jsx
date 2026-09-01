@@ -21,7 +21,7 @@ import BatchInferencePage from "./pages/BatchInferencePage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
-import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminPage from "./pages/AdminPage";
 import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
 
@@ -51,13 +51,16 @@ function App() {
                 /login?next=... when the invitee is not signed in yet. */}
             <Route path="/invites/:token" element={<AcceptInvitePage />} />
             <Route
-              path="/admin/users"
+              path="/admin"
               element={
                 <ProtectedRoute>
-                  <AdminUsersPage />
+                  <AdminPage />
                 </ProtectedRoute>
               }
             />
+            {/* The account table used to be the whole admin surface and lived
+                here; keep the old path working for anyone who bookmarked it. */}
+            <Route path="/admin/users" element={<Navigate to="/admin" replace />} />
             <Route
               path="/dataset/:datasetId/datamanagement"
               element={
