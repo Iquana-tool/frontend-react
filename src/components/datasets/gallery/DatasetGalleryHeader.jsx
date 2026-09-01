@@ -6,8 +6,18 @@ import AuthButtons from '../../auth/AuthButtons';
 import ReportBugLink from '../../ui/ReportBugLink';
 import ThemeToggle from '../../ui/ThemeToggle';
 import Wordmark from '../../Wordmark';
+import DatasetNav from './DatasetNav';
 
-const DatasetGalleryHeader = ({ datasetName, onStartAnnotation, density = "default" }) => {
+/**
+ * The top bar every dataset management page sits under.
+ *
+ * Two rows: the instance-level one (where you are, who you are, log out), and
+ * below it the dataset's own section navigation. That second row replaces the
+ * left sidebar — the pages are wide enough as it is, and a sidebar that only
+ * repeated the dataset name and the label list was paying for itself in pixels
+ * rather than in navigation.
+ */
+const DatasetGalleryHeader = ({ dataset, datasetName, onStartAnnotation, density = "default" }) => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const isCompact = density === "compact";
@@ -24,7 +34,7 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation, density = "defau
             <span>Back to Datasets</span>
           </button>
           <div className={`${isCompact ? "h-4" : "h-6"} w-px bg-ln`}></div>
-          <h1 
+          <h1
             className={`${isCompact ? "text-xl" : "text-2xl"} font-bold cursor-pointer hover:text-ac transition-colors duration-150`}
             onClick={() => navigate('/')}
           >
@@ -50,13 +60,32 @@ const DatasetGalleryHeader = ({ datasetName, onStartAnnotation, density = "defau
           </button>
           <ThemeToggle />
           <ReportBugLink variant="default" />
-          
+
           <AuthButtons showLogoutOnly={true} />
         </div>
+      </div>
+
+      {/* Section navigation. Every dataset page is reachable from every other
+          one, which is what the sidebar never did. */}
+      <div
+        className={`max-w-full mx-auto px-4 ${isCompact ? "pb-1.5" : "pb-2"} flex items-center justify-between gap-4 border-t border-ln pt-1.5`}
+      >
+        <DatasetNav dataset={dataset} datasetId={dataset?.id} compact={isCompact} />
+
+        {onStartAnnotation && (
+          <button
+            onClick={onStartAnnotation}
+            className={`flex items-center gap-2 bg-accent text-onAccent rounded-lg hover:brightness-110 transition-colors font-medium shrink-0 ${
+              isCompact ? "px-3 py-1 text-xs" : "px-4 py-1.5 text-sm"
+            }`}
+          >
+            <Play size={isCompact ? 14 : 16} />
+            <span>Start Annotation</span>
+          </button>
+        )}
       </div>
     </nav>
   );
 };
 
 export default DatasetGalleryHeader;
-

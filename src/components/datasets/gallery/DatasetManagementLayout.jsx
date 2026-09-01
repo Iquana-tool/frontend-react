@@ -1,55 +1,51 @@
-import React, { useCallback } from "react";
+import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDataset } from "../../../contexts/DatasetContext";
-import DatasetInfo from "./DatasetInfo";
 import DatasetGalleryHeader from "./DatasetGalleryHeader";
 import SmallScreenMessage from "./SmallScreenMessage";
 import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
 import * as api from "../../../api";
-import { 
-  useGalleryLabels,
+import {
   useGalleryLoadingData,
   useGalleryError,
-  useGalleryActions 
+  useGalleryActions
 } from "../../../stores/selectors";
 import { useDatasetGalleryData } from "../../../hooks/useDatasetGalleryData";
 
 /**
  * Shared layout component for all dataset management pages.
- * Provides consistent left sidebar (Dataset Overview) across all views.
+ *
+ * The dataset overview used to be a persistent left sidebar here. It carried the
+ * dataset name (already in the header), its description, a Start Annotation
+ * button and the label list — none of which are worth a fixed 25rem column on
+ * every page, and the label list had a page of its own anyway. Navigation now
+ * runs through the top bar (see `DatasetNav`), so the pages get the full width.
+ *
  * @param {Object} props
  * @param {React.ReactNode} props.children - Content to display in the main area
  * @param {string|number} [props.datasetId] - Optional dataset ID (if not in URL params)
- * @param {boolean} [props.showSidebar=true] - Whether to show persistent Dataset Info sidebar
  * @param {string} [props.headerDensity="default"] - Header density ("default" | "compact")
  */
 const DatasetManagementLayout = ({
   children,
   datasetId: propDatasetId,
-  showSidebar = true,
   headerDensity = "default",
 }) => {
   const { datasetId: paramDatasetId } = useParams();
   const navigate = useNavigate();
   const { loading } = useDataset();
-  
+
   // Use prop datasetId if provided, otherwise use URL param
   const datasetId = propDatasetId || paramDatasetId;
-  
+
   // Zustand store selectors
-  const labels = useGalleryLabels();
   const loadingData = useGalleryLoadingData();
   const error = useGalleryError();
   const galleryActions = useGalleryActions();
-  
+
   // Use custom hook for data fetching and initialization
   const dataset = useDatasetGalleryData(datasetId, galleryActions);
-
-  // Handle labels updated from DatasetInfo component
-  const handleLabelsUpdated = useCallback((updatedLabels) => {
-    galleryActions.setLabels(updatedLabels);
-  }, [galleryActions]);
 
   // Open the editor on the first image nobody has annotated yet.
   //
@@ -94,7 +90,8 @@ const DatasetManagementLayout = ({
 
       {/* Large Screen Content - Show dataset management layout on screens 1024px and above */}
       <div className="hidden lg:flex lg:flex-col lg:h-screen">
-        <DatasetGalleryHeader 
+        <DatasetGalleryHeader
+          dataset={dataset}
           datasetName={dataset.name}
           onStartAnnotation={handleStartAnnotation}
           density={headerDensity}
@@ -102,19 +99,6 @@ const DatasetManagementLayout = ({
 
         {/* Main Content */}
         <div className="max-w-full mx-auto flex flex-1 min-h-0 w-full">
-          {/* Left Sidebar - Dataset Info (Persistent across all views when enabled) */}
-          {showSidebar && (
-            <div className="w-100 bg-p1 border-r border-ln flex-shrink-0">
-              <DatasetInfo
-                dataset={dataset}
-                labels={labels}
-                onStartAnnotation={handleStartAnnotation}
-                onLabelsUpdated={handleLabelsUpdated}
-              />
-            </div>
-          )}
-
-          {/* Center - Dynamic Content (Children) */}
           <div className="flex-1 overflow-hidden">
             {children}
           </div>
