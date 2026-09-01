@@ -1,8 +1,9 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, User } from 'lucide-react';
+import { User } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import AuthButtons from '../../auth/AuthButtons';
+import DocsLink from '../../ui/DocsLink';
 import ReportBugLink from '../../ui/ReportBugLink';
 import ThemeToggle from '../../ui/ThemeToggle';
 import Wordmark from '../../Wordmark';
@@ -77,13 +78,7 @@ const DatasetGalleryHeader = ({ dataset }) => {
               <span className="font-medium">{user.username}</span>
             </div>
           )}
-          <button
-            onClick={() => navigate("/docs")}
-            className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors"
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Documentation</span>
-          </button>
+          <DocsLink className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors" />
           <ThemeToggle />
           <ReportBugLink variant="default" />
 

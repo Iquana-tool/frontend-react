@@ -8,6 +8,7 @@ import { Permission } from '../../../utils/permissions';
 import { OVERALL_STATES, getPhase } from '../../../utils/imageStatus';
 import { useGalleryStats } from '../../../stores/selectors';
 import { fetchReviewSummary, fetchCorrectionSummary } from '../../../api/reviews';
+import { DOCS, openDocs } from '../../../constants/docs';
 
 /**
  * The sections the cards are grouped under, in display order. Each card names its
@@ -311,15 +312,18 @@ const ManagementCardsView = ({
       disabled: true,
     },
     {
-      // Placeholder: will open the documentation. Dysfunctional for now.
+      // The documentation is a separate site, so this card leaves the app rather
+      // than routing anywhere. It is permitted for everyone: whatever a role can
+      // or cannot do here, reading about it should never be gated.
       id: 'help',
       group: 'configurations',
       icon: HelpCircle,
       title: 'Help',
       description: 'Read the documentation and learn how everything works',
+      stat: 'Opens the documentation site in a new tab',
+      onClick: () => openDocs(DOCS.home),
       permitted: true,
       color: 'blue',
-      disabled: true,
     },
   ].filter((card) => card.permitted);
 
