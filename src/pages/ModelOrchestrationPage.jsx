@@ -158,7 +158,7 @@ export default function ModelOrchestrationPage() {
     };
 
     return (
-        <DatasetManagementLayout showSidebar={false} headerDensity="compact">
+        <DatasetManagementLayout>
             <div className="flex flex-col h-full bg-app min-h-0 overflow-hidden">
                 {/* Header */}
                 <header className="py-4 px-6 border-b border-ln bg-p1 flex flex-wrap items-center justify-between gap-4 flex-shrink-0">

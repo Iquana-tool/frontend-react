@@ -189,7 +189,6 @@ const DatasetGallery = () => {
           <DataManagementView
             images={images}
             dataset={dataset}
-            onBack={() => navigate(`/dataset/${datasetId}/datamanagement`)}
             onImageClick={handleImageClick}
             onImagesUpdated={refreshImages}
           />
@@ -197,7 +196,6 @@ const DatasetGallery = () => {
           <LabelManagementView
             dataset={dataset}
             labels={labels}
-            onBack={() => navigate(`/dataset/${datasetId}/datamanagement`)}
             onLabelsUpdated={handleLabelsUpdated}
           />
         ) : null}

@@ -334,12 +334,19 @@ const ManagementCardsView = ({
   return (
     <div className="overflow-y-auto bg-app p-4 sm:p-5 lg:p-6 h-full">
       <div className="w-full mx-auto">
+        {/* The dataset's name and description used to live in the sidebar. This
+            is the one page with room for them, and the one where knowing which
+            dataset you are looking at actually decides what you click next. */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-1 sm:mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-t1">Dataset Management</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-t1">
+              {dataset?.name || 'Dataset Management'}
+            </h2>
             {role && <RoleBadge role={role} showDescription />}
           </div>
-          <p className="text-sm sm:text-base text-t2">Manage your dataset, models, and annotations</p>
+          <p className="text-sm sm:text-base text-t2 max-w-3xl">
+            {dataset?.description || 'Manage your dataset, models, and annotations'}
+          </p>
         </div>
 
         <div className="space-y-8 sm:space-y-10">
