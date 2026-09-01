@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
-import { BookOpen, User, Brain, Search, Star, ArrowLeft, Loader2, GraduationCap, ArrowUpDown } from "lucide-react";
+import { User, Brain, Search, Star, ArrowLeft, Loader2, GraduationCap, ArrowUpDown } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../contexts/ToastContext";
 import AuthButtons from "../components/auth/AuthButtons";
+import DocsLink from "../components/ui/DocsLink";
 import ReportBugLink from "../components/ui/ReportBugLink";
 import ModelChip from "../components/models/ModelChip";
 import ModelDetailPanel from "../components/models/ModelDetailPanel";
@@ -633,13 +634,7 @@ const ModelZooPage = () => {
                   <span className="font-medium">{user.username}</span>
                 </div>
               )}
-              <button
-                onClick={() => navigate("/docs")}
-                className="flex items-center gap-[7px] bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-6 transition-colors duration-150"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Documentation</span>
-              </button>
+              <DocsLink className="flex items-center gap-[7px] bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-6 transition-colors duration-150" />
               <ThemeToggle />
           <ReportBugLink />
               <AuthButtons showLogoutOnly={true} />
