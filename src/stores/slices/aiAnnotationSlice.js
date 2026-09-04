@@ -116,20 +116,53 @@ export const createAIAnnotationSlice = (set) => ({
    * that produced the object and never reach the object itself, because the
    * prompt stack stayed non-empty for the rest of the session.
    *
-   * So this drops both stacks rather than pushing to them, which hands the next
-   * Ctrl+Z to the annotation history where it belongs.
+   * So a consume that takes everything drops both stacks, which hands the next Ctrl+Z to
+   * the annotation history where it belongs.
+   *
+   * A consume that takes only *some* prompts must not do that. Ctrl+Z routes on the prompt
+   * stack rather than on what is drawn (see undoRouting.js), so emptying the stack while
+   * prompts are still on the canvas sends the next Ctrl+Z to the history and deletes an
+   * object the user was not undoing. The surviving prompts keep their history instead:
+   * every snapshot is filtered through the same predicate, and steps that no longer change
+   * anything are dropped, so undo can walk back over what is left without ever restoring a
+   * prompt that has already become an object.
    *
    * @param {Function} [predicate] - Consume only the prompts it matches. "Add
    *   this object" passes one, because a box on the canvas is still a prompt
    *   waiting to be run and must survive the outlines being committed.
    */
   consumePrompts: (predicate) => set((state) => {
-    state.aiAnnotation.prompts = predicate
-      ? state.aiAnnotation.prompts.filter((prompt) => !predicate(prompt))
-      : [];
     state.aiAnnotation.activePreview = null;
-    state.aiAnnotation.undoStack = [];
-    state.aiAnnotation.redoStack = [];
+
+    if (!predicate) {
+      state.aiAnnotation.prompts = [];
+      state.aiAnnotation.undoStack = [];
+      state.aiAnnotation.redoStack = [];
+      return;
+    }
+
+    const survives = (prompt) => !predicate(prompt);
+    state.aiAnnotation.prompts = state.aiAnnotation.prompts.filter(survives);
+
+    // Prompt ids are unique per placement, so they identify a snapshot exactly.
+    const signature = (prompts) => prompts.map((prompt) => prompt.id).join('|');
+    const current = signature(state.aiAnnotation.prompts);
+
+    const prune = (stack) => {
+      const pruned = [];
+      for (const snapshot of stack || []) {
+        const kept = snapshot.filter(survives);
+        // Two adjacent snapshots that now differ only by consumed prompts are one step.
+        if (pruned.length && signature(pruned[pruned.length - 1]) === signature(kept)) continue;
+        pruned.push(kept);
+      }
+      // Nor is a step one that would leave the canvas exactly as it already is.
+      while (pruned.length && signature(pruned[pruned.length - 1]) === current) pruned.pop();
+      return pruned;
+    };
+
+    state.aiAnnotation.undoStack = prune(state.aiAnnotation.undoStack);
+    state.aiAnnotation.redoStack = prune(state.aiAnnotation.redoStack);
   }),
 
   setActivePreview: (preview) => set((state) => {

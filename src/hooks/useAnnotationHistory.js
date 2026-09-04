@@ -49,6 +49,10 @@ import { PROMPT, SERVER, routeRedo, routeUndo } from './undoRouting';
  * and undoing an object while half-placed prompts sit on the canvas would feel
  * like the key skipped a step. So: prompts first, objects once the canvas is
  * clear. Both live here rather than in two listeners racing for the same key.
+ *
+ * The one handler that stays outside is EditableContourOverlay's, which reverts an outline
+ * being edited. That is narrower still — it belongs to an overlay that is open — so this
+ * hook stands aside for undo while it is, rather than the two both firing.
  */
 export default function useAnnotationHistory() {
   const { addToast } = useToast();
@@ -192,8 +196,10 @@ export default function useAnnotationHistory() {
   // Starting fresh on another image: the memory belongs to the image it was made on.
   useEffect(() => { lastUndoSourceRef.current = null; }, [imageId]);
 
-  // The toolbar buttons and the keyboard resolve the routing the same way, so
-  // clicking Undo and pressing Ctrl+Z can never mean two different things.
+  // The toolbar buttons and the keyboard resolve the routing the same way, so clicking
+  // Undo and pressing Ctrl+Z mean the same thing. The exception is an open outline editor:
+  // it owns Ctrl+Z but cannot be reached from the toolbar, so the button still acts on the
+  // history there (closing the editor first, as `run` does).
   const undo = useCallback(() => {
     if (undoSource === PROMPT) {
       undoPrompt();
@@ -233,6 +239,13 @@ export default function useAnnotationHistory() {
       const isRedo = (key === 'z' && event.shiftKey) || key === 'y';
       if (!isUndo && !isRedo) return;
 
+      // While an outline is open for editing, EditableContourOverlay owns Ctrl+Z: it steps
+      // the vertex edit back. It listens on window too, so without this both handlers run
+      // and one keypress reverts two unrelated things — the edit in progress and whatever
+      // action preceded it. The overlay offers no redo, so Ctrl+Shift+Z still reaches the
+      // history, which closes the overlay before applying it.
+      if (isUndo && editModeActive) return;
+
       event.preventDefault();
       if (isUndo) undo();
       else redo();
@@ -240,7 +253,7 @@ export default function useAnnotationHistory() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, editModeActive]);
 
   return {
     undo,

@@ -30,7 +30,9 @@ const MainCanvas = forwardRef((props, ref) => {
   const clearSelection = useClearSelection();
 
   const { imageObject, imageLoading, imageError, loadImage } = useImageLoader(currentImage);
-  const { isDragging, isPanMode } = useCanvasInteractions(containerRef);
+  // The image is passed in so panning can be clamped against the fitted image's real
+  // size — without it the canvas cannot tell when the image has left the viewport.
+  const { isDragging, isPanMode } = useCanvasInteractions(containerRef, imageObject);
   const {
     loading: contoursLoading,
     error: contoursError,
@@ -92,7 +94,6 @@ const MainCanvas = forwardRef((props, ref) => {
             currentImage={currentImage}
             zoomLevel={zoomLevel}
             panOffset={panOffset}
-            isDragging={isDragging}
           />
           {/* Sits over the loaded image, not over the image loader: the two are separate
               waits, and the contours regularly outlast the picture they belong to. */}

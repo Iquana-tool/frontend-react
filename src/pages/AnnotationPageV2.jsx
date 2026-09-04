@@ -17,6 +17,8 @@ import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import websocketService from '../services/websocket';
+import annotationSession from '../services/annotationSession';
+import { AnnotationRoutingPolicyProvider } from '../contexts/AnnotationRoutingPolicyContext';
 
 const AnnotationPageV2 = () => {
   const { datasetId, imageId: urlImageId } = useParams();
@@ -44,6 +46,10 @@ const AnnotationPageV2 = () => {
   const cachedLabelsMap = useDatasetLabelsMap();
   const cachedLabels = useDatasetLabels();
   const { currentDataset, datasets } = useDataset();
+  // /annotate-v2 has no dataset route segment; use the dataset selected by the
+  // loader once it becomes available while preserving the URL id for normal
+  // dataset-scoped annotation routes.
+  const effectiveDatasetId = datasetId ?? currentDataset?.id;
   // Resolve from the list rather than currentDataset: the list entries carry
   // my_permissions, and currentDataset may not be the one in the URL yet.
   const routeDataset = React.useMemo(
@@ -87,10 +93,15 @@ const AnnotationPageV2 = () => {
     }
   }, [cachedLabels, cachedLabelsMap, setDatasetLabels]);
 
-  // Function to load objects with label names
-  const loadObjectsWithLabels = React.useCallback(async (hierarchy, dataset) => {
+  // Load objects with their label names.
+  //
+  // `imageId` tags the contours with the image the session fetched them for. The label
+  // lookup below is awaited, and on a reload the contours can arrive before DatasetLoader
+  // has made that image current; without the tag `setCurrentImage` cannot distinguish them
+  // from a previous image's and wipes them.
+  const loadObjectsWithLabels = React.useCallback(async (hierarchy, dataset, imageId) => {
     const { labelsMap } = await ensureLabelsLoaded(dataset);
-    setObjectsFromHierarchy(hierarchy, labelsMap);
+    setObjectsFromHierarchy(hierarchy, labelsMap, imageId);
   }, [setObjectsFromHierarchy, ensureLabelsLoaded]);
 
   // Initialize WebSocket session for the current image
@@ -150,7 +161,9 @@ const AnnotationPageV2 = () => {
         // No clearObjects() first: setObjectsFromHierarchy replaces the list wholesale,
         // and clearing ahead of the awaited label lookup only opened a window in which
         // the canvas was empty for no reason.
-        loadObjectsWithLabels(message.data, currentDataset);
+        // The session's own image id rather than the store's, which may not have caught up
+        // yet — the case the tag exists for.
+        loadObjectsWithLabels(message.data, currentDataset, annotationSession.getCurrentImageId());
       }
     );
     return unsubscribe;
@@ -177,13 +190,15 @@ const AnnotationPageV2 = () => {
   }
 
   return (
-    <DatasetLoader>
-      {/* The workspace shell carries its own toolbar (app menu, breadcrumb and
-          account chip), so the app navbar is not rendered here. */}
-      <ResponsiveWrapper>
-        <MainLayout />
-      </ResponsiveWrapper>
-    </DatasetLoader>
+    <AnnotationRoutingPolicyProvider datasetId={effectiveDatasetId}>
+      <DatasetLoader>
+        {/* The workspace shell carries its own toolbar (app menu, breadcrumb and
+            account chip), so the app navbar is not rendered here. */}
+        <ResponsiveWrapper>
+          <MainLayout />
+        </ResponsiveWrapper>
+      </DatasetLoader>
+    </AnnotationRoutingPolicyProvider>
   );
 };
 

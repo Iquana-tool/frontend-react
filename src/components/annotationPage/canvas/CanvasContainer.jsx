@@ -89,11 +89,17 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => e.preventDefault()}
     >
+      {/* Deliberately untransitioned. Every overlay below applies this same transform with
+          no transition of its own, so easing the image alone leaves the contours out of step
+          with it for the duration of every zoom change. Lockstep with the overlays matters
+          more than the glide, and a cursor-anchored zoom needs to track the cursor
+          immediately. `willChange` keeps the layer on the compositor. */}
       <div
-        className="relative w-full h-full transition-transform duration-200 ease-out"
+        className="relative w-full h-full"
         style={{
           transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
           transformOrigin: 'center center',
+          willChange: 'transform',
         }}
       >
         <img
