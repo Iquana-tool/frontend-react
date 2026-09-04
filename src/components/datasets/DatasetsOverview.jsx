@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, FolderOpen, BookOpen, User, UserCog } from "lucide-react";
+import { Plus, FolderOpen, User, UserCog } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePermissions } from "../../hooks/usePermissions";
 import { GLOBAL_ROLE_LABELS } from "../../utils/permissions";
 import AuthButtons from "../auth/AuthButtons";
+import DocsLink from "../ui/DocsLink";
 import ReportBugLink from "../ui/ReportBugLink";
 import AddDatasetModal from "./AddDatasetModal";
 import UploadingModal from "./UploadingDatasetModal"
@@ -224,20 +225,15 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               )}
               {canManageUsers && (
                 <button
-                  onClick={() => navigate("/admin/users")}
+                  onClick={() => navigate("/admin")}
+                  title="Accounts and instance settings"
                   className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
                 >
                   <UserCog className="w-4 h-4" />
-                  <span>Users</span>
+                  <span>Admin</span>
                 </button>
               )}
-              <button
-                onClick={() => navigate("/docs")}
-                className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Documentation</span>
-              </button>
+              <DocsLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />
               <ThemeToggle />
           <ReportBugLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />
               <AuthButtons
