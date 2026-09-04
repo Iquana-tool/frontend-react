@@ -58,9 +58,19 @@ export const createObjectsSlice = (set) => ({
     state.objects.colors[newObject.id] = newObject.color;
   }),
   
-  // Replace all objects from a backend ContourHierarchy
-  // labelsMap: Optional Map mapping label_id to label name (always Map or null in production)
-  setObjectsFromHierarchy: (hierarchy, labelsMap = null) => set((state) => {
+  /**
+   * Replace all objects from a backend ContourHierarchy.
+   *
+   * @param hierarchy The backend ContourHierarchy.
+   * @param labelsMap Optional Map from label_id to label name (always Map or null in
+   *   production).
+   * @param imageId The image these contours belong to. Callers handling an OBJECTS
+   *   message must pass it — the contours can arrive before that image is the current
+   *   one, and `setCurrentImage` needs the tag to know not to wipe them. Omitted by
+   *   callers that are by definition already on the image (undo/redo, a full hierarchy
+   *   pushed after an edit), which fall back to whatever is current.
+   */
+  setObjectsFromHierarchy: (hierarchy, labelsMap = null, imageId = undefined) => set((state) => {
     const list = [];
     const colors = {};
     
@@ -152,6 +162,8 @@ export const createObjectsSlice = (set) => ({
     // The hierarchy is the answer the spinner was waiting for, whether or not it is empty.
     state.objects.loading = false;
     state.objects.loadError = null;
+    state.objects.loadedForImageId =
+      imageId !== undefined ? imageId : state.images.currentImageId;
   }),
 
   clearObjects: () => set((state) => {
@@ -159,6 +171,7 @@ export const createObjectsSlice = (set) => ({
     state.objects.selected = [];
     state.objects.colors = {};
     state.objects.labelAssignmentCounter = 0;
+    state.objects.loadedForImageId = null;
   }),
 
   /**
@@ -175,6 +188,7 @@ export const createObjectsSlice = (set) => ({
     state.objects.labelAssignmentCounter = 0;
     state.objects.loading = true;
     state.objects.loadError = null;
+    state.objects.loadedForImageId = null;
   }),
 
   /** Give up on the current load and show `error` in place of the spinner. */

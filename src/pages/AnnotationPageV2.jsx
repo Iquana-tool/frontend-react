@@ -17,6 +17,7 @@ import { fetchLabels } from '../api/labels';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import websocketService from '../services/websocket';
+import annotationSession from '../services/annotationSession';
 
 const AnnotationPageV2 = () => {
   const { datasetId, imageId: urlImageId } = useParams();
@@ -87,10 +88,15 @@ const AnnotationPageV2 = () => {
     }
   }, [cachedLabels, cachedLabelsMap, setDatasetLabels]);
 
-  // Function to load objects with label names
-  const loadObjectsWithLabels = React.useCallback(async (hierarchy, dataset) => {
+  // Function to load objects with label names.
+  //
+  // `imageId` tags the contours with the image the session fetched them for. The label
+  // lookup below is awaited, and on a reload the contours can arrive before DatasetLoader
+  // has made that image current — without the tag, `setCurrentImage` cannot tell them
+  // from a previous image's and wipes them.
+  const loadObjectsWithLabels = React.useCallback(async (hierarchy, dataset, imageId) => {
     const { labelsMap } = await ensureLabelsLoaded(dataset);
-    setObjectsFromHierarchy(hierarchy, labelsMap);
+    setObjectsFromHierarchy(hierarchy, labelsMap, imageId);
   }, [setObjectsFromHierarchy, ensureLabelsLoaded]);
 
   // Initialize WebSocket session for the current image
@@ -150,7 +156,9 @@ const AnnotationPageV2 = () => {
         // No clearObjects() first: setObjectsFromHierarchy replaces the list wholesale,
         // and clearing ahead of the awaited label lookup only opened a window in which
         // the canvas was empty for no reason.
-        loadObjectsWithLabels(message.data, currentDataset);
+        // The session's own image id, not the store's: the store may not have caught
+        // up yet, which is the whole reason the tag exists.
+        loadObjectsWithLabels(message.data, currentDataset, annotationSession.getCurrentImageId());
       }
     );
     return unsubscribe;
