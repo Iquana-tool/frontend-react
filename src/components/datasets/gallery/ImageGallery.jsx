@@ -31,8 +31,11 @@ import {
  * @param {Function} [onBulkDelete] - Called with the selected image objects when
  *   the viewer asks to delete them. Optional: the caller passes it only where
  *   deleting is allowed, and the bulk bar hides the button without it.
+ * @param {Function} [onShowQuantifications] - Called with an image to open its
+ *   measurements. Optional for the same reason, and gated on the export permission
+ *   the per-image page's table needs.
  */
-const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated, onBulkDelete }) => {
+const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUpdated, onBulkDelete, onShowQuantifications }) => {
   // Zustand store selectors - provides persistence across navigation
   const searchTerm = useSearchTerm();
   const filterStatus = useFilterStatus();
@@ -290,6 +293,7 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
                 onImageClick={onImageClick}
                 onDeleteImage={onDeleteImage}
                 onEditMetadata={canEditMetadata ? (img) => setEditingImages([img]) : undefined}
+                onShowQuantifications={onShowQuantifications}
                 selected={selectedIds.has(image.id)}
                 onToggleSelect={canSelect ? toggleSelected : undefined}
               />

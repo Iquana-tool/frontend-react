@@ -9,7 +9,12 @@ import ColorMetricCard from "./ColorMetricCard";
 //   - COLOR (value_dim 3)                -> ColorMetricCard (swatch + channel means)
 //   - LENGTH/AREA/RATIO/INTENSITY (dim 1)-> mean ± std, min–max, unit
 //   - CONTEXTUAL metrics get a footnote that count may exclude isolated objects.
-const SummaryMetricCard = ({ metricKey, metric, catalog }) => {
+//
+// `footer` is an optional node rendered inside the card, below the stats. The per-image
+// page uses it for the "vs dataset" comparison, which only makes sense there — putting it
+// inside the card rather than under it is what keeps the two pages sharing one card
+// instead of forking a near-copy.
+const SummaryMetricCard = ({ metricKey, metric, catalog, footer }) => {
   const components = metric?.components || [];
   if (components.length === 0) return null;
 
@@ -17,7 +22,7 @@ const SummaryMetricCard = ({ metricKey, metric, catalog }) => {
   const valueDim = catalog?.value_dim ?? components.length;
 
   if (unitKind === "color" && valueDim === 3) {
-    return <ColorMetricCard metric={metric} catalog={catalog} />;
+    return <ColorMetricCard metric={metric} catalog={catalog} footer={footer} />;
   }
 
   // Scalar metric: use the first component's pre-aggregated stats.
@@ -73,6 +78,7 @@ const SummaryMetricCard = ({ metricKey, metric, catalog }) => {
           object count.
         </p>
       )}
+      {footer}
     </div>
   );
 };

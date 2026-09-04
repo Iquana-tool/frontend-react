@@ -229,3 +229,39 @@ export const defaultViewerConfig = (columns, theme) => ({
     settings: true,
     theme,
 });
+
+/** Columns that carry no information once the table is scoped to a single image. */
+const CONSTANT_ON_ONE_IMAGE = (column) => column === "file_name" || column.startsWith("meta_");
+
+/** The hierarchy columns, which the per-image pivot groups by rather than lists. */
+const PARENT_COLUMNS = ["parent_label", "parent_id"];
+
+/**
+ * The configuration the per-image pivot opens with: children grouped under their parent.
+ *
+ * Unlike the dataset-wide explorer, this one does open pivoted, and for a reason the
+ * dataset view does not have. A per-contour table is flat, but the annotations are not —
+ * objects sit inside other objects, and on one image that hierarchy is the structure of
+ * what is being looked at. Grouping by ``parent_label`` then ``parent_id`` restores it, so
+ * the polyps of a colony are summed under that colony instead of scattered through a
+ * flat list of rows. (Perspective's default aggregate for a numeric column is ``sum``,
+ * which is exactly the reading wanted for a parent's children.)
+ *
+ * Root-level objects have no parent and land together in the one group Perspective makes
+ * for the null value — which reads correctly as "objects that are not inside anything".
+ *
+ * ``file_name`` and the ``meta_*`` columns are dropped: they are properties of the image,
+ * so on a single-image table every row carries the same value and they are pure width.
+ */
+export const perImageViewerConfig = (columns, theme) => ({
+    ...defaultViewerConfig(columns, theme),
+    columns: orderColumnsForDisplay(
+        columns.filter(
+            (column) => !CONSTANT_ON_ONE_IMAGE(column) && !PARENT_COLUMNS.includes(column)
+        )
+    ),
+    // Only group by hierarchy columns the table actually has: an export taken before
+    // parent_id existed, or a client held open across a deploy, would otherwise restore a
+    // config naming a column that is not there and fall back to the plain table.
+    group_by: PARENT_COLUMNS.filter((column) => columns.includes(column)),
+});

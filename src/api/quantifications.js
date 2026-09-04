@@ -86,6 +86,12 @@ export const getQuantificationSummary = async (
         // An image-metadata key to break the results down by (site, treatment, ...).
         // Only groupable key types are accepted; the server answers 422 otherwise.
         groupBy = null,
+        // Narrow every aggregation to one image of the dataset. The response shape is
+        // unchanged, so the per-image page renders it with the same components as the
+        // dataset page; it just asks twice - once scoped, once not - to have a baseline
+        // to compare the image against. Note `scale_status` then describes that one
+        // image, so a calibrated image reports mm even in a dataset that mixes units.
+        imageId = null,
     } = {}
 ) => {
     const params = new URLSearchParams();
@@ -102,6 +108,9 @@ export const getQuantificationSummary = async (
     }
     if (groupBy) {
         params.append("group_by", groupBy);
+    }
+    if (imageId !== null && imageId !== undefined) {
+        params.append("image_id", imageId);
     }
     const url = `${API_BASE_URL}/datasets/${datasetId}/quantification/summary?${params.toString()}`;
     return fetch(url, { headers: getAuthHeaders() }).then(handleApiError);
@@ -173,17 +182,22 @@ export const deleteQuantificationProfile = async (datasetId, profileId) => {
  * before building the frame, so a first call on a large or newly-changed dataset can be
  * slow. That is compute, not transfer.
  *
+ * `imageId` narrows it to one image, which is what the per-image page tabulates. It reads
+ * the same endpoint on purpose: the table on screen and the "Export this image" file are
+ * then the same rows, and cannot drift apart.
+ *
  * @returns {Promise<{rows: Object[], empty: boolean, message: string|null}>}
  */
 export const fetchQuantificationRows = async (
     datasetId,
-    { profileId = null, excludeNotFullyAnnotated = true, excludeUnreviewed = true } = {}
+    { profileId = null, excludeNotFullyAnnotated = true, excludeUnreviewed = true, imageId = null } = {}
 ) => {
     const url = buildQuantificationDownloadUrl(datasetId, {
         profileId,
         fileFormat: "json",
         excludeNotFullyAnnotated,
         excludeUnreviewed,
+        imageId,
     });
     const payload = await fetch(url, { headers: getAuthHeaders() }).then(handleApiError);
 
@@ -199,7 +213,14 @@ export const fetchQuantificationRows = async (
 // The exclude_* flags mirror the summary so the export matches whatever the page shows.
 export const buildQuantificationDownloadUrl = (
     datasetId,
-    { profileId = null, fileFormat = "csv", excludeNotFullyAnnotated = true, excludeUnreviewed = true } = {}
+    {
+        profileId = null,
+        fileFormat = "csv",
+        excludeNotFullyAnnotated = true,
+        excludeUnreviewed = true,
+        // Restrict the export to one image of the dataset (same columns, that image's rows).
+        imageId = null,
+    } = {}
 ) => {
     const params = new URLSearchParams();
     params.append("file_format", fileFormat);
@@ -207,6 +228,9 @@ export const buildQuantificationDownloadUrl = (
     params.append("exclude_unreviewed", excludeUnreviewed);
     if (profileId !== null && profileId !== undefined) {
         params.append("profile_id", profileId);
+    }
+    if (imageId !== null && imageId !== undefined) {
+        params.append("image_id", imageId);
     }
     return `${API_BASE_URL}/datasets/${datasetId}/quantification/download?${params.toString()}`;
 };

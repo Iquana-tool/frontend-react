@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image as ImageIcon, Tag, Trash2 } from 'lucide-react';
+import { BarChart3, Image as ImageIcon, Tag, Trash2 } from 'lucide-react';
 import {
   PHASES,
   getImageStatus,
@@ -9,6 +9,11 @@ import {
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
 
+/**
+ * @param {Function} [onShowQuantifications] - Opens this image's measurements (issue #15).
+ *   Optional, like the other per-tile actions: the caller passes it only where the viewer
+ *   may see quantifications, and the button is left out entirely otherwise.
+ */
 const ImageThumbnail = ({
   image,
   thumbnailUrl,
@@ -16,6 +21,7 @@ const ImageThumbnail = ({
   onImageClick,
   onDeleteImage,
   onEditMetadata,
+  onShowQuantifications,
   selected = false,
   onToggleSelect,
 }) => {
@@ -87,6 +93,18 @@ const ImageThumbnail = ({
 
       {/* Per-image actions */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
+        {onShowQuantifications && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowQuantifications(image);
+            }}
+            className="opacity-0 group-hover:opacity-100 transition-opacity bg-p1 hover:bg-hv text-t1 p-1.5 rounded-full shadow-lg"
+            title="Quantifications for this image"
+          >
+            <BarChart3 size={14} />
+          </button>
+        )}
         {onEditMetadata && (
           <button
             onClick={(e) => {

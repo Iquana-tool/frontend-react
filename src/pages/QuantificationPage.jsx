@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
-import { useParams } from "react-router-dom";
-import { Download, AlertTriangle, Info, LayoutGrid, Table2 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Download, AlertTriangle, Info, LayoutGrid, Table2, Image as ImageIcon } from "lucide-react";
 import {
   getQuantificationSummary,
   getMetricsCatalog,
@@ -69,6 +69,7 @@ const TabButton = ({ icon: Icon, label, active, onClick }) => (
 
 const QuantificationPage = () => {
   const { datasetId } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [catalog, setCatalog] = useState([]);
   const [profiles, setProfiles] = useState([]);
@@ -504,6 +505,16 @@ const QuantificationPage = () => {
                 onClick={() => setActiveTab("data")}
               />
             )}
+            {/* Sits with the tabs because it is a third way of looking at the same
+                measurements, but it navigates: per-image inspection is its own page, with
+                its own URL to link to and its own image in the address bar. It lands on
+                the first image of the dataset, which the page resolves for itself. */}
+            <TabButton
+              icon={ImageIcon}
+              label="Per image"
+              active={false}
+              onClick={() => navigate(`/dataset/${datasetId}/quantifications/image`)}
+            />
           </div>
         </div>
 
