@@ -4,10 +4,9 @@ import { MODE_STORAGE_KEY, readStoredMode } from './workspaceSlice';
 import useAnnotationStore from '../useAnnotationStore';
 
 /**
- * The workspace tab has to survive a reload. Everything else in the workspace slice is
- * throwaway view state, but the mode is where the user is in the workflow: a reviewer who
- * refreshes mid-review was being dropped back into Annotate, which both lost their place
- * and quietly changed what the canvas was showing them.
+ * The workspace tab has to survive a reload. The rest of the workspace slice is transient
+ * view state, but the mode is where the user stands in the workflow, and losing it drops a
+ * reviewer back into Annotate mid-review — which also changes what the canvas shows.
  */
 describe('workspace mode persistence', () => {
   beforeEach(() => {
@@ -34,8 +33,8 @@ describe('workspace mode persistence', () => {
   });
 
   test('the store starts on the stored mode', async () => {
-    // The store reads storage once, as it is created, so the value has to be in place
-    // before the module is imported for the first time in this test's registry.
+    // The store reads storage once, when it is created, so the value must be in place before
+    // the module is first imported in this test's registry.
     window.localStorage.setItem(MODE_STORAGE_KEY, 'review');
     const { default: store } = await import('../useAnnotationStore?fresh-mode');
     expect(store.getState().workspace.mode).toBe('review');

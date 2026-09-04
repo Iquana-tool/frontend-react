@@ -3,16 +3,16 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import useAnnotationStore from './useAnnotationStore';
 
 /**
- * The contours for an image can arrive *before* that image becomes the current one.
+ * The contours for an image can arrive before that image becomes the current one.
  *
- * The websocket session is opened from the URL's image id and the server answers it with
+ * The websocket session is opened from the URL's image id and answered with
  * SESSION_INITIALIZED followed immediately by OBJECTS, while `DatasetLoader` is still
- * fetching the image list and the annotation queue over REST. Whichever finishes first is
- * a coin flip, which is why this only bites on some reloads.
+ * fetching the image list and the annotation queue over REST. Either can finish first,
+ * which is why the failure is intermittent across reloads.
  *
- * When the contours win that race, `setCurrentImage` used to wipe them and re-arm the
- * spinner — and nothing re-requests them, because the session is already pointed at that
- * image. The canvas then sat on "Loading contours" until the 60s timeout gave up.
+ * If the contours arrive first, `setCurrentImage` must not wipe them: nothing re-requests
+ * them, since the session is already pointed at that image, so the canvas would wait on the
+ * loading state until its timeout.
  */
 const hierarchy = {
   root_contours: [
@@ -40,7 +40,7 @@ describe('contours arriving before the image becomes current', () => {
   test('are kept when that image is then made current', () => {
     const { setObjectsFromHierarchy, setCurrentImage } = useAnnotationStore.getState();
 
-    // OBJECTS lands first, tagged with the image the session asked for.
+    // OBJECTS arrives first, tagged with the image the session asked for.
     setObjectsFromHierarchy(hierarchy, null, 2);
     expect(useAnnotationStore.getState().objects.list).toHaveLength(2);
     expect(useAnnotationStore.getState().objects.loading).toBe(false);

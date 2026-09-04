@@ -64,11 +64,11 @@ export const createObjectsSlice = (set) => ({
    * @param hierarchy The backend ContourHierarchy.
    * @param labelsMap Optional Map from label_id to label name (always Map or null in
    *   production).
-   * @param imageId The image these contours belong to. Callers handling an OBJECTS
-   *   message must pass it — the contours can arrive before that image is the current
-   *   one, and `setCurrentImage` needs the tag to know not to wipe them. Omitted by
-   *   callers that are by definition already on the image (undo/redo, a full hierarchy
-   *   pushed after an edit), which fall back to whatever is current.
+   * @param imageId The image these contours belong to. Callers handling an OBJECTS message
+   *   must pass it: the contours can arrive before that image is current, and
+   *   `setCurrentImage` needs the tag to know not to wipe them. Callers that are by
+   *   definition already on the image (undo/redo, a hierarchy pushed after an edit) may omit
+   *   it and fall back to the current image.
    */
   setObjectsFromHierarchy: (hierarchy, labelsMap = null, imageId = undefined) => set((state) => {
     const list = [];

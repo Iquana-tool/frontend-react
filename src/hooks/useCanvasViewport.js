@@ -1,5 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
+import { clampZoom } from '../components/annotationPage/workspace/constants';
+import {
+  clampPan,
+  fitImageToContainer,
+  imageRectOnScreen,
+  panForDrag,
+  panForFocalZoom,
+} from '../utils/canvasViewport';
+
 /**
  * Shared canvas viewport logic for the Konva-based annotation canvases
  * (AI prompting and manual drawing).
@@ -17,6 +26,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
  * @param {Function} params.setPanOffset - Store setter for pan
  * @param {boolean} params.active - Whether the owning tool is active (gates key listeners)
  */
+/** Zoom multiplier for one wheel notch. */
+const SCALE_BY = 1.1;
+
 const useCanvasViewport = ({ imageObject, zoomLevel, panOffset, setZoomLevel, setPanOffset, active }) => {
   const containerRef = useRef(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -38,46 +50,22 @@ const useCanvasViewport = ({ imageObject, zoomLevel, panOffset, setZoomLevel, se
 
   useEffect(() => {
     if (imageObject && containerSize.width && containerSize.height) {
-      const imageAspect = imageObject.width / imageObject.height;
-      const containerAspect = containerSize.width / containerSize.height;
-
-      let baseScale, imageWidth, imageHeight, x, y;
-
-      if (imageAspect > containerAspect) {
-        baseScale = containerSize.width / imageObject.width;
-        imageWidth = containerSize.width;
-        imageHeight = imageObject.height * baseScale;
-        x = 0;
-        y = (containerSize.height - imageHeight) / 2;
-      } else {
-        baseScale = containerSize.height / imageObject.height;
-        imageWidth = imageObject.width * baseScale;
-        imageHeight = containerSize.height;
-        x = (containerSize.width - imageWidth) / 2;
-        y = 0;
-      }
-
-      // CSS transform applies translate in the SCALED coordinate system, so the
-      // pan offset is multiplied by zoom to get the actual pixel offset.
-      const zoomedWidth = imageWidth * zoomLevel;
-      const zoomedHeight = imageHeight * zoomLevel;
-      const baseCenterX = x + imageWidth / 2;
-      const baseCenterY = y + imageHeight / 2;
-      const zoomedX = baseCenterX - zoomedWidth / 2;
-      const zoomedY = baseCenterY - zoomedHeight / 2;
-      const finalX = zoomedX + (panOffset.x * zoomLevel);
-      const finalY = zoomedY + (panOffset.y * zoomLevel);
+      const imageSize = { width: imageObject.width, height: imageObject.height };
+      const fit = fitImageToContainer(imageSize, containerSize);
+      // Derived from the same formula as the CSS transform, so the Konva overlays and the
+      // image beneath cannot disagree about where the image is.
+      const rect = imageRectOnScreen({ zoom: zoomLevel, pan: panOffset, containerSize, imageSize });
 
       setImageDimensions({
-        width: imageWidth,
-        height: imageHeight,
-        x,
-        y,
-        baseScale,
-        displayWidth: zoomedWidth,
-        displayHeight: zoomedHeight,
-        displayX: finalX,
-        displayY: finalY,
+        width: fit.width,
+        height: fit.height,
+        x: fit.x,
+        y: fit.y,
+        baseScale: fit.baseScale,
+        displayWidth: rect.width,
+        displayHeight: rect.height,
+        displayX: rect.x,
+        displayY: rect.y,
       });
     }
   }, [imageObject, containerSize, zoomLevel, panOffset]);
@@ -136,16 +124,22 @@ const useCanvasViewport = ({ imageObject, zoomLevel, panOffset, setZoomLevel, se
   const handlePanMove = useCallback((e) => {
     if (!isPanning || !panStart) return;
 
-    const deltaX = e.evt.clientX - panStart.x;
-    const deltaY = e.evt.clientY - panStart.y;
+    const delta = { x: e.evt.clientX - panStart.x, y: e.evt.clientY - panStart.y };
+    const next = panForDrag({ panOffset, delta, zoom: zoomLevel });
 
-    setPanOffset({
-      x: panOffset.x + deltaX,
-      y: panOffset.y + deltaY,
-    });
+    setPanOffset(
+      imageObject
+        ? clampPan({
+            pan: next,
+            zoom: zoomLevel,
+            containerSize,
+            imageSize: { width: imageObject.width, height: imageObject.height },
+          })
+        : next
+    );
 
     setPanStart({ x: e.evt.clientX, y: e.evt.clientY });
-  }, [isPanning, panStart, panOffset, setPanOffset]);
+  }, [isPanning, panStart, panOffset, setPanOffset, zoomLevel, imageObject, containerSize]);
 
   const handlePanEnd = useCallback(() => {
     setIsPanning(false);
@@ -157,51 +151,25 @@ const useCanvasViewport = ({ imageObject, zoomLevel, panOffset, setZoomLevel, se
 
     if (!imageObject || !containerSize.width || !containerSize.height) return;
 
-    const stage = e.target.getStage();
-    const pointerPosition = stage.getPointerPosition();
-    const scaleBy = 1.1;
-    const newScale = e.evt.deltaY > 0 ? zoomLevel / scaleBy : zoomLevel * scaleBy;
-    const clampedScale = Math.max(0.1, Math.min(10, newScale));
-    const imageAspect = imageObject.width / imageObject.height;
-    const containerAspect = containerSize.width / containerSize.height;
+    const pointerPosition = e.target.getStage().getPointerPosition();
+    if (!pointerPosition) return;
 
-    let baseScale, imageWidth, imageHeight, x, y;
+    // Shares the workspace zoom limits with the toolbar and the plain-image canvas, so all
+    // three agree on how far the viewport can go.
+    const newZoom = clampZoom(e.evt.deltaY > 0 ? zoomLevel / SCALE_BY : zoomLevel * SCALE_BY);
+    if (newZoom === zoomLevel) return;
 
-    if (imageAspect > containerAspect) {
-      baseScale = containerSize.width / imageObject.width;
-      imageWidth = containerSize.width;
-      imageHeight = imageObject.height * baseScale;
-      x = 0;
-      y = (containerSize.height - imageHeight) / 2;
-    } else {
-      baseScale = containerSize.height / imageObject.height;
-      imageWidth = imageObject.width * baseScale;
-      imageHeight = containerSize.height;
-      x = (containerSize.width - imageWidth) / 2;
-      y = 0;
-    }
+    const imageSize = { width: imageObject.width, height: imageObject.height };
+    const focal = panForFocalZoom({
+      pointer: pointerPosition,
+      containerSize,
+      panOffset,
+      oldZoom: zoomLevel,
+      newZoom,
+    });
 
-    const baseCenterX = x + imageWidth / 2;
-    const baseCenterY = y + imageHeight / 2;
-    const currentZoomedWidth = imageWidth * zoomLevel;
-    const currentZoomedHeight = imageHeight * zoomLevel;
-    const currentZoomedX = baseCenterX - currentZoomedWidth / 2;
-    const currentZoomedY = baseCenterY - currentZoomedHeight / 2;
-    const currentImageX = currentZoomedX + panOffset.x;
-    const currentImageY = currentZoomedY + panOffset.y;
-    const relativeX = pointerPosition.x - currentImageX;
-    const relativeY = pointerPosition.y - currentImageY;
-    const imagePixelX = relativeX / (baseScale * zoomLevel);
-    const imagePixelY = relativeY / (baseScale * zoomLevel);
-    const newZoomedWidth = imageWidth * clampedScale;
-    const newZoomedHeight = imageHeight * clampedScale;
-    const newZoomedX = baseCenterX - newZoomedWidth / 2;
-    const newZoomedY = baseCenterY - newZoomedHeight / 2;
-    const newPanX = pointerPosition.x - newZoomedX - (imagePixelX * baseScale * clampedScale);
-    const newPanY = pointerPosition.y - newZoomedY - (imagePixelY * baseScale * clampedScale);
-
-    setZoomLevel(clampedScale);
-    setPanOffset({ x: newPanX, y: newPanY });
+    setZoomLevel(newZoom);
+    setPanOffset(clampPan({ pan: focal, zoom: newZoom, containerSize, imageSize }));
   }, [zoomLevel, panOffset, setZoomLevel, setPanOffset, imageObject, containerSize]);
 
   // Space-to-pan: hold Space to temporarily switch to pan mode

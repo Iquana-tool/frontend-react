@@ -29,12 +29,12 @@ export const createImagesSlice = (set) => ({
       // left the previous image's contours drawn over the new one for as long as the
       // round trip took, which read as the objects belonging to the image on screen.
       //
-      // Unless the contours already on hand are this image's own. On a reload the
-      // websocket session is opened straight from the URL's image id and answered with
-      // OBJECTS immediately, while DatasetLoader is still fetching the image list that
-      // makes the image current — so the contours often land first. Wiping them here
-      // left the canvas spinning for a message the server had already sent, since the
-      // session is by then pointed at that same image and sends no other.
+      // Unless the contours already on hand are this image's own. On a reload the websocket
+      // session is opened from the URL's image id and answered with OBJECTS immediately,
+      // while DatasetLoader is still fetching the image list that makes the image current,
+      // so the contours can land first. Wiping them here would leave the canvas waiting for
+      // a message the server has already sent: the session is by then pointed at that same
+      // image and sends no other.
       if (state.objects.loadedForImageId !== state.images.currentImageId) {
         state.objects.list = [];
         state.objects.selected = [];

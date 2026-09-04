@@ -38,16 +38,14 @@ const persistTheme = (theme) => {
 /**
  * Reads the persisted workspace tab, falling back to Annotate (the default).
  *
- * The mode is persisted for the same reason the theme is, but it matters more: it is
- * where the user stands in the workflow, not a cosmetic preference. A reviewer who
- * reloaded mid-review was dropped back into Annotate, which lost their place *and*
- * silently changed what the canvas showed them — Review hides approved objects, so the
- * same image comes back looking like it has unreviewed work left on it.
+ * The mode is persisted for the same reason as the theme, but it carries more weight: it is
+ * where the user stands in the workflow rather than a cosmetic preference. Losing it on
+ * reload also changes what the canvas shows, since Review hides approved objects.
  *
- * `?mode=` is deliberately not the mechanism here: that parameter is a one-shot
- * instruction from a caller (the dataset page's Calibrate card), stripped from the URL
- * as soon as it is applied so a later switch is not undone. It cannot survive a reload
- * by design — see the effect that consumes it in `WorkspaceShell`.
+ * `?mode=` is not the mechanism here. That parameter is a one-shot instruction from a
+ * caller (the dataset page's Calibrate card), stripped from the URL once applied so a later
+ * switch is not undone, and so cannot survive a reload by design — see the effect that
+ * consumes it in `WorkspaceShell`.
  */
 export const readStoredMode = () => {
   try {
