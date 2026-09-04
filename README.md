@@ -1,226 +1,205 @@
-# Coral Segmentation Frontend
+# IQUANA frontend
 
-This is the frontend application for the Coral Segmentation project. It provides an interactive interface for segmenting coral images using the SAM2 model.
+The web UI for [IQUANA](https://github.com/Iquana-tool/iquana-tool) — **I**ntelligent
+**QU**antification, **AN**notation and **A**nalysis, a tool for AI-assisted segmentation,
+annotation and quantification of scientific image datasets, built at
+[DFKI](https://www.dfki.de/).
 
-## Features
+A React 18 single-page app built with Vite, talking to the
+[backend](https://github.com/Iquana-tool/backend) over REST and a WebSocket.
 
-- Upload and manage coral images
-- Interactive segmentation tools (point, box, circle, polygon)
-- Foreground/background prompting
-- Image zoom and pan controls
-- Save and refine segmentation masks
-- Integration with SAM2 segmentation backend
+- **User documentation:** https://iquana-tool.github.io/docs/
+- **Installing the whole tool:** do not clone this repo by hand — run the
+  [installer](https://github.com/Iquana-tool/iquana-tool), which sets up every component and
+  wires their configuration together.
+- **Issues:** all IQUANA bug reports and feature requests go to
+  [iquana-tool/issues](https://github.com/Iquana-tool/iquana-tool/issues/new/choose).
 
-## Prerequisites
+---
 
-- Node.js (v20.19+ or v22.12+, required by Vite 8)
-- bun (the package manager of record; `bun.lock` is the committed lockfile)
-- Backend server running (see backend setup)
+## What the UI covers
+
+| Page | Route | Purpose |
+|---|---|---|
+| Landing | `/` | Instance identity, sign-in, entry points |
+| Datasets | `/datasets` | Dataset list, creation, upload |
+| Data management | `/dataset/:datasetId/datamanagement` (+ `/images`, `/labels`) | Gallery, image metadata, label hierarchy |
+| Annotation | `/dataset/:datasetId/annotate/:imageId` | The annotation canvas |
+| Viewer | `/dataset/:datasetId/view/:imageId` | Read-only annotation view |
+| Review | `/dataset/:datasetId/review` | Review queue — accept, reject, send back for correction |
+| Correction | `/dataset/:datasetId/correct` | Work through instances sent back by review |
+| Quantification | `/dataset/:datasetId/quantifications` (+ `/image/:imageId`) | Metric explorer, per-image tables, export |
+| Training | `/dataset/:datasetId/training` | Per-label instance-segmentation training runs |
+| Batch inference | `/dataset/:datasetId/inference` | Dataset-wide model runs and progress |
+| Access | `/dataset/:datasetId/access` | Members, invites, review policy, task assignment |
+| Model zoo | `/models` | Browse available models, capabilities and performance stats |
+| Admin | `/admin/users` | User management and instance settings |
+
+### The annotation canvas
+
+Three workflow tabs — **Calibrate**, **Annotate**, **Review**.
+
+- **Calibrate** — draw a scale line and give it a physical unit, or colour-calibrate from
+  patches or a greyscale card.
+- **Annotate** — four prompt types (points, boxes, polygons, freedraw). *Run AI* invokes a
+  prompted-segmentation model, *Suggest similar* an instance-suggestion model, and boxes and
+  freedraw shapes can be added as objects directly. The **instant switch** (*Nothing* /
+  *Run AI* / *Add manually*) sets what happens the moment a prompt lands, which is what
+  removes most of the clicking. Outlines are editable three ways: AI refinement from extra
+  prompts, dragging outline vertices, or redrawing a section with a polygon or freedraw.
+  Selecting an object enters **focus mode**, zooming into it and nesting everything drawn
+  next underneath it — arbitrarily deep.
+- **Review** — every object not yet accepted, with accept / reject / send-back actions.
+
+---
 
 ## Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd coral-frontend
-   ```
+### Prerequisites
 
-2. **Install dependencies**
-   ```bash
-   bun install
-   ```
+- **Node.js ≥ 22.12** (see `.nvmrc`; required by Vite 8)
+- **[bun](https://bun.sh)** — the package manager of record; `bun.lock` is the committed
+  lockfile
+- A running [backend](https://github.com/Iquana-tool/backend)
 
-3. **Configure API endpoint**
+### Install and run
 
-   Copy `env.example` to `.env` and set the backend URL. Only variables
-   prefixed `VITE_` are exposed to client code:
-   ```
-   VITE_API_BASE_URL=http://localhost:8000
-   ```
+```bash
+bun install
+cp env.example .env.local
+bun run dev
+```
 
-4. **Start the development server**
-   ```bash
-   bun run dev
-   ```
+| Script | What it does |
+|---|---|
+| `bun run dev` | Vite dev server with HMR, on `PORT` (default 3000) |
+| `bun run build` | Production bundle into `build/` |
+| `bun run preview` | Serve the built bundle |
+| `bun run test` | Vitest suite (jsdom, globals enabled) |
 
-5. **Build for production**
-   ```bash
-   bun run build
-   ```
+To serve the app from a path prefix behind a reverse proxy, set `PUBLIC_URL` at build time:
 
-   Output lands in `build/`. Preview that bundle with `bun run preview`.
-   To serve the app from a path prefix behind the reverse proxy, set
-   `PUBLIC_URL` (e.g. `PUBLIC_URL=/iquana bun run build`).
+```bash
+PUBLIC_URL=/iquana bun run build
+```
 
-6. **Run tests**
-   ```bash
-   bun run test
-   ```
+---
 
-## Backend Integration
+## Configuration
 
-This frontend is designed to work with the FastAPI backend for coral segmentation. Make sure the backend server is running before using the frontend application.
+Only variables prefixed `VITE_` reach client code. The unprefixed ones are read in Node at
+build/serve time by `vite.config.mjs` (through `loadEnv`, so `.env.local` works for them too).
 
-### Backend API Endpoints Used
+| Variable | Scope | Purpose |
+|---|---|---|
+| `VITE_API_BASE_URL` | client | Backend base URL — scheme, host and port only, **no** trailing `/api` |
+| `VITE_WS_URL` | client | WebSocket URL; derived from the API base URL when unset |
+| `PORT` | dev server | Port the dev server binds (default 3000) |
+| `PUBLIC_URL` | build | Path prefix the app is served under; becomes Vite's `base` |
+| `ALLOWED_HOSTS` | dev server | Comma-separated hostnames the dev server answers to |
+| `CHOKIDAR_USEPOLLING` | dev server | File polling, needed for bind-mounted source on non-Linux hosts |
 
-- `/images/upload_image` - Upload a new image
-- `/images/list_images` - Get all available images
-- `/images/get_image/{image_id}` - Get a specific image
-- `/images/delete_image/{image_id}` - Delete an image
-- `/segmentation/segment_image` - Perform segmentation with optional prompts
-- `/masks/save_mask` - Save a segmentation mask
-- `/masks/get_mask/{mask_id}` - Get a specific mask
-- `/masks/get_masks_for_image/{image_id}` - Get all masks for an image
-- `/masks/delete_mask/{mask_id}` - Delete a mask
-- `/cutouts/get_cutouts` - Get cutouts based on masks
+### Reaching the dev server from another machine
 
-## Usage
+Vite refuses any request whose `Host` header is not `localhost` or a bare IP, as
+DNS-rebinding protection. Reaching the tool from another PC *by name* therefore returns a
+bare `403 Blocked request` even though the port is bound on every interface — the same URL
+by IP works, which is what makes it look like a DNS problem. List the name in
+`ALLOWED_HOSTS`, or set `ALLOWED_HOSTS=true` to accept any name (only behind a reverse proxy
+that already terminates the hostname; it gives up the rebinding check).
 
-1. **Upload an image** by dragging and dropping or using the file selector
-2. **Select segmentation tools** from the toolbar
-3. **Add prompts** to indicate foreground (green) or background (red)
-4. **Click "Start Segmentation"** to process the image
-5. **Review the segments** that appear in the results section
-6. **Refine segments** by selecting and using the refine button
-7. **Save masks** to the database for future use
+---
 
-## Components
-
-- **AnnotationPageV2** - Main component for image viewing and interaction
-- **PromptingCanvas** - Canvas for adding segmentation prompts
-- **API** - Handles communication with the backend
-
-## Advanced Features
-
-### Model Selection
-
-The application supports different SAM2 models:
-- SAM2 Tiny (fast but less accurate)
-- SAM2 Small (balanced)
-- SAM2 Large (more accurate but slower)
-- SAM2 Base Plus (enhanced version)
-
-### Refinement Mode
-
-To refine a segment:
-1. Select a segmentation result
-2. Click "Refine Selected Segment"
-3. Add additional prompts in the refinement view
-4. Click "Start Segmentation"
-5. Return to the full image view to see the updated segment
-
-## Troubleshooting
-
-- **Image fails to load**: Ensure the backend is running and the image exists
-- **Segmentation fails**: Check console for errors and ensure your backend has the proper SAM2 models installed
-- **Slow performance**: Try using the SAM2 Tiny model for faster results
-
-## Development
-
-### Directory Structure
+## Project structure
 
 ```
 src/
-├── api.js          # API functions for backend communication
-├── App.jsx         # Main application component
+├── api/                # One module per backend area (datasets, contours, labels,
+│                       #   masks, models, inference, reviews, calibration, auth, ...)
+│                       #   config.js holds API_BASE_URL and BASE_PATH
 ├── components/
-│   └── prompting/  # Segmentation components
-│       ├── AnnotationPageV2.jsx
-│       ├── PromptingCanvas.jsx
-│       ├── index.js
-│       └── utils.js
-├── sampleImages.js # Sample images for development
-└── index.js        # Entry point
+│   ├── annotationPage/ # Canvas, layout, modals, workspace
+│   ├── auth/           # Login, Register, ProtectedRoute, Can
+│   ├── datasets/       # Cards, gallery, access, training
+│   ├── inference/      # Label/model planner, progress, write-mode selector
+│   ├── models/         # Model cards, detail panel, training modal
+│   ├── quantification/ # Metric cards, label tree, Perspective explorer
+│   ├── review/         # Review setup and session
+│   ├── viewer/, ui/, documentation/, correction/
+├── pages/              # One component per route
+├── stores/             # Zustand store, split into slices (canvas, objects, images,
+│                       #   history, models, websocket, focus mode, workspace, ...)
+├── hooks/              # Canvas interaction, AI segmentation, sessions, permissions, ...
+├── contexts/           # Auth, Dataset, Toast, Correction
+├── services/           # WebSocket transport + annotation-session protocol
+├── utils/              # Contour geometry, label hierarchy, quantification, exports
+└── styles/             # Theme tokens, workspace and Perspective CSS
 ```
 
-## CI/CD Pipeline
+### State and transport
 
-This project uses GitHub Actions for Continuous Integration and Continuous Deployment.
+Client state lives in a **[zustand](https://github.com/pmndrs/zustand)** store composed of
+slices under `src/stores/slices/`. The annotation canvas is **konva** / **react-konva**;
+styling is **Tailwind CSS v3** utilities with a few MUI components.
 
-### Workflow Overview
+Annotation is a stateful session over a WebSocket (`src/services/annotationSession.js`), not
+a series of REST calls: prompts, model switches, object updates and image switches are all
+messages on the one connection.
 
-The CI/CD pipeline consists of four main jobs:
+### Perspective is lazily loaded
 
-1. **Build and Test**
-   - Checkout code
-   - Set up Node.js environment
-   - Install dependencies
-   - Run linting checks
-   - Run tests
-   - Build the application
-   - Upload build artifacts
+The quantification explorer is built on `@perspective-dev` v5. It is reached only through
+`React.lazy()` (see `src/components/quantification/QuantificationExplorer.jsx`) so the engine
+and its plugins — several MB — stay out of the main bundle. Perspective v5 requires Vite;
+it cannot run under webpack, which is part of why this app migrated.
 
-2. **Docker Build**
-   - Builds a Docker image for the application
-   - Pushes the image to Docker Hub with appropriate tags
-   - Uses build caching for faster builds
-   - Comments on pull requests with Docker image information
-   - Runs only on pushes to main and development branches
+---
 
-3. **Staging Deployment** (for development branch)
-   - Connects to the staging server via SSH
-   - Deploys the latest development image
-   - Uses environment variables for flexibility
-   - Runs container on port 3001
+## In-app documentation
 
-4. **Production Deployment** (for main branch)
-   - Connects to the production server via SSH
-   - Deploys the latest main branch image
-   - Uses environment variables for flexibility
-   - Runs container on port 3000
+`/docs` renders a short in-app guide, but the canonical user documentation is the MkDocs
+site at **https://iquana-tool.github.io/docs/**. Help links throughout the app point there;
+prefer adding to the docs site over extending `src/components/documentation/`.
 
-### Required Secrets
+---
 
-To use this CI/CD workflow, you need to set up the following GitHub secrets:
+## Docker
 
-- `DOCKER_HUB_USERNAME`: The Docker Hub username
-- `DOCKER_HUB_TOKEN`: A Docker Hub access token
-- `SSH_HOST`: The IP address or hostname of your deployment VM
-- `SSH_USERNAME`: The username for SSH access to the VM
-- `SSH_PRIVATE_KEY`: The private SSH key for authentication
+`Dockerfile` builds the production bundle and serves it with nginx; `Dockerfile.dev` runs
+the Vite dev server. `docker-compose.yml` defines both:
 
-### Team Collaboration
+```bash
+docker compose up --build          # production image on :3000
+docker compose up dev              # dev server on :3001
+```
 
-This CI/CD setup supports collaborative development through:
+The `VITE_*` variables are read at **build** time (the bundle is baked, then served
+statically), so setting them under `environment:` for the production service has no effect —
+they must be passed as build args.
 
-1. **Branch-Based Workflow**
-   - `main`: Production branch (deployed to production environment)
-   - `development`: Staging branch (deployed to staging environment)
-   - Feature branches: Create from development, merge via pull request
+---
 
-2. **Pull Request Workflow**
-   - Create a feature branch from development
-   - Make your changes and push
-   - Create a pull request to development
-   - CI will run tests and build Docker image
-   - Review and approve
-   - Merge to trigger deployment to staging
+## CI
 
-3. **Local Development with Docker**
-   
-   You can use the same Docker images locally:
-   ```bash
-   # Pull the latest development image
-   docker pull [DOCKER_USERNAME]/frontend-coral:development
-   
-   # Run locally
-   docker run -p 3000:3000 [DOCKER_USERNAME]/frontend-coral:development
-   ```
+`.github/workflows/` still contains the pipeline inherited from the pre-Vite app: it uses
+npm with `package-lock.json` and Node 18, while the project now builds with bun and needs
+Node ≥ 22.12. **Treat those workflows as stale** — they do not reflect how the app is built
+today, and installation is done by the [installer](https://github.com/Iquana-tool/iquana-tool)
+rather than by the Docker Hub deploy they describe.
 
-4. **Manual Deployment**
-   
-   If needed, you can deploy manually using the script:
-   ```bash
-   # Deploy the latest main image
-   ./scripts/deploy.sh --username [DOCKER_USERNAME] --tag main
-   
-   # Or deploy with custom settings
-   ./scripts/deploy.sh --username [DOCKER_USERNAME] --tag development --port 3001 --container react-frontend-dev
-   ```
+---
 
-### Best Practices
+## Related repositories
 
-- Always create pull requests for changes
-- Wait for CI checks to pass before merging
-- Test on staging before promoting to production
-- Use descriptive commit messages
+| Repo | Role |
+|---|---|
+| [iquana-tool](https://github.com/Iquana-tool/iquana-tool) | Installer, launcher and the issue tracker for all of IQUANA |
+| [backend](https://github.com/Iquana-tool/backend) | REST + WebSocket API, database, exports |
+| [ai-service](https://github.com/Iquana-tool/ai-service) | Model inference and training |
+| [iquana-toolbox](https://github.com/Iquana-tool/iquana-toolbox) | Shared Pydantic schemas and registries |
+
+---
+
+## License
+
+AGPL-3.0 — see [LICENSE](LICENSE).
