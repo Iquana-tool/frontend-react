@@ -4,11 +4,17 @@
  * Everything here is presentation state. Nothing in this slice is persisted to
  * the backend except through the actions that already own that concern
  * (label assignment, visibility filters, object mutation), which live in
- * `objectsSlice`. The one exception is `theme`, mirrored to localStorage so the
- * choice survives a reload.
+ * `objectsSlice`. The exceptions are `theme` and `mode`, mirrored to localStorage
+ * so the choices survive a reload.
  */
 
 const THEME_STORAGE_KEY = 'iquana.workspace.theme';
+
+/** @see readStoredMode */
+export const MODE_STORAGE_KEY = 'iquana.workspace.mode';
+
+/** The workspace tabs, and the only values `mode` is ever allowed to take. */
+const WORKSPACE_MODES = ['calibrate', 'annotate', 'review'];
 
 /** Reads the persisted theme, falling back to dark (the design default). */
 export const readStoredTheme = () => {
@@ -26,6 +32,36 @@ const persistTheme = (theme) => {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     // Non-fatal: the theme simply won't survive a reload.
+  }
+};
+
+/**
+ * Reads the persisted workspace tab, falling back to Annotate (the default).
+ *
+ * The mode is persisted for the same reason as the theme, but it carries more weight: it is
+ * where the user stands in the workflow rather than a cosmetic preference. Losing it on
+ * reload also changes what the canvas shows, since Review hides approved objects.
+ *
+ * `?mode=` is not the mechanism here. That parameter is a one-shot instruction from a
+ * caller (the dataset page's Calibrate card), stripped from the URL once applied so a later
+ * switch is not undone, and so cannot survive a reload by design — see the effect that
+ * consumes it in `WorkspaceShell`.
+ */
+export const readStoredMode = () => {
+  try {
+    const stored = window.localStorage.getItem(MODE_STORAGE_KEY);
+    return WORKSPACE_MODES.includes(stored) ? stored : 'annotate';
+  } catch {
+    // Private browsing / disabled storage — the default is good enough.
+    return 'annotate';
+  }
+};
+
+const persistMode = (mode) => {
+  try {
+    window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch {
+    // Non-fatal: the mode simply won't survive a reload.
   }
 };
 
@@ -64,6 +100,7 @@ export const createWorkspaceSlice = (set) => ({
     const previous = state.workspace.mode;
     if (previous === mode) return;
     state.workspace.mode = mode;
+    persistMode(mode);
 
     // Leaving review mode should not strand the "show approved" escape hatch on.
     if (mode !== 'review') state.workspace.showApproved = false;

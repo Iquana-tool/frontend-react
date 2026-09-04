@@ -11,12 +11,12 @@ import {
   useClearSelection,
   useSetInstanceRunRequested,
   useInstanceWarningModalOpen,
-  useRefinementModeActive,
   useWorkspaceMode,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
 import { deleteObject } from '../utils/objectOperations';
+import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
 
 /**
  * Action keyboard shortcuts for the annotation page.
@@ -30,7 +30,8 @@ import { deleteObject } from '../utils/objectOperations';
  * - 1: Run Prompted Segmentation
  * - 2: Run Instance Suggestion (suggestion) with selected objects as seeds
  * - 3: Open Instance Segmentation (warning modal)
- * - Delete/Backspace: In refinement mode with prompts, remove last prompt; otherwise reject selected objects, or remove last prompt when in AI tool with no selection
+ * - Delete/Backspace: Remove the last prompt while any are on the AI canvas, otherwise
+ *   reject the selected objects. See deleteRouting.js for why prompts come first.
  */
 export default function useAnnotationKeyboardShortcuts() {
   const currentTool = useCurrentTool();
@@ -48,7 +49,6 @@ export default function useAnnotationKeyboardShortcuts() {
   const clearSelection = useClearSelection();
   const setInstanceRunRequested = useSetInstanceRunRequested();
   const instanceWarningModalOpen = useInstanceWarningModalOpen();
-  const refinementModeActive = useRefinementModeActive();
   const mode = useWorkspaceMode();
 
   const { runSegmentation } = useAISegmentation();
@@ -121,20 +121,20 @@ export default function useAnnotationKeyboardShortcuts() {
         }
         case 'Delete':
         case 'Backspace': {
-          // In refinement mode with prompts: erase last prompt (don't reject the contour being refined)
-          if (
-            currentTool === 'ai_annotation' &&
-            refinementModeActive &&
-            prompts.length > 0
-          ) {
+          // Prompts before the selection, always — see deleteRouting.js. This used to hold
+          // only inside refinement mode, which left a segmentation run's auto-selected
+          // object outranking a prompt placed after it.
+          const target = routeDelete({
+            tool: currentTool,
+            promptCount: prompts.length,
+            selectionCount: selectedObjects.length,
+          });
+          if (target === DELETE_PROMPT) {
             e.preventDefault();
             removeLastPrompt();
-          } else if (selectedObjects.length > 0) {
+          } else if (target === DELETE_SELECTION) {
             e.preventDefault();
             handleRejectSelected();
-          } else if (currentTool === 'ai_annotation') {
-            e.preventDefault();
-            removeLastPrompt();
           }
           break;
         }
@@ -154,7 +154,6 @@ export default function useAnnotationKeyboardShortcuts() {
     runInstanceRequest,
     handleRejectSelected,
     currentTool,
-    refinementModeActive,
     prompts.length,
     removeLastPrompt,
   ]);

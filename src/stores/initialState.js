@@ -249,6 +249,16 @@ export const initialState = {
     loading: false,
     /** When the contours could not be loaded — the message shown in place of the spinner. */
     loadError: null,
+    /**
+     * Which image the contours in `list` were loaded for, or null when none have been.
+     *
+     * The websocket session is opened from the URL's image id and answered with the contours
+     * straight away, while the image list is still being fetched over REST, so the contours
+     * can arrive before their image is the current one. Without this tag `setCurrentImage`
+     * cannot distinguish them from a previous image's and wipes them, leaving the canvas
+     * waiting for a message the server has already sent.
+     */
+    loadedForImageId: null,
   },
   
   // WebSocket State
