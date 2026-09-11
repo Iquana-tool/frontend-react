@@ -99,7 +99,7 @@ const ToolOptionsDrawer = () => {
 
         <div className="h-px bg-ln" />
 
-        <div>
+        <div data-guide="drawer-services">
           <div className="flex items-center gap-[7px] mb-[9px]">
             <Sparkles size={14} className="text-ac flex-none" />
             <span className="text-row font-bold text-t1">Annotation services</span>

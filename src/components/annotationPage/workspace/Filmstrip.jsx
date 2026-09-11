@@ -23,7 +23,10 @@ const Filmstrip = () => {
   ).length;
 
   return (
-    <div className="h-[74px] flex-none flex items-center gap-[7px] px-[10px] bg-p1 border-t border-ln">
+    <div
+      data-guide="filmstrip"
+      className="h-[74px] flex-none flex items-center gap-[7px] px-[10px] bg-p1 border-t border-ln"
+    >
       <button
         type="button"
         onClick={toggleFilmstrip}

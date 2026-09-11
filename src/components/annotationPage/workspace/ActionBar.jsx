@@ -355,6 +355,7 @@ const ActionBar = () => {
             disabled={isAdding}
             title="Save the outline exactly as drawn, without running a model"
             onClick={addShapes}
+            guide="action-add-object"
           />
         )}
         <BarButton
@@ -365,6 +366,7 @@ const ActionBar = () => {
           disabled={!canRunAI}
           title={runAIBlockedReason || undefined}
           onClick={() => runSegmentation()}
+          guide="action-run-ai"
         />
       </>
     );
@@ -392,6 +394,7 @@ const ActionBar = () => {
           label="Edit contour"
           shortcut="E"
           onClick={() => actions.editContour(single)}
+          guide="action-edit-contour"
         />
         <BarButton icon={PenLine} label="Reshape" onClick={() => actions.reshapeByLine(single)} />
         <BarButton
@@ -401,6 +404,7 @@ const ActionBar = () => {
           disabled={!suggest.eligible}
           title={suggest.reason || undefined}
           onClick={suggest.run}
+          guide="action-suggest-similar"
         />
         <BarButton
           icon={Trash2}
@@ -415,6 +419,7 @@ const ActionBar = () => {
             shortcut="L"
             variant="primary"
             onClick={() => setPicker('label')}
+            guide="action-assign-label"
           />
         ) : (
           <BarButton
@@ -423,6 +428,7 @@ const ActionBar = () => {
             shortcut="L"
             variant="chip"
             onClick={() => setPicker('label')}
+            guide="action-assign-label"
           />
         )}
       </>
@@ -446,6 +452,7 @@ const ActionBar = () => {
           disabled={!suggest.eligible}
           title={suggest.reason || undefined}
           onClick={suggest.run}
+          guide="action-suggest-similar"
         />
         <BarButton
           icon={Trash2}
@@ -517,6 +524,7 @@ const ActionBar = () => {
           variant="ok"
           disabled={!reviewTarget}
           onClick={acceptCurrent}
+          guide="review-accept"
         />
       </>
     );
@@ -603,7 +611,10 @@ const ActionBar = () => {
         </div>
       )}
 
-      <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-[7px] p-[6px] rounded-12 bg-glass border border-ln2 shadow-bar backdrop-blur-sm">
+      <div
+        data-guide="action-bar"
+        className="pointer-events-auto flex flex-wrap items-center justify-center gap-[7px] p-[6px] rounded-12 bg-glass border border-ln2 shadow-bar backdrop-blur-sm"
+      >
         <div className="flex items-center gap-[6px] pl-[5px]">{context}</div>
         {sub && <span className="font-mono text-meta text-t3">{sub}</span>}
         {buttons && <div className="w-px h-5 bg-ln2" />}

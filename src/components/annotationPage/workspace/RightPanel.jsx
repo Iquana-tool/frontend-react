@@ -46,6 +46,7 @@ const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount, tabs }) =
           type="button"
           onClick={() => onPickTab(id)}
           aria-label={label}
+          data-guide={`right-tab-${id}`}
           className={`w-[26px] h-[26px] flex items-center justify-center rounded-6 transition-colors ${
             activeTab === id ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv hover:text-t1'
           }`}
@@ -94,7 +95,10 @@ const RightPanel = () => {
   }
 
   return (
-    <div className="w-[290px] flex-none flex flex-col bg-p1 border-l border-ln min-h-0 relative">
+    <div
+      data-guide="right-panel"
+      className="w-[290px] flex-none flex flex-col bg-p1 border-l border-ln min-h-0 relative"
+    >
       <div
         role="tablist"
         className="h-[34px] flex-none flex items-center gap-[4px] px-[6px] border-b border-ln"
@@ -108,6 +112,7 @@ const RightPanel = () => {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(id)}
+              data-guide={`right-tab-${id}`}
               className={`h-[24px] px-[9px] flex items-center gap-[5px] rounded-6 text-row font-semibold transition-colors ${
                 active ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv hover:text-t1'
               }`}

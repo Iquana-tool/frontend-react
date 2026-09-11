@@ -142,7 +142,7 @@ const LabelsTab = () => {
 
 
 
-      <div className="flex-1 min-h-0 overflow-y-auto px-[8px] pb-[10px]">
+      <div data-guide="labels-list" className="flex-1 min-h-0 overflow-y-auto px-[8px] pb-[10px]">
         {rows.length === 0 ? (
           <p className="py-[20px] text-center text-meta text-t3">
             This dataset has no labels yet.

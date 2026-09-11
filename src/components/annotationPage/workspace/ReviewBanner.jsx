@@ -42,7 +42,10 @@ const ReviewBanner = () => {
   const canReject = can(Permission.REVIEW_REJECT);
 
   return (
-    <div className="h-[38px] flex-none flex items-center gap-[10px] px-[10px] bg-revBg border-b border-revLn animate-dcFadeSlow">
+    <div
+      data-guide="review-banner"
+      className="h-[38px] flex-none flex items-center gap-[10px] px-[10px] bg-revBg border-b border-revLn animate-dcFadeSlow"
+    >
       <span className="flex items-center gap-[6px] text-row font-semibold text-rev flex-none">
         <RotateCcw size={13} strokeWidth={1.9} />
         Review mode

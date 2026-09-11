@@ -13,7 +13,10 @@ const VARIANT = {
 
 const SOLID = new Set(['primary', 'ok']);
 
-/** A button in the floating action bar. Icon-only when no label is given. */
+/**
+ * A button in the floating action bar. Icon-only when no label is given.
+ * `guide` names it as an anchor for the guide cards (`data-guide`).
+ */
 const BarButton = ({
   icon: Icon,
   label,
@@ -22,12 +25,14 @@ const BarButton = ({
   disabled = false,
   title,
   onClick,
+  guide,
 }) => (
   <button
     type="button"
     onClick={onClick}
     disabled={disabled}
     title={title}
+    data-guide={guide}
     aria-label={label || title}
     className={`h-[30px] flex items-center gap-[6px] rounded-8 text-btn font-semibold transition-[filter,background-color] duration-150 hover:brightness-110
       ${label ? 'px-[11px]' : 'w-[30px] justify-center'}

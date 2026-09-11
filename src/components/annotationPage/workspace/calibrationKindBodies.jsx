@@ -116,6 +116,7 @@ export const ScaleBody = ({ entry, onSave }) => {
           setCurrentTool('set_scale');
           startCalibration();
         }}
+        data-guide="calibration-measure"
         className={secondaryButtonClass}
       >
         <Ruler size={13} strokeWidth={1.9} />

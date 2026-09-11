@@ -62,7 +62,7 @@ const LabelPicker = ({
   };
 
   return (
-    <div className="w-[300px] p-[7px] rounded-11 bg-p2 border border-ln2 shadow-picker animate-dcPop">
+    <div data-guide-float="" className="w-[300px] p-[7px] rounded-11 bg-p2 border border-ln2 shadow-picker animate-dcPop">
       <div className="flex items-center gap-[6px] h-7 px-[8px] rounded-7 bg-well">
         <Tag size={13} className="text-t3 flex-none" />
         <input

@@ -72,6 +72,7 @@ const RailButton = ({ tool, active, unsupportedReason, onSelect }) => {
         disabled={disabled}
         aria-pressed={active}
         aria-label={tool.name}
+        data-guide={`rail-tool-${tool.id}`}
         className={`w-8 h-8 flex items-center justify-center rounded-8 border transition-[background-color,color,border-color] duration-[140ms]
           ${
             active
@@ -99,6 +100,7 @@ const CalibrationRailButton = ({ entry, active, onSelect }) => {
         onClick={() => onSelect(entry.kind)}
         aria-pressed={active}
         aria-label={entry.label}
+        data-guide={`rail-calibration-${entry.kind}`}
         className={`relative w-8 h-8 flex items-center justify-center rounded-8 border transition-[background-color,color,border-color] duration-[140ms]
           ${
             active
@@ -217,6 +219,7 @@ const ToolRail = () => {
           <div
             role="radiogroup"
             aria-label="What happens when a prompt is placed"
+            data-guide="prompt-actions"
             className="flex flex-col items-center gap-[3px]"
           >
             {PROMPT_ACTIONS.map((action) => {
@@ -274,6 +277,7 @@ const ToolRail = () => {
             type="button"
             onClick={() => setRightTab('labels')}
             aria-label="Active label colour"
+            data-guide="rail-active-label"
             className="w-[26px] h-[26px] mt-[4px] rounded-6 border border-ln2 transition-transform hover:scale-105"
             style={{ background: activeColor || 'transparent' }}
           >

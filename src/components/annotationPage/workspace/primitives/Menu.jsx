@@ -35,6 +35,7 @@ export const Menu = ({ open, onClose, align = 'left', width = 238, children }) =
     <div
       ref={ref}
       role="menu"
+      data-guide-float=""
       style={{ width }}
       className={`absolute top-[34px] z-[80] p-[5px] rounded-9 bg-p2 border border-ln2 shadow-dropdown animate-dcPop
         ${align === 'right' ? 'right-0' : 'left-0'}`}
