@@ -60,6 +60,7 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationHistory from '../../../hooks/useAnnotationHistory';
 import { DOCS, openDocs } from '../../../constants/docs';
+import GuidesButton from '../../guides/GuidesButton';
 
 /** Status-pill tokens for the three workflow states. */
 const STATUS_TONE = {
@@ -153,6 +154,7 @@ const TopToolbar = () => {
           }}
           aria-label="Main menu"
           aria-expanded={appMenuOpen}
+          data-guide="app-menu"
           className="w-7 h-7 flex items-center justify-center rounded-6 bg-hv text-t1 hover:bg-hv2 transition-colors"
         >
           <MenuIcon size={15} strokeWidth={1.7} />
@@ -246,6 +248,7 @@ const TopToolbar = () => {
             in the breadcrumb would crowd out the image name; one plus a tooltip
             still lets the annotator see which phase is holding the image back. */}
         <span
+          data-guide="image-status"
           title={PHASES.map(
             (phase) => `${phase.label}: ${getStateDescriptor(phaseStatus?.[phase.key]).label}`
           ).join('\n')}
@@ -381,6 +384,7 @@ const TopToolbar = () => {
         })}
       </Group>
 
+      <GuidesButton />
       <ToolbarButton
         icon={theme === 'dark' ? Sun : Moon}
         label={theme === 'dark' ? 'Light theme' : 'Dark theme'}
@@ -417,6 +421,7 @@ const TopToolbar = () => {
             setAccountMenuOpen((open) => !open);
           }}
           aria-expanded={accountMenuOpen}
+          data-guide="account-menu"
           className="flex items-center gap-[5px] h-[26px] pl-[3px] pr-[7px] rounded-14 bg-hv hover:bg-hv2 transition-colors"
         >
           <span className="w-5 h-5 rounded-full bg-acS text-ac text-sect font-bold flex items-center justify-center">

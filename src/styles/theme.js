@@ -200,6 +200,22 @@ const dark = {
   '--sh3': '0 18px 44px rgba(0,0,0,.55)',
   '--sh4': '0 30px 80px rgba(0,0,0,.62)',
   '--shAc': '0 4px 14px rgba(20,184,166,.3)',
+
+  // Guide cards. Inverted against the workspace — a light card on the dark
+  // theme, a dark one on the light — because every hue is already spoken for
+  // (teal accent, the three phase colours, the status colours), and a card in
+  // any of them read as part of the page rather than a layer above it.
+  '--gd': '#f4f7fa',
+  '--gd2': 'rgba(15, 23, 32, 0.07)',
+  '--gdLn': 'rgba(15, 23, 32, 0.12)',
+  '--onGd': '#0f1720',
+  '--onGd2': '#48566a',
+  '--gdAc': '#0b6f66',
+  '--gdGlow': 'rgba(244, 247, 250, 0.22)',
+  // The spotlight's dim around the step's target. Heavy enough to separate,
+  // light enough that the dimmed workspace still reads and stays usable.
+  '--gdDim': 'rgba(3, 6, 10, 0.58)',
+  '--shGd': '0 0 0 1px rgba(244,247,250,.5), 0 18px 48px rgba(0,0,0,.6)',
 };
 
 const light = {
@@ -270,6 +286,17 @@ const light = {
   '--sh3': '0 14px 32px rgba(15,23,32,.12)',
   '--sh4': '0 24px 60px rgba(15,23,32,.16)',
   '--shAc': '0 4px 14px rgba(20,184,166,.28)',
+
+  // Guide cards — the dark counterpart of the light card above.
+  '--gd': '#131a23',
+  '--gd2': 'rgba(255, 255, 255, 0.1)',
+  '--gdLn': 'rgba(255, 255, 255, 0.14)',
+  '--onGd': '#eef2f6',
+  '--onGd2': '#aab6c3',
+  '--gdAc': '#3ddbc7',
+  '--gdGlow': 'rgba(19, 26, 35, 0.2)',
+  '--gdDim': 'rgba(15, 23, 32, 0.42)',
+  '--shGd': '0 0 0 1px rgba(19,26,35,.4), 0 16px 40px rgba(15,23,32,.28)',
 };
 
 const themes = { dark, light };

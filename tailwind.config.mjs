@@ -109,6 +109,12 @@ export default {
         acLn: 'var(--acLn)',
         accent: 'var(--accent)',
         onAccent: 'var(--onAccent)',
+        gd: 'var(--gd)',
+        gd2: 'var(--gd2)',
+        gdLn: 'var(--gdLn)',
+        onGd: 'var(--onGd)',
+        onGd2: 'var(--onGd2)',
+        gdAc: 'var(--gdAc)',
       },
       fontSize: {
         // The workspace type scale. Named rather than numeric so the intent
@@ -153,6 +159,7 @@ export default {
         modal: 'var(--sh4)',
         stage: 'var(--sh3)',
         primary: 'var(--shAc)',
+        guide: 'var(--shGd)',
       },
       animation: {
         progress: 'progress 2s ease-in-out infinite',

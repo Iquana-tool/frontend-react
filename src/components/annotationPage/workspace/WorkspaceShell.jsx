@@ -14,6 +14,7 @@ import useWorkspaceShortcuts from './useWorkspaceShortcuts';
 import useArmedLabelAutoApply from './useArmedLabelAutoApply';
 import { useCalibrationSync } from './useCalibrationState';
 import MainCanvas from '../canvas/MainCanvas';
+import GuideLayer from '../../guides/GuideLayer';
 import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
@@ -130,7 +131,7 @@ const WorkspaceShell = () => {
         )}
 
         <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">
-          <div className="flex-1 relative overflow-hidden">
+          <div data-guide="canvas" className="flex-1 relative overflow-hidden">
             <MainCanvas />
             <ActionBar />
             {/* Mode ring. The stage fills the screen and the eye lives on it, so
@@ -152,6 +153,8 @@ const WorkspaceShell = () => {
       </div>
 
       <ShortcutSheet />
+      {/* Guide cards and offers. Inside the workspace root for its theme tokens. */}
+      <GuideLayer />
     </div>
   );
 };
