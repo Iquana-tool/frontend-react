@@ -6,11 +6,11 @@ import {
   useEditModeIsDirty,
   useEditModeObjectId,
   useEnterEditMode,
-  useUpdateDraftPoint,
   useResetDraft,
   useExitEditMode,
   useUpdateObject,
   useObjectsList,
+  useRefinementModeActive,
 } from '../stores/selectors/annotationSelectors';
 import annotationSession from '../services/annotationSession';
 
@@ -26,10 +26,10 @@ export const useContourEditing = () => {
   const draftCoordinates = useEditModeDraftCoordinates();
   const isDirty = useEditModeIsDirty();
   const objects = useObjectsList();
+  const refinementModeActive = useRefinementModeActive();
 
   // Actions
   const enterEditMode = useEnterEditMode();
-  const updateDraftPoint = useUpdateDraftPoint();
   const resetDraft = useResetDraft();
   const exitEditMode = useExitEditMode();
   const updateObject = useUpdateObject();
@@ -44,12 +44,29 @@ export const useContourEditing = () => {
     draftCoordinates: null,
     isDirty: false,
     objects: [],
+    refinementModeActive: false,
   });
 
   // Sync stateRef after every render (no deps = always current)
   useEffect(() => {
-    stateRef.current = { isEditModeActive, editingObjectId, editingContourId, draftCoordinates, isDirty, objects };
+    stateRef.current = {
+      isEditModeActive,
+      editingObjectId,
+      editingContourId,
+      draftCoordinates,
+      isDirty,
+      objects,
+      refinementModeActive,
+    };
   });
+
+  // Cancel any pending auto-save timer if refinement mode becomes active
+  useEffect(() => {
+    if (refinementModeActive && autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, [refinementModeActive]);
 
   /**
    * Start editing a contour
@@ -65,21 +82,6 @@ export const useContourEditing = () => {
     
     enterEditMode(objectId, contourId, x, y);
   }, [enterEditMode]);
-
-  /**
-   * Update a single point in the draft contour with interpolation
-   * @param {number} pointIndex - Index of the point to update
-   * @param {number} normalizedX - New x coordinate (normalized 0-1)
-   * @param {number} normalizedY - New y coordinate (normalized 0-1)
-   * @param {number} decimationFactor - Factor for point decimation 
-   */
-  const updatePoint = useCallback((pointIndex, normalizedX, normalizedY, decimationFactor = 1) => {
-    if (!isEditModeActive) {
-      return;
-    }
-    
-    updateDraftPoint(pointIndex, normalizedX, normalizedY, decimationFactor);
-  }, [isEditModeActive, updateDraftPoint]);
 
   /**
    * Cancel editing and revert to original coordinates
@@ -174,13 +176,16 @@ export const useContourEditing = () => {
   /**
    * Schedule an automatic save after AUTO_SAVE_DELAY ms of inactivity.
    * Resets the timer on each call so rapid edits only trigger one save.
+   * Skipped when refinement mode is active (exit refinement handles saving).
    */
   const scheduleAutoSave = useCallback(() => {
+    if (stateRef.current.refinementModeActive) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(async () => {
       autoSaveTimerRef.current = null;
       const s = stateRef.current;
+      if (s.refinementModeActive) return;
       if (!s.isEditModeActive || !s.editingObjectId || !s.editingContourId || !s.draftCoordinates || !s.isDirty) return;
 
       const currentObject = s.objects.find(obj => obj.id === s.editingObjectId);
@@ -224,7 +229,6 @@ export const useContourEditing = () => {
     
     // Actions
     startEditing,
-    updatePoint,
     cancelEditing,
     resetChanges,
     saveEditing,

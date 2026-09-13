@@ -9,8 +9,8 @@ import { useWebSocketIsReady } from '../stores/selectors/annotationSelectors';
 /**
  * Preload a model when it changes
  * @param {string|object} model - Model ID string or model object
- * @param {Function} preloadFn - Function to call to preload the model (selectPromptedModel or selectCompletionModel)
- * @param {string} modelType - Type of model for logging (e.g., 'prompted', 'completion')
+ * @param {Function} preloadFn - Function to call to preload the model (selectPromptedModel or selectSuggestionModel)
+ * @param {string} modelType - Type of model for logging (e.g., 'prompted', 'suggestion')
  */
 const useModelSwitchPreloader = (model, preloadFn, modelType) => {
   const wsIsReady = useWebSocketIsReady();

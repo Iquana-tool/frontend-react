@@ -14,6 +14,9 @@ import { createFocusModeSlice } from './slices/focusModeSlice';
 import { createEditModeSlice } from './slices/editModeSlice';
 import { createAIAnnotationSlice } from './slices/aiAnnotationSlice';
 import { createObjectsSlice } from './slices/objectsSlice';
+import { createWorkspaceSlice, readStoredMode, readStoredTheme } from './slices/workspaceSlice';
+import { createCalibrationSlice } from './slices/calibrationSlice';
+import { createHistorySlice } from './slices/historySlice';
 
 /**
  * Combined annotation store using Zustand with Immer middleware
@@ -29,6 +32,8 @@ import { createObjectsSlice } from './slices/objectsSlice';
  * - Edit Mode: Contour editing mode
  * - AI Annotation: AI prompts and undo/redo
  * - Objects: Annotation objects, selection, visibility
+ * - Calibration: The Calibrate tab's per-image calibration state
+ * - History: Undo/redo availability for the current image (the stack is the server's)
  */
 const useAnnotationStore = create()(
   devtools(
@@ -36,10 +41,17 @@ const useAnnotationStore = create()(
       immer((set, get) => ({
         // Initial state
         ...initialState,
-        
+        // theme and mode are the two workspace choices that outlive a reload; both are
+        // read from localStorage here because the store is built once, at import.
+        workspace: {
+          ...initialState.workspace,
+          theme: readStoredTheme(),
+          mode: readStoredMode(),
+        },
+
         // Combine all slices
         ...createUISlice(set),
-        ...createModelsSlice(set),
+        ...createModelsSlice(set, get),
         ...createCanvasSlice(set),
         ...createContextMenuSlice(set),
         ...createWebSocketSlice(set),
@@ -48,6 +60,9 @@ const useAnnotationStore = create()(
         ...createEditModeSlice(set),
         ...createAIAnnotationSlice(set),
         ...createObjectsSlice(set),
+        ...createWorkspaceSlice(set),
+        ...createCalibrationSlice(set),
+        ...createHistorySlice(set),
       }))
     ),
     { name: 'annotation-store' }

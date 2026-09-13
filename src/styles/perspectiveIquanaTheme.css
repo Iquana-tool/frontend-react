@@ -1,0 +1,101 @@
+/**
+ * An iquana theme for `<perspective-viewer>`.
+ *
+ * A Perspective theme is nothing more than a CSS rule that selects
+ * `perspective-viewer[theme="<Name>"]`, declares `--psp-theme-name`, and sets the `--psp-*`
+ * variables. Declaring the name is what registers it: the viewer scans stylesheets for
+ * `--psp-theme-name`, so "Iquana" shows up in its own theme dropdown alongside Pro Light,
+ * Dracula and the rest.
+ *
+ * There is one theme, not a light and a dark one, because every value here is a reference
+ * to an app design token rather than a literal colour — and those tokens are already
+ * swapped by `[data-theme]` (see styles/theme.js). So the viewer follows the app's light
+ * and dark automatically, and there is only ever one place a colour is defined.
+ *
+ * Anything not overridden below inherits Pro Light's defaults, which `pro.css` sets on the
+ * bare `perspective-viewer` selector. That is fine for structural values, but it is why the
+ * handful of genuinely mode-dependent declarations (icon inversions, map tiles) still need
+ * an explicit dark branch at the bottom.
+ */
+
+perspective-viewer[theme="Iquana"],
+perspective-viewer [theme="Iquana"] {
+    --psp-theme-name: "Iquana";
+
+    /* Surfaces and text. `--p1` is the page surface the rest of this route sits on, so the
+       viewer stops reading as a panel dropped onto the page. */
+    --psp--background-color: var(--p1);
+    --psp--color: var(--t1);
+    --psp-inactive--color: var(--t3);
+    --psp-inactive--border-color: var(--ln);
+
+    /* Selection and focus use the app accent, so a selected column here matches a selected
+       anything else in the app. */
+    --psp-active--color: var(--ac);
+    --psp-active--background: var(--acS);
+
+    --psp-error--color: var(--err);
+    --psp-warning--color: var(--warn);
+    --psp-warning--background: var(--warnBg);
+
+    /* Chart series are the annotation class palette (`--cls-1..12`, the same values
+       `getLabelColor` hands the canvas). A label therefore keeps one colour everywhere it
+       appears — the editor, the label tree, and now a bar in a plot. That correspondence is
+       worth more than any palette chosen for the charts alone. */
+    --psp-charts--series--color: var(--cls-1);
+    --psp-charts--series-1--color: var(--cls-1);
+    --psp-charts--series-2--color: var(--cls-2);
+    --psp-charts--series-3--color: var(--cls-3);
+    --psp-charts--series-4--color: var(--cls-4);
+    --psp-charts--series-5--color: var(--cls-5);
+    --psp-charts--series-6--color: var(--cls-6);
+    --psp-charts--series-7--color: var(--cls-7);
+    --psp-charts--series-8--color: var(--cls-8);
+    --psp-charts--series-9--color: var(--cls-9);
+    --psp-charts--series-10--color: var(--cls-10);
+
+    /* Chart furniture: present enough to read against, quiet enough not to compete. */
+    --psp-charts--axis-lines--color: var(--ln);
+    --psp-charts--axis-ticks--color: var(--t3);
+    --psp-charts--gridline--color: var(--ln);
+    --psp-charts--legend--background: var(--p1);
+    --psp-charts--legend--color: var(--t2);
+    --psp-charts--treemap--labels: var(--t1);
+    --psp-charts--treemap--hover-highlight: var(--ac);
+
+    /* Tooltips reuse the app's tooltip surface rather than Perspective's own. */
+    --psp-charts--tooltip--background: var(--tip);
+    --psp-charts--tooltip--color: var(--t1);
+    --psp-charts--tooltip--border-color: var(--ln);
+
+    /* The datagrid's signed-value colouring, on the app's ok/err pair. */
+    --psp-datagrid--pos-cell--color: var(--ok);
+    --psp-datagrid--neg-cell--color: var(--err);
+
+    /* Expression editor syntax colours. */
+    --psp-expression--operator--color: var(--t2);
+    --psp-expression--function--color: var(--ac);
+    --psp-expression--error--color: var(--err);
+    --psp-code-editor--column--color: var(--ac);
+    --psp-code-editor--comment--color: var(--t3);
+    --psp-code-editor--literal--color: var(--ok);
+    --psp-code-editor--operator--color: var(--t2);
+    --psp-code-editor--symbol--color: var(--t1);
+}
+
+/**
+ * The mode-dependent remainder.
+ *
+ * These are not colours and so cannot be expressed as a token reference: they invert
+ * bitmap icons and swap a raster map tileset. Values mirror Pro Dark's, which is what they
+ * would have been had we shipped a separate dark theme.
+ */
+:root[data-theme="dark"] perspective-viewer[theme="Iquana"],
+:root[data-theme="dark"] perspective-viewer [theme="Iquana"] {
+    --psp-calendar--filter: invert(1);
+    --psp-input--filter: invert(1);
+    --psp-icon--select-arrow--mask-image: var(--psp-icon--select-arrow-light--mask-image);
+    --psp-icon--select-arrow-hover--mask-image: var(--psp-icon--select-arrow-dark--mask-image);
+    --psp-openlayers--attribution--filter: invert(1) hue-rotate(180deg);
+    --psp-openlayers--tile-url: "http://{a-c}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+}

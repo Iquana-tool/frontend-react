@@ -1,47 +1,43 @@
 import { useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import {
   useCurrentTool,
   useAIPrompts,
   usePromptedModel,
   useIsSubmitting,
-  useImageList,
-  useCurrentImageId,
-  useSetCurrentImage,
   useSelectedObjects,
   useObjectsList,
   useRemoveObject,
   useRemoveLastPrompt,
   useClearSelection,
-  useSetSemanticRunRequested,
-  useSemanticWarningModalOpen,
-  useRefinementModeActive,
+  useSetInstanceRunRequested,
+  useInstanceWarningModalOpen,
+  useWorkspaceMode,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
-import { useCompletionSegmentation } from './useCompletionSegmentation';
+import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
 import { deleteObject } from '../utils/objectOperations';
-import { getContourId } from '../utils/objectUtils';
+import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
 
 /**
- * Global keyboard shortcuts for the annotation page.
+ * Action keyboard shortcuts for the annotation page.
  *
- * - Enter: Run primary action (AI segmentation when in AI tool with prompts)
+ * Tool selection, panel toggles, zoom and image navigation live in
+ * useWorkspaceShortcuts; this hook owns the keys that trigger annotation work.
+ *
+ * - Enter: Run primary action (AI segmentation when in AI tool with prompts).
+ *   Not in review mode — there the primary action is approving the instance
+ *   under review, which the action bar owns along with the review cursor.
  * - 1: Run Prompted Segmentation
- * - 2: Run Instance Discovery (completion) with selected objects as seeds
- * - 3: Open Semantic Segmentation (warning modal)
- * - Delete/Backspace: In refinement mode with prompts, remove last prompt; otherwise reject selected objects, or remove last prompt when in AI tool with no selection
- * - Arrow Left/Right: Previous/next image
+ * - 2: Run Instance Suggestion (suggestion) with selected objects as seeds
+ * - 3: Open Instance Segmentation (warning modal)
+ * - Delete/Backspace: Remove the last prompt while any are on the AI canvas, otherwise
+ *   reject the selected objects. See deleteRouting.js for why prompts come first.
  */
 export default function useAnnotationKeyboardShortcuts() {
-  const navigate = useNavigate();
-  const { datasetId } = useParams();
   const currentTool = useCurrentTool();
   const prompts = useAIPrompts();
   const promptedModel = usePromptedModel();
   const isSubmitting = useIsSubmitting();
-  const imageList = useImageList();
-  const currentImageId = useCurrentImageId();
-  const setCurrentImage = useSetCurrentImage();
   const selectedIds = useSelectedObjects(); // store holds selected object IDs
   const objectsList = useObjectsList();
   const selectedObjects = useMemo(
@@ -51,42 +47,20 @@ export default function useAnnotationKeyboardShortcuts() {
   const removeObject = useRemoveObject();
   const removeLastPrompt = useRemoveLastPrompt();
   const clearSelection = useClearSelection();
-  const setSemanticRunRequested = useSetSemanticRunRequested();
-  const semanticWarningModalOpen = useSemanticWarningModalOpen();
-  const refinementModeActive = useRefinementModeActive();
+  const setInstanceRunRequested = useSetInstanceRunRequested();
+  const instanceWarningModalOpen = useInstanceWarningModalOpen();
+  const mode = useWorkspaceMode();
 
   const { runSegmentation } = useAISegmentation();
-  const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation();
-  const runSemanticRequest = setSemanticRunRequested;
+  const suggestSimilar = useSuggestSimilar();
+  const runInstanceRequest = setInstanceRunRequested;
 
   const canRunPrompted =
     currentTool === 'ai_annotation' &&
     promptedModel &&
     !isSubmitting &&
     prompts.length > 0 &&
-    !semanticWarningModalOpen;
-
-  const goNextImage = useCallback(() => {
-    const currentIndex = imageList.findIndex((img) => img.id === currentImageId);
-    if (currentIndex < imageList.length - 1) {
-      const nextImage = imageList[currentIndex + 1];
-      setCurrentImage(nextImage);
-      if (nextImage?.id && datasetId) {
-        navigate(`/dataset/${datasetId}/annotate/${nextImage.id}`);
-      }
-    }
-  }, [imageList, currentImageId, setCurrentImage, datasetId, navigate]);
-
-  const goPrevImage = useCallback(() => {
-    const currentIndex = imageList.findIndex((img) => img.id === currentImageId);
-    if (currentIndex > 0) {
-      const prevImage = imageList[currentIndex - 1];
-      setCurrentImage(prevImage);
-      if (prevImage?.id && datasetId) {
-        navigate(`/dataset/${datasetId}/annotate/${prevImage.id}`);
-      }
-    }
-  }, [imageList, currentImageId, setCurrentImage, datasetId, navigate]);
+    !instanceWarningModalOpen;
 
   const handleRejectSelected = useCallback(async () => {
     if (selectedObjects.length === 0) return;
@@ -116,7 +90,9 @@ export default function useAnnotationKeyboardShortcuts() {
 
       switch (e.key) {
         case 'Enter': {
-          if (canRunPrompted) {
+          // Shift+Enter belongs to the action bar's "Add this object"; running
+          // the model here as well would do both at once.
+          if (canRunPrompted && mode !== 'review' && !e.shiftKey) {
             e.preventDefault();
             runSegmentation();
           }
@@ -131,53 +107,35 @@ export default function useAnnotationKeyboardShortcuts() {
         }
         case '2': {
           if (isModifier) break;
-          if (selectedObjects.length === 0) break;
-          if (isRunningCompletion) break;
+          if (!suggestSimilar.eligible) break;
           e.preventDefault();
-          const contourIds = selectedObjects.map((o) => getContourId(o)).filter(Boolean);
-          const labelId = selectedObjects[0]?.labelId ?? null;
-          if (contourIds.length > 0) {
-            runCompletion(
-              contourIds.length === 1 ? contourIds[0] : contourIds,
-              labelId
-            );
-          }
+          suggestSimilar.run();
           break;
         }
         case '3': {
           if (!isModifier) {
             e.preventDefault();
-            runSemanticRequest(true);
+            runInstanceRequest(true);
           }
           break;
         }
         case 'Delete':
         case 'Backspace': {
-          // In refinement mode with prompts: erase last prompt (don't reject the contour being refined)
-          if (
-            currentTool === 'ai_annotation' &&
-            refinementModeActive &&
-            prompts.length > 0
-          ) {
+          // Prompts before the selection, always — see deleteRouting.js. This used to hold
+          // only inside refinement mode, which left a segmentation run's auto-selected
+          // object outranking a prompt placed after it.
+          const target = routeDelete({
+            tool: currentTool,
+            promptCount: prompts.length,
+            selectionCount: selectedObjects.length,
+          });
+          if (target === DELETE_PROMPT) {
             e.preventDefault();
             removeLastPrompt();
-          } else if (selectedObjects.length > 0) {
+          } else if (target === DELETE_SELECTION) {
             e.preventDefault();
             handleRejectSelected();
-          } else if (currentTool === 'ai_annotation') {
-            e.preventDefault();
-            removeLastPrompt();
           }
-          break;
-        }
-        case 'ArrowLeft': {
-          e.preventDefault();
-          goPrevImage();
-          break;
-        }
-        case 'ArrowRight': {
-          e.preventDefault();
-          goNextImage();
           break;
         }
         default:
@@ -189,17 +147,14 @@ export default function useAnnotationKeyboardShortcuts() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     canRunPrompted,
+    mode,
     runSegmentation,
     selectedObjects,
-    runCompletion,
-    isRunningCompletion,
-    runSemanticRequest,
+    suggestSimilar,
+    runInstanceRequest,
     handleRejectSelected,
     currentTool,
-    refinementModeActive,
     prompts.length,
     removeLastPrompt,
-    goPrevImage,
-    goNextImage,
   ]);
 }

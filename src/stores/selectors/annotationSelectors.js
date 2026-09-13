@@ -17,6 +17,7 @@ export const useCurrentImage = () => useAnnotationStore(state => state.images.cu
 export const useCurrentImageId = () => useAnnotationStore(state => state.images.currentImageId);
 export const useImageList = () => useAnnotationStore(state => state.images.imageList);
 export const useAnnotationStatus = () => useAnnotationStore(state => state.images.annotationStatus);
+export const usePhaseStatus = () => useAnnotationStore(state => state.images.phaseStatus);
 
 // Image loading and display selectors
 export const useImageObject = () => useAnnotationStore(state => state.images.imageObject);
@@ -28,16 +29,16 @@ export const useZoomLevel = () => useAnnotationStore(state => state.images.zoomL
 export const usePanOffset = () => useAnnotationStore(state => state.images.panOffset);
 
 export const usePromptedModel = () => useAnnotationStore(state => state.models.promptedModel);
-export const useCompletionModel = () => useAnnotationStore(state => state.models.completionModel);
-export const useSemanticModel = () => useAnnotationStore(state => state.models.semanticModel);
+export const useSuggestionModel = () => useAnnotationStore(state => state.models.suggestionModel);
+export const useInstanceModel = () => useAnnotationStore(state => state.models.instanceModel);
 export const useAvailablePromptedModels = () => useAnnotationStore(state => state.models.availablePromptedModels);
-export const useAvailableCompletionModels = () => useAnnotationStore(state => state.models.availableCompletionModels);
-export const useAvailableSemanticModels = () => useAnnotationStore(state => state.models.availableSemanticModels);
+export const useAvailableSuggestionModels = () => useAnnotationStore(state => state.models.availableSuggestionModels);
+export const useAvailableInstanceModels = () => useAnnotationStore(state => state.models.availableInstanceModels);
 export const useIsLoadingPromptedModels = () => useAnnotationStore(state => state.models.isLoadingModels);
-export const useIsLoadingCompletionModels = () => useAnnotationStore(state => state.models.isLoadingCompletionModels);
-export const useIsLoadingSemanticModels = () => useAnnotationStore(state => state.models.isLoadingSemanticModels);
-export const useIsRunningCompletion = () => useAnnotationStore(state => state.models.isRunningCompletion);
-export const useIsRunningSemantic = () => useAnnotationStore(state => state.models.isRunningSemantic);
+export const useIsLoadingSuggestionModels = () => useAnnotationStore(state => state.models.isLoadingSuggestionModels);
+export const useIsLoadingInstanceModels = () => useAnnotationStore(state => state.models.isLoadingInstanceModels);
+export const useIsRunningSuggestion = () => useAnnotationStore(state => state.models.isRunningSuggestion);
+export const useIsRunningInstance = () => useAnnotationStore(state => state.models.isRunningInstance);
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
@@ -45,8 +46,11 @@ export const useObjectsVisibility = () => useAnnotationStore(state => state.obje
 export const useObjectColors = () => useAnnotationStore(state => state.objects.colors);
 export const useDatasetLabels = () => useAnnotationStore(state => state.objects.datasetLabels);
 export const useDatasetLabelsMap = () => useAnnotationStore(state => state.objects.datasetLabelsMap);
+export const useLabelDatasetId = () => useAnnotationStore(state => state.objects.labelDatasetId);
+export const useLabelDatasetGeneration = () => useAnnotationStore(state => state.objects.labelDatasetGeneration);
 export const useSetDatasetLabels = () => useAnnotationStore(state => state.setDatasetLabels);
 export const useClearDatasetLabels = () => useAnnotationStore(state => state.clearDatasetLabels);
+export const useActivateLabelDataset = () => useAnnotationStore(state => state.activateLabelDataset);
 
 // Action selectors
 export const useSetCurrentTool = () => useAnnotationStore(state => state.setCurrentTool);
@@ -68,21 +72,30 @@ export const useDeselectObject = () => useAnnotationStore(state => state.deselec
 export const useClearSelection = () => useAnnotationStore(state => state.clearSelection);
 export const useSetObjectsFromHierarchy = () => useAnnotationStore(state => state.setObjectsFromHierarchy);
 export const useClearObjects = () => useAnnotationStore(state => state.clearObjects);
+export const useBeginObjectsLoad = () => useAnnotationStore(state => state.beginObjectsLoad);
+export const useFailObjectsLoad = () => useAnnotationStore(state => state.failObjectsLoad);
+export const useObjectsLoading = () => useAnnotationStore(state => state.objects.loading);
+export const useObjectsLoadError = () => useAnnotationStore(state => state.objects.loadError);
 
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
-export const useSetCompletionModel = () => useAnnotationStore(state => state.setCompletionModel);
-export const useSetSemanticModel = () => useAnnotationStore(state => state.setSemanticModel);
-export const useSetIsRunningCompletion = () => useAnnotationStore(state => state.setIsRunningCompletion);
-export const useSetIsRunningSemantic = () => useAnnotationStore(state => state.setIsRunningSemantic);
+export const useSetSuggestionModel = () => useAnnotationStore(state => state.setSuggestionModel);
+export const useSetInstanceModel = () => useAnnotationStore(state => state.setInstanceModel);
+export const useSetIsRunningSuggestion = () => useAnnotationStore(state => state.setIsRunningSuggestion);
+export const useSetIsRunningInstance = () => useAnnotationStore(state => state.setIsRunningInstance);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
-export const useFetchAvailableCompletionModels = () => useAnnotationStore(state => state.fetchAvailableCompletionModels);
-export const useFetchAvailableSemanticModels = () => useAnnotationStore(state => state.fetchAvailableSemanticModels);
+export const useFetchAvailableSuggestionModels = () => useAnnotationStore(state => state.fetchAvailableSuggestionModels);
+export const useFetchAvailableInstanceModels = () => useAnnotationStore(state => state.fetchAvailableInstanceModels);
+export const useModelFavorites = () => useAnnotationStore(state => state.models.favorites);
+export const useFetchModelFavorites = () => useAnnotationStore(state => state.fetchModelFavorites);
+export const useSetFavoriteModel = () => useAnnotationStore(state => state.setFavoriteModel);
+export const useClearFavoriteModel = () => useAnnotationStore(state => state.clearFavoriteModel);
 export const useSetVisibilityMode = () => useAnnotationStore(state => state.setVisibilityMode);
 export const useToggleVisibility = () => useAnnotationStore(state => state.toggleVisibility);
 export const useInitializeLabelVisibility = () => useAnnotationStore(state => state.initializeLabelVisibility);
 export const useSetCurrentImage = () => useAnnotationStore(state => state.setCurrentImage);
 export const useSetImageList = () => useAnnotationStore(state => state.setImageList);
 export const useSetAnnotationStatus = () => useAnnotationStore(state => state.setAnnotationStatus);
+export const useSetPhaseStatus = () => useAnnotationStore(state => state.setPhaseStatus);
 
 // Image loading and display actions
 export const useSetImageObject = () => useAnnotationStore(state => state.setImageObject);
@@ -95,8 +108,8 @@ export const useSetPanOffset = () => useAnnotationStore(state => state.setPanOff
 export const useResetImageState = () => useAnnotationStore(state => state.resetImageState);
 
 // UI selectors
-export const useSemanticRunRequested = () => useAnnotationStore(state => state.ui.semanticRunRequested);
-export const useSemanticWarningModalOpen = () => useAnnotationStore(state => state.ui.semanticWarningModalOpen);
+export const useInstanceRunRequested = () => useAnnotationStore(state => state.ui.instanceRunRequested);
+export const useInstanceWarningModalOpen = () => useAnnotationStore(state => state.ui.instanceWarningModalOpen);
 
 // Sidebar actions
 export const useSetLeftSidebarCollapsed = () => useAnnotationStore(state => state.setLeftSidebarCollapsed);
@@ -107,14 +120,15 @@ export const useToggleRightSidebar = () => useAnnotationStore(state => state.tog
 // Annotation Overview actions
 export const useSetVisibilityControlsExpanded = () => useAnnotationStore(state => state.setVisibilityControlsExpanded);
 export const useToggleVisibilityControls = () => useAnnotationStore(state => state.toggleVisibilityControls);
-export const useSetSemanticRunRequested = () => useAnnotationStore(state => state.setSemanticRunRequested);
-export const useSetSemanticWarningModalOpen = () => useAnnotationStore(state => state.setSemanticWarningModalOpen);
+export const useSetInstanceRunRequested = () => useAnnotationStore(state => state.setInstanceRunRequested);
+export const useSetInstanceWarningModalOpen = () => useAnnotationStore(state => state.setInstanceWarningModalOpen);
 
 // AI Annotation selectors
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
-export const useInstantSegmentation = () => useAnnotationStore(state => state.aiAnnotation.instantSegmentation);
+export const usePromptMode = () => useAnnotationStore(state => state.aiAnnotation.promptMode);
+export const useManualDrawMode = () => useAnnotationStore(state => state.aiAnnotation.manualDrawMode);
 
 // Refinement mode selectors
 export const useRefinementModeActive = () => useAnnotationStore(state => state.aiAnnotation.refinementMode.active);
@@ -124,13 +138,32 @@ export const useRefinementModeContourId = () => useAnnotationStore(state => stat
 // AI Annotation actions
 export const useAddPointPrompt = () => useAnnotationStore(state => state.addPointPrompt);
 export const useAddBoxPrompt = () => useAnnotationStore(state => state.addBoxPrompt);
+export const useAddPolygonPrompt = () => useAnnotationStore(state => state.addPolygonPrompt);
+export const useSetPromptMode = () => useAnnotationStore(state => state.setPromptMode);
+export const useSetManualDrawMode = () => useAnnotationStore(state => state.setManualDrawMode);
 export const useRemoveLastPrompt = () => useAnnotationStore(state => state.removeLastPrompt);
 export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
+// For prompts that became an object. Not interchangeable with the above — see the slice.
+export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
-export const useToggleInstantSegmentation = () => useAnnotationStore(state => state.toggleInstantSegmentation);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
+// Depths, not the arrays: Ctrl+Z routing only needs to know whether each prompt
+// stack has anything left, and a length never re-renders on prompt content changes.
+export const usePromptUndoDepth = () => useAnnotationStore(state => state.aiAnnotation.undoStack?.length ?? 0);
+export const usePromptRedoDepth = () => useAnnotationStore(state => state.aiAnnotation.redoStack?.length ?? 0);
+
+// Annotation history (server-side undo/redo of objects — distinct from the prompt
+// stack above, which only covers unsubmitted prompt dots on the AI canvas).
+export const useCanUndoAction = () => useAnnotationStore(state => state.history.canUndo);
+export const useCanRedoAction = () => useAnnotationStore(state => state.history.canRedo);
+export const useUndoActionLabel = () => useAnnotationStore(state => state.history.undoLabel);
+export const useRedoActionLabel = () => useAnnotationStore(state => state.history.redoLabel);
+export const useHistoryBusy = () => useAnnotationStore(state => state.history.busy);
+export const useSetHistoryStatus = () => useAnnotationStore(state => state.setHistoryStatus);
+export const useSetHistoryBusy = () => useAnnotationStore(state => state.setHistoryBusy);
+export const useClearHistoryStatus = () => useAnnotationStore(state => state.clearHistoryStatus);
 
 // Refinement mode actions
 export const useEnterRefinementMode = () => useAnnotationStore(state => state.enterRefinementMode);
@@ -179,6 +212,15 @@ export const useFocusModeActive = () => useAnnotationStore(state => state.focusM
 export const useFocusModeObjectId = () => useAnnotationStore(state => state.focusMode.objectId);
 export const useFocusModeObjectMask = () => useAnnotationStore(state => state.focusMode.objectMask);
 
+// Contour id of the focused object (for nesting manual annotations), or null
+export const useFocusedParentContourId = () => useAnnotationStore((state) => {
+  if (!state.focusMode.active) return null;
+  const focusedId = state.focusMode.objectId;
+  const obj = state.objects.list.find((o) => o.id === focusedId);
+  if (!obj) return null;
+  return obj.contour_id ?? obj.id ?? null;
+});
+
 // Focus Mode actions
 export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFocusMode);
 export const useEnterFocusModeWithZoom = () => useAnnotationStore(state => state.enterFocusModeWithZoom);
@@ -191,11 +233,116 @@ export const useEditModeObjectId = () => useAnnotationStore(state => state.editM
 export const useEditModeContourId = () => useAnnotationStore(state => state.editMode.contourId);
 export const useEditModeOriginalCoordinates = () => useAnnotationStore(state => state.editMode.originalCoordinates);
 export const useEditModeDraftCoordinates = () => useAnnotationStore(state => state.editMode.draftCoordinates);
+export const useEditModeVertices = () => useAnnotationStore(state => state.editMode.vertices);
 export const useEditModeIsDirty = () => useAnnotationStore(state => state.editMode.isDirty);
 
 // Edit Mode actions
 export const useEnterEditMode = () => useAnnotationStore(state => state.enterEditMode);
-export const useUpdateDraftPoint = () => useAnnotationStore(state => state.updateDraftPoint);
+export const useMoveVertex = () => useAnnotationStore(state => state.moveVertex);
+export const useInsertVertex = () => useAnnotationStore(state => state.insertVertex);
+export const useDeleteVertex = () => useAnnotationStore(state => state.deleteVertex);
 export const useResetDraft = () => useAnnotationStore(state => state.resetDraft);
 export const useSyncEditModeDraftFromRefinement = () => useAnnotationStore(state => state.syncEditModeDraftFromRefinement);
 export const useExitEditMode = () => useAnnotationStore(state => state.exitEditMode);
+
+// Line-edit Mode selectors
+export const useLineEditActive = () => useAnnotationStore(state => state.lineEdit.active);
+export const useLineEditObjectId = () => useAnnotationStore(state => state.lineEdit.objectId);
+export const useLineEditContourId = () => useAnnotationStore(state => state.lineEdit.contourId);
+export const useLineEditOriginal = () => useAnnotationStore(state => state.lineEdit.original);
+export const useLineEditMode = () => useAnnotationStore(state => state.lineEdit.mode);
+
+// Line-edit Mode actions
+export const useStartLineEdit = () => useAnnotationStore(state => state.startLineEdit);
+export const useStopLineEdit = () => useAnnotationStore(state => state.stopLineEdit);
+
+// Scale selectors
+export const useImageScale = () => useAnnotationStore(state => state.images.scale);
+export const useIsCalibrating = () => useAnnotationStore(state => state.images.scale.isCalibrating);
+export const useCalibrationPoints = () => useAnnotationStore(state => state.images.scale.calibrationPoints);
+
+// Scale action selectors
+export const useSetImageScale = () => useAnnotationStore(state => state.setImageScale);
+export const useStartCalibration = () => useAnnotationStore(state => state.startCalibration);
+export const useSetCalibrationPoint = () => useAnnotationStore(state => state.setCalibrationPoint);
+export const useCancelCalibration = () => useAnnotationStore(state => state.cancelCalibration);
+
+// Calibration selectors — the Calibrate tab. Distinct from the four above,
+// which are the *scale* kind's draw-a-line interaction and predate the tab.
+export const useCalibrationKinds = () => useAnnotationStore(state => state.calibration.kinds);
+export const useCalibrationKindsLoaded = () => useAnnotationStore(state => state.calibration.kindsLoaded);
+export const useCalibrationEntries = () => useAnnotationStore(state => state.calibration.entries);
+export const useCalibrationLoading = () => useAnnotationStore(state => state.calibration.loading);
+export const useCalibrationError = () => useAnnotationStore(state => state.calibration.error);
+export const useActiveCalibrationKind = () => useAnnotationStore(state => state.calibration.activeKind);
+export const useActivePatchPick = () => useAnnotationStore(state => state.calibration.activePick);
+export const useSampleRadius = () => useAnnotationStore(state => state.calibration.sampleRadius);
+export const usePendingSamples = () => useAnnotationStore(state => state.calibration.pending);
+export const useWedgeState = () => useAnnotationStore(state => state.calibration.wedge);
+
+// Calibration action selectors
+export const useSetCalibrationKinds = () => useAnnotationStore(state => state.setCalibrationKinds);
+export const useSetCalibrationEntries = () => useAnnotationStore(state => state.setCalibrationEntries);
+export const useSetCalibrationLoading = () => useAnnotationStore(state => state.setCalibrationLoading);
+export const useSetCalibrationError = () => useAnnotationStore(state => state.setCalibrationError);
+export const useSetActiveCalibrationKind = () => useAnnotationStore(state => state.setActiveCalibrationKind);
+export const useStartPatchPick = () => useAnnotationStore(state => state.startPatchPick);
+export const useCancelPatchPick = () => useAnnotationStore(state => state.cancelPatchPick);
+export const useSetSampleRadius = () => useAnnotationStore(state => state.setSampleRadius);
+export const useSetPendingSample = () => useAnnotationStore(state => state.setPendingSample);
+export const useClearPendingSamples = () => useAnnotationStore(state => state.clearPendingSamples);
+export const useResetCalibrationForImage = () => useAnnotationStore(state => state.resetCalibrationForImage);
+export const useAddWedgeEnd = () => useAnnotationStore(state => state.addWedgeEnd);
+export const useSetWedgePoint = () => useAnnotationStore(state => state.setWedgePoint);
+export const useSetWedgeSampling = () => useAnnotationStore(state => state.setWedgeSampling);
+export const useSetWedgeSamples = () => useAnnotationStore(state => state.setWedgeSamples);
+export const useSetWedgeSample = () => useAnnotationStore(state => state.setWedgeSample);
+export const useClearWedge = () => useAnnotationStore(state => state.clearWedge);
+
+// Workspace shell selectors
+export const useWorkspaceTheme = () => useAnnotationStore(state => state.workspace.theme);
+export const useWorkspaceMode = () => useAnnotationStore(state => state.workspace.mode);
+export const usePromptAction = () => useAnnotationStore(state => state.workspace.promptAction);
+export const useLeftDrawerOpen = () => useAnnotationStore(state => state.workspace.leftDrawerOpen);
+export const useRightPanelOpen = () => useAnnotationStore(state => state.workspace.rightPanelOpen);
+export const useRightTab = () => useAnnotationStore(state => state.workspace.rightTab);
+export const useFilmstripOpen = () => useAnnotationStore(state => state.workspace.filmstripOpen);
+export const useShowApproved = () => useAnnotationStore(state => state.workspace.showApproved);
+export const useChipMode = () => useAnnotationStore(state => state.workspace.chipMode);
+export const useSetChipMode = () => useAnnotationStore(state => state.setChipMode);
+export const useCycleChipMode = () => useAnnotationStore(state => state.cycleChipMode);
+export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
+export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
+export const usePicker = () => useAnnotationStore(state => state.workspace.picker);
+export const useShortcutSheetOpen = () => useAnnotationStore(state => state.workspace.shortcutSheetOpen);
+export const useHiddenObjectIds = () => useAnnotationStore(state => state.workspace.hiddenObjectIds);
+export const useCollapsedObjectIds = () => useAnnotationStore(state => state.workspace.collapsedObjectIds);
+export const useLabelColorOverrides = () => useAnnotationStore(state => state.workspace.labelColorOverrides);
+export const useRootOrder = () => useAnnotationStore(state => state.workspace.rootOrder);
+export const useCursorPosition = () => useAnnotationStore(state => state.workspace.cursor);
+
+// Workspace action selectors
+export const useSetTheme = () => useAnnotationStore(state => state.setTheme);
+export const useToggleTheme = () => useAnnotationStore(state => state.toggleTheme);
+export const useSetWorkspaceMode = () => useAnnotationStore(state => state.setWorkspaceMode);
+export const useSetPromptAction = () => useAnnotationStore(state => state.setPromptAction);
+export const useToggleLeftDrawer = () => useAnnotationStore(state => state.toggleLeftDrawer);
+export const useSetLeftDrawerOpen = () => useAnnotationStore(state => state.setLeftDrawerOpen);
+export const useToggleRightPanel = () => useAnnotationStore(state => state.toggleRightPanel);
+export const useSetRightPanelOpen = () => useAnnotationStore(state => state.setRightPanelOpen);
+export const useSetRightTab = () => useAnnotationStore(state => state.setRightTab);
+export const useToggleFilmstrip = () => useAnnotationStore(state => state.toggleFilmstrip);
+export const useSetFilmstripOpen = () => useAnnotationStore(state => state.setFilmstripOpen);
+export const useToggleShowApproved = () => useAnnotationStore(state => state.toggleShowApproved);
+export const useSetActiveLabelId = () => useAnnotationStore(state => state.setActiveLabelId);
+export const useSetHoveredObjectId = () => useAnnotationStore(state => state.setHoveredObjectId);
+export const useSetPicker = () => useAnnotationStore(state => state.setPicker);
+export const useSetShortcutSheetOpen = () => useAnnotationStore(state => state.setShortcutSheetOpen);
+export const useToggleObjectHidden = () => useAnnotationStore(state => state.toggleObjectHidden);
+export const useToggleObjectCollapsed = () => useAnnotationStore(state => state.toggleObjectCollapsed);
+export const useExpandObject = () => useAnnotationStore(state => state.expandObject);
+export const useSetLabelColorOverride = () => useAnnotationStore(state => state.setLabelColorOverride);
+export const useReorderRootObject = () => useAnnotationStore(state => state.reorderRootObject);
+export const useInitRootOrder = () => useAnnotationStore(state => state.initRootOrder);
+export const useSetCursorPosition = () => useAnnotationStore(state => state.setCursorPosition);
+export const useResetWorkspaceForImage = () => useAnnotationStore(state => state.resetWorkspaceForImage);

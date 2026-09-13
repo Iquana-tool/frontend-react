@@ -23,13 +23,27 @@ export const ConnectionState = {
 };
 
 /**
+ * WebSocket close codes we treat specially (RFC 6455).
+ */
+export const CloseCode = {
+  NORMAL: 1000,
+  POLICY_VIOLATION: 1008,
+};
+
+/**
+ * Event type emitted when the server refuses the session outright.
+ * Subscribe with `websocketService.on(REFUSED_EVENT, cb)`.
+ */
+export const REFUSED_EVENT = '__connection_refused__';
+
+/**
  * Default configuration
  */
 const DEFAULT_CONFIG = {
   reconnectAttempts: 5,
   reconnectDelay: 1000,
   maxReconnectDelay: 10000,
-  messageTimeout: 180000, // 3 minutes — long enough for instance discovery inference
+  messageTimeout: 180000, // 3 minutes — long enough for instance suggestion inference
 };
 
 /**
@@ -110,6 +124,21 @@ class WebSocketService {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Re-point the reconnect target without touching the live connection.
+   *
+   * The annotation session stays on one socket and re-targets it with messages, so the
+   * URL it was opened with goes stale as soon as the user steps to another image. An
+   * automatic reconnect would then silently resume on whichever image the session
+   * started with. Keeping this in step means a dropped connection comes back where the
+   * user actually is.
+   *
+   * @param {string} url - URL to use for the next reconnection attempt
+   */
+  setUrl(url) {
+    this.url = url;
   }
 
   /**
@@ -222,6 +251,15 @@ class WebSocketService {
    */
   onConnectionStateChange(callback) {
     return this.on('__connection_state_change__', callback);
+  }
+
+  /**
+   * Subscribe to the server refusing the session (auth or permission failure).
+   * @param {Function} callback - Callback function (reason: string) => void
+   * @returns {Function} Unsubscribe function
+   */
+  onRefused(callback) {
+    return this.on(REFUSED_EVENT, callback);
   }
 
   /**
@@ -374,6 +412,17 @@ class WebSocketService {
       return;
     }
 
+    // 1008 (policy violation) is how the backend refuses a session it will not
+    // authorise — bad/absent token, unknown image, or no annotation rights on the
+    // dataset. Retrying cannot change any of those, so surface it instead of
+    // hammering the endpoint five times.
+    if (event.code === CloseCode.POLICY_VIOLATION) {
+      console.error('[WebSocket] Session refused:', event.reason || 'not authorised');
+      this._updateConnectionState(ConnectionState.ERROR);
+      this._notifyRefused(event.reason || 'You do not have permission to annotate this dataset.');
+      return;
+    }
+
     // Attempt reconnection
     if (this.reconnectCount < this.config.reconnectAttempts) {
       this._reconnect();
@@ -404,6 +453,22 @@ class WebSocketService {
         console.error('[WebSocket] Reconnection failed:', error);
       });
     }, delay);
+  }
+
+  /**
+   * Notify listeners that the server refused the session.
+   * @private
+   */
+  _notifyRefused(reason) {
+    const listeners = this.listeners.get(REFUSED_EVENT);
+    if (!listeners) return;
+    listeners.forEach(callback => {
+      try {
+        callback(reason);
+      } catch (error) {
+        console.error('[WebSocket] Refusal listener error:', error);
+      }
+    });
   }
 
   /**

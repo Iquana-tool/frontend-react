@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {Cpu, Loader, StopCircle, Info} from "lucide-react";
 import {startTraining, cancelTraining, fetchModel} from "../../../../api";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import useThemeColors from "../../../../hooks/useThemeColors";
 
 const IMAGE_SIZE_PRESETS = [
     [256, 256], [512, 512], [1024, 1024],
@@ -12,13 +13,13 @@ function ProgressBar({ current, total }) {
     const percent = Math.min(100, Math.round((current / total) * 100));
     return (
         <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <div className="flex justify-between text-xs text-t3 mb-1">
                 <span>Training Progress:</span>
                 <span>{current} / {total} epochs</span>
             </div>
-            <div className="w-full bg-gray-200 rounded h-2">
+            <div className="w-full bg-hv2 rounded h-2">
                 <div
-                    className="bg-blue-500 h-2 rounded"
+                    className="bg-accent h-2 rounded"
                     style={{ width: `${percent}%`, transition: 'width 0.5s' }}
                 />
             </div>
@@ -31,6 +32,7 @@ export default function InferenceTrainingCard({
                                               setSelectedModel,
                                               datasetId,
                                               }) {
+    const { colors } = useThemeColors();
     const [epochs, setEpochs] = useState(100);
     const [augment, setAugment] = useState(true);
     const [earlyStopping, setEarlyStopping] = useState(true);
@@ -134,9 +136,9 @@ export default function InferenceTrainingCard({
     }
 
     return (
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-5">
+        <div className="bg-well rounded-lg border border-ln p-4 mb-5">
             <div className="flex items-center gap-2 mb-4">
-                <Cpu size={20} className="text-blue-600" />
+                <Cpu size={20} className="text-ac" />
                 <h3 className="text-lg font-semibold">Training</h3>
             </div>
             <div className="space-y-3">
@@ -145,7 +147,7 @@ export default function InferenceTrainingCard({
                     {/* Controls */}
                     <div>
                         <label className={`flex items-center cursor-pointer ${isTraining || isStarting ? "opacity-50" : ""}`}>
-                            <span className="ml-2 text-sm text-gray-700">Steps: {epochs}</span>
+                            <span className="ml-2 text-sm text-t2">Steps: {epochs}</span>
                             <input type={"range"} min={0} max={500} step={20} value={epochs}
                                    onChange={e=>setEpochs(e.target.value)}
                                      className="ml-2 w-full"
@@ -172,7 +174,7 @@ export default function InferenceTrainingCard({
                         </label>
                     </div>
                     <div className="flex items-center space-x-2">
-                        <label className="text-sm font-medium text-gray-700">Image Size:</label>
+                        <label className="text-sm font-medium text-t2">Image Size:</label>
                         <select
                             value={IMAGE_SIZE_PRESETS.some(p=>JSON.stringify(p)===JSON.stringify(imageSize)) ? JSON.stringify(imageSize) : "custom"}
                             onChange={handleImageSizeChange}
@@ -196,10 +198,10 @@ export default function InferenceTrainingCard({
                         )}
                         {isTrained && (
                             <span className="relative inline-flex items-center cursor-pointer group">
-                                <Info size={15} className="text-gray-400 ml-1" />
+                                <Info size={15} className="text-t3 ml-1" />
                                 <span className="invisible group-hover:visible opacity-0 group-hover:opacity-100
                                                  absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-60 z-10
-                                                 p-2 text-xs text-gray-700 bg-white border border-gray-300 rounded shadow-lg transition-opacity">
+                                                 p-2 text-xs text-t2 bg-p1 border border-ln2 rounded shadow-lg transition-opacity">
                                     {"Cannot change the image size of already trained models."}
                                 </span>
                             </span>
@@ -212,7 +214,7 @@ export default function InferenceTrainingCard({
                 {!isTraining
                     ? <button
                         onClick={handleStartTraining}
-                        className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 text-sm mt-3"
+                        className="w-full flex items-center justify-center space-x-2 bg-accent text-onAccent py-2 px-4 rounded-lg hover:brightness-110 transition-colors disabled:opacity-50 text-sm mt-3"
                         disabled={!model}
                     >
                         {isStarting ? <Loader className="animate-spin" size={16} /> : <Cpu size={16}/>}
@@ -227,8 +229,8 @@ export default function InferenceTrainingCard({
                                         <button
                                             key={tabName}
                                             className={`text-xs px-3 py-1 rounded ${tab === idx 
-                                                ? "bg-blue-500 text-white"
-                                                : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}
+                                                ? "bg-accent text-onAccent"
+                                                : "bg-hv2 text-t2 hover:bg-ln2"}`}
                                             onClick={() => setTab(idx)}
                                             type="button"
                                         >
@@ -257,13 +259,16 @@ export default function InferenceTrainingCard({
                                                 })()
                                             }
                                         >
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="epoch" tick={{fontSize:10}} />
-                                            <YAxis tick={{fontSize:10}} />
-                                            <Tooltip />
-                                            <Legend />
-                                            <Line type="monotone" dataKey="Train" stroke="#2563EB" dot={false} />
-                                            <Line type="monotone" dataKey="Val" stroke="#16A34A" dot={false} />
+                                            <CartesianGrid strokeDasharray="3 3" stroke={colors.ln2} />
+                                            <XAxis dataKey="epoch" tick={{fontSize:10, fill: colors.t2}} />
+                                            <YAxis tick={{fontSize:10, fill: colors.t3}} />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: colors.p2, border: `1px solid ${colors.ln}`, borderRadius: '8px', color: colors.t1 }}
+                                                labelStyle={{ color: colors.t2 }}
+                                            />
+                                            <Legend wrapperStyle={{ color: colors.t2, fontSize: 12 }} />
+                                            <Line type="monotone" dataKey="Train" stroke={colors.ac} dot={false} />
+                                            <Line type="monotone" dataKey="Val" stroke={colors.ok} dot={false} />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -272,7 +277,7 @@ export default function InferenceTrainingCard({
                         <div>
                             <button
                                 onClick={handleCancelTraining}
-                                className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 text-sm mt-3"
+                                className="w-full flex items-center justify-center space-x-2 bg-err text-onAccent py-2 px-4 rounded-lg hover:brightness-110 transition-colors disabled:opacity-50 text-sm mt-3"
                                 >
                                 {isStopping ? <Loader className="animate-spin" size={16} /> : <StopCircle size={16} />}
                                 <span>{isStopping ? "Stopping" : "Stop Training"}</span>
@@ -281,7 +286,7 @@ export default function InferenceTrainingCard({
                     </div>
             }
                 {isFailed && (
-                    <div className="text-red-700 text-sm">Model Training Failed. Speak to an admin if this keeps happening.</div>
+                    <div className="text-err text-sm">Model Training Failed. Speak to an admin if this keeps happening.</div>
                 )}
             </div>
         </div>
