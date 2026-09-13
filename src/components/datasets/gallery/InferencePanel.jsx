@@ -12,17 +12,17 @@ const InferencePanel = ({ dataset }) => {
       <div className="p-5 h-full overflow-y-auto">
         <div className="mb-5">
           <div className="flex items-center mb-2">
-            <Brain className="w-5 h-5 text-teal-600 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">Inference Model</h2>
+            <Brain className="w-5 h-5 text-ac mr-2" />
+            <h2 className="text-lg font-semibold text-t1">Inference Model</h2>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-t2">
             Select the AI architecture to train on this dataset
           </p>
         </div>
 
         {/* Model Selection */}
         <div className="mb-5">
-          <h3 className="text-base font-medium text-gray-900 mb-2">Model</h3>
+          <h3 className="text-base font-medium text-t1 mb-2">Model</h3>
           <InferenceModelSelect dataset={dataset} selectedModel={selectedModel} setSelectedModel={setSelectedModel} />
 
           {/* Selected Model Info */}

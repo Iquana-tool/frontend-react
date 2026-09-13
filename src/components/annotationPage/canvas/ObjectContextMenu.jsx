@@ -12,22 +12,28 @@ import {
   useUpdateObject,
   useRemoveObject,
   useEnterRefinementMode,
+  useCurrentTool,
   useSetCurrentTool,
   useRefinementModeActive,
   useFocusModeActive,
+  useFocusModeObjectId,
   useExitFocusMode,
-  useCompletionModel,
-  useWebSocketIsReady,
   useEnterEditMode,
+  useStartLineEdit,
+  useSelectObject,
+  useCurrentMaskId,
 } from '../../../stores/selectors/annotationSelectors';
 import { useRefinementMode } from '../../../hooks/useRefinementMode';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
-import { useCompletionSegmentation } from '../../../hooks/useCompletionSegmentation';
+import { getChildLabels, resolveParentLabelId } from '../../../utils/labelHierarchy';
+import useSuggestSimilar from '../workspace/useSuggestSimilar';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
+import { mergeObjects } from '../../../utils/contourOperations';
+import { useToast } from '../../../contexts/ToastContext';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
@@ -47,11 +53,12 @@ const ObjectContextMenu = () => {
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
   const enterRefinementMode = useEnterRefinementMode();
+  const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
   const refinementModeActive = useRefinementModeActive();
   const focusModeActive = useFocusModeActive();
+  const focusModeObjectId = useFocusModeObjectId();
   const exitFocusMode = useExitFocusMode();
-  const completionModel = useCompletionModel();
   
   // Use the same zoom hook as refinement mode
   const { zoomToObject } = useZoomToObject({
@@ -59,12 +66,16 @@ const ObjectContextMenu = () => {
     maxZoom: 4,
     minZoom: 1,
   });
-  const wsIsReady = useWebSocketIsReady();
   const enterEditMode = useEnterEditMode();
+  const startLineEdit = useStartLineEdit();
+  const selectObject = useSelectObject();
+  const maskId = useCurrentMaskId();
+  const { addToast } = useToast();
   const { currentDataset } = useDataset();
   const menuRef = useRef(null);
-  
+
   const [adjustedPosition, setAdjustedPosition] = useState({ x, y });
+  const [isMerging, setIsMerging] = useState(false);
   
   // Get all selected objects (targets for batch operations)
   const targetObjects = React.useMemo(() => {
@@ -81,13 +92,48 @@ const ObjectContextMenu = () => {
   }, [isMultiSelect, objectsList, targetObjectId]);
   
   // Use labels hierarchy hook
-  const { labelHierarchy, labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
-  
-  // Use completion segmentation hook
-  const { runCompletion, isRunning: isRunningCompletion } = useCompletionSegmentation(
-    null, // onSuccess: objects are automatically added via WebSocket
-    (error) => alert(`Failed to suggest similar instances: ${error.message || 'Unknown error'}`)
+  const { labelMap, labelsLoading } = useLabelsHierarchy(visible, currentDataset);
+
+  // Restrict the selectable labels to the current hierarchy level: root labels
+  // when annotating at the top level, or the children of the parent contour's
+  // label when annotating inside another contour.
+  const flatLabels = React.useMemo(() => Array.from(labelMap.values()), [labelMap]);
+
+  const primaryTarget = React.useMemo(
+    () => objectsList.find((obj) => obj.id === targetObjectId) || targetObjects[0] || null,
+    [objectsList, targetObjectId, targetObjects]
   );
+
+  const parentLabelId = React.useMemo(
+    () =>
+      resolveParentLabelId(primaryTarget, objectsList, {
+        active: focusModeActive,
+        objectId: focusModeObjectId,
+      }),
+    [primaryTarget, objectsList, focusModeActive, focusModeObjectId]
+  );
+
+  const parentLabelName = React.useMemo(() => {
+    if (parentLabelId === null || parentLabelId === undefined) return null;
+    const parent =
+      labelMap.get(parentLabelId) ||
+      labelMap.get(Number(parentLabelId)) ||
+      labelMap.get(String(parentLabelId));
+    return parent?.name ?? null;
+  }, [labelMap, parentLabelId]);
+
+  // Strip nested children so only the single current level is rendered.
+  const currentLevelLabels = React.useMemo(
+    () =>
+      getChildLabels(flatLabels, parentLabelId).map((label) => ({
+        id: label.id,
+        name: label.name,
+        parent_id: label.parent_id,
+      })),
+    [flatLabels, parentLabelId]
+  );
+  
+  const suggestSimilar = useSuggestSimilar();
 
   // Adjust position to keep menu within container bounds and place it intuitively next to the object
   useEffect(() => {
@@ -153,8 +199,9 @@ const ObjectContextMenu = () => {
   const handleLabelSelectBase = useLabelSelection(
     updateObject,
     () => {
-      // onSuccess: switch tool and hide menu
-      setCurrentTool('ai_annotation');
+      // onSuccess: switch tool and hide menu. Manual drawing stays put —
+      // labelling the outline you just drew should not end the drawing session.
+      if (currentTool !== 'manual_drawing') setCurrentTool('ai_annotation');
       hideContextMenu();
     },
     (error) => {
@@ -279,8 +326,9 @@ const ObjectContextMenu = () => {
         await deleteObject(targetObject, removeObject);
       }
       
-      // Switch to AI assisted annotation tool
-      setCurrentTool('ai_annotation');
+      // Switch to AI assisted annotation tool, unless the user is drawing by
+      // hand — deleting an object is no reason to put their tool back.
+      if (currentTool !== 'manual_drawing') setCurrentTool('ai_annotation');
       
       hideContextMenu();
     } catch (error) {
@@ -335,37 +383,74 @@ const ObjectContextMenu = () => {
   };
 
   const handleSuggestSimilar = async () => {
-    if (targetObjects.length === 0) {
+    hideContextMenu();
+    await suggestSimilar.run();
+  };
+
+  const handleLineEditContour = (lineMode = 'reshape') => {
+    if (isMultiSelect) return;
+    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
+    if (!targetObject || targetObject.contour_id == null ||
+        !targetObject.x || targetObject.x.length === 0) {
       hideContextMenu();
       return;
     }
 
-    // Get all contour IDs from selected objects
-    const contourIds = targetObjects
-      .map(obj => obj.contour_id)
-      .filter(id => id !== null && id !== undefined);
-    
-    if (contourIds.length === 0) {
-      alert('Could not find contour IDs for selected objects');
-      hideContextMenu();
-      return;
+    if (focusModeActive) {
+      if (annotationSession.isReady()) {
+        annotationSession.unfocusImage().catch(() => {});
+      }
+      exitFocusMode();
     }
 
-    // Check if WebSocket is ready
-    if (!wsIsReady) {
-      alert('WebSocket connection is not ready. Please wait or refresh the page.');
-      hideContextMenu();
-      return;
+    selectObject(targetObject.id);
+    setCurrentTool('selection');
+    startLineEdit(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y, lineMode);
+
+    // Frame the instance so there is room to draw the line.
+    if (imageObject && targetObject.x.length > 0) {
+      const container = menuRef.current?.parentElement;
+      if (container?.offsetWidth && container?.offsetHeight) {
+        const rendered = calculateRenderedImageDimensions(imageObject, container.offsetWidth, container.offsetHeight);
+        zoomToObject(
+          targetObject,
+          { width: imageObject.width, height: imageObject.height },
+          { width: container.offsetWidth, height: container.offsetHeight },
+          rendered,
+          { animateMs: 300, immediate: false }
+        );
+      }
     }
 
     hideContextMenu();
-    
-    // Use the completion hook with all selected contour IDs as seeds
-    // For multiple seeds, we'll use the first object's labelId as the default
-    const labelId = targetObjects[0]?.labelId;
-    
-    // Pass contour IDs (hook handles both single and array)
-    await runCompletion(contourIds.length === 1 ? contourIds[0] : contourIds, labelId);
+  };
+
+  /**
+   * Merge the selection into one object (#44).
+   *
+   * Only touching or overlapping outlines can be merged: their union is a single
+   * ring, which is what a contour already is. A disjoint selection is refused by
+   * `mergeObjects` rather than quietly producing a shape that spans the gap.
+   */
+  const handleMergeObjects = async () => {
+    if (!isMultiSelect || isMerging) return;
+
+    setIsMerging(true);
+    hideContextMenu();
+    try {
+      const result = await mergeObjects({
+        objects: targetObjects,
+        objectsList,
+        imageObject,
+        maskId,
+        updateObject,
+      });
+      addToast({ type: result.success ? 'success' : 'error', message: result.message });
+    } catch (error) {
+      addToast({ type: 'error', message: error.message || 'Could not merge those objects.' });
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   const handleEditContour = () => {
@@ -440,7 +525,7 @@ const ObjectContextMenu = () => {
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 bg-white rounded-md shadow-xl border border-gray-200 py-1 min-w-[120px] max-w-[220px]"
+      className="absolute z-[80] w-[216px] p-[5px] rounded-9 bg-p2 border border-ln2 shadow-ctx animate-dcPop"
       style={{
         left: `${adjustedPosition.x}px`,
         top: `${adjustedPosition.y}px`,
@@ -448,7 +533,7 @@ const ObjectContextMenu = () => {
     >
       {/* Header showing selection count */}
       {isMultiSelect && (
-        <div className="px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border-b border-blue-100">
+        <div className="px-[8px] py-[6px] mb-[3px] rounded-6 bg-acS text-meta font-bold text-ac">
           {targetObjects.length} objects selected
         </div>
       )}
@@ -456,7 +541,7 @@ const ObjectContextMenu = () => {
       {/* Reject Object Option */}
       <ContextMenuItem
         onClick={handleReject}
-        className="hover:bg-red-50 hover:text-red-700"
+        tone="danger"
         label={isMultiSelect ? `Reject ${targetObjects.length} objects` : "Reject object"}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -491,7 +576,6 @@ const ObjectContextMenu = () => {
         onClick={handleRefine}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Refinement mode is disabled for multiple selections' : 'Refine object'}
-        className="hover:bg-purple-50 hover:text-purple-700"
         label="Refine Object"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -500,12 +584,54 @@ const ObjectContextMenu = () => {
         }
       />
 
+      {/* Reshape by Line Option - draw a line that is merged into the boundary */}
+      <ContextMenuItem
+        onClick={() => handleLineEditContour('reshape')}
+        disabled={isMultiSelect}
+        title={isMultiSelect ? 'Reshape is disabled for multiple selections' : 'Draw a line across the boundary to cut off or add a region'}
+        label="Reshape by Line"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20l6-6m0 0l4-4 6-6M10 14l4 4m-4-4l-2-2" />
+          </svg>
+        }
+      />
+
+      {/* Split Option - draw a line across the object to cut it in two */}
+      <ContextMenuItem
+        onClick={() => handleLineEditContour('split')}
+        disabled={isMultiSelect}
+        title={isMultiSelect ? 'Split works on one object at a time' : 'Draw a line across this object to cut it into two objects'}
+        label="Split Object"
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v18M6 7l-3 5 3 5m12-10l3 5-3 5" />
+          </svg>
+        }
+      />
+
+      {/* Merge Option - union of a touching or overlapping selection */}
+      <ContextMenuItem
+        onClick={handleMergeObjects}
+        disabled={!isMultiSelect || isMerging}
+        title={
+          !isMultiSelect
+            ? 'Select two or more touching objects to merge them'
+            : 'Merge the selected objects into one'
+        }
+        label={isMerging ? 'Merging…' : (isMultiSelect ? `Merge ${targetObjects.length} Objects` : 'Merge Objects')}
+        icon={
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h5a3 3 0 013 3v6a3 3 0 003 3h5m0-12h-5a3 3 0 00-3 3" />
+          </svg>
+        }
+      />
+
       {/* Edit Contour Option - Disabled for multi-select */}
       <ContextMenuItem
         onClick={handleEditContour}
         disabled={isMultiSelect}
-        title={isMultiSelect ? 'Edit contour is disabled for multiple selections' : 'Edit contour shape'}
-        className="hover:bg-blue-50 hover:text-blue-700"
+        title={isMultiSelect ? 'Edit contour is disabled for multiple selections' : 'Drag the existing outline’s control points'}
         label="Edit Contour"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -517,18 +643,14 @@ const ObjectContextMenu = () => {
       {/* Suggest Similar Instances Option */}
       <ContextMenuItem
         onClick={handleSuggestSimilar}
-        disabled={isRunningCompletion || !completionModel || !wsIsReady}
-        className="hover:bg-green-50 hover:text-green-700"
+        disabled={!suggestSimilar.eligible}
         title={
-          !completionModel 
-            ? 'Select a completion model first' 
-            : !wsIsReady 
-              ? 'WebSocket not ready' 
-              : isMultiSelect
-                ? `Use ${targetObjects.length} objects as seeds for completion segmentation`
-                : 'Find similar instances using completion segmentation'
+          suggestSimilar.reason ||
+          (isMultiSelect
+            ? `Use ${targetObjects.length} objects as seeds for suggestion segmentation`
+            : 'Find similar instances using suggestion segmentation')
         }
-        label={isRunningCompletion ? 'Finding similar...' : 'Suggest Similar Instances'}
+        label={suggestSimilar.isRunning ? 'Finding similar...' : 'Suggest Similar Instances'}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -537,19 +659,28 @@ const ObjectContextMenu = () => {
       />
 
       {/* Label section header */}
-      <div className="px-3 py-1 text-xs font-medium text-gray-600 border-b border-gray-100">
-        {isMultiSelect ? `Assign label to ${targetObjects.length} objects` : 'Label'}
+      <div className="mt-[4px] pt-[6px] px-[8px] border-t border-ln">
+        <div className="text-sect font-bold tracking-[.08em] uppercase text-t3">
+          {isMultiSelect ? `Label ${targetObjects.length} objects` : 'Label'}
+        </div>
+        <div className="mb-[4px] text-meta text-t3">
+          {parentLabelName ? `Sub-labels of ${parentLabelName}` : 'Root level'}
+        </div>
       </div>
-      
-      {/* Hierarchical label list */}
+
+      {/* Current-level label list (root labels, or children of the parent contour's label) */}
       <HierarchicalLabelList
-        labelHierarchy={labelHierarchy}
+        labelHierarchy={currentLevelLabels}
         labelsLoading={labelsLoading}
         onLabelSelect={handleLabelSelect}
+        emptyMessage={
+          parentLabelName
+            ? `No sub-labels under "${parentLabelName}"`
+            : 'No labels available'
+        }
       />
     </div>
   );
 };
 
 export default ObjectContextMenu;
-

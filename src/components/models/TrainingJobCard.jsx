@@ -40,38 +40,38 @@ const TrainingJobCard = ({
   const statusConfig = {
     PENDING: {
       icon: Clock,
-      bg: "bg-amber-50",
-      border: "border-amber-200",
-      text: "text-amber-800",
-      iconClass: "text-amber-600",
+      bg: "bg-warnBg",
+      border: "border-warnLn",
+      text: "text-warn",
+      iconClass: "text-warn",
     },
     STARTED: {
       icon: Loader2,
-      bg: "bg-blue-50",
-      border: "border-blue-200",
-      text: "text-blue-800",
-      iconClass: "text-blue-600 animate-spin",
+      bg: "bg-acS",
+      border: "border-acLn",
+      text: "text-ac",
+      iconClass: "text-ac animate-spin",
     },
     SUCCESS: {
       icon: CheckCircle2,
-      bg: "bg-green-50",
-      border: "border-green-200",
-      text: "text-green-800",
-      iconClass: "text-green-600",
+      bg: "bg-okBg",
+      border: "border-okLn",
+      text: "text-ok",
+      iconClass: "text-ok",
     },
     FAILURE: {
       icon: XCircle,
-      bg: "bg-red-50",
-      border: "border-red-200",
-      text: "text-red-800",
-      iconClass: "text-red-600",
+      bg: "bg-errBg",
+      border: "border-errLn",
+      text: "text-err",
+      iconClass: "text-err",
     },
     REVOKED: {
       icon: StopCircle,
-      bg: "bg-gray-100",
-      border: "border-gray-200",
-      text: "text-gray-700",
-      iconClass: "text-gray-500",
+      bg: "bg-well",
+      border: "border-ln",
+      text: "text-t2",
+      iconClass: "text-t3",
     },
   };
 
@@ -86,7 +86,7 @@ const TrainingJobCard = ({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-semibold text-gray-900 truncate">{model_name || model_key || "Model"}</h4>
+            <h4 className="font-semibold text-t1 truncate">{model_name || model_key || "Model"}</h4>
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text} border ${config.border}`}
             >
@@ -94,21 +94,21 @@ const TrainingJobCard = ({
               {getDisplayStatus(status)}
             </span>
           </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-t2">
             <span>Dataset ID: {dataset_id}</span>
-            <span className="font-mono text-xs text-gray-500">Task: {task_id?.slice(0, 8)}…</span>
+            <span className="font-mono text-xs text-t3">Task: {task_id?.slice(0, 8)}…</span>
           </div>
           {progressMessage && (
-            <p className="mt-2 text-sm text-gray-700">{progressMessage}</p>
+            <p className="mt-2 text-sm text-t2">{progressMessage}</p>
           )}
           {error && (
-            <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+            <p className="mt-2 text-sm text-err flex items-center gap-1">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               {error}
             </p>
           )}
           {progress && typeof progress === "object" && (progress.epoch_count != null || progress.current_epoch != null || progress.epoch != null) && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-t3">
               Epoch {progress.current_epoch ?? progress.epoch_count ?? progress.epoch ?? "—"}
               {(progress.total_epochs ?? progress.num_epochs) != null && ` / ${progress.total_epochs ?? progress.num_epochs}`}
             </p>
@@ -118,7 +118,7 @@ const TrainingJobCard = ({
           <button
             type="button"
             onClick={() => onCancel(task_id)}
-            className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="flex-shrink-0 px-3 py-1.5 text-sm font-medium text-t2 bg-p1 border border-ln2 rounded-lg hover:bg-hv"
           >
             Cancel
           </button>

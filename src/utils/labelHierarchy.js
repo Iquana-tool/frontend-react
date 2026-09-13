@@ -44,6 +44,52 @@ export const buildLabelHierarchy = (flatLabels) => {
 };
 
 /**
+ * Get the labels available at a single hierarchy level from a flat label array.
+ * When parentLabelId is null/undefined, returns the root-level labels;
+ * otherwise returns the direct children of that parent label.
+ *
+ * @param {Array} flatLabels - Flat array of labels (each with parent_id)
+ * @param {number|string|null} parentLabelId - Parent label id, or null for root
+ * @returns {Array} - Labels at the requested level
+ */
+export const getChildLabels = (flatLabels, parentLabelId = null) => {
+  if (!Array.isArray(flatLabels)) return [];
+  if (parentLabelId === null || parentLabelId === undefined) {
+    return flatLabels.filter((label) => label.parent_id === null || label.parent_id === undefined);
+  }
+  return flatLabels.filter((label) => String(label.parent_id) === String(parentLabelId));
+};
+
+/**
+ * Resolve the parent label id that determines which labels are selectable for a
+ * given object. An object's level is dictated by the label of the contour it
+ * lives inside:
+ *   - If the object is nested in a parent contour (parent_id), use that parent's label.
+ *   - Otherwise, if annotating inside a focused contour, use the focused object's label.
+ *   - Otherwise, return null (root level).
+ *
+ * @param {Object} targetObject - The object being labelled
+ * @param {Array} objectsList - All objects on the current image
+ * @param {{active: boolean, objectId: number|string|null}} focus - Focus mode state
+ * @returns {number|string|null} - Parent label id, or null for root level
+ */
+export const resolveParentLabelId = (targetObject, objectsList, focus = {}) => {
+  let parentObjectId = targetObject?.parent_id ?? null;
+
+  // Brand-new contours may not be nested yet — fall back to the focused contour.
+  if ((parentObjectId === null || parentObjectId === undefined) && focus.active) {
+    parentObjectId = focus.objectId ?? null;
+  }
+
+  if (parentObjectId === null || parentObjectId === undefined) return null;
+
+  const parent = (objectsList || []).find(
+    (obj) => String(obj.id) === String(parentObjectId)
+  );
+  return parent?.labelId ?? null;
+};
+
+/**
  * Find a label by ID in the hierarchy
  * @param {Array} hierarchy - Hierarchical label structure
  * @param {number} labelId - ID to search for

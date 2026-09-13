@@ -7,6 +7,7 @@
  */
 
 import websocketService from './websocket';
+import { getAuthToken } from '../api/util';
 import { MessageBuilders, SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 
 /**
@@ -21,11 +22,14 @@ export const SessionState = {
 
 /**
  * Gets the authenticated username from the stored auth user.
- * Falls back to a temporary timestamp-based ID if no auth user is available.
- * @returns {string} The authenticated username or a temp ID
+ *
+ * This is display information only. The backend derives the session's identity
+ * from the bearer token and ignores the username in the URL, so there is no
+ * anonymous fallback any more — a session without a token is refused.
+ *
+ * @returns {string|null} The authenticated username, or null when logged out
  */
 const getUserId = () => {
-  // Try to get the real authenticated username from localStorage
   try {
     const userStr = localStorage.getItem('auth_user');
     if (userStr) {
@@ -37,30 +41,16 @@ const getUserId = () => {
   } catch (error) {
     console.warn('[AnnotationSession] Failed to read auth user from localStorage:', error);
   }
-
-  // Fallback: use a temporary timestamp-based ID
-  let userId = sessionStorage.getItem('temp_user_id');
-  if (!userId) {
-    const numericId = Date.now();
-    sessionStorage.setItem('temp_user_id', numericId.toString());
-    return numericId;
-  }
-  const parsedId = parseInt(userId, 10);
-  if (isNaN(parsedId)) {
-    const numericId = Date.now();
-    sessionStorage.setItem('temp_user_id', numericId.toString());
-    return numericId;
-  }
-  return parsedId;
+  return null;
 };
 
 const getWsBaseUrl = () => {
-  const wsEnv = process.env.REACT_APP_WS_URL;
+  const wsEnv = import.meta.env.VITE_WS_URL;
   if (wsEnv && wsEnv.trim()) {
     return wsEnv.trim().replace(/\/$/, '');
   }
 
-  const apiEnv = process.env.REACT_APP_API_BASE_URL;
+  const apiEnv = import.meta.env.VITE_API_BASE_URL;
   if (apiEnv && apiEnv.trim()) {
     const apiBase = apiEnv.trim().replace(/\/$/, '');
     if (apiBase.startsWith('https://')) {
@@ -68,6 +58,10 @@ const getWsBaseUrl = () => {
     }
     if (apiBase.startsWith('http://')) {
       return apiBase.replace(/^http:\/\//, 'ws://');
+    }
+    if (apiBase.startsWith('/') && typeof window !== 'undefined' && window.location.host) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${window.location.host}${apiBase}`;
     }
   }
 
@@ -92,8 +86,12 @@ class AnnotationSession {
 
   /**
    * Initialize annotation session for an image
+   *
+   * The socket is opened per *user*, with the first image in the URL. Later images
+   * are reached with `switchImage`, which reuses this same connection.
+   *
    * @param {number|string} imageId - Image ID
-   * @param {number} userId - User ID (optional, will use temp ID if not provided)
+   * @param {string} userId - Username for display (optional; identity comes from the token)
    * @returns {Promise<Object>} Session initialization data
    */
   async initialize(imageId, userId = null) {
@@ -102,8 +100,16 @@ class AnnotationSession {
       this.currentUserId = userId || getUserId();
       this._updateSessionState(SessionState.INITIALIZING);
 
-      // Construct WebSocket URL
-      const wsUrl = `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}/${this.currentImageId}`;
+      // The backend authenticates the socket and checks `annotation.create` on the
+      // image's dataset before accepting it. Browsers cannot set headers on a
+      // WebSocket handshake, so the token travels as a query parameter.
+      const token = getAuthToken();
+      if (!token) {
+        this._updateSessionState(SessionState.ERROR);
+        throw new Error('You must be signed in to open an annotation session.');
+      }
+
+      const wsUrl = this._buildUrl(this.currentImageId, token);
 
       // Connect to WebSocket
       await websocketService.connect(wsUrl, {
@@ -144,7 +150,11 @@ class AnnotationSession {
               failed: this.failedServices,
               objects: message.data?.objects || null,
               maskId: message.data?.mask_id ?? null,
+              // The image's combined status, plus its Calibrate/Annotate/Review
+              // breakdown — both arrive with SESSION_INITIALIZED so the workspace
+              // needs no extra REST call to draw the status pill.
               maskStatus: message.data?.mask_status ?? null,
+              phaseStatus: message.data?.phase_status ?? null,
             });
           }
         );
@@ -181,23 +191,95 @@ class AnnotationSession {
   }
 
   /**
-   * Switch to a different image (close current session and open new one)
+   * Point the session at a different image.
+   *
+   * Sends a `switch_image` message over the existing socket rather than closing and
+   * reopening it. A reconnect meant re-authenticating, re-running three backend health
+   * checks and re-selecting every model before the new image's contours could even be
+   * asked for — all of which the server already has loaded and can keep.
+   *
+   * If the socket is not up (first image, or it dropped), this falls back to opening one.
+   *
    * @param {number|string} newImageId - New image ID
-   * @returns {Promise<Object>} New session initialization data
+   * @returns {Promise<Object>} Session data for the new image
    */
   async switchImage(newImageId) {
-    if (this.currentImageId === newImageId) {
+    if (this.currentImageId === newImageId && this.isReady()) {
       return {
         running: this.runningServices,
         failed: this.failedServices,
       };
     }
 
-    // Close current session (don't mark as finished when switching)
-    await this.close(false);
+    if (!websocketService.isConnected()) {
+      // No live connection to switch on — open one pointed at the new image.
+      await this.close(false);
+      return this.initialize(newImageId, this.currentUserId);
+    }
 
-    // Initialize new session
-    return this.initialize(newImageId, this.currentUserId);
+    this._updateSessionState(SessionState.INITIALIZING);
+
+    try {
+      const response = await websocketService.send(
+        MessageBuilders.switchImage(newImageId),
+        true
+      );
+
+      this.currentImageId = newImageId;
+      // Keep the reconnect target in step, so a dropped connection comes back on the
+      // image the user is looking at rather than the one the socket was opened with.
+      const token = getAuthToken();
+      if (token) {
+        websocketService.setUrl(this._buildUrl(newImageId, token));
+      }
+      // The backend re-reports its services with every switch, so a backend that came
+      // up (or went down) since connecting is reflected without a reconnect.
+      this.runningServices = response?.data?.running || this.runningServices;
+      this.failedServices = response?.data?.failed || this.failedServices;
+      this._updateSessionState(
+        this.runningServices.length > 0 ? SessionState.READY : SessionState.ERROR
+      );
+
+      return {
+        running: this.runningServices,
+        failed: this.failedServices,
+        // Contours are not in this reply — they arrive as a separate OBJECTS message,
+        // so the canvas can show the image immediately and the object list can fill in
+        // behind its own spinner.
+        objects: null,
+        maskId: response?.data?.mask_id ?? null,
+        maskStatus: response?.data?.mask_status ?? null,
+        phaseStatus: response?.data?.phase_status ?? null,
+      };
+    } catch (error) {
+      console.error('[AnnotationSession] switch_image failed:', error);
+      this._updateSessionState(SessionState.ERROR);
+      throw error;
+    }
+  }
+
+  /**
+   * Ask the server to re-send the current image's contours.
+   *
+   * Backs the "Retry" on the contour spinner. Re-switching to the image we are already
+   * on is the cheapest way to do it — the server treats it as any other switch and
+   * follows the reply with a fresh OBJECTS message.
+   *
+   * @returns {Promise<Object>} Session data for the (unchanged) image
+   */
+  async reloadObjects() {
+    if (this.currentImageId == null) {
+      throw new Error('No image to reload.');
+    }
+    const imageId = this.currentImageId;
+    // Clear it first so switchImage does not short-circuit on "already on this image".
+    this.currentImageId = null;
+    try {
+      return await this.switchImage(imageId);
+    } catch (error) {
+      this.currentImageId = imageId;
+      throw error;
+    }
   }
 
   // ==================== AI SEGMENTATION OPERATIONS ====================
@@ -223,49 +305,49 @@ class AnnotationSession {
   }
 
   /**
-   * Select model for completion segmentation
-   * @param {string} modelIdentifier - Completion model identifier
+   * Select model for suggestion segmentation
+   * @param {string} modelIdentifier - Suggestion model identifier
    * @returns {Promise<Object>} Response message
    */
-  async selectCompletionModel(modelIdentifier) {
+  async selectSuggestionModel(modelIdentifier) {
     this._ensureReady();
     if (!modelIdentifier) {
       return Promise.resolve({ success: true, message: 'No model to select' });
     }
     
-    // Only send message if completion service is available
-    if (!this.isServiceAvailable('completion_segmentation')) {
+    // Only send message if suggestion service is available
+    if (!this.isServiceAvailable('suggestion_segmentation')) {
       return Promise.resolve({ success: false, message: 'Service not available' });
     }
     
-    const message = MessageBuilders.selectCompletionModel(modelIdentifier);
+    const message = MessageBuilders.selectSuggestionModel(modelIdentifier);
     return websocketService.send(message, true);
   }
 
   /**
-   * Select model for semantic segmentation
-   * @param {string} modelName - Semantic model identifier
+   * Select model for instance segmentation
+   * @param {string} modelName - Instance model identifier
    * @returns {Promise<Object>} Response message
    */
-  async selectSemanticModel(modelName) {
+  async selectInstanceModel(modelName) {
     this._ensureReady();
     if (!modelName) {
       return Promise.resolve({ success: true, message: 'No model to select' });
     }
-    
-    // Only send message if semantic service is available
-    if (!this.isServiceAvailable('semantic_segmentation')) {
+
+    // Only send message if instance service is available
+    if (!this.isServiceAvailable('instance_segmentation')) {
       return Promise.resolve({ success: false, message: 'Service not available' });
     }
-    
-    const message = MessageBuilders.selectSemanticModel(modelName);
+
+    const message = MessageBuilders.selectInstanceModel(modelName);
     return websocketService.send(message, true);
   }
 
   /**
    * Preload models into backend memory after session initialization
    * This sends select_model messages to preload the currently selected models
-   * @param {Object} selectedModels - Object with promptedModel, completionModel, semanticModel
+   * @param {Object} selectedModels - Object with promptedModel, suggestionModel, instanceModel
    * @returns {Promise<void>}
    */
   async preloadModels(selectedModels = {}) {
@@ -273,12 +355,12 @@ class AnnotationSession {
       return;
     }
 
-    const { promptedModel, completionModel, semanticModel } = selectedModels;
+    const { promptedModel, suggestionModel, instanceModel } = selectedModels;
 
     // Extract model IDs (handle both string IDs and model objects)
     const promptedModelId = typeof promptedModel === 'string' ? promptedModel : promptedModel?.id;
-    const completionModelId = typeof completionModel === 'string' ? completionModel : completionModel?.id;
-    const semanticModelId = typeof semanticModel === 'string' ? semanticModel : semanticModel?.id;
+    const suggestionModelId = typeof suggestionModel === 'string' ? suggestionModel : suggestionModel?.id;
+    const instanceModelId = typeof instanceModel === 'string' ? instanceModel : instanceModel?.id;
 
     // Send model selection messages to preload models into memory
     // These calls won't throw errors if services aren't available
@@ -292,17 +374,17 @@ class AnnotationSession {
       );
     }
 
-    if (completionModelId && this.isServiceAvailable('completion_segmentation')) {
+    if (suggestionModelId && this.isServiceAvailable('suggestion_segmentation')) {
       promises.push(
-        this.selectCompletionModel(completionModelId).catch(() => {
+        this.selectSuggestionModel(suggestionModelId).catch(() => {
           // Error handled silently
         })
       );
     }
 
-    if (semanticModelId && this.isServiceAvailable('semantic_segmentation')) {
+    if (instanceModelId && this.isServiceAvailable('instance_segmentation')) {
       promises.push(
-        this.selectSemanticModel(semanticModelId).catch(() => {
+        this.selectInstanceModel(instanceModelId).catch(() => {
           // Error handled silently
         })
       );
@@ -326,11 +408,12 @@ class AnnotationSession {
    * Run AI segmentation with prompts
    * @param {string} modelIdentifier - Model to use
    * @param {Object} prompts - Prompts object {points, boxes, masks}
+   * @param {Object|null} inputs - Optional routing inputs (parameters / conditioning)
    * @returns {Promise<Object>} Segmentation result
    */
-  async runSegmentation(modelIdentifier, prompts) {
+  async runSegmentation(modelIdentifier, prompts, inputs = null) {
     this._ensureReady();
-    const message = MessageBuilders.runSegmentation(modelIdentifier, prompts);
+    const message = MessageBuilders.runSegmentation(modelIdentifier, prompts, inputs);
     return websocketService.send(message, true);
   }
 
@@ -343,11 +426,12 @@ class AnnotationSession {
    * @param {string|null} label - Object label
    * @param {number|null} parentId - Parent contour ID
    * @param {number} confidence - Confidence score
+   * @param {number|null} labelId - Label the new object is created with (optional)
    * @returns {Promise<Object>} Response with added objects
    */
-  async addObject(x, y, label = null, parentId = null, confidence = 1.0) {
+  async addObject(x, y, label = null, parentId = null, confidence = 1.0, labelId = null) {
     this._ensureReady();
-    const message = MessageBuilders.addObject(x, y, label, parentId, confidence);
+    const message = MessageBuilders.addObject(x, y, label, parentId, confidence, labelId);
     return websocketService.send(message, true);
   }
 
@@ -435,54 +519,56 @@ class AnnotationSession {
     return websocketService.send(message, true);
   }
 
-  // ==================== COMPLETION SEGMENTATION ====================
+  // ==================== SUGGESTION SEGMENTATION ====================
 
   /**
-   * Run completion segmentation to find similar instances
+   * Run suggestion segmentation to find similar instances
    * @param {Array<number>} seedContourIds - Array of contour IDs to use as seeds
    * @param {number|null} labelId - Optional label ID to assign to found instances
    * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
    */
-  async runCompletion(seedContourIds, modelKey, labelId = null) {
+  async runSuggestion(seedContourIds, modelKey, labelId = null, inputs = null) {
     this._ensureReady();
     
-    // Check if completion service is available
-    if (!this.isServiceAvailable('completion_segmentation')) {
-      throw new Error('Completion segmentation service is not available. Please check your connection.');
+    // Check if suggestion service is available
+    if (!this.isServiceAvailable('suggestion_segmentation')) {
+      throw new Error('Suggestion segmentation service is not available. Please check your connection.');
     }
     
-    const message = MessageBuilders.runCompletion(seedContourIds, modelKey, labelId);
+    const message = MessageBuilders.runSuggestion(seedContourIds, modelKey, labelId, inputs);
     return websocketService.send(message, true);
   }
 
-  // ==================== SEMANTIC SEGMENTATION ====================
+  // ==================== INSTANCE SEGMENTATION ====================
 
   /**
-   * Run semantic segmentation inference
-   * @param {string} modelKey - Semantic model key
+   * Run instance segmentation inference
+   * @param {string} modelKey - Instance model key
+   * @param {'patch'|'override'} writeMode - How predictions are applied to existing contours
+   * @param {Object|null} inputs - Optional routing inputs (parameters / conditioning)
    * @returns {Promise<Object>} Response with added objects (objects are added via OBJECT_ADDED WebSocket messages)
    */
-  async runSemantic(modelKey) {
+  async runInstance(modelKey, writeMode = 'patch', inputs = null) {
     this._ensureReady();
-    
-    // Check if semantic service is available
-    if (!this.isServiceAvailable('semantic_segmentation')) {
-      throw new Error('Semantic segmentation service is not available. Please check your connection.');
+
+    // Check if instance service is available
+    if (!this.isServiceAvailable('instance_segmentation')) {
+      throw new Error('Instance segmentation service is not available. Please check your connection.');
     }
-    
-    const message = MessageBuilders.runSemantic(modelKey);
+
+    const message = MessageBuilders.runInstance(modelKey, writeMode, inputs);
     return websocketService.send(message, true);
   }
 
   // ==================== SESSION MANAGEMENT ====================
 
   /**
-   * Enable completion mode
+   * Enable suggestion mode
    * @returns {Promise<void>}
    */
-  async enableCompletion() {
+  async enableSuggestion() {
     this._ensureReady();
-    const message = MessageBuilders.enableCompletion();
+    const message = MessageBuilders.enableSuggestion();
     return websocketService.send(message);
   }
 
@@ -580,6 +666,24 @@ class AnnotationSession {
   // ==================== PRIVATE METHODS ====================
 
   /**
+   * Build the session URL for an image.
+   *
+   * The image rides in the path even though the socket is per-user: it is what an
+   * automatic reconnect replays, and the server pre-selects it so the reconnected
+   * session comes back with the right contours and needs no follow-up switch.
+   *
+   * @private
+   * @param {number|string|null} imageId - Image to open on, or null for no image
+   * @param {string} token - Bearer token (browsers cannot set handshake headers)
+   * @returns {string} The WebSocket URL
+   */
+  _buildUrl(imageId, token) {
+    const imageSegment = imageId != null ? `/${imageId}` : '';
+    return `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}` +
+      `${imageSegment}?token=${encodeURIComponent(token)}`;
+  }
+
+  /**
    * Ensure session is ready
    * @private
    * @throws {Error} If session is not ready
@@ -614,6 +718,3 @@ class AnnotationSession {
 const annotationSession = new AnnotationSession();
 
 export default annotationSession;
-
-
-

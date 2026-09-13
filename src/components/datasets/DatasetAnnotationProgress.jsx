@@ -1,122 +1,56 @@
 import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts";
+import PhaseProgressBar from "./PhaseProgressBar";
+import { OVERALL_STATES, PHASES, emptyStateCounts } from "../../utils/imageStatus";
 
-const COLORS = ["#DC2626", "#F59E0B", "#3B82F6", "#059669"]; // Red (Not started), Orange (In progress), Blue (Reviewable), Green (Finished)
-
+/**
+ * A dataset's progress through the three workflow phases, all three bars together.
+ *
+ * This is the at-a-glance form, for the dataset tiles on the overview page where
+ * there is no room to give each phase its own card. Inside a dataset the same bars
+ * live on the Calibrate / Annotate / Review cards instead, each next to the button
+ * that acts on it — see ManagementCardsView.
+ *
+ * It replaced a single pie of the old five-state lifecycle, which could only ever
+ * show one dimension of progress: a dataset fully annotated but never calibrated
+ * looked complete in it. Three bars also answer the question the pie was actually
+ * read for — "where is the work?" — because the phases share a scale and the
+ * bottleneck is whichever bar is least filled.
+ */
 const DatasetAnnotationProgress = ({ stats }) => {
-  // Ensure we have valid numbers, default to 0 if undefined/null
-  const notStarted = stats?.not_started || 0;
-  const inProgress = stats?.in_progress || 0;
-  const reviewable = stats?.reviewable || 0;
-  const finished = stats?.finished || 0;
-  const total = stats?.total || (notStarted + inProgress + reviewable + finished);
+  // `total` is the image count, which is the denominator every bar shares. Falling
+  // back to the overall row keeps this right for a payload that omits it.
+  const overall = stats?.overall || emptyStateCounts();
+  const total =
+    stats?.total ||
+    OVERALL_STATES.reduce((acc, state) => acc + (overall[state.key] || 0), 0);
 
   if (total === 0) {
-    return (
-      <p className="text-sm text-gray-500 mb-4">
-        No annotations yet
-      </p>
-    );
+    return <p className="text-sm text-t3 mb-4">No images yet</p>;
   }
-
-  const data = [
-    { name: "Not started", value: notStarted },
-    { name: "In progress", value: inProgress },
-    { name: "Reviewable", value: reviewable },
-    { name: "Finished", value: finished }
-  ].filter(item => item.value > 0); // Only show statuses with counts > 0
 
   return (
     <div className="mb-4">
-      <h4 className="text-sm font-semibold text-gray-700 mb-4">
-        Annotation status:
-      </h4>
-      
-      <div className="flex items-center gap-6">
-        {/* Text Summary */}
-        <div className="flex-1 space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[0] }}></div>
-              <span>Not started:</span>
-            </div>
-            <span className="font-medium">{notStarted} ({Math.round((notStarted / total) * 100)}%)</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[1] }}></div>
-              <span>In progress:</span>
-            </div>
-            <span className="font-medium">{inProgress} ({Math.round((inProgress / total) * 100)}%)</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[2] }}></div>
-              <span>Reviewable:</span>
-            </div>
-            <span className="font-medium">{reviewable} ({Math.round((reviewable / total) * 100)}%)</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[3] }}></div>
-              <span>Finished:</span>
-            </div>
-            <span className="font-medium">{finished} ({Math.round((finished / total) * 100)}%)</span>
-          </div>
-        </div>
+      <h4 className="text-sm font-semibold text-t2 mb-3">Workflow progress:</h4>
 
-        {/* Enhanced Pie Chart */}
-        <div className="w-24 h-24 flex-shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={20}
-                outerRadius={40}
-                fill="#8884d8"
-                dataKey="value"
-                stroke="white"
-                strokeWidth={2}
-              >
-                {data.map((entry, index) => {
-                  // Map data entry back to color index
-                  const colorIndex = entry.name === "Not started" ? 0 :
-                                   entry.name === "In progress" ? 1 :
-                                   entry.name === "Reviewable" ? 2 : 3;
-                  return <Cell key={`cell-${index}`} fill={COLORS[colorIndex]} />;
-                })}
-              </Pie>
-              <Tooltip 
-                formatter={(value, name) => [`${value} (${Math.round((value / total) * 100)}%)`, name]}
-                labelStyle={{ color: '#374151' }}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="space-y-3">
+        {PHASES.map((phase) => (
+          <PhaseProgressBar
+            key={phase.key}
+            phase={phase}
+            counts={stats?.[phase.key]}
+            total={total}
+          />
+        ))}
       </div>
-      
-      {/* Total Images - Separate row */}
-      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 text-sm">
-        <span className="font-medium text-gray-700">Total images:</span>
-        <span className="font-semibold text-gray-900">{total}</span>
+
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-ln text-sm">
+        <span className="font-medium text-t2">Fully finished:</span>
+        <span className="font-semibold text-t1 tabular-nums">
+          {overall.finished || 0} / {total} images
+        </span>
       </div>
     </div>
   );
 };
 
 export default DatasetAnnotationProgress;
-

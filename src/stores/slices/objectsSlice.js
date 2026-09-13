@@ -1,19 +1,80 @@
 import { getObjectColor } from '../utils/objectColors';
 import { hasValidLabel } from '../utils/labelValidation';
 
+const normalizeDatasetId = (id) => (id != null ? String(id) : null);
+
 /**
  * Objects slice - manages annotation objects, selection, visibility, and colors
  */
 export const createObjectsSlice = (set) => ({
+  activateLabelDataset: (datasetId) => set((state) => {
+    const nextNormalized = normalizeDatasetId(datasetId);
+    const currentNormalized = normalizeDatasetId(state.objects.labelDatasetId);
+    if (nextNormalized === currentNormalized) {
+      return;
+    }
+    state.objects.labelDatasetId = datasetId != null ? datasetId : null;
+    state.objects.labelDatasetGeneration = (state.objects.labelDatasetGeneration || 0) + 1;
+    state.objects.datasetLabels = [];
+    state.objects.datasetLabelsMap = null;
+    if (state.workspace) {
+      state.workspace.activeLabelId = null;
+      state.workspace.labelColorOverrides = {};
+      if (state.workspace.picker) {
+        state.workspace.picker = null;
+      }
+    }
+    if (state.objects.visibility) {
+      state.objects.visibility.labels = {};
+      state.objects.visibility.rootLabelIds = [];
+    }
+  }),
+
   // Dataset labels cache – populated once per dataset, shared by all components
-  setDatasetLabels: (labelsArray, labelsMap) => set((state) => {
+  setDatasetLabels: (labelsArray, labelsMap, datasetId = undefined, generation = undefined) => set((state) => {
+    if (
+      datasetId !== undefined &&
+      state.objects.labelDatasetId !== null &&
+      normalizeDatasetId(datasetId) !== normalizeDatasetId(state.objects.labelDatasetId)
+    ) {
+      return;
+    }
+    if (
+      generation !== undefined &&
+      state.objects.labelDatasetGeneration !== undefined &&
+      state.objects.labelDatasetGeneration !== generation
+    ) {
+      return;
+    }
+    if (datasetId !== undefined && state.objects.labelDatasetId === null) {
+      state.objects.labelDatasetId = datasetId;
+    }
     state.objects.datasetLabels = labelsArray;
     state.objects.datasetLabelsMap = labelsMap;
+    if (state.workspace?.activeLabelId != null) {
+      const exists = Array.isArray(labelsArray) && labelsArray.some((l) => Number(l.id) === Number(state.workspace.activeLabelId));
+      if (!exists) {
+        state.workspace.activeLabelId = null;
+      }
+    }
   }),
 
   clearDatasetLabels: () => set((state) => {
+    state.objects.labelDatasetId = null;
+    state.objects.labelDatasetGeneration = (state.objects.labelDatasetGeneration || 0) + 1;
     state.objects.datasetLabels = [];
     state.objects.datasetLabelsMap = null;
+    if (state.workspace) {
+      state.workspace.activeLabelId = null;
+      state.workspace.labelColorOverrides = {};
+      if (state.workspace.picker) {
+        state.workspace.picker = null;
+      }
+    }
+    if (state.objects.visibility) {
+      state.objects.visibility.labels = {};
+      state.objects.visibility.rootLabelIds = [];
+    }
   }),
 
   addObject: (object) => set((state) => {
@@ -58,19 +119,30 @@ export const createObjectsSlice = (set) => ({
     state.objects.colors[newObject.id] = newObject.color;
   }),
   
-  // Replace all objects from a backend ContourHierarchy
-  // labelsMap: Optional Map mapping label_id to label name (always Map or null in production)
-  setObjectsFromHierarchy: (hierarchy, labelsMap = null) => set((state) => {
+  /**
+   * Replace all objects from a backend ContourHierarchy.
+   *
+   * @param hierarchy The backend ContourHierarchy.
+   * @param labelsMap Optional Map from label_id to label name (always Map or null in
+   *   production).
+   * @param imageId The image these contours belong to. Callers handling an OBJECTS message
+   *   must pass it: the contours can arrive before that image is current, and
+   *   `setCurrentImage` needs the tag to know not to wipe them. Callers that are by
+   *   definition already on the image (undo/redo, a hierarchy pushed after an edit) may omit
+   *   it and fall back to the current image.
+   */
+  setObjectsFromHierarchy: (hierarchy, labelsMap = null, imageId = undefined) => set((state) => {
     const list = [];
     const colors = {};
     
     // labelsMap is always a Map or null (constructed in AnnotationPageV2)
     const labelIdToNameMap = labelsMap;
+    const payload = hierarchy?.contours || hierarchy;
     
-    if (hierarchy && Array.isArray(hierarchy.root_contours)) {
+    if (payload && Array.isArray(payload.root_contours)) {
       // Queue entries are { contour, parentId } so we preserve hierarchy when backend
       // returns nested children without parent_id on each node (e.g. after page refresh)
-      const queue = hierarchy.root_contours.map(c => ({ contour: c, parentId: null }));
+      const queue = payload.root_contours.map(c => ({ contour: c, parentId: null }));
       let orderCounter = 0;
 
       while (queue.length > 0) {
@@ -149,13 +221,42 @@ export const createObjectsSlice = (set) => ({
     state.objects.list = list;
     state.objects.selected = [];
     state.objects.colors = colors;
+    // The hierarchy is the answer the spinner was waiting for, whether or not it is empty.
+    state.objects.loading = false;
+    state.objects.loadError = null;
+    state.objects.loadedForImageId =
+      imageId !== undefined ? imageId : state.images.currentImageId;
   }),
-  
+
   clearObjects: () => set((state) => {
     state.objects.list = [];
     state.objects.selected = [];
     state.objects.colors = {};
     state.objects.labelAssignmentCounter = 0;
+    state.objects.loadedForImageId = null;
+  }),
+
+  /**
+   * Wipe the canvas for an incoming image and put it into the loading state.
+   *
+   * One action rather than `clearObjects()` + `setObjectsLoading(true)` so the canvas
+   * can never render the gap between them: an emptied list that does not yet know it is
+   * waiting looks exactly like an image with no annotations.
+   */
+  beginObjectsLoad: () => set((state) => {
+    state.objects.list = [];
+    state.objects.selected = [];
+    state.objects.colors = {};
+    state.objects.labelAssignmentCounter = 0;
+    state.objects.loading = true;
+    state.objects.loadError = null;
+    state.objects.loadedForImageId = null;
+  }),
+
+  /** Give up on the current load and show `error` in place of the spinner. */
+  failObjectsLoad: (error) => set((state) => {
+    state.objects.loading = false;
+    state.objects.loadError = error || 'Could not load the annotations for this image.';
   }),
   
   removeObject: (id) => set((state) => {

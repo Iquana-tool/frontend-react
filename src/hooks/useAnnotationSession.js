@@ -2,8 +2,12 @@
  * useAnnotationSession Hook
  * 
  * Hook for managing WebSocket annotation session lifecycle.
- * Handles connection, session initialization, reconnection on image change,
- * and cleanup on unmount.
+ * Handles connection, session initialization, re-targeting the session when the image
+ * changes, and cleanup on unmount.
+ *
+ * The socket is opened once per user and kept: switching images sends a `switch_image`
+ * message rather than tearing the connection down, so the AI backends stay registered
+ * and their models stay loaded across the whole navigation.
  */
 
 import { useEffect, useCallback, useRef } from 'react';

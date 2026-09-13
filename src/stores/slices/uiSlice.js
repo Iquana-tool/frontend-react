@@ -32,13 +32,13 @@ export const createUISlice = (set) => ({
     state.ui.visibilityControlsExpanded = !state.ui.visibilityControlsExpanded;
   }),
 
-  /** Request opening the semantic segmentation warning modal (used by shortcut "3") */
-  setSemanticRunRequested: (requested) => set((state) => {
-    state.ui.semanticRunRequested = !!requested;
+  /** Request opening the instance segmentation warning modal (used by shortcut "3") */
+  setInstanceRunRequested: (requested) => set((state) => {
+    state.ui.instanceRunRequested = !!requested;
   }),
 
-  setSemanticWarningModalOpen: (open) => set((state) => {
-    state.ui.semanticWarningModalOpen = !!open;
+  setInstanceWarningModalOpen: (open) => set((state) => {
+    state.ui.instanceWarningModalOpen = !!open;
   }),
 });
 

@@ -1,23 +1,23 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
-const ErrorState = ({ error, onRetry }) => {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-      <div className="text-center">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-red-600 text-2xl">⚠️</span>
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Image</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button
-          onClick={onRetry}
-          className="bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors"
-        >
-          Retry
-        </button>
+const ErrorState = ({ error, onRetry }) => (
+  <div className="absolute inset-0 z-10 flex items-center justify-center bg-canvasbg/80 backdrop-blur-sm">
+    <div className="text-center max-w-[320px] px-[16px]">
+      <div className="w-14 h-14 rounded-full bg-errBg flex items-center justify-center mx-auto mb-[12px]">
+        <AlertTriangle size={22} className="text-err" />
       </div>
+      <h3 className="text-modaltitle font-bold text-t1 mb-[4px]">Failed to load image</h3>
+      <p className="text-row text-t3 mb-[12px]">{error}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="h-7 px-[12px] rounded-7 bg-accent text-onAccent text-btn font-bold hover:brightness-110 transition-[filter]"
+      >
+        Retry
+      </button>
     </div>
-  );
-};
+  </div>
+);
 
 export default ErrorState;

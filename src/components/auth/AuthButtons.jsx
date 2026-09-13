@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
  */
 const AuthButtons = ({ 
   variant = 'default',
-  textColor = 'text-teal-100',
+  textColor = 'text-t2',
   buttonClass,
   usernameClass,
   showLogoutOnly = false
@@ -37,7 +37,7 @@ const AuthButtons = ({
   const buttonPadding = isMobile ? 'py-1.5 px-3' : 'py-2 px-4';
   
   // Default classes
-  const defaultButtonClass = `flex items-center ${spaceClass} bg-white/10 hover:bg-white/20 text-white ${buttonPadding} rounded-lg transition-colors ${isMobile ? 'text-sm' : ''}`;
+  const defaultButtonClass = `flex items-center ${spaceClass} bg-hv hover:bg-hv2 text-t1 ${buttonPadding} rounded-6 transition-colors duration-150 ${isMobile ? 'text-sm' : ''}`;
   const defaultUsernameClass = `flex items-center ${spaceClass} ${usernamePadding} py-1.5 ${textSize} ${textColor}`;
   
   const finalButtonClass = buttonClass || defaultButtonClass;

@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
 import annotationSession from '../services/annotationSession';
 import { pixelToNormalized } from '../utils/coordinateUtils';
+import { useDataset } from '../contexts/DatasetContext';
 import {
   useAIPrompts,
   usePromptedModel,
   useCurrentImage,
-  useClearAllPrompts,
+  useConsumePrompts,
   useSetIsSubmittingAI,
   useImageObject,
   useAddObject,
@@ -17,7 +19,20 @@ import {
   useSetCurrentTool,
   useSetPromptedModel,
   useSyncEditModeDraftFromRefinement,
+  useAvailablePromptedModels,
+  useActiveLabelId,
 } from '../stores/selectors/annotationSelectors';
+import { useAnnotationRoutingPolicy } from '../contexts/AnnotationRoutingPolicyContext';
+import { matchesModelKey, resolveRoutingBinding } from '../utils/inferenceRouting';
+
+const PROMPTED_SEGMENTATION_TASK = 'prompted-segmentation';
+const ROUTING_POLICY_LOADING_ERROR = 'Routing policy is still loading. Please try again in a moment.';
+const isRoutingInputs = (value) =>
+  value != null &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  (Object.prototype.hasOwnProperty.call(value, 'conditioning') ||
+    Object.prototype.hasOwnProperty.call(value, 'parameters'));
 
 /**
  * Normalize contour data from the backend.
@@ -37,6 +52,8 @@ const normalizeContourData = (data) => {
  */
 const useAISegmentation = () => {
   const [error, setError] = useState(null);
+  const { datasetId: routeDatasetId } = useParams();
+  const { currentDataset } = useDataset();
 
   // Store state
   const prompts = useAIPrompts();
@@ -45,9 +62,18 @@ const useAISegmentation = () => {
   const currentImage = useCurrentImage();
   const imageObject = useImageObject();
   const objectsList = useObjectsList();
+  const availablePromptedModels = useAvailablePromptedModels();
+  const activeLabelId = useActiveLabelId();
+  const datasetId =
+    currentImage?.dataset_id ??
+    (routeDatasetId ? parseInt(routeDatasetId, 10) : null) ??
+    currentDataset?.id ??
+    null;
+  const { policy, policyLoading } = useAnnotationRoutingPolicy(datasetId);
 
   // Store actions
-  const clearAllPrompts = useClearAllPrompts();
+  // Prompts that produced an object are spent, not discarded — see the slice.
+  const consumePrompts = useConsumePrompts();
   const setIsSubmitting = useSetIsSubmittingAI();
   const addObject = useAddObject();
   const updateObject = useUpdateObject();
@@ -111,12 +137,25 @@ const useAISegmentation = () => {
   /**
    * Run AI segmentation via WebSocket
    */
-  const runSegmentation = useCallback(async () => {
+  const runSegmentation = useCallback(async (explicitInputs = null) => {
+    const requestedInputs = isRoutingInputs(explicitInputs) ? explicitInputs : null;
+    const hasExplicitInputs = requestedInputs !== null;
+    const policyLoadingForDataset = datasetId != null && policyLoading;
+
     // Note: promptedModelId is just a string ID, we don't need to set model_status here
     // The status is handled by the backend
     if (!currentImage || !promptedModelId || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
+    }
+
+    // A model selected from the dataset policy can arrive before this hook's
+    // policy request. Do not run it without the saved contract inputs during
+    // that short window. Explicit callers already own their inputs and are
+    // allowed to proceed.
+    if (!hasExplicitInputs && policyLoadingForDataset) {
+      setError(ROUTING_POLICY_LOADING_ERROR);
+      return { success: false, error: ROUTING_POLICY_LOADING_ERROR };
     }
 
     if (!imageObject) {
@@ -142,10 +181,23 @@ const useAISegmentation = () => {
       const wsPrompts = {
         point_prompts: [],
         box_prompt: null,
+        polygon_prompt: null,
       };
 
       prompts.forEach((prompt) => {
-        if (prompt.type === 'point') {
+        if (prompt.type === 'polygon') {
+          // Polygon (and freehand) prompts: convert each vertex to normalized
+          // [x, y] pairs. The backend expects at least 3 vertices; if multiple
+          // polygons were drawn we keep the last one (same as box_prompt).
+          const vertices = (prompt.coords.points || [])
+            .map((pt) => {
+              const n = pixelToNormalized(pt.x, pt.y, imageObject.width, imageObject.height);
+              return [n.x, n.y];
+            });
+          if (vertices.length >= 3) {
+            wsPrompts.polygon_prompt = { vertices };
+          }
+        } else if (prompt.type === 'point') {
           // Convert pixel coordinates to normalized
           const normalized = pixelToNormalized(
             prompt.coords.x, 
@@ -188,8 +240,28 @@ const useAISegmentation = () => {
       // promptedModelId is already the string identifier we need
       const modelIdentifier = promptedModelId;
 
+      let resolvedInputs = requestedInputs;
+      if (!hasExplicitInputs && policy) {
+        const routing = resolveRoutingBinding(
+          policy,
+          PROMPTED_SEGMENTATION_TASK,
+          activeLabelId,
+          availablePromptedModels
+        );
+
+        const selectedModelMatchesBinding =
+          routing?.model &&
+          routing?.isCompatible &&
+          !routing?.isStale &&
+          matchesModelKey(routing.model, PROMPTED_SEGMENTATION_TASK, modelIdentifier);
+
+        if (selectedModelMatchesBinding && routing.binding?.inputs != null) {
+          resolvedInputs = routing.binding.inputs;
+        }
+      }
+
       // Send segmentation request via WebSocket
-      const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts);
+      const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts, resolvedInputs);
 
       // Transform response to mask format
       const mask = transformResponseToMask(response);
@@ -241,12 +313,12 @@ const useAISegmentation = () => {
           }
         }
         // For refinement (object_modified): stay in refinement mode so user can refine again or exit via "Exit Refinement"
-        clearAllPrompts();
+        consumePrompts();
         return { success: true, mask };
       }
       // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
       if (response && response.success !== false && response.type === 'object_added') {
-        clearAllPrompts();
+        consumePrompts();
         if (refinementModeActive) {
           try {
             await annotationSession.unselectRefinementObject();
@@ -260,7 +332,7 @@ const useAISegmentation = () => {
 
       // Other success response we couldn't parse (e.g. hierarchy); treat as success
       if (response && response.success !== false) {
-        clearAllPrompts();
+        consumePrompts();
         return { success: true, mask: null };
       }
 
@@ -278,17 +350,21 @@ const useAISegmentation = () => {
     promptedModelId,
     prompts,
     imageObject,
-    objectsList,
-    setIsSubmitting,
-    transformResponseToMask,
-    clearAllPrompts,
-    addObject,
-    updateObject,
     refinementModeActive,
     refinementModeObjectId,
+    objectsList,
+    transformResponseToMask,
+    addObject,
+    updateObject,
+    consumePrompts,
     exitRefinementMode,
     setCurrentTool,
     syncEditModeDraftFromRefinement,
+    policy,
+    policyLoading,
+    activeLabelId,
+    availablePromptedModels,
+    datasetId,
   ]);
 
   return {

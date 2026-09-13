@@ -9,6 +9,7 @@ import {
   useClearSelection,
   useSelectObject,
   useSetObjectsFromHierarchy,
+  useDatasetLabelsMap,
 } from '../stores/selectors/annotationSelectors';
 
 const useWebSocketObjectHandler = () => {
@@ -19,6 +20,7 @@ const useWebSocketObjectHandler = () => {
   const clearSelection = useClearSelection();
   const selectObject = useSelectObject();
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
+  const datasetLabelsMap = useDatasetLabelsMap();
 
   // Keep a ref to always have the latest objectsList inside the stable WebSocket listeners
   // without re-subscribing every time objectsList changes
@@ -26,6 +28,13 @@ const useWebSocketObjectHandler = () => {
   useEffect(() => {
     objectsListRef.current = objectsList;
   }, [objectsList]);
+
+  // Same pattern for the dataset label map so full-hierarchy updates (e.g. after a
+  // manual add) can resolve label names instead of blanking every object's label.
+  const datasetLabelsMapRef = useRef(datasetLabelsMap);
+  useEffect(() => {
+    datasetLabelsMapRef.current = datasetLabelsMap;
+  }, [datasetLabelsMap]);
 
   useEffect(() => {
     const unsubscribeAdded = websocketService.on(
@@ -51,7 +60,9 @@ const useWebSocketObjectHandler = () => {
 
         // Backend sometimes sends full hierarchy
         if (data.root_contours && Array.isArray(data.root_contours)) {
-          setObjectsFromHierarchy(data, null);
+          // Pass the dataset label map so existing objects keep their label names
+          // (a null map would blank every label until the next page reload).
+          setObjectsFromHierarchy(data, datasetLabelsMapRef.current);
           clearSelection();
           return;
         }
