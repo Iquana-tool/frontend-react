@@ -81,3 +81,54 @@ describe("ManagementCardsView - Model Orchestration card", () => {
         expect(screen.queryByText("Model Orchestration")).not.toBeInTheDocument();
     });
 });
+
+describe("ManagementCardsView - Export Dataset card", () => {
+    const dataset = { id: 101, name: "Test Dataset" };
+
+    it("renders Export Dataset card when user has EXPORT_ANNOTATIONS permission and triggers click", () => {
+        mockUsePermissions.mockReturnValue({
+            can: (perm) => perm === Permission.EXPORT_ANNOTATIONS,
+            canAny: () => false,
+            role: "annotator",
+        });
+
+        const onExportDatasetClick = vi.fn();
+
+        render(
+            <ManagementCardsView
+                dataset={dataset}
+                onExportDatasetClick={onExportDatasetClick}
+            />
+        );
+
+        const cardTitle = screen.getByText("Export Dataset");
+        expect(cardTitle).toBeInTheDocument();
+        expect(screen.getByText("Download in IQUANA archive or COCO format.")).toBeInTheDocument();
+
+        // Ensure old separate cards do not exist
+        expect(screen.queryByText("Export to COCO")).not.toBeInTheDocument();
+        expect(screen.queryByText("Export IQUANA ZIP")).not.toBeInTheDocument();
+
+        fireEvent.click(cardTitle);
+        expect(onExportDatasetClick).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not render Export Dataset card when user lacks EXPORT_ANNOTATIONS permission", () => {
+        mockUsePermissions.mockReturnValue({
+            can: (perm) => perm === Permission.EXPORT_IMAGES,
+            canAny: () => false,
+            role: "viewer",
+        });
+
+        render(
+            <ManagementCardsView
+                dataset={dataset}
+                onExportDatasetClick={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByText("Export Dataset")).not.toBeInTheDocument();
+        expect(screen.queryByText("Export to COCO")).not.toBeInTheDocument();
+        expect(screen.queryByText("Export IQUANA ZIP")).not.toBeInTheDocument();
+    });
+});

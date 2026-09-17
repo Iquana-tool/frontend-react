@@ -131,6 +131,7 @@ export const getSampleImages = async (datasetId, limit = 4) => {
  * @param {boolean} [options.excludeUnreviewed=true] - Drop contours that haven't been reviewed.
  * @param {boolean} [options.excludeNotFullyAnnotated=true] - Drop images whose masks aren't fully annotated.
  * @param {"all"|"leaves"|"top_level"} [options.contourSelection="all"] - Which contours of the hierarchy to emit.
+ * @param {Array<number>|null} [options.labelIds=null] - Optional array of label IDs to restrict export.
  */
 export const downloadCocoExport = async (
     datasetId,
@@ -139,6 +140,7 @@ export const downloadCocoExport = async (
         excludeUnreviewed = true,
         excludeNotFullyAnnotated = true,
         contourSelection = "all",
+        labelIds = null,
     } = {}
 ) => {
     if (!datasetId) {
@@ -156,6 +158,9 @@ export const downloadCocoExport = async (
     };
     if (includeImages) {
         params.include_images = true;
+    }
+    if (Array.isArray(labelIds) && labelIds.length > 0) {
+        params.label_ids = labelIds.join(",");
     }
 
     const url = buildUrl(API_BASE_URL, path, params);
@@ -190,4 +195,115 @@ export const downloadCocoExport = async (
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(blobUrl);
+};
+
+/**
+ * Download a dataset in IQUANA archive format (.zip) directly from the browser.
+ *
+ * The browser download is triggered automatically with object URL cleanup.
+ * Note: Uses response.blob() which buffers in browser tab memory; recommended for
+ * standard browser workflows up to ~2 GiB. For multi-gigabyte exports, backend streaming
+ * should be consumed via direct curl/HTTP client or native file stream writer.
+ *
+ * @param {number} datasetId
+ * @param {Object} [options]
+ * @param {boolean} [options.includeImages=true] - Bundle images (full mode) vs annotations only.
+ * @param {boolean} [options.includeConfig=false] - Whether to include internal configuration (config.json).
+ * @param {string} [options.datasetName] - Fallback dataset name for the filename.
+ */
+export const downloadIquanaArchive = async (
+    datasetId,
+    { includeImages = true, includeConfig = false, datasetName } = {}
+) => {
+    if (!datasetId) {
+        throw new Error("Dataset ID is required");
+    }
+
+    const path = `/datasets/${datasetId}/iquana`;
+    const params = {
+        include_images: Boolean(includeImages),
+        include_config: Boolean(includeConfig),
+    };
+
+    const url = buildUrl(API_BASE_URL, path, params);
+    const response = await fetch(url, { headers: getAuthHeaders() });
+
+    if (!response.ok) {
+        let message = `Export failed (${response.status})`;
+        try {
+            const data = await response.json();
+            message = data.detail || data.message || message;
+        } catch (_) {
+            // non-JSON error body
+        }
+        throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const suffix = includeImages ? "" : "_annotations";
+    const fallback = datasetName ? `${datasetName}${suffix}.zip` : `dataset_${datasetId}${suffix}.zip`;
+    const filename = match ? match[1] : fallback;
+
+    const blobUrl = URL.createObjectURL(blob);
+    try {
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
+        URL.revokeObjectURL(blobUrl);
+    }
+};
+
+/**
+ * Import a dataset from an IQUANA archive ZIP (v1).
+ *
+ * Sends a multipart POST to `POST /datasets/import/iquana`.
+ *
+ * @param {File} file - The .zip file to import.
+ * @param {string|null} [name=null] - Optional override dataset name.
+ * @returns {Promise<{success: boolean, message: string, dataset_id: number, dataset_name: string, config_applied: boolean, warnings: string[]}>}
+ */
+export const importIquanaArchive = async (file, name = null) => {
+    if (!file) {
+        throw new Error("Archive file is required");
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    if (name && name.trim()) {
+        formData.append("name", name.trim());
+    }
+
+    const authHeaders = getAuthHeaders();
+    const headers = { ...authHeaders };
+    delete headers["Content-Type"];
+
+    const response = await fetch(`${API_BASE_URL}/datasets/import/iquana`, {
+        method: "POST",
+        headers,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        let message = `Import failed (${response.status})`;
+        let detail = null;
+        try {
+            const data = await response.json();
+            detail = data.detail;
+            message = detail || data.message || message;
+        } catch (_) {
+            // non-JSON response
+        }
+        const error = new Error(message);
+        error.status = response.status;
+        error.detail = detail;
+        throw error;
+    }
+
+    return await response.json();
 };
