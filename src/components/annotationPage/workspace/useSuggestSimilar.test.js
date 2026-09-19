@@ -60,9 +60,37 @@ describe("useSuggestSimilar dynamic exemplar routing", () => {
     ];
     mockState.selectedIds = [1, 2];
     mockState.suggestionModel = "sam3-default";
+    mockState.availableModels = mockState.availableModels.filter((m) => m.id !== "sam3-hierarchical");
     mockState.wsReady = true;
     mockState.isRunning = false;
     mockState.favorites = {};
+  });
+
+  it("uses a model picked in the suggestion card over the dataset routing", async () => {
+    mockState.availableModels = [
+      ...mockState.availableModels,
+      { id: "sam3-hierarchical", name: "SAM 3 (hierarchy-aware)", task: "instance-suggestion", label_ids: [] },
+    ];
+    mockState.suggestionModel = "sam3-hierarchical";
+    getInferenceRoutingPolicy.mockResolvedValueOnce({
+      dataset_id: 101,
+      bindings: [
+        { task: "instance-suggestion", label_id: null, model_registry_key: "sam3-default" },
+      ],
+    });
+
+    const { result } = renderHook(() => useSuggestSimilar());
+
+    await waitFor(() => {
+      expect(result.current.eligible).toBe(true);
+      expect(result.current.resolvedModelId).toBe("sam3-hierarchical");
+    });
+
+    await act(async () => {
+      await result.current.run();
+    });
+
+    expect(mockRunSuggestion).toHaveBeenCalledWith([101, 102], 2, "sam3-hierarchical", null);
   });
 
   it("resolves label-specific model when selected exemplars share a label", async () => {

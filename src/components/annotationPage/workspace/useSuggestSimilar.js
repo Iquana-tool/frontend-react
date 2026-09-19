@@ -14,6 +14,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
 import {
+  getAutoTaskModelKey,
   isModelCompatibleWithLabel,
   matchesModelKey,
   resolveRoutingBinding,
@@ -95,6 +96,29 @@ export default function useSuggestSimilar() {
       return { modelId: null, inputs: null, error: null };
     }
 
+    const favoriteKey = favorites?.['instance-suggestion'];
+    const manualSelection = suggestionModel
+      ? availableModels.find((model) =>
+          matchesModelKey(model, 'instance-suggestion', suggestionModel)
+        )
+      : null;
+
+    // A model picked in the Within-Image Suggestion card (i.e. not the one the page chose
+    // on its own) is a session override: it wins over the dataset routing for every label.
+    const autoKey = getAutoTaskModelKey(
+      policyReady ? policy : null,
+      'instance-suggestion',
+      availableModels,
+      favoriteKey
+    );
+    if (
+      manualSelection &&
+      getModelKey(manualSelection) !== autoKey &&
+      isModelCompatibleWithLabel(manualSelection, sharedLabelId)
+    ) {
+      return { modelId: getModelKey(manualSelection), inputs: null, error: null };
+    }
+
     const resolved = policyReady
       ? resolveRoutingBinding(
           policy,
@@ -121,12 +145,6 @@ export default function useSuggestSimilar() {
       };
     }
 
-    const favoriteKey = favorites?.['instance-suggestion'];
-    const manualSelection = suggestionModel
-      ? availableModels.find((model) =>
-          matchesModelKey(model, 'instance-suggestion', suggestionModel)
-        )
-      : null;
     const favorite = favoriteKey
       ? availableModels.find((model) => matchesModelKey(model, 'instance-suggestion', favoriteKey))
       : null;
