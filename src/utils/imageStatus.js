@@ -28,6 +28,10 @@ import { Ban, Check, Circle, CheckCircle2, Clock, Eye, PenTool, Ruler, X } from 
  * at 6-10px. Shape does the work there rather than colour: three shades of the same
  * dot are not distinguishable at that size, whereas a cross, a ring and a tick are,
  * and they still read for anyone who cannot separate the hues.
+ *
+ * `strength` is the same ramp as a phase's `fill` tones, expressed as opacity so it
+ * can be laid over a phase hue used as *ink* rather than as a background — see
+ * `phaseIconClass`.
  */
 export const PHASE_STATES = [
   {
@@ -53,6 +57,7 @@ export const PHASE_STATES = [
     label: 'Not started',
     icon: Circle,
     smallIcon: X,
+    strength: 'opacity-45',
     dot: 'bg-t3',
     badge: 'bg-well text-t2',
     ring: 'ring-ln2',
@@ -63,6 +68,7 @@ export const PHASE_STATES = [
     label: 'In progress',
     icon: Clock,
     smallIcon: Circle,
+    strength: 'opacity-75',
     dot: 'bg-warn',
     badge: 'bg-warnBg text-warn',
     ring: 'ring-warn',
@@ -73,6 +79,7 @@ export const PHASE_STATES = [
     label: 'Finished',
     icon: CheckCircle2,
     smallIcon: Check,
+    strength: 'opacity-100',
     dot: 'bg-ok',
     badge: 'bg-okBg text-ok',
     ring: 'ring-ok',
@@ -210,6 +217,27 @@ export const phaseFill = (phase, state) => {
   // A phase that cannot be blocked has no fill for it; fall back to the neutral
   // rather than rendering an element with no background class at all.
   return descriptor.fill[stateKey] || BLOCKED_FILL;
+};
+
+/**
+ * Colour classes for a phase's state glyph — the foreground counterpart to
+ * `phaseFill`.
+ *
+ * The `fill` tones cannot simply be reused as text colours. They are background
+ * colours: in the light theme `cal3` is a near-white, which is fine behind a
+ * progress bar and invisible the moment it becomes ink. The phase hue at reduced
+ * opacity keeps the same ramp while staying legible against either surface.
+ *
+ * Without a phase this falls back to the neutral state tone, so a phase-agnostic
+ * caller gets grey / amber / green from the same call.
+ */
+export const phaseIconClass = (phase, state) => {
+  const stateKey = getStateDescriptor(state).key;
+  const descriptor = getPhase(phase);
+  // `blocked` stays neutral for the same reason its fill does: it is not a step
+  // of the phase's progress, it is work that does not exist yet.
+  if (!descriptor || stateKey === 'blocked') return PHASE_STATE_MAP[stateKey].tone;
+  return `${descriptor.text} ${PHASE_STATE_MAP[stateKey].strength}`;
 };
 
 /**

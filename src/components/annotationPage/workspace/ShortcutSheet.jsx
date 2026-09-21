@@ -39,6 +39,8 @@ const GROUPS = [
       { keys: '⌥1', label: 'Toggle the tool-options drawer' },
       { keys: '⌥2', label: 'Toggle the side panel' },
       { keys: 'T', label: 'Label chips — all / selected only / off' },
+      { keys: 'O', label: 'Outlines — filled / no fill / hairline' },
+      { keys: '`', label: 'Hold to hide every outline and see the bare image' },
       { keys: 'space', label: 'Hold to pan' },
       { keys: '?', label: 'This sheet' },
     ],

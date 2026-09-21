@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import SegmentationOverlay from './SegmentationOverlay';
 import * as annotationSelectors from '../../../stores/selectors/annotationSelectors';
+import { OUTLINE_PRESETS } from '../../../utils/outlineSettings';
 
 describe('SegmentationOverlay refinement fill regression', () => {
   beforeAll(() => {
@@ -125,5 +126,57 @@ describe('SegmentationOverlay refinement fill regression', () => {
 
     // Normal mode must retain solid/state fill rather than transparent
     expect(isTransparentFill(fill)).toBe(false);
+  });
+
+  describe('outline settings', () => {
+    beforeEach(() => {
+      vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(false);
+      vi.spyOn(annotationSelectors, 'useRefinementModeObjectId').mockReturnValue(null);
+    });
+
+    const withOutline = (overrides) =>
+      vi.spyOn(annotationSelectors, 'useOutlineSettings').mockReturnValue({
+        ...OUTLINE_PRESETS.fill,
+        preset: 'fill',
+        constantWidth: true,
+        peek: false,
+        ...overrides,
+      });
+
+    // Losing the fill must not lose the click target: 'auto' hit-tests only
+    // where something is painted, which would leave a 1px hairline as the only
+    // way to select an object.
+    it('keeps the whole shape clickable when the fill is switched off', () => {
+      withOutline({ ...OUTLINE_PRESETS.hairline, preset: 'hairline' });
+
+      const { container } = render(<SegmentationOverlay />);
+      const path = container.querySelector('svg path');
+
+      expect(isTransparentFill(path.getAttribute('fill'))).toBe(true);
+      expect(path.style.pointerEvents).toBe('all');
+    });
+
+    it('measures the stroke in screen pixels while constant width is on', () => {
+      withOutline({});
+      const { container } = render(<SegmentationOverlay />);
+      expect(container.querySelector('svg path').getAttribute('vector-effect'))
+        .toBe('non-scaling-stroke');
+    });
+
+    it('measures the stroke in image pixels once it is off', () => {
+      withOutline({ constantWidth: false });
+      const { container } = render(<SegmentationOverlay />);
+      expect(container.querySelector('svg path').getAttribute('vector-effect')).toBe('none');
+    });
+
+    // The peek key takes the annotation layer off the image entirely — chips
+    // included, since they are planned from the same list.
+    it('renders nothing at all while peek is held', () => {
+      withOutline({ peek: true });
+      vi.spyOn(annotationSelectors, 'useChipMode').mockReturnValue('all');
+
+      const { container } = render(<SegmentationOverlay />);
+      expect(container.querySelectorAll('svg path').length).toBe(0);
+    });
   });
 });

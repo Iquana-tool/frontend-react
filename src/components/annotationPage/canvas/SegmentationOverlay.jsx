@@ -28,6 +28,7 @@ import {
   useShowApproved,
   useChipMode,
   useHiddenObjectIds,
+  useOutlineSettings,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
@@ -93,6 +94,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const workspaceMode = useWorkspaceMode();
   const showApproved = useShowApproved();
   const chipMode = useChipMode();
+  // How the polygons are painted, as opposed to which of them are painted at
+  // all — see utils/outlineSettings and getPolygonStyle.
+  const outline = useOutlineSettings();
   const hiddenObjectIds = useHiddenObjectIds();
   const selectedObjects = useSelectedObjects();
   const selectObject = useSelectObject();
@@ -130,6 +134,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
 
   // Filter objects based on visibility settings and focus/refinement mode
   const visibleObjects = useMemo(() => {
+    // Peek: the whole annotation layer steps aside while the key is held, so the
+    // question "what does the image actually look like under all this?" costs a
+    // keypress rather than a round trip through the settings. Returning nothing
+    // here also takes the chips with it, since they are planned from this list.
+    if (outline.peek) return [];
+
     // Per-object visibility from the Objects panel's eye button. Applied first
     // so a hidden object disappears regardless of the label-level filters.
     let filtered = objectsList.filter((obj) => !hiddenObjectIds[obj.id]);
@@ -195,7 +205,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     }
 
     return filtered;
-  }, [objectsList, hiddenObjectIds, visibility, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
+  }, [objectsList, hiddenObjectIds, visibility, outline.peek, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
   /**
    * Which objects get a chip, and where.
@@ -752,6 +762,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             selected: isSelected,
             reviewMode: workspaceMode === 'review' && !showApproved,
             color: object.color,
+            outline,
           });
           normalStyle = style;
           fillOpacity = null;
@@ -840,6 +851,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               fill={normalStyle ? normalStyle.fill : hexToRgba(object.color, fillOpacity)}
               stroke={strokeColor}
               strokeWidth={strokeWidth}
+              vectorEffect={normalStyle?.vectorEffect || 'none'}
               strokeLinejoin="round"
               strokeLinecap="round"
               strokeDasharray={normalStyle ? normalStyle.strokeDasharray : (isSelected ? "15,10" : "none")}
@@ -857,7 +869,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 cursor: pathsInert ? 'default' : 'pointer',
                 // In refinement mode and while drawing manually, disable pointer
                 // events so clicks pass through to the canvas below.
-                pointerEvents: pathsInert ? 'none' : 'auto',
+                //
+                // 'all' rather than 'auto' so an object stays clickable across its
+                // whole area once the outline settings take the fill away: 'auto'
+                // means visiblePainted, which only hit-tests where something is
+                // actually painted, and aiming at a 1px hairline is not a way to
+                // select anything.
+                pointerEvents: pathsInert ? 'none' : 'all',
                 transitionProperty: 'fill-opacity, stroke-width',
                 animation: normalStyle?.marchingAnts
                   ? `dash-${object.id} 1.6s linear infinite`

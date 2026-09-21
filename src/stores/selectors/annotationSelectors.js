@@ -311,6 +311,14 @@ export const useShowApproved = () => useAnnotationStore(state => state.workspace
 export const useChipMode = () => useAnnotationStore(state => state.workspace.chipMode);
 export const useSetChipMode = () => useAnnotationStore(state => state.setChipMode);
 export const useCycleChipMode = () => useAnnotationStore(state => state.cycleChipMode);
+export const useOutlineSettings = () => useAnnotationStore(state => state.workspace.outline);
+export const useOutlinePreset = () => useAnnotationStore(state => state.workspace.outline.preset);
+export const useOutlinePeek = () => useAnnotationStore(state => state.workspace.outline.peek);
+export const useSetOutlinePreset = () => useAnnotationStore(state => state.setOutlinePreset);
+export const useCycleOutlinePreset = () => useAnnotationStore(state => state.cycleOutlinePreset);
+export const useSetOutlineValue = () => useAnnotationStore(state => state.setOutlineValue);
+export const useSetOutlineConstantWidth = () => useAnnotationStore(state => state.setOutlineConstantWidth);
+export const useSetOutlinePeek = () => useAnnotationStore(state => state.setOutlinePeek);
 export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
 export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
 export const usePicker = () => useAnnotationStore(state => state.workspace.picker);

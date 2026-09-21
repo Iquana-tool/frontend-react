@@ -1,3 +1,5 @@
+import { DEFAULT_OUTLINE } from '../utils/outlineSettings';
+
 /**
  * Initial state for the annotation store
  */
@@ -55,6 +57,12 @@ export const initialState = {
     cursor: null,
     /** Canvas label chips: 'all' | 'minimal' (hover/selection only) | 'off'. */
     chipMode: 'all',
+    /**
+     * How object polygons are painted — the companion axis to the visibility
+     * filters above, which decide *which* objects are painted at all.
+     * See utils/outlineSettings.
+     */
+    outline: { ...DEFAULT_OUTLINE },
   },
 
   // Canvas State (needed for canvas components)

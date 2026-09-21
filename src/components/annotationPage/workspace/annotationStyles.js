@@ -1,5 +1,6 @@
 import { getObjectState } from './objectViewModel';
 import { withAlpha } from './labelColorUtils';
+import { DEFAULT_OUTLINE, TABLE_STROKE_WIDTH } from '../../../utils/outlineSettings';
 
 /** Amber used for objects that have been drawn but not classified yet. */
 export const UNLABELLED_COLOR = '#f59e0b';
@@ -19,48 +20,81 @@ export const HATCH_PATTERN_ID = 'iq-unlabelled-hatch';
  *
  * Hover and selection are modifiers on top of the base state, not states of
  * their own, so a selected pending object keeps its dashes.
+ *
+ * The user's outline settings are a second layer of modifiers on top of all of
+ * that, and deliberately *scale* the table rather than replace it: the whole
+ * point of the table is that state is legible at a glance, and an absolute
+ * opacity setting would flatten approved, pending and unlabelled into one
+ * uniform tint. See utils/outlineSettings.
  */
-export const getPolygonStyle = (object, { hovered, selected, reviewMode, color }) => {
+export const getPolygonStyle = (object, { hovered, selected, reviewMode, color, outline } = {}) => {
+  const {
+    fillScale,
+    strokeWidth: settingWidth,
+    hoverFill,
+    constantWidth,
+  } = { ...DEFAULT_OUTLINE, ...(outline || {}) };
+
   const state = getObjectState(object);
   const base = state === 'unlabelled' ? UNLABELLED_COLOR : color || UNLABELLED_COLOR;
+
+  // The setting applies as a scale against the width the table is written at —
+  // so pending stays heavier than approved and selection stays heaviest,
+  // whatever the user has dialled in. Note the reference is TABLE_STROKE_WIDTH
+  // and not the default setting: those are different numbers, and dividing by
+  // the default would make every width below it rescale the table into itself.
+  const widthScale = settingWidth / TABLE_STROKE_WIDTH;
+  // Without this the stroke is measured in image pixels, because the overlay's
+  // viewBox is the image's natural size: outlines fatten as you zoom in and
+  // vanish on a large image zoomed out. See DEFAULT_OUTLINE.constantWidth.
+  const vectorEffect = constantWidth ? 'non-scaling-stroke' : 'none';
 
   // Approved objects recede to a hairline while reviewing, so the work that
   // still needs attention is what stands out.
   if (reviewMode && state === 'approved' && !selected && !hovered) {
     return {
       stroke: base,
-      strokeWidth: 1.5,
+      strokeWidth: 1.5 * widthScale,
       strokeDasharray: 'none',
-      fill: withAlpha(base, 0.04),
+      fill: withAlpha(base, 0.04 * fillScale),
+      vectorEffect,
       marchingAnts: false,
     };
   }
 
-  let strokeWidth = state === 'pending' ? 3 : 2.5;
-  let fillOpacity = state === 'approved' ? 0.16 : state === 'pending' ? 0.1 : 0.18;
+  let strokeWidth = (state === 'pending' ? 3 : 2.5) * widthScale;
+  let fillOpacity =
+    (state === 'approved' ? 0.16 : state === 'pending' ? 0.1 : 0.18) * fillScale;
   let strokeDasharray =
     state === 'pending' ? '30 8' : state === 'unlabelled' ? '18 10' : 'none';
 
   if (hovered) {
-    strokeWidth += 1.5;
-    fillOpacity = 0.24;
+    strokeWidth += 1.5 * widthScale;
+    // A floor rather than a value: at fillScale 0 this is what makes the
+    // outline-only presets workable, since the shape under the cursor is the
+    // one you are about to act on; and at fillScale above 1 it never dims an
+    // object just because you pointed at it.
+    if (hoverFill) fillOpacity = Math.max(fillOpacity, 0.24);
   }
   if (selected) {
-    strokeWidth = 5;
-    fillOpacity = 0.34;
+    strokeWidth = 5 * widthScale;
+    if (hoverFill) fillOpacity = Math.max(fillOpacity, 0.34);
     strokeDasharray = 'none';
   }
+
+  // The hatch is a state marker, not a tint, so the fill slider does not dim
+  // it — an object nobody has classified yet has to stay unmissable. It does go
+  // away when the settings ask for no fill under any circumstances (hairline),
+  // where the amber dashes and the marching ants carry the state instead.
+  const hatched =
+    state === 'unlabelled' && !selected && !hovered && (fillScale > 0 || hoverFill);
 
   return {
     stroke: base,
     strokeWidth,
     strokeDasharray,
-    // Unlabelled objects get a hatch rather than a flat tint, so they read as
-    // unfinished even at a glance.
-    fill:
-      state === 'unlabelled' && !selected && !hovered
-        ? `url(#${HATCH_PATTERN_ID})`
-        : withAlpha(base, fillOpacity),
+    fill: hatched ? `url(#${HATCH_PATTERN_ID})` : withAlpha(base, fillOpacity),
+    vectorEffect,
     marchingAnts: state === 'unlabelled' && !selected,
   };
 };

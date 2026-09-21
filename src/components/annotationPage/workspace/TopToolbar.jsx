@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
+  Blend,
   BookOpen,
   Bug,
   Check,
@@ -34,9 +35,10 @@ import useWorkspaceImageNav from './useWorkspaceImageNav';
 import useImageLevelActions from './useImageLevelActions';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useAuth } from '../../../contexts/AuthContext';
-import { PHASES, getStateDescriptor } from '../../../utils/imageStatus';
+import { PHASES, getStateDescriptor, phaseIconClass, stateLabel } from '../../../utils/imageStatus';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clampZoom } from './constants';
 import { CHIP_MODE_LABELS } from '../canvas/chipLayout';
+import { OUTLINE_PRESET_LABELS } from '../../../utils/outlineSettings';
 import {
   useAnnotationStatus,
   usePhaseStatus,
@@ -44,6 +46,8 @@ import {
   useSetZoomLevel,
   useChipMode,
   useCycleChipMode,
+  useOutlinePreset,
+  useCycleOutlinePreset,
   useSetPanOffset,
   useWorkspaceMode,
   useSetWorkspaceMode,
@@ -89,11 +93,18 @@ const TopToolbar = () => {
   const annotationStatus = useAnnotationStatus();
   const phaseStatus = usePhaseStatus();
   const overall = getStateDescriptor(annotationStatus);
+  // The pill wears the same cross / ring / tick as the glyphs beside it. It used
+  // to show a tick and nothing else, so the two halves of one status cluster
+  // spoke different languages — and the states that need attention were the ones
+  // with no mark at all.
+  const OverallIcon = overall.smallIcon;
 
   const zoomLevel = useZoomLevel();
   const setZoomLevel = useSetZoomLevel();
   const chipMode = useChipMode();
   const cycleChipMode = useCycleChipMode();
+  const outlinePreset = useOutlinePreset();
+  const cycleOutlinePreset = useCycleOutlinePreset();
   const setPanOffset = useSetPanOffset();
 
   const mode = useWorkspaceMode();
@@ -256,23 +267,35 @@ const TopToolbar = () => {
             STATUS_TONE[overall.key] || STATUS_TONE.not_started
           }`}
         >
-          {overall.key === 'finished' && <Check size={13} strokeWidth={2} />}
+          <OverallIcon size={12} strokeWidth={3} />
           {overall.label}
         </span>
 
-        {/* Per-phase dots: the compact form of the same tooltip, so the phase a
-            reviewer sent back is visible without hovering. Each dot is a tone of
-            its own phase's hue, matching the mode tabs and the strip on the
-            gallery thumbnails — position and colour say the same thing. */}
-        <span className="inline-flex items-center gap-[3px] flex-none">
+        {/* Per-phase glyphs: the compact form of the same tooltip, so the phase a
+            reviewer sent back is visible without hovering.
+
+            Cross / ring / tick rather than three dots, matching the badge on the
+            gallery thumbnails and the filmstrip tiles. Dots left both encodings
+            on colour — the phase on its hue, the state on a tone of that same
+            hue — and at 6px two tones of one blue are the same blue. Shape now
+            carries the state and the hue carries only the phase, which is also
+            the encoding that survives being unable to tell the hues apart: the
+            phases are always these three, in this order, so position already
+            names them; the state had nothing but colour. */}
+        <span className="inline-flex items-center gap-[5px] flex-none">
           {PHASES.map((phase) => {
             const state = getStateDescriptor(phaseStatus?.[phase.key]);
+            const StateIcon = state.smallIcon;
+            const label = `${phase.label}: ${stateLabel(phase.key, state.key)}`;
             return (
               <span
                 key={phase.key}
-                title={`${phase.label}: ${state.label}`}
-                className={`w-[6px] h-[6px] rounded-full ${phase.fill[state.key]}`}
-              />
+                title={label}
+                aria-label={label}
+                className={`inline-flex items-center ${phaseIconClass(phase.key, state.key)}`}
+              >
+                <StateIcon size={11} strokeWidth={3} />
+              </span>
             );
           })}
         </span>
@@ -351,6 +374,17 @@ const TopToolbar = () => {
           shortcut="T"
           active={chipMode !== 'all'}
           onClick={cycleChipMode}
+        />
+        {/* Its neighbour for the same reason, one level down: the chips are what
+            covers a crowded image, the fills are what covers the pixels. Cycles
+            filled → no fill → hairline; the sliders behind it are in the Objects
+            panel. */}
+        <ToolbarButton
+          icon={Blend}
+          label={OUTLINE_PRESET_LABELS[outlinePreset] || OUTLINE_PRESET_LABELS.custom}
+          shortcut="O"
+          active={outlinePreset !== 'fill'}
+          onClick={cycleOutlinePreset}
         />
       </Group>
 

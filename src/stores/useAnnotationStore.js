@@ -14,7 +14,12 @@ import { createFocusModeSlice } from './slices/focusModeSlice';
 import { createEditModeSlice } from './slices/editModeSlice';
 import { createAIAnnotationSlice } from './slices/aiAnnotationSlice';
 import { createObjectsSlice } from './slices/objectsSlice';
-import { createWorkspaceSlice, readStoredMode, readStoredTheme } from './slices/workspaceSlice';
+import {
+  createWorkspaceSlice,
+  readStoredMode,
+  readStoredOutline,
+  readStoredTheme,
+} from './slices/workspaceSlice';
 import { createCalibrationSlice } from './slices/calibrationSlice';
 import { createHistorySlice } from './slices/historySlice';
 
@@ -41,12 +46,14 @@ const useAnnotationStore = create()(
       immer((set, get) => ({
         // Initial state
         ...initialState,
-        // theme and mode are the two workspace choices that outlive a reload; both are
-        // read from localStorage here because the store is built once, at import.
+        // theme, mode and the outline settings are the workspace choices that outlive
+        // a reload; all are read from localStorage here because the store is built
+        // once, at import.
         workspace: {
           ...initialState.workspace,
           theme: readStoredTheme(),
           mode: readStoredMode(),
+          outline: readStoredOutline(),
         },
 
         // Combine all slices
