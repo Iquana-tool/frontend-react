@@ -279,6 +279,65 @@ export const formatDelta = (fraction) => {
 };
 
 /**
+ * Objects on this image whose measurement sits far from the dataset's.
+ *
+ * The companion to {@link relativeToBaseline} one level down: that says whether
+ * the image disagrees with the dataset, this says which contours are why. A
+ * reviewer's next click after "this image reads high" is to find the object
+ * responsible, and that is otherwise a manual sweep of the panel.
+ *
+ * Distance is in standard deviations of the *dataset* distribution, not the
+ * image's: an image where every object is oversized has a small internal spread
+ * and would report no outliers against itself, which is exactly the case worth
+ * catching. A zero or missing spread yields nothing rather than flagging
+ * everything — one distinct value across the dataset makes every deviation
+ * infinite, and that is a statement about the dataset, not about these objects.
+ *
+ * Each object is measured against its own label's distribution where one exists,
+ * falling back to the dataset-wide figures otherwise. On a hierarchy this is the
+ * difference between a useful answer and a useless one: pooling every label puts
+ * a parent contour in the same population as the dozens of small children inside
+ * it, and against that mean every parent on every image reads as an outlier —
+ * which flags everything and therefore says nothing.
+ *
+ * @param {Array<Object>} objects - Workspace objects, carrying `quantification`.
+ * @param {Object} baseline - `{metricKey, mean, std}` plus an optional
+ *   `byLabel` of `{[labelId]: {mean, std}}` preferred per object.
+ * @param {Object} [options]
+ * @param {number} [options.threshold=2] - Deviations before an object is flagged.
+ * @returns {Array<{object: Object, value: number, z: number, scope: string}>}
+ *   worst first; `scope` is the label id compared against, or 'dataset'.
+ */
+export const findMetricOutliers = (objects, baseline, { threshold = 2 } = {}) => {
+  const { metricKey, mean, std, byLabel } = baseline || {};
+  if (!metricKey) return [];
+
+  const usable = (stats) =>
+    stats && stats.mean != null && Number.isFinite(stats.std) && stats.std > 0;
+
+  const wide = usable({ mean, std }) ? { mean, std } : null;
+
+  return (objects || [])
+    .map((object) => {
+      const value = object?.quantification?.[metricKey]
+        ?? (metricKey === 'area' ? object?.pixelCount : null);
+      if (value == null || !Number.isFinite(value)) return null;
+
+      const labelKey = object?.labelId == null ? null : String(object.labelId);
+      const forLabel = labelKey ? byLabel?.[labelKey] : null;
+      const stats = usable(forLabel) ? forLabel : wide;
+      if (!stats) return null;
+
+      const z = (value - stats.mean) / stats.std;
+      return Math.abs(z) >= threshold
+        ? { object, value, z, scope: usable(forLabel) ? labelKey : 'dataset' }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
+};
+
+/**
  * Total number of distinct objects on the image having at least one measurement.
  *
  * Each label's measured count is the maximum count among that label's metrics,

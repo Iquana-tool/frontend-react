@@ -3,6 +3,7 @@ import {
   aggregateMetric,
   aggregateMetricEntry,
   countMeasuredObjects,
+  findMetricOutliers,
   formatDelta,
   frameCoverage,
   isAdditiveMetric,
@@ -291,5 +292,140 @@ describe('countMeasuredObjects', () => {
     };
     expect(countMeasuredObjects(metrics)).toBe(7);
     expect(countMeasuredObjects(metrics, { includeUnlabeled: false })).toBe(5);
+  });
+});
+
+describe("findMetricOutliers", () => {
+  const object = (id, area) => ({ id, quantification: { area } });
+  const baseline = { metricKey: "area", mean: 100, std: 10 };
+
+  it("flags objects beyond the threshold in either direction", () => {
+    const found = findMetricOutliers(
+      [object(1, 100), object(2, 130), object(3, 70), object(4, 105)],
+      baseline
+    );
+    expect(found.map((row) => row.object.id)).toEqual([2, 3]);
+    expect(found[0].z).toBeCloseTo(3);
+    expect(found[1].z).toBeCloseTo(-3);
+  });
+
+  it("orders by distance, worst first, regardless of sign", () => {
+    const found = findMetricOutliers([object(1, 125), object(2, 60)], baseline);
+    expect(found.map((row) => row.object.id)).toEqual([2, 1]);
+  });
+
+  it("honours a custom threshold", () => {
+    const objects = [object(1, 115)];
+    expect(findMetricOutliers(objects, baseline)).toHaveLength(0);
+    expect(findMetricOutliers(objects, baseline, { threshold: 1 })).toHaveLength(1);
+  });
+
+  // One distinct value across the dataset makes every deviation infinite; that
+  // is a statement about the dataset, not about these objects.
+  it("flags nothing when the dataset has no spread", () => {
+    expect(findMetricOutliers([object(1, 999)], { ...baseline, std: 0 })).toEqual([]);
+    expect(findMetricOutliers([object(1, 999)], { ...baseline, std: null })).toEqual([]);
+  });
+
+  it("returns nothing without a usable baseline", () => {
+    expect(findMetricOutliers([object(1, 999)], null)).toEqual([]);
+    expect(findMetricOutliers([object(1, 999)], { metricKey: "area", std: 10 })).toEqual([]);
+  });
+
+  it("skips objects that never measured the metric", () => {
+    const found = findMetricOutliers(
+      [{ id: 1 }, { id: 2, quantification: {} }, object(3, 200)],
+      baseline
+    );
+    expect(found.map((row) => row.object.id)).toEqual([3]);
+  });
+
+  // Area predates the quantification payload on some objects; the pixel count is
+  // the same measurement under an older name.
+  it("falls back to pixelCount for area", () => {
+    const found = findMetricOutliers([{ id: 7, pixelCount: 200 }], baseline);
+    expect(found).toHaveLength(1);
+    expect(found[0].value).toBe(200);
+  });
+
+  it("does not use pixelCount for any other metric", () => {
+    const found = findMetricOutliers([{ id: 7, pixelCount: 200 }], {
+      metricKey: "perimeter",
+      mean: 100,
+      std: 10,
+    });
+    expect(found).toEqual([]);
+  });
+
+  it("tolerates an empty or missing object list", () => {
+    expect(findMetricOutliers([], baseline)).toEqual([]);
+    expect(findMetricOutliers(undefined, baseline)).toEqual([]);
+  });
+
+  /**
+   * The hierarchy case this exists for: a parent contour pooled with the dozens
+   * of small children inside it reads as an outlier on every image, which flags
+   * everything and therefore says nothing.
+   */
+  describe("per-label baselines", () => {
+    const labelled = (id, labelId, area) => ({ id, labelId, quantification: { area } });
+    // Parents average 100, children 10; pooling them puts the mean between.
+    const nested = {
+      metricKey: "area",
+      mean: 20,
+      std: 5,
+      byLabel: {
+        1: { mean: 100, std: 10 },
+        2: { mean: 10, std: 2 },
+      },
+    };
+
+    it("clears an object that is normal for its own label", () => {
+      // 105 is +17 sigma against the pooled mean and +0.5 against its label's.
+      expect(findMetricOutliers([labelled(1, 1, 105)], nested)).toEqual([]);
+    });
+
+    it("still catches one that is abnormal for its own label", () => {
+      const found = findMetricOutliers([labelled(1, 1, 140)], nested);
+      expect(found).toHaveLength(1);
+      expect(found[0].z).toBeCloseTo(4);
+      expect(found[0].scope).toBe("1");
+    });
+
+    it("judges each label against its own distribution", () => {
+      const found = findMetricOutliers(
+        [labelled(1, 1, 100), labelled(2, 2, 10), labelled(3, 2, 30)],
+        nested
+      );
+      expect(found.map((row) => row.object.id)).toEqual([3]);
+    });
+
+    it("falls back to the pooled figures for a label with no baseline", () => {
+      const found = findMetricOutliers([labelled(1, 99, 100)], nested);
+      expect(found).toHaveLength(1);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("matches label ids across number and string forms", () => {
+      expect(findMetricOutliers([labelled(1, "1", 105)], nested)).toEqual([]);
+    });
+
+    it("falls back for an unlabelled object", () => {
+      const found = findMetricOutliers([{ id: 1, quantification: { area: 100 } }], nested);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("ignores a label baseline with no spread", () => {
+      const flat = { ...nested, byLabel: { 1: { mean: 100, std: 0 } } };
+      const found = findMetricOutliers([labelled(1, 1, 100)], flat);
+      // Falls through to the pooled figures rather than dividing by zero.
+      expect(found).toHaveLength(1);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("skips an object entirely when neither baseline is usable", () => {
+      const unusable = { metricKey: "area", mean: 20, std: 0, byLabel: {} };
+      expect(findMetricOutliers([labelled(1, 1, 100)], unusable)).toEqual([]);
+    });
   });
 });

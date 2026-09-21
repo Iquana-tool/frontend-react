@@ -132,11 +132,49 @@ export const MEASURE_SCALE_TOOL = { id: 'scale', name: 'Measure scale', icon: 'R
  */
 export const CALIBRATE_RAIL_TOOL_IDS = ['pan', 'zoom'];
 
-export const railToolsForMode = (mode) => (
-  mode === 'calibrate'
-    ? RAIL_TOOLS.filter((tool) => CALIBRATE_RAIL_TOOL_IDS.includes(tool.id))
-    : RAIL_TOOLS
-);
+/**
+ * The rail in Review mode.
+ *
+ * Reviewing is judging what is already there, not making more of it: the
+ * decisions are accept, reject and fix, and all three are reachable from the
+ * action bar on a selected object. The shape tools have nothing to contribute —
+ * an object drawn while reviewing is an object nobody reviewed — so the rail
+ * keeps only the selection and the two ways of looking closer.
+ *
+ * Not a lockout: the modes share one canvas and one viewport, so an annotator
+ * who does want to draw is one click away in the mode switcher, landing on the
+ * same image at the same zoom.
+ */
+export const REVIEW_RAIL_TOOL_IDS = ['select', 'pan', 'zoom'];
+
+const RAIL_TOOL_IDS_BY_MODE = {
+  calibrate: CALIBRATE_RAIL_TOOL_IDS,
+  review: REVIEW_RAIL_TOOL_IDS,
+};
+
+export const railToolsForMode = (mode) => {
+  const ids = RAIL_TOOL_IDS_BY_MODE[mode];
+  return ids ? RAIL_TOOLS.filter((tool) => ids.includes(tool.id)) : RAIL_TOOLS;
+};
+
+/**
+ * Where a mode's rail lands when the tool carried in from the previous mode is
+ * not on it.
+ *
+ * Switching modes keeps the image, the zoom and the selection, which is the
+ * point of them being modes — but it cannot keep a tool the new rail does not
+ * offer, or the rail shows nothing selected while the canvas still answers to
+ * the old one. Calibrate lands on pan (it is navigation around a reference),
+ * Review on select (its actions all start from an object).
+ */
+export const DEFAULT_RAIL_TOOL_BY_MODE = {
+  calibrate: 'pan',
+  review: 'select',
+};
+
+/** True when `railTool` is one the mode's rail actually offers. */
+export const railToolAllowedInMode = (railTool, mode) =>
+  railToolsForMode(mode).some((tool) => tool.id === railTool);
 
 /** Icon per calibration kind, falling back for a kind this build predates. */
 export const CALIBRATION_KIND_ICONS = {

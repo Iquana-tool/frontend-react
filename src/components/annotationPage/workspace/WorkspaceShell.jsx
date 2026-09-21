@@ -4,6 +4,7 @@ import TopToolbar from './TopToolbar';
 import ToolRail from './ToolRail';
 import ToolOptionsDrawer from './ToolOptionsDrawer';
 import CalibrationDrawer from './CalibrationDrawer';
+import ReviewDrawer from './ReviewDrawer';
 import RightPanel from './RightPanel';
 import ActionBar from './ActionBar';
 import Filmstrip from './Filmstrip';
@@ -11,6 +12,8 @@ import StatusBar from './StatusBar';
 import ReviewBanner from './ReviewBanner';
 import ShortcutSheet from './ShortcutSheet';
 import useWorkspaceShortcuts from './useWorkspaceShortcuts';
+import useRailTools from './useRailTools';
+import { DEFAULT_RAIL_TOOL_BY_MODE, railToolAllowedInMode } from './toolModel';
 import useArmedLabelAutoApply from './useArmedLabelAutoApply';
 import { useCalibrationSync } from './useCalibrationState';
 import MainCanvas from '../canvas/MainCanvas';
@@ -29,13 +32,22 @@ import {
   useCurrentImageId,
   useCurrentMaskId,
   useCurrentTool,
-  useSetCurrentTool,
+  useCalibrationEntries,
+  useActiveCalibrationKind,
+  useSetActiveCalibrationKind,
   useSetWorkspaceMode,
   useResetWorkspaceForImage,
 } from '../../../stores/selectors/annotationSelectors';
 
-/** The only tools the rail offers in Calibrate mode. See toolModel.js. */
-const CALIBRATE_TOOLS = ['pan', 'zoom', 'set_scale'];
+/**
+ * Store tools that belong to no rail and must survive a mode change.
+ *
+ * A live scale measurement puts the store in `set_scale` while the user is
+ * drawing it. That is not a rail tool in any mode, so the fallback below would
+ * read it as "carried in from somewhere else" and reset it — cancelling the
+ * measurement mid-drag.
+ */
+const MEASUREMENT_TOOLS = ['set_scale'];
 
 /**
  * The annotation workspace shell.
@@ -55,7 +67,10 @@ const WorkspaceShell = () => {
   const currentImageId = useCurrentImageId();
   const maskId = useCurrentMaskId();
   const currentTool = useCurrentTool();
-  const setCurrentTool = useSetCurrentTool();
+  const { railTool, setRailTool } = useRailTools();
+  const calibrationEntries = useCalibrationEntries();
+  const activeCalibrationKind = useActiveCalibrationKind();
+  const setActiveCalibrationKind = useSetActiveCalibrationKind();
   const setWorkspaceMode = useSetWorkspaceMode();
   const resetForImage = useResetWorkspaceForImage();
   const { datasets } = useDataset();
@@ -76,14 +91,34 @@ const WorkspaceShell = () => {
     resetForImage();
   }, [currentImageId, resetForImage]);
 
-  // Stepping to another image resets the tool to the annotation default, which
-  // in Calibrate mode is not on the rail at all. Put it back to a tool that is,
-  // so the rail keeps showing what is actually selected.
+  // Keep the armed tool on the rail the current mode actually shows.
+  //
+  // Two things put it off: switching modes carries the previous mode's tool in,
+  // and stepping to another image resets it to the annotation default. Either
+  // way the rail ends up with nothing highlighted while the canvas still answers
+  // to a tool that is not on it — which in Review meant the prompt canvas was
+  // live behind a rail that offered no way to see it.
   useEffect(() => {
-    if (mode === 'calibrate' && !CALIBRATE_TOOLS.includes(currentTool)) {
-      setCurrentTool('pan');
-    }
-  }, [mode, currentTool, setCurrentTool]);
+    if (MEASUREMENT_TOOLS.includes(currentTool)) return;
+    if (railToolAllowedInMode(railTool, mode)) return;
+    const fallback = DEFAULT_RAIL_TOOL_BY_MODE[mode];
+    if (fallback) setRailTool(fallback);
+  }, [mode, railTool, currentTool, setRailTool]);
+
+  // Arm the calibration that most likely needs attention as soon as the mode is
+  // entered — the first uncalibrated one, else the first.
+  //
+  // This used to live in CalibrationDrawer, which meant it only ran once that
+  // component had mounted: entering Calibrate with the drawer collapsed left the
+  // rail with every calibration unselected and no controls anywhere, and even
+  // with the drawer open the entries usually had not arrived yet on the pass
+  // that mattered. The rail is always mounted, so the shell is where this
+  // belongs.
+  useEffect(() => {
+    if (mode !== 'calibrate' || activeCalibrationKind || !calibrationEntries.length) return;
+    const next = calibrationEntries.find((entry) => !entry.calibrated) || calibrationEntries[0];
+    setActiveCalibrationKind(next.kind);
+  }, [mode, activeCalibrationKind, calibrationEntries, setActiveCalibrationKind]);
 
   // `?mode=` lets a caller open the workspace on a given tab — the dataset page's
   // Calibrate card is the one that does. It is an instruction, not state: applied
@@ -123,11 +158,15 @@ const WorkspaceShell = () => {
 
       <div className="flex-1 min-h-0 flex">
         <ToolRail />
-        {/* The drawer is the rail's companion in both modes: it configures
-            whatever the rail selected. In Calibrate mode that is a calibration
-            rather than a drawing tool. */}
+        {/* The drawer is the rail's companion in every mode, and carries whatever
+            that mode's work needs beside the canvas: the options for the selected
+            drawing tool while annotating, the selected calibration's controls
+            while calibrating, and — since reviewing configures nothing — what the
+            image measures, for judging it against the dataset it belongs to. */}
         {leftDrawerOpen && (
-          mode === 'calibrate' ? <CalibrationDrawer /> : <ToolOptionsDrawer />
+          mode === 'calibrate' ? <CalibrationDrawer />
+            : mode === 'review' ? <ReviewDrawer />
+              : <ToolOptionsDrawer />
         )}
 
         <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">

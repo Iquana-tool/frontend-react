@@ -7,9 +7,12 @@ import {
   Eraser,
   Layers,
   Loader2,
+  Palette,
   Pencil,
   PenLine,
   RotateCcw,
+  Ruler,
+  SlidersHorizontal,
   Shapes,
   Sparkles,
   SkipForward,
@@ -28,7 +31,7 @@ import useAddShapesAsObjects from './useAddShapesAsObjects';
 import useSupportedPromptTypes from './useSupportedPromptTypes';
 import useSuggestSimilar from './useSuggestSimilar';
 import useRailTools from './useRailTools';
-import { getPromptAction } from './toolModel';
+import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
 import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
@@ -45,6 +48,8 @@ import {
   useSetPromptedModel,
   usePicker,
   useSetPicker,
+  useSetActiveCalibrationKind,
+  useSetLeftDrawerOpen,
   useImageScale,
   useDatasetLabels,
   useLabelColorOverrides,
@@ -65,6 +70,14 @@ const RUN_COPY = {
 };
 
 /** Small coloured dot that precedes the bar's context label. */
+/** The same per-kind icons the rail uses, resolved to components for the bar. */
+const CALIBRATION_BAR_ICONS = Object.fromEntries(
+  Object.entries(CALIBRATION_KIND_ICONS).map(([kind, icon]) => [
+    kind,
+    { Ruler, Palette, SlidersHorizontal }[icon] || SlidersHorizontal,
+  ])
+);
+
 const Dot = ({ color, className = '' }) => (
   <span
     className={`w-[6px] h-[6px] rounded-full flex-none ${className}`}
@@ -103,6 +116,8 @@ const ActionBar = () => {
   const setPromptedModel = useSetPromptedModel();
   const picker = usePicker();
   const setPicker = useSetPicker();
+  const setActiveCalibrationKind = useSetActiveCalibrationKind();
+  const setLeftDrawerOpen = useSetLeftDrawerOpen();
   const scale = useImageScale();
   const labels = useDatasetLabels();
   const colorOverrides = useLabelColorOverrides();
@@ -468,6 +483,45 @@ const ActionBar = () => {
           variant="primary"
           onClick={() => setPicker('label')}
         />
+      </>
+    );
+  } else if (bar.state === 'calibrate') {
+    // Named after the calibrations the server's registry actually offers, so a
+    // kind added there gets its button here without a client change.
+    //
+    // The buttons select a calibration and open its controls rather than
+    // starting its measurement: how a measurement begins is kind-specific — the
+    // scale hands off to the draw-a-line overlay, the colour response to a patch
+    // pick — and forking that into a second place is how the two would drift.
+    const active = bar.activeCalibration;
+    context = (
+      <>
+        <Dot className={active?.calibrated ? 'bg-ok' : 'bg-t3'} />
+        <span className="text-btn font-bold text-t1">
+          {active ? `${active.label} — ${active.calibrated ? 'set' : 'not set'}` : 'Calibrate'}
+        </span>
+      </>
+    );
+    sub = active
+      ? active.summary
+      : bar.calibrations.length
+        ? 'Pick a calibration to set it'
+        : 'No calibrations are available for this image';
+    buttons = bar.calibrations.length === 0 ? null : (
+      <>
+        {bar.calibrations.map((entry) => (
+          <BarButton
+            key={entry.kind}
+            icon={CALIBRATION_BAR_ICONS[entry.kind] || SlidersHorizontal}
+            label={`Calibrate ${entry.label.toLowerCase()}`}
+            variant={entry.kind === active?.kind ? 'primary' : 'chip'}
+            title={entry.summary}
+            onClick={() => {
+              setActiveCalibrationKind(entry.kind);
+              setLeftDrawerOpen(true);
+            }}
+          />
+        ))}
       </>
     );
   } else if (bar.state === 'review') {

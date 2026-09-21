@@ -208,7 +208,11 @@ export const computeAnnotationInsights = (metricsPerLabelId, labelIdToName = {},
 // Build a lookup: metric_key -> catalog entry (name, unit_kind, value_dim, components...).
 export const buildMetricCatalogMap = (catalog) => {
   const map = {};
-  (catalog || []).forEach((m) => {
+  // Tolerates the catalog endpoint's envelope as well as the bare list, so a
+  // caller that forgets to unwrap `.metrics` gets an empty map — metric names
+  // fall back to their keys — rather than taking its whole view down.
+  const entries = Array.isArray(catalog) ? catalog : catalog?.metrics;
+  (Array.isArray(entries) ? entries : []).forEach((m) => {
     map[m.key] = m;
   });
   return map;
