@@ -115,11 +115,9 @@ const ToolOptionsDrawer = () => {
             </p>
           )}
           <div className="flex flex-col gap-[9px]">
-            {services
-              .filter((s) => s.key === 'prompted' || s.key === 'instance')
-              .map((service) => (
-                <ServiceCard key={service.key} service={service} />
-              ))}
+            {services.map((service) => (
+              <ServiceCard key={service.key} service={service} />
+            ))}
             <CrossImageSuggestionCard />
           </div>
         </div>

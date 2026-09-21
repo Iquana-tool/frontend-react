@@ -26,6 +26,7 @@ import {
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
 import {
+  getAutoTaskModelKey,
   resolveRoutingBinding,
   isModelCompatibleWithLabel,
   matchesModelKey,
@@ -148,6 +149,19 @@ export default function useAnnotationServices() {
   const instanceSelectionNotice =
     policyResolved && hasUsableSelectedInstanceModel && !instanceDefaultIsValid
       ? 'Session override for this image — dataset default remains unchanged.'
+      : null;
+
+  const suggestionSelectionNotice =
+    policyResolved &&
+    suggestionModel &&
+    suggestionModel !==
+      getAutoTaskModelKey(
+        policyReady ? policy : null,
+        'instance-suggestion',
+        availableSuggestionModels,
+        favorites?.['instance-suggestion']
+      )
+      ? 'Session override — used for every label instead of the dataset routing.'
       : null;
 
   useEffect(() => {
@@ -325,8 +339,9 @@ export default function useAnnotationServices() {
       selectedModel: suggestionModel,
       setSelectedModel: setSuggestionModel,
       isRunning: isRunningSuggestion,
+      selectionNotice: suggestionSelectionNotice,
       usageHint:
-        'Shift-click objects on canvas to select exemplars, then right-click any exemplar and choose “Suggest Similar Instances”.',
+        'Select exemplars of one class, then press “Suggest similar” (2) in the action bar.',
     },
   ];
 

@@ -99,6 +99,26 @@ export const resolveRoutingBinding = (policy, task, labelId = null, catalogModel
 };
 
 /**
+ * The task-level model the annotation page selects on its own: the usable task default
+ * binding, else (when the task has no default) the favorite, else the first model.
+ * A session selection that differs from this was picked by the user.
+ */
+export const getAutoTaskModelKey = (policy, task, catalogModels, favoriteKey = null) => {
+    const getKey = (m) => m?.id || m?.registry_key || m?.identifier || null;
+    const resolved = resolveRoutingBinding(policy, task, null, catalogModels);
+    if (resolved?.binding) {
+        return resolved.model && resolved.isCompatible && !resolved.isStale
+            ? getKey(resolved.model)
+            : null;
+    }
+    const models = catalogModels || [];
+    const favorite = favoriteKey
+        ? models.find((m) => matchesModelKey(m, task, favoriteKey))
+        : null;
+    return getKey(favorite || models[0]);
+};
+
+/**
  * Builds a deterministic batch step mapping from policy bindings.
  *
  * @param {object|null} policy - Stored routing policy
