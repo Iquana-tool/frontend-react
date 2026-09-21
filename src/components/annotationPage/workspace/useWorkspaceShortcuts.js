@@ -29,7 +29,9 @@ import {
   useCycleChipMode,
   useCycleOutlinePreset,
   useSetOutlinePeek,
+  useToggleCalibratedColors,
 } from '../../../stores/selectors/annotationSelectors';
+import { useCalibratedColorPreview } from '../canvas/CalibratedColorFilter';
 
 /** Held to take the annotation layer off the image. @see the peek effect below. */
 const PEEK_KEY = '`';
@@ -72,6 +74,8 @@ export default function useWorkspaceShortcuts() {
   const exitFocusMode = useExitFocusMode();
   const cycleChipMode = useCycleChipMode();
   const cycleOutlinePreset = useCycleOutlinePreset();
+  const toggleCalibratedColors = useToggleCalibratedColors();
+  const calibratedColors = useCalibratedColorPreview();
   const setOutlinePeek = useSetOutlinePeek();
 
   useEffect(() => {
@@ -136,6 +140,15 @@ export default function useWorkspaceShortcuts() {
           // about getting the overlay out of the way of the image.
           event.preventDefault();
           cycleOutlinePreset();
+          break;
+        case 'C':
+          // Matches the toolbar button exactly, including staying inert on an
+          // image with no correction to show: a shortcut that silently flips a
+          // preference nothing can act on is worse than one that does nothing.
+          if (calibratedColors.available && !calibratedColors.suppressed) {
+            event.preventDefault();
+            toggleCalibratedColors();
+          }
           break;
         case 'L':
           if (selectedIds.length > 0) {
@@ -217,6 +230,9 @@ export default function useWorkspaceShortcuts() {
     exitFocusMode,
     cycleChipMode,
     cycleOutlinePreset,
+    toggleCalibratedColors,
+    calibratedColors.available,
+    calibratedColors.suppressed,
     zoomLevel,
     setZoomLevel,
     setPanOffset,

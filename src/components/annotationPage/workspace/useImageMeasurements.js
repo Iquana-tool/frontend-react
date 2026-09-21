@@ -9,8 +9,10 @@ import {
   aggregateAllMetrics,
   aggregateMetric,
   pickFeaturedMetric,
+  standardizedColorComparison,
   standardizedMetricComparison,
 } from '../../../utils/perImageQuantification';
+import { colorSpaceOf } from '../../../utils/colorDifference';
 import { useCurrentImageId } from '../../../stores/selectors/annotationSelectors';
 
 /**
@@ -106,15 +108,25 @@ export default function useImageMeasurements({ enabled = true } = {}) {
   const rows = useMemo(() => {
     if (!state.image?.metrics) return [];
     return aggregateAllMetrics(state.image.metrics, catalogMap).map(({ metricKey }) => {
-      const comparison = state.dataset?.metrics
-        ? standardizedMetricComparison(state.image.metrics, state.dataset.metrics, metricKey)
-        : null;
-      const image = aggregateMetric(state.image.metrics, metricKey);
+      const catalogEntry = catalogMap[metricKey];
+      // A colour is three numbers and is compared perceptually; everything else
+      // is a scalar compared proportionally. Routing them through one code path
+      // is what reduced "mean colour" to "mean lightness, ±%".
+      const space = colorSpaceOf(metricKey, catalogEntry);
+      const comparison = !state.dataset?.metrics
+        ? null
+        : space
+          ? standardizedColorComparison(
+            state.image.metrics, state.dataset.metrics, metricKey, space
+          )
+          : standardizedMetricComparison(state.image.metrics, state.dataset.metrics, metricKey);
+
       return {
         metricKey,
-        label: catalogMap[metricKey]?.name || metricKey,
-        tier: catalogMap[metricKey]?.tier || null,
-        image,
+        label: catalogEntry?.name || metricKey,
+        tier: catalogEntry?.tier || null,
+        space,
+        image: aggregateMetric(state.image.metrics, metricKey),
         comparison,
         labels: (comparison?.labels || []).map((entry) => ({
           ...entry,

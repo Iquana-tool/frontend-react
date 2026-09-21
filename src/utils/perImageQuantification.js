@@ -12,6 +12,8 @@
  * ``{ [labelId]: { [metricKey]: { unit, components: [{count, mean, std, min, max}, ...] } } }``
  */
 
+import { deltaE2000, toLab } from "./colorDifference";
+
 /** The label id the endpoint uses for objects with no label assigned. */
 const UNLABELED_KEY = "null";
 
@@ -279,6 +281,127 @@ export const formatDelta = (fraction) => {
 };
 
 /**
+ * One metric's per-label component vectors — the multi-channel `perLabelMetric`.
+ *
+ * A colour is three numbers, and taking only the first (as the scalar helpers do)
+ * silently reduces "mean colour" to "mean lightness".
+ *
+ * @returns {Array<{labelId: string, count: number, means: number[]}>}
+ */
+export const perLabelMetricVector = (metricsByLabelId, metricKey) =>
+  Object.entries(metricsByLabelId || {})
+    .map(([labelId, metrics]) => {
+      const components = metrics?.[metricKey]?.components;
+      if (!Array.isArray(components) || !components.length) return null;
+      const count = components[0]?.count;
+      if (!count) return null;
+      return {
+        labelId: String(labelId),
+        count,
+        means: components.map((component) => component.mean),
+      };
+    })
+    .filter(Boolean);
+
+/**
+ * A colour metric compared against the dataset, corrected for what is on the image.
+ *
+ * The same standardization as {@link standardizedMetricComparison} — each label
+ * weighted by how many of it this image carries — but the difference at the end
+ * is CIEDE2000 rather than a percentage, because a percentage on a colour is not
+ * a quantity. See utils/colorDifference.
+ *
+ * The channel means are averaged in whatever space they were measured in and
+ * converted afterwards. That is not perceptually exact for sRGB, whose gamma
+ * makes a channel mean darker than the light it stands for, but it is the
+ * encoding the per-label means already arrived in and re-deriving them is not
+ * possible from an aggregate.
+ *
+ * @returns {{kind: 'color', observed, expected, deltaE, space, count,
+ *   droppedLabels, labels: Array}|null}
+ */
+export const standardizedColorComparison = (
+  imageMetrics,
+  datasetMetrics,
+  metricKey,
+  space
+) => {
+  if (!space) return null;
+  const onImage = perLabelMetricVector(imageMetrics, metricKey);
+  if (!onImage.length) return null;
+
+  const inDataset = new Map(
+    perLabelMetricVector(datasetMetrics, metricKey).map((row) => [row.labelId, row])
+  );
+
+  const shared = [];
+  let dropped = 0;
+  for (const row of onImage) {
+    const reference = inDataset.get(row.labelId);
+    if (reference) shared.push({ row, reference });
+    else dropped += 1;
+  }
+
+  const weightedMean = (rows, pick) => {
+    const channels = [];
+    let weight = 0;
+    for (const entry of rows) {
+      const means = pick(entry);
+      weight += entry.row.count;
+      means.forEach((value, index) => {
+        channels[index] = (channels[index] || 0) + entry.row.count * value;
+      });
+    }
+    return weight ? channels.map((total) => total / weight) : null;
+  };
+
+  const base = {
+    kind: 'color',
+    space,
+    droppedLabels: dropped,
+    count: onImage.reduce((total, row) => total + row.count, 0),
+  };
+
+  if (!shared.length) {
+    const observedOnly = weightedMean(
+      onImage.map((row) => ({ row })),
+      (entry) => entry.row.means
+    );
+    return {
+      ...base,
+      observed: toLab(observedOnly, space),
+      expected: null,
+      deltaE: null,
+      labels: [],
+    };
+  }
+
+  const observed = toLab(weightedMean(shared, (entry) => entry.row.means), space);
+  const expected = toLab(weightedMean(shared, (entry) => entry.reference.means), space);
+
+  return {
+    ...base,
+    observed,
+    expected,
+    deltaE: deltaE2000(observed, expected),
+    count: shared.reduce((total, entry) => total + entry.row.count, 0),
+    labels: shared
+      .map(({ row, reference }) => {
+        const labelObserved = toLab(row.means, space);
+        const labelExpected = toLab(reference.means, space);
+        return {
+          labelId: row.labelId,
+          count: row.count,
+          observed: labelObserved,
+          expected: labelExpected,
+          deltaE: deltaE2000(labelObserved, labelExpected),
+        };
+      })
+      .sort((a, b) => b.count - a.count),
+  };
+};
+
+/**
  * One metric compared against the dataset, corrected for what is on the image.
  *
  * The naive comparison — this image's mean against the dataset's — is only
@@ -329,6 +452,7 @@ export const standardizedMetricComparison = (imageMetrics, datasetMetrics, metri
   if (!shared.length) {
     const fallback = aggregateMetric(imageMetrics, metricKey);
     return {
+      kind: 'scalar',
       observed: fallback.mean,
       expected: null,
       delta: null,
@@ -352,6 +476,7 @@ export const standardizedMetricComparison = (imageMetrics, datasetMetrics, metri
   const expected = expectedTotal / objects;
 
   return {
+    kind: 'scalar',
     observed,
     expected,
     delta: relativeToBaseline(observed, expected),

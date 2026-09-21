@@ -46,6 +46,17 @@ export const createCalibrationSlice = (set) => ({
     state.calibration.error = null;
   }),
 
+  /**
+   * The server-derived preview table for the current image.
+   *
+   * Kept beside the entries it arrived with rather than derived from them: the
+   * table describes the whole pixel pipeline, not any one kind, and deriving it
+   * here would mean reimplementing the correction in the client.
+   */
+  setPixelLut: (lut) => set((state) => {
+    state.calibration.pixelLut = Array.isArray(lut) && lut.length === 3 ? lut : null;
+  }),
+
   setCalibrationLoading: (loading) => set((state) => {
     state.calibration.loading = !!loading;
   }),
@@ -172,6 +183,10 @@ export const createCalibrationSlice = (set) => ({
    */
   resetCalibrationForImage: () => set((state) => {
     state.calibration.entries = [];
+    // Cleared with the entries, not left to be overwritten by the next fetch:
+    // a stale table would spend that fetch painting this image with the previous
+    // image's correction.
+    state.calibration.pixelLut = null;
     state.calibration.pending = {};
     state.calibration.wedge = emptyWedge();
     state.calibration.activePick = null;

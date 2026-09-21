@@ -54,6 +54,41 @@ const singleLabelRow = {
   labels: [{ labelId: '1', name: 'Coral', count: 2, imageMean: 12, datasetMean: 12, delta: 0 }],
 };
 
+const colorRow = {
+  metricKey: 'mean_color_lab',
+  label: 'Mean color (CIELAB)',
+  space: 'opencv_lab',
+  image: { mean: 128, unit: null },
+  comparison: {
+    kind: 'color',
+    observed: { L: 50, a: 40, b: -30 },
+    expected: { L: 52, a: 2, b: 4 },
+    deltaE: 34.6,
+    space: 'opencv_lab',
+    count: 4,
+    droppedLabels: 0,
+    labels: [],
+  },
+  labels: [
+    {
+      labelId: '1',
+      name: 'Coral',
+      count: 3,
+      observed: { L: 50, a: 40, b: -30 },
+      expected: { L: 52, a: 2, b: 4 },
+      deltaE: 34.6,
+    },
+    {
+      labelId: '2',
+      name: 'Polyp',
+      count: 1,
+      observed: { L: 60, a: 1, b: 1 },
+      expected: { L: 60, a: 1, b: 1 },
+      deltaE: 0.4,
+    },
+  ],
+};
+
 const setMeasurements = (overrides = {}) => {
   measurements.current = {
     rows: [areaRow],
@@ -207,6 +242,70 @@ describe('ReviewDrawer', () => {
       vi.spyOn(annotationSelectors, 'useObjectsList').mockReturnValue([]);
       render(<ReviewDrawer />);
       expect(screen.getByText(/No object is more than 2σ/)).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * A percentage on a colour is not a quantity — the channels are signed and
+   * cross zero. These pin the perceptual presentation in its place.
+   */
+  describe('colour metrics', () => {
+    it('reports a perceptual difference, not a percentage', () => {
+      setMeasurements({ rows: [colorRow] });
+      render(<ReviewDrawer />);
+      expect(screen.getByText('ΔE 34.6')).toBeInTheDocument();
+      expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+    });
+
+    // The measured numbers are in an encoding nobody reads by eye, and the whole
+    // claim is about how the two look.
+    it('shows the measured colour beside the expected one', () => {
+      setMeasurements({ rows: [colorRow] });
+      render(<ReviewDrawer />);
+      expect(screen.getByTitle('This image')).toBeInTheDocument();
+      expect(screen.getByTitle("Expected for this image's labels")).toBeInTheDocument();
+    });
+
+    it('never prints a raw channel mean as if it were the colour', () => {
+      setMeasurements({ rows: [colorRow] });
+      render(<ReviewDrawer />);
+      expect(screen.queryByText('128')).not.toBeInTheDocument();
+    });
+
+    it('explains the scale it is using', () => {
+      setMeasurements({ rows: [colorRow] });
+      render(<ReviewDrawer />);
+      expect(
+        screen.getByTitle(/CIEDE2000 colour difference.*very different.*threshold of a visible/s)
+      ).toBeInTheDocument();
+    });
+
+    it('gives each label its own difference in the breakdown', () => {
+      setMeasurements({ rows: [colorRow] });
+      render(<ReviewDrawer />);
+      fireEvent.click(screen.getByRole('button', { name: /Mean color/ }));
+      expect(screen.getByText('ΔE 0.4')).toBeInTheDocument();
+      expect(screen.getAllByText('ΔE 34.6')).toHaveLength(2);
+    });
+
+    it('withholds the difference when there is nothing to compare against', () => {
+      setMeasurements({
+        rows: [{
+          ...colorRow,
+          comparison: { ...colorRow.comparison, expected: null, deltaE: null },
+          labels: [],
+        }],
+      });
+      render(<ReviewDrawer />);
+      expect(screen.queryByText(/ΔE/)).not.toBeInTheDocument();
+      expect(screen.getByTitle('This image')).toBeInTheDocument();
+    });
+
+    it('still renders scalar rows proportionally alongside', () => {
+      setMeasurements({ rows: [areaRow, colorRow] });
+      render(<ReviewDrawer />);
+      expect(screen.getByText('-20.0 %')).toBeInTheDocument();
+      expect(screen.getByText('ΔE 34.6')).toBeInTheDocument();
     });
   });
 

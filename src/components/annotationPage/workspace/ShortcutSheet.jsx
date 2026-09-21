@@ -40,6 +40,7 @@ const GROUPS = [
       { keys: '⌥2', label: 'Toggle the side panel' },
       { keys: 'T', label: 'Label chips — all / selected only / off' },
       { keys: 'O', label: 'Outlines — filled / no fill / hairline' },
+      { keys: 'C', label: 'Calibrated / raw colours (calibrated images only)' },
       { keys: '`', label: 'Hold to hide every outline and see the bare image' },
       { keys: 'space', label: 'Hold to pan' },
       { keys: '?', label: 'This sheet' },

@@ -15,6 +15,7 @@ import {
   formatDelta,
   formatMeasurement,
 } from '../../../utils/perImageQuantification';
+import { describeDeltaE, labToCss } from '../../../utils/colorDifference';
 import {
   useObjectsList,
   useSelectedObjects,
@@ -58,6 +59,56 @@ const DeltaValue = ({ delta, title }) => (
 );
 
 /**
+ * The measured colour beside the expected one.
+ *
+ * Two swatches rather than three numbers, because the numbers are in an
+ * encoding nobody reads by eye — and the whole claim is about how they look.
+ */
+const ColorPair = ({ observed, expected }) => (
+  <span className="inline-flex items-center gap-[2px] flex-none">
+    <span
+      className="w-[11px] h-[11px] rounded-[3px] border border-ln2"
+      style={{ background: observed ? labToCss(observed) : 'transparent' }}
+      title="This image"
+    />
+    {expected && (
+      <span
+        className="w-[11px] h-[11px] rounded-[3px] border border-ln2 opacity-70"
+        style={{ background: labToCss(expected) }}
+        title="Expected for this image's labels"
+      />
+    )}
+  </span>
+);
+
+/**
+ * A colour difference, on its own scale.
+ *
+ * Left-anchored rather than centred: unlike a percentage a CIEDE2000 distance is
+ * unsigned — there is no "below the dataset" colour — so a midpoint would mean
+ * nothing. The track runs to 10, past which the two are already unmistakably
+ * different and the exact figure stops mattering.
+ */
+const DELTA_E_FULL_SCALE = 10;
+
+const DeltaEBar = ({ value }) => {
+  const width = Math.min(1, value / DELTA_E_FULL_SCALE) * 100;
+  return (
+    <div className="relative flex-1 h-[4px] rounded-full bg-well overflow-hidden">
+      {/* The just-noticeable threshold, so the bar says where "different" starts. */}
+      <span
+        className="absolute inset-y-0 w-px bg-ln2"
+        style={{ left: `${(1 / DELTA_E_FULL_SCALE) * 100}%` }}
+      />
+      <span
+        className={`absolute inset-y-0 left-0 ${value >= 2 ? 'bg-warn' : 'bg-ac'}`}
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
+};
+
+/**
  * One metric: what this image measures, and how that sits against the dataset.
  *
  * The headline compares like with like — the dataset's figures for the labels
@@ -68,13 +119,18 @@ const DeltaValue = ({ delta, title }) => (
 const MetricRow = ({ row }) => {
   const [open, setOpen] = useState(false);
   const comparison = row.comparison;
-  const value = comparison?.observed ?? row.image?.mean ?? null;
-  const delta = comparison?.delta ?? null;
+  const isColor = comparison?.kind === 'color';
   const unit = comparison?.unit || row.image?.unit;
   // One list, named once: the breakdown below and the count in the tooltip are
   // the same claim, and reading them from two places invites them to disagree.
   const labels = row.labels || [];
   const canExpand = labels.length > 1;
+
+  const mixNote =
+    `for this image's mix of ${labels.length} label${labels.length === 1 ? '' : 's'}`
+    + (comparison?.droppedLabels
+      ? ` — ${comparison.droppedLabels} label(s) on this image have no dataset figure and are excluded`
+      : '');
 
   return (
     <div className="flex flex-col gap-[3px]">
@@ -98,24 +154,45 @@ const MetricRow = ({ row }) => {
         >
           {row.label}
         </span>
-        <span className="font-mono text-ctl text-t1 tabular-nums">
-          {formatMeasurement(value)}
-        </span>
-        {unit && <span className="text-meta text-t3">{unit}</span>}
+
+        {isColor ? (
+          <ColorPair observed={comparison.observed} expected={comparison.expected} />
+        ) : (
+          <>
+            <span className="font-mono text-ctl text-t1 tabular-nums">
+              {formatMeasurement(comparison?.observed ?? row.image?.mean ?? null)}
+            </span>
+            {unit && <span className="text-meta text-t3">{unit}</span>}
+          </>
+        )}
       </button>
 
-      {delta != null && (
+      {isColor && comparison.deltaE != null && (
         <div className="flex items-center gap-[6px] pl-[17px]">
-          <DeltaBar delta={delta} />
+          <DeltaEBar value={comparison.deltaE} />
+          <span
+            className={`w-[52px] text-right font-mono text-meta tabular-nums flex-none ${
+              comparison.deltaE >= 2 ? 'text-warn' : 'text-t3'
+            }`}
+            title={
+              `CIEDE2000 colour difference from the colour expected ${mixNote}`
+              + ` — ${describeDeltaE(comparison.deltaE)}. About 1 is the threshold`
+              + ' of a visible difference.'
+            }
+          >
+            {`ΔE ${comparison.deltaE.toFixed(1)}`}
+          </span>
+        </div>
+      )}
+
+      {!isColor && comparison?.delta != null && (
+        <div className="flex items-center gap-[6px] pl-[17px]">
+          <DeltaBar delta={comparison.delta} />
           <DeltaValue
-            delta={delta}
+            delta={comparison.delta}
             title={
               `Expected ${formatMeasurement(comparison.expected)}${unit ? ` ${unit}` : ''} `
-              + `for this image's mix of ${labels.length} `
-              + `label${labels.length === 1 ? '' : 's'}`
-              + (comparison.droppedLabels
-                ? ` — ${comparison.droppedLabels} label(s) on this image have no dataset figure and are excluded`
-                : '')
+              + mixNote
             }
           />
         </div>
@@ -131,14 +208,33 @@ const MetricRow = ({ row }) => {
                 {entry.name}
                 <span className="text-t3 opacity-70">{` ×${entry.count}`}</span>
               </span>
-              <span className="font-mono text-meta text-t2 tabular-nums">
-                {formatMeasurement(entry.imageMean)}
-              </span>
-              {entry.delta != null && (
-                <DeltaValue
-                  delta={entry.delta}
-                  title={`Dataset mean for ${entry.name}: ${formatMeasurement(entry.datasetMean)}`}
-                />
+
+              {isColor ? (
+                <>
+                  <ColorPair observed={entry.observed} expected={entry.expected} />
+                  {entry.deltaE != null && (
+                    <span
+                      className={`w-[52px] text-right font-mono text-meta tabular-nums flex-none ${
+                        entry.deltaE >= 2 ? 'text-warn' : 'text-t3'
+                      }`}
+                      title={`${entry.name}: ${describeDeltaE(entry.deltaE)} against the dataset`}
+                    >
+                      {`ΔE ${entry.deltaE.toFixed(1)}`}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <span className="font-mono text-meta text-t2 tabular-nums">
+                    {formatMeasurement(entry.imageMean)}
+                  </span>
+                  {entry.delta != null && (
+                    <DeltaValue
+                      delta={entry.delta}
+                      title={`Dataset mean for ${entry.name}: ${formatMeasurement(entry.datasetMean)}`}
+                    />
+                  )}
+                </>
               )}
             </div>
           ))}

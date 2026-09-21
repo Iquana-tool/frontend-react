@@ -10,6 +10,8 @@ import {
   perLabelMetric,
   pickFeaturedMetric,
   relativeToBaseline,
+  perLabelMetricVector,
+  standardizedColorComparison,
   standardizedMetricComparison,
 } from './perImageQuantification';
 
@@ -509,5 +511,106 @@ describe("standardizedMetricComparison", () => {
   it("returns null when the metric is not measured on the image", () => {
     expect(standardizedMetricComparison({ 1: entry(1, 100) }, dataset, "perimeter")).toBeNull();
     expect(standardizedMetricComparison({}, dataset, "area")).toBeNull();
+  });
+});
+
+describe("perLabelMetricVector", () => {
+  const colour = (count, means) => ({
+    mean_color_lab: { unit: null, components: means.map((mean) => ({ count, mean })) },
+  });
+
+  // The scalar helpers take components[0], which on a colour is the L channel
+  // alone — "mean colour" silently reduced to "mean lightness".
+  it("keeps every channel, not just the first", () => {
+    expect(perLabelMetricVector({ 1: colour(4, [120, 130, 140]) }, "mean_color_lab")).toEqual([
+      { labelId: "1", count: 4, means: [120, 130, 140] },
+    ]);
+  });
+
+  it("skips labels that measured nothing", () => {
+    expect(perLabelMetricVector({ 1: colour(0, [1, 2, 3]) }, "mean_color_lab")).toEqual([]);
+    expect(perLabelMetricVector({ 1: {} }, "mean_color_lab")).toEqual([]);
+    expect(perLabelMetricVector(null, "mean_color_lab")).toEqual([]);
+  });
+});
+
+/**
+ * A colour is compared perceptually, not proportionally: see colorDifference for
+ * why a percentage on a channel is not a quantity at all.
+ */
+describe("standardizedColorComparison", () => {
+  const colour = (count, means) => ({
+    mean_color_lab: { components: means.map((mean) => ({ count, mean })) },
+  });
+  // Mid grey in OpenCV's packing: L 128 of 255, a and b at the 128 origin.
+  const grey = [128, 128, 128];
+
+  it("reports no difference when the image matches the dataset", () => {
+    const metrics = { 1: colour(3, grey) };
+    const result = standardizedColorComparison(metrics, metrics, "mean_color_lab", "opencv_lab");
+    expect(result.deltaE).toBeCloseTo(0, 10);
+    expect(result.kind).toBe("color");
+  });
+
+  it("measures a real shift in CIEDE2000 units", () => {
+    const image = { 1: colour(3, [128, 160, 100]) };
+    const dataset = { 1: colour(30, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.deltaE).toBeGreaterThan(10);
+    // Both sides converted, not compared in the packed encoding.
+    expect(result.observed.a).toBe(32);
+    expect(result.expected.a).toBe(0);
+  });
+
+  it("weights the expected colour by the image's own label mix", () => {
+    const image = { 1: colour(1, grey), 2: colour(3, grey) };
+    const dataset = { 1: colour(50, [255, 128, 128]), 2: colour(50, [0, 128, 128]) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    // Three parts black to one part white, in the packed L: 255/4 = 63.75.
+    expect(result.expected.L).toBeCloseTo((63.75 / 255) * 100, 6);
+  });
+
+  it("gives each label its own difference, busiest first", () => {
+    const image = { 1: colour(1, grey), 2: colour(5, [128, 190, 128]) };
+    const dataset = { 1: colour(9, grey), 2: colour(9, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.labels.map((row) => row.labelId)).toEqual(["2", "1"]);
+    expect(result.labels[0].deltaE).toBeGreaterThan(5);
+    expect(result.labels[1].deltaE).toBeCloseTo(0, 10);
+  });
+
+  it("drops a label the dataset has no colour for", () => {
+    const image = { 1: colour(2, grey), 99: colour(2, [255, 200, 40]) };
+    const dataset = { 1: colour(9, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.droppedLabels).toBe(1);
+    expect(result.deltaE).toBeCloseTo(0, 10);
+  });
+
+  it("keeps the measured colour but withholds the difference when nothing is shared", () => {
+    const result = standardizedColorComparison(
+      { 99: colour(2, grey) }, { 1: colour(9, grey) }, "mean_color_lab", "opencv_lab"
+    );
+    expect(result.observed).not.toBeNull();
+    expect(result.expected).toBeNull();
+    expect(result.deltaE).toBeNull();
+  });
+
+  it("converts sRGB through its own path", () => {
+    const image = { 1: { mean_color_rgb: { components: [255, 255, 255].map((mean) => ({ count: 1, mean })) } } };
+    const dataset = { 1: { mean_color_rgb: { components: [0, 0, 0].map((mean) => ({ count: 9, mean })) } } };
+    const result = standardizedColorComparison(image, dataset, "mean_color_rgb", "srgb");
+    expect(result.observed.L).toBeCloseTo(100, 4);
+    expect(result.expected.L).toBeCloseTo(0, 4);
+    expect(result.deltaE).toBeGreaterThan(90);
+  });
+
+  it("refuses to guess at a space it was not given", () => {
+    const metrics = { 1: colour(1, grey) };
+    expect(standardizedColorComparison(metrics, metrics, "mean_color_lab", null)).toBeNull();
+  });
+
+  it("returns null when the metric is not on the image", () => {
+    expect(standardizedColorComparison({}, {}, "mean_color_lab", "opencv_lab")).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import {
   Menu as MenuIcon,
   Minus,
   Moon,
+  Palette,
   PanelLeft,
   PanelRight,
   Plus,
@@ -39,6 +40,7 @@ import { PHASES, getStateDescriptor, phaseIconClass, stateLabel } from '../../..
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clampZoom } from './constants';
 import { CHIP_MODE_LABELS } from '../canvas/chipLayout';
 import { OUTLINE_PRESET_LABELS } from '../../../utils/outlineSettings';
+import { useCalibratedColorPreview } from '../canvas/CalibratedColorFilter';
 import {
   useAnnotationStatus,
   usePhaseStatus,
@@ -48,6 +50,7 @@ import {
   useCycleChipMode,
   useOutlinePreset,
   useCycleOutlinePreset,
+  useToggleCalibratedColors,
   useSetPanOffset,
   useWorkspaceMode,
   useSetWorkspaceMode,
@@ -105,6 +108,8 @@ const TopToolbar = () => {
   const cycleChipMode = useCycleChipMode();
   const outlinePreset = useOutlinePreset();
   const cycleOutlinePreset = useCycleOutlinePreset();
+  const toggleCalibratedColors = useToggleCalibratedColors();
+  const calibratedColors = useCalibratedColorPreview();
   const setPanOffset = useSetPanOffset();
 
   const mode = useWorkspaceMode();
@@ -386,6 +391,26 @@ const TopToolbar = () => {
           active={outlinePreset !== 'fill'}
           onClick={cycleOutlinePreset}
         />
+        {/* Only rendered on an image that has a colour calibration to show. A
+            permanently dead switch on every uncalibrated image would say the
+            correction is missing, when the honest answer is that there is nothing
+            to correct with. */}
+        {calibratedColors.available && (
+          <ToolbarButton
+            icon={Palette}
+            label={
+              calibratedColors.suppressed
+                ? 'Raw colours while sampling a reference'
+                : calibratedColors.enabled
+                  ? 'Calibrated colours'
+                  : 'Raw colours'
+            }
+            shortcut="C"
+            active={calibratedColors.active}
+            disabled={calibratedColors.suppressed}
+            onClick={toggleCalibratedColors}
+          />
+        )}
       </Group>
 
       {/* Calibrate / Annotate / Review.

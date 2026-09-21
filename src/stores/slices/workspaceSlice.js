@@ -209,6 +209,17 @@ export const createWorkspaceSlice = (set) => ({
     state.workspace.chipMode = mode;
   }),
 
+  /**
+   * Show the image as calibrated, or as it came off the camera.
+   *
+   * Purely what the canvas draws. Nothing measured moves with it — the metrics
+   * are computed from corrected pixels either way — so this switch answers
+   * "what did the calibration do?", never "what is measured?".
+   */
+  toggleCalibratedColors: () => set((state) => {
+    state.workspace.calibratedColors = !state.workspace.calibratedColors;
+  }),
+
   // Cycled rather than toggled: on a dense image the useful middle setting is
   // "only what I am pointing at", and a two-state switch would skip it.
   cycleChipMode: () => set((state) => {
