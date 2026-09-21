@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { MODE_STORAGE_KEY, readStoredMode } from './workspaceSlice';
+import {
+  MODE_STORAGE_KEY,
+  REFINEMENT_TOOL_STORAGE_KEY,
+  readStoredMode,
+  readStoredRefinementTool,
+} from './workspaceSlice';
 import useAnnotationStore from '../useAnnotationStore';
 
 /**
@@ -38,5 +43,44 @@ describe('workspace mode persistence', () => {
     window.localStorage.setItem(MODE_STORAGE_KEY, 'review');
     const { default: store } = await import('../useAnnotationStore?fresh-mode');
     expect(store.getState().workspace.mode).toBe('review');
+  });
+});
+
+/**
+ * "Whatever was last selected stays selected" is the whole point of the refinement
+ * tool switch, so the choice has to outlive the object, the image and the reload.
+ */
+describe('refinement tool persistence', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  test('defaults to the AI tool when nothing has been stored', () => {
+    expect(readStoredRefinementTool()).toBe('ai');
+  });
+
+  test('restores a previously stored tool', () => {
+    window.localStorage.setItem(REFINEMENT_TOOL_STORAGE_KEY, 'draw');
+    expect(readStoredRefinementTool()).toBe('draw');
+  });
+
+  test('falls back to the AI tool on an unrecognised stored value', () => {
+    window.localStorage.setItem(REFINEMENT_TOOL_STORAGE_KEY, 'lasso');
+    expect(readStoredRefinementTool()).toBe('ai');
+  });
+
+  test('setRefinementTool persists the choice and ignores anything else', () => {
+    useAnnotationStore.getState().setRefinementTool('points');
+    expect(useAnnotationStore.getState().workspace.refinementTool).toBe('points');
+    expect(window.localStorage.getItem(REFINEMENT_TOOL_STORAGE_KEY)).toBe('points');
+
+    useAnnotationStore.getState().setRefinementTool('lasso');
+    expect(useAnnotationStore.getState().workspace.refinementTool).toBe('points');
+  });
+
+  test('the store starts on the stored tool', async () => {
+    window.localStorage.setItem(REFINEMENT_TOOL_STORAGE_KEY, 'draw');
+    const { default: store } = await import('../useAnnotationStore?fresh-refinement-tool');
+    expect(store.getState().workspace.refinementTool).toBe('draw');
   });
 });

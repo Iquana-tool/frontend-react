@@ -145,7 +145,8 @@ const CalibrationRailButton = ({ entry, active, onSelect }) => {
  * side rather than in the panel that lists what has been annotated.
  */
 const ToolRail = () => {
-  const { railTool, setRailTool, promptAction, changePromptAction } = useRailTools();
+  const { railTool, setRailTool, railDisabledReason, promptAction, changePromptAction } =
+    useRailTools();
   const supported = useSupportedPromptTypes();
   const leftDrawerOpen = useLeftDrawerOpen();
   const toggleLeftDrawer = useToggleLeftDrawer();
@@ -188,7 +189,8 @@ const ToolRail = () => {
             tool={tool}
             active={railTool === tool.id}
             unsupportedReason={
-              shapeUnavailableForAction(tool.id, promptAction)
+              railDisabledReason
+              || shapeUnavailableForAction(tool.id, promptAction)
               // The model can only veto a tool where drawing with it runs the
               // model. Otherwise the shape may be destined for "Add this
               // object", and the Run AI button is the one that says no.

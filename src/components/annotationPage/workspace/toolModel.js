@@ -220,8 +220,8 @@ export const shapeUnavailableForAction = (railTool, promptAction) => {
 
 /**
  * Derives the rail selection from the underlying store state, so the rail
- * highlights correctly even when a tool is changed from elsewhere (the context
- * menu's "Reshape by line" switches to 'selection', for example).
+ * highlights correctly even when a tool is changed from elsewhere (Refinement
+ * mode's geometry tools switch to 'selection', for example).
  */
 export const railToolFromStore = ({ currentTool, promptMode, manualDrawMode }) => {
   switch (currentTool) {

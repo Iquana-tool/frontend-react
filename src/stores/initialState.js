@@ -1,4 +1,5 @@
 import { DEFAULT_OUTLINE } from '../utils/outlineSettings';
+import { DEFAULT_REFINEMENT_TOOL } from '../utils/refinementTools';
 
 /**
  * Initial state for the annotation store
@@ -41,6 +42,12 @@ export const initialState = {
     activeLabelId: null,
     /** Hover is shared between the canvas and the object rows so both highlight. */
     hoveredObjectId: null,
+    /**
+     * Which of the three refinement tools is armed — see utils/refinementTools.
+     * Persisted, so the way an annotator fixes outlines is chosen once rather
+     * than on every object.
+     */
+    refinementTool: DEFAULT_REFINEMENT_TOOL, // 'ai' | 'points' | 'draw'
     /** Which floating picker is open above the action bar, if any. */
     picker: null,               // 'label' | 'model' | 'reject' | 'parent' | 'more' | null
     /** Shortcut cheat-sheet overlay. Other modals keep their own local state. */

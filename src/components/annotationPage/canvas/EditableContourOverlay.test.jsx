@@ -275,10 +275,9 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
     expect(mockScheduleAutoSave).toHaveBeenCalledTimes(1);
   });
 
-  it.each([false, true])('drags the nearest vertex with touch and suppresses the resulting tap (refinement: %s)', (refinementModeActive) => {
+  it('drags the nearest vertex with touch and suppresses the resulting tap', () => {
     vi.spyOn(annotationSelectors, 'useEditModeVertices').mockReturnValue(uncrowdedVertices);
     vi.spyOn(annotationSelectors, 'useEditModeDraftCoordinates').mockReturnValue(uncrowdedVertices);
-    vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(refinementModeActive);
 
     render(<EditableContourOverlay canvasRef={canvasRef} zoomLevel={1} />);
     const stageProps = capturedStages[capturedStages.length - 1];
@@ -505,53 +504,6 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
     expect(mockScheduleAutoSave).toHaveBeenCalled();
   });
 
-  it('forwards wheel events to underlying canvas during refinement mode', () => {
-    vi.spyOn(annotationSelectors, 'useEditModeVertices').mockReturnValue(uncrowdedVertices);
-    vi.spyOn(annotationSelectors, 'useEditModeDraftCoordinates').mockReturnValue(uncrowdedVertices);
-    vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(true);
-
-    const mockElementBelow = document.createElement('div');
-    const dispatchSpy = vi.spyOn(mockElementBelow, 'dispatchEvent');
-    const origElementFromPoint = document.elementFromPoint;
-    document.elementFromPoint = vi.fn().mockReturnValue(mockElementBelow);
-
-    try {
-      capturedStages = [];
-      render(<EditableContourOverlay canvasRef={canvasRef} zoomLevel={3} />);
-
-      expect(capturedStages.length).toBe(2);
-      const pointsStageProps = capturedStages[1];
-      expect(typeof pointsStageProps.onWheel).toBe('function');
-
-      const mockPreventDefault = vi.fn();
-      act(() => {
-        pointsStageProps.onWheel({
-          evt: {
-            type: 'wheel',
-            clientX: 400,
-            clientY: 300,
-            deltaY: -100,
-            deltaX: 0,
-            deltaZ: 0,
-            deltaMode: 0,
-            preventDefault: mockPreventDefault,
-          },
-        });
-      });
-
-      expect(mockPreventDefault).toHaveBeenCalled();
-      expect(dispatchSpy).toHaveBeenCalledTimes(1);
-      const forwardedEvent = dispatchSpy.mock.calls[0][0];
-      expect(forwardedEvent).toBeInstanceOf(WheelEvent);
-      expect(forwardedEvent.type).toBe('wheel');
-      expect(forwardedEvent.deltaY).toBe(-100);
-      expect(forwardedEvent.clientX).toBe(400);
-      expect(forwardedEvent.clientY).toBe(300);
-    } finally {
-      document.elementFromPoint = origElementFromPoint;
-    }
-  });
-
   it('forwards wheel events during single-stage edit mode', () => {
     vi.spyOn(annotationSelectors, 'useEditModeVertices').mockReturnValue(uncrowdedVertices);
     vi.spyOn(annotationSelectors, 'useEditModeDraftCoordinates').mockReturnValue(uncrowdedVertices);
@@ -594,10 +546,9 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
     }
   });
 
-  it('forwards mousedown and does not drag vertex during space-to-pan in refinement mode', () => {
+  it('forwards mousedown and does not drag vertex during space-to-pan', () => {
     vi.spyOn(annotationSelectors, 'useEditModeVertices').mockReturnValue(uncrowdedVertices);
     vi.spyOn(annotationSelectors, 'useEditModeDraftCoordinates').mockReturnValue(uncrowdedVertices);
-    vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(true);
 
     const mockElementBelow = document.createElement('div');
     const dispatchSpy = vi.spyOn(mockElementBelow, 'dispatchEvent');
@@ -613,18 +564,18 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
         window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
       });
 
-      const pointsStageProps = capturedStages[capturedStages.length - 1];
-      expect(pointsStageProps.className).toContain('cursor-grab');
+      const stageProps = capturedStages[capturedStages.length - 1];
+      expect(stageProps.className).toContain('cursor-grab');
 
       // Mousedown on handle 0 forwards the event for pan and does not move vertex
       act(() => {
-        pointsStageProps.onMouseDown(createStageEvent({ x: 80, y: 60 }, {
+        stageProps.onMouseDown(createStageEvent({ x: 80, y: 60 }, {
           type: 'mousedown',
           button: 0,
           clientX: 80,
           clientY: 60,
         }));
-        pointsStageProps.onMouseMove(createStageEvent({ x: 90, y: 70 }, {
+        stageProps.onMouseMove(createStageEvent({ x: 90, y: 70 }, {
           type: 'mousemove',
           button: 0,
           clientX: 90,
@@ -648,7 +599,6 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
   it('forwards middle-click mouse events for panning even when space is not pressed', () => {
     vi.spyOn(annotationSelectors, 'useEditModeVertices').mockReturnValue(uncrowdedVertices);
     vi.spyOn(annotationSelectors, 'useEditModeDraftCoordinates').mockReturnValue(uncrowdedVertices);
-    vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(true);
 
     const mockElementBelow = document.createElement('div');
     const dispatchSpy = vi.spyOn(mockElementBelow, 'dispatchEvent');
@@ -659,11 +609,11 @@ describe('EditableContourOverlay stage-level nearest-vertex interaction', () => 
       capturedStages = [];
       render(<EditableContourOverlay canvasRef={canvasRef} zoomLevel={1} />);
 
-      const pointsStageProps = capturedStages[1];
+      const stageProps = capturedStages[0];
 
       // Middle-click (button === 1) over a handle
       act(() => {
-        pointsStageProps.onMouseDown(createStageEvent({ x: 80, y: 60 }, {
+        stageProps.onMouseDown(createStageEvent({ x: 80, y: 60 }, {
           type: 'mousedown',
           button: 1,
           clientX: 200,

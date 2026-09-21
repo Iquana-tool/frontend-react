@@ -382,7 +382,7 @@ const ObjectsTab = () => {
                   onAssignLabel={() => openLabelPicker([object])}
                   onDiscard={() => actions.remove(object)}
                   onSendBack={() => setSendBackFor(object)}
-                  onEditContour={() => actions.editContour(object)}
+                  onRefine={() => actions.refine(object)}
                   onDelete={() =>
                     setConfirm({
                       title: 'Delete this object?',

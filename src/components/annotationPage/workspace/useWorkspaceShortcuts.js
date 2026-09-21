@@ -30,7 +30,11 @@ import {
   useCycleOutlinePreset,
   useSetOutlinePeek,
   useToggleCalibratedColors,
+  useRefinementModeActive,
+  useRefinementTool,
 } from '../../../stores/selectors/annotationSelectors';
+import useRefinementSession from '../../../hooks/useRefinementSession';
+import { nextRefinementTool } from '../../../utils/refinementTools';
 import { useCalibratedColorPreview } from '../canvas/CalibratedColorFilter';
 
 /** Held to take the annotation layer off the image. @see the peek effect below. */
@@ -77,6 +81,9 @@ export default function useWorkspaceShortcuts() {
   const toggleCalibratedColors = useToggleCalibratedColors();
   const calibratedColors = useCalibratedColorPreview();
   const setOutlinePeek = useSetOutlinePeek();
+  const refinementActive = useRefinementModeActive();
+  const refinementTool = useRefinementTool();
+  const { switchRefinementTool } = useRefinementSession();
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -106,8 +113,11 @@ export default function useWorkspaceShortcuts() {
 
       // A shortcut must not reach a tool the current mode's rail does not offer —
       // otherwise `P` would arm the point tool in Calibrate mode, where the rail
-      // deliberately has no shape tools at all.
+      // deliberately has no shape tools at all. Refinement mode goes further and
+      // takes the whole rail (see useRailTools), so its keys fall through here to
+      // the actions below rather than being swallowed by a pick that cannot land.
       const inThisMode = railTool
+        && !refinementActive
         && railToolsForMode(mode).some((tool) => tool.id === railTool);
 
       // A shape the current prompt action does not offer is disabled on the
@@ -157,9 +167,15 @@ export default function useWorkspaceShortcuts() {
           }
           break;
         case 'E':
-          if (selected) {
+          // One key for one job: open Refinement mode on the selected object,
+          // then step through its three tools. It used to open the contour
+          // editor directly, which is now the `points` tool inside that mode.
+          if (refinementActive) {
             event.preventDefault();
-            actions.editContour(selected);
+            switchRefinementTool(nextRefinementTool(refinementTool));
+          } else if (selected) {
+            event.preventDefault();
+            actions.refine(selected);
           }
           break;
         case 'X':
@@ -226,6 +242,9 @@ export default function useWorkspaceShortcuts() {
     selectedIds,
     objects,
     actions,
+    refinementActive,
+    refinementTool,
+    switchRefinementTool,
     focusModeActive,
     exitFocusMode,
     cycleChipMode,

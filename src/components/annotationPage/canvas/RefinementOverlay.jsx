@@ -1,115 +1,78 @@
 import React, { useEffect, useCallback } from 'react';
 import ModeBanner from '../workspace/ModeBanner';
+import RefinementToolSwitch from './RefinementToolSwitch';
 import {
   useRefinementModeActive,
   useRefinementModeObjectId,
-  useExitRefinementMode,
   useObjectsList,
-  useSetZoomLevel,
-  useSetPanOffset,
-  useExitEditMode,
-  useEditModeActive,
-  useUpdateObject,
 } from '../../../stores/selectors/annotationSelectors';
-import useAnnotationStore from '../../../stores/useAnnotationStore';
-import annotationSession from '../../../services/annotationSession';
+import useRefinementSession from '../../../hooks/useRefinementSession';
+import { getRefinementTool } from '../../../utils/refinementTools';
 
+/**
+ * Refinement mode's chrome: which object is being fixed, which of the three
+ * tools is armed, and the way out.
+ *
+ * The overlay owns the mode. Each tool's canvas (the prompt canvas, the
+ * control-point overlay, the line canvas) renders itself when its own state is
+ * live, but none of them decides when the mode ends — Escape and the exit button
+ * both go through `useRefinementSession`, which saves whatever the live tool is
+ * holding before it lets go.
+ */
 const RefinementOverlay = () => {
   const refinementModeActive = useRefinementModeActive();
   const refinementModeObjectId = useRefinementModeObjectId();
-  const exitRefinementMode = useExitRefinementMode();
-  const setZoomLevel = useSetZoomLevel();
-  const setPanOffset = useSetPanOffset();
   const objectsList = useObjectsList();
-  const exitEditMode = useExitEditMode();
-  const editModeActive = useEditModeActive();
-  const updateObject = useUpdateObject();
 
-  // Find the object being refined
-  const refinementObject = refinementModeActive && refinementModeObjectId
-    ? objectsList.find(obj => obj.id === refinementModeObjectId)
+  const { refinementTool, switchRefinementTool, exitRefinement } = useRefinementSession();
+
+  const refinementObject = refinementModeActive && refinementModeObjectId != null
+    ? objectsList.find((object) => object.id === refinementModeObjectId)
     : null;
 
-  /**
-   * Save any pending edit-mode changes, then exit edit mode.
-   * Reads the latest state directly from the store to avoid stale closures.
-   */
-  const saveAndExitEdit = useCallback(() => {
-    const { editMode, objects } = useAnnotationStore.getState();
-    if (!editMode.active) return;
-
-    if (editMode.isDirty && editMode.draftCoordinates && editMode.objectId) {
-      const editObj = objects.list.find(o => o.id === editMode.objectId);
-      if (editObj) {
-        updateObject(editMode.objectId, {
-          x: [...editMode.draftCoordinates.x],
-          y: [...editMode.draftCoordinates.y],
-          path: null,
-        });
-        annotationSession
-          .modifyObject(editMode.contourId, { x: editMode.draftCoordinates.x, y: editMode.draftCoordinates.y })
-          .catch(err => console.error('Save on exit refinement failed:', err));
-      }
-    }
-    exitEditMode();
-  }, [exitEditMode, updateObject]);
-
-  const handleExitRefinementMode = useCallback(async () => {
-    try {
-      // Save any pending contour edits before leaving
-      saveAndExitEdit();
-
-      // Send unselect message to backend
-      await annotationSession.unselectRefinementObject();
-      
-      // Reset zoom and pan
-      setZoomLevel(1);
-      setPanOffset({ x: 0, y: 0 });
-      
-      // Exit refinement mode in store
-      exitRefinementMode();
-    } catch (error) {
-      console.error('Failed to exit refinement mode:', error);
-      alert(`Failed to exit refinement mode: ${error.message || 'Unknown error'}`);
-    }
-  }, [saveAndExitEdit, exitRefinementMode, setZoomLevel, setPanOffset]);
-
-  // Handle Escape key to exit refinement mode (and save edits)
+  // Escape leaves the whole mode, not just the armed tool. The listener is in the
+  // capture phase and stops immediate propagation so the tool canvases below —
+  // which each handle Escape when they are used on their own — do not also act on
+  // it and tear half the mode down.
   useEffect(() => {
-    if (!refinementModeActive) return;
+    if (!refinementModeActive) return undefined;
 
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        // Prevent EditableContourOverlay from also handling Escape
-        e.stopImmediatePropagation();
-        handleExitRefinementMode();
-      }
+    const handleKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      event.stopImmediatePropagation();
+      exitRefinement();
     };
 
-    // Use capture phase so this fires before EditableContourOverlay's bubble-phase listener
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [refinementModeActive, handleExitRefinementMode]);
+  }, [refinementModeActive, exitRefinement]);
+
+  const handleExit = useCallback(() => { exitRefinement(); }, [exitRefinement]);
 
   if (!refinementModeActive || !refinementObject) {
     return null;
   }
 
-  // Sits above the control-points overlay (z65) so the exit control receives
-  // clicks instead of dropping a prompt on the canvas beneath it.
+  const editable = refinementObject.contour_id != null && refinementObject.x?.length > 0;
+
+  // Sits above the control-points overlay (z65) so the exit control and the tool
+  // switch receive clicks instead of dropping a prompt on the canvas beneath them.
   return (
-    <ModeBanner
-      title="Refinement Mode"
-      subject={refinementObject.label || `Object #${refinementObject.id}`}
-      hint={
-        editModeActive
-          ? 'Drag the control points, or add prompts and run the model'
-          : 'Add prompts and run the model to refine this outline'
-      }
-      dotClass="bg-ac"
-      exitLabel="Exit refinement"
-      onExit={handleExitRefinementMode}
-    />
+    <>
+      <ModeBanner
+        title="Refinement Mode"
+        subject={refinementObject.label || `Object #${refinementObject.id}`}
+        hint={getRefinementTool(refinementTool).hint}
+        dotClass="bg-ac"
+        exitLabel="Exit refinement"
+        onExit={handleExit}
+      />
+      <RefinementToolSwitch
+        value={refinementTool}
+        onChange={switchRefinementTool}
+        geometryDisabled={!editable}
+      />
+    </>
   );
 };
 

@@ -20,12 +20,21 @@ import { nearestEdge } from '../../../utils/contourEditing';
  * `draftCoordinates`) plus a handful of draggable **control vertices**. Drag a
  * vertex to reshape, click the outline to add a vertex where you need finer
  * control, double-click a vertex to remove it. All geometry is normalized [0,1].
+ *
+ * This is Refinement mode's `points` tool, and also stands on its own wherever a
+ * contour is edited outside that mode. It used to have a second rendering path
+ * for refinement, which split the outline and the handles across two stages so
+ * the AI prompt canvas could sit between them and receive clicks. That path is
+ * gone with the tool switch: the prompt canvas and the handles are now two tools
+ * that take turns, never two layers competing for the same pointer.
  */
 const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const editModeActive = useEditModeActive();
   const draftCoordinates = useEditModeDraftCoordinates();
   const vertices = useEditModeVertices();
   const imageObject = useImageObject();
+  // Only to decide whose hint is on screen — Refinement mode's banner already
+  // names this tool's gestures, and its Esc saves rather than discards.
   const refinementModeActive = useRefinementModeActive();
 
   const moveVertex = useMoveVertex();
@@ -37,11 +46,8 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, x: 0, y: 0 });
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const containerRef = useRef(null);
-  const pointsWrapperRef = useRef(null);
-  // Konva Stage nodes, so their backing-store resolution can track the zoom.
+  // Konva Stage node, so its backing-store resolution can track the zoom.
   const singleStageRef = useRef(null);
-  const pointsStageRef = useRef(null);
-  const lineStageRef = useRef(null);
 
   // Keep the overlay crisp when zoomed. The wrapper is CSS-scaled by `zoomLevel`,
   // which would upscale (blur) a fixed-resolution canvas — so bump each Konva
@@ -61,9 +67,7 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
       }
     };
     apply(singleStageRef.current);
-    apply(pointsStageRef.current);
-    apply(lineStageRef.current);
-  }, [zoomLevel, editModeActive, refinementModeActive]);
+  }, [zoomLevel, editModeActive]);
 
   // Calculate rendered image dimensions
   useEffect(() => {
@@ -119,9 +123,10 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     if (!editModeActive) return;
 
     const handleKeyDown = (e) => {
-      // Escape: discard changes and exit — but only when NOT in refinement mode.
-      // In refinement mode, RefinementOverlay owns the Escape key (it saves + exits both modes).
-      if (e.key === 'Escape' && !refinementModeActive) {
+      // Escape: discard changes and exit. In Refinement mode this listener never
+      // sees the key — RefinementOverlay takes it in the capture phase and leaves
+      // the whole mode, saving first.
+      if (e.key === 'Escape') {
         e.preventDefault();
         cancelAutoSave();
         cancelEditing();
@@ -136,7 +141,7 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editModeActive, refinementModeActive, cancelEditing, resetChanges, cancelAutoSave]);
+  }, [editModeActive, cancelEditing, resetChanges, cancelAutoSave]);
 
   // --- Space-to-pan tracking ---
   const [spacePressed, setSpacePressed] = useState(false);
@@ -181,17 +186,16 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     };
   }, [editModeActive, spacePressed]);
 
-  // --- Event forwarding for refinement mode ---
-  // In refinement mode the control-points Stage sits at z-65, above the AIPromptCanvas at z-62.
-  // A full-screen Konva canvas captures ALL pointer events, blocking prompt placement and wheel zoom.
-  // Fix: when an event lands on the Stage background or is a wheel/pan gesture, temporarily
-  // disable pointer-events on this canvas and re-dispatch the native event to whatever element
-  // is actually below — i.e. the AIPromptCanvas Stage (or the main canvas).
+  // --- Event forwarding ---
+  // A full-screen Konva canvas captures ALL pointer events, including the wheel
+  // and the pan gestures the viewport below needs. Fix: for those gestures,
+  // temporarily hide this canvas and re-dispatch the native event to whatever
+  // element is actually underneath.
   const forwardedMouseDownRef = useRef(false);
   const forwardedTargetRef = useRef(null);
 
   const forwardNativeEvent = useCallback((nativeEvent) => {
-    const wrapper = refinementModeActive ? pointsWrapperRef.current : containerRef.current;
+    const wrapper = containerRef.current;
     if (!wrapper) return;
 
     let elementBelow;
@@ -231,7 +235,7 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
       screenX: nativeEvent.screenX ?? 0,
       screenY: nativeEvent.screenY ?? 0,
     } : nativeEvent));
-  }, [refinementModeActive, canvasRef]);
+  }, [canvasRef]);
 
   // --- Stage-level nearest-vertex drag & pan state ---
   const activeVertexRef = useRef(null);
@@ -314,22 +318,6 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
 
     return nearest;
   }, [findNearestHandle]);
-
-  const handlePointsStageMouseDown = useCallback((e) => {
-    const isPanAction = e.evt?.button === 1 || (e.evt?.button === 0 && spacePressed);
-    if (isPanAction || (e.evt?.button != null && e.evt.button !== 0)) {
-      forwardedMouseDownRef.current = true;
-      forwardNativeEvent(e.evt);
-      return;
-    }
-    const nearest = armNearestVertex(e);
-    if (nearest) {
-      forwardedMouseDownRef.current = false;
-    } else {
-      forwardedMouseDownRef.current = true;
-      forwardNativeEvent(e.evt);
-    }
-  }, [armNearestVertex, forwardNativeEvent, spacePressed]);
 
   const handleSingleStageMouseDown = useCallback((e) => {
     const isPanAction = e.evt?.button === 1 || (e.evt?.button === 0 && spacePressed);
@@ -423,15 +411,6 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     }
   }, [forwardNativeEvent]);
 
-  // Prevent browser context menu; forward right-click events so the AIPromptCanvas
-  // can synthesise its own Konva click (button=2) and add a negative prompt.
-  const handlePointsStageContextMenu = useCallback((e) => {
-    e.evt.preventDefault();
-    if (e.target === e.target.getStage()) {
-      forwardNativeEvent(e.evt);
-    }
-  }, [forwardNativeEvent]);
-
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault();
     forwardNativeEvent(e.evt);
@@ -520,49 +499,8 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
     </Layer>
   );
 
-  // In refinement mode: line below (z-55, non-interactive) so prompt canvas (z-62) can receive clicks; points above (z-65) so they remain draggable
-  if (refinementModeActive) {
-    return (
-      <>
-        <div
-          ref={containerRef}
-          className="absolute inset-0 pointer-events-none"
-          style={{ ...transformStyle, zIndex: 55 }}
-        >
-          <Stage {...stageProps} listening={false} ref={lineStageRef}>
-            {lineLayer}
-          </Stage>
-        </div>
-        <div
-          ref={pointsWrapperRef}
-          className="absolute inset-0 pointer-events-none"
-          style={{ ...transformStyle, zIndex: 65 }}
-        >
-          <Stage
-            {...stageProps}
-            ref={pointsStageRef}
-            className={spacePressed ? 'cursor-grab pointer-events-auto' : 'pointer-events-auto'}
-            onMouseDown={handlePointsStageMouseDown}
-            onMouseMove={handleStageMouseMove}
-            onMouseUp={handleStageMouseUp}
-            onMouseLeave={handleStageMouseLeave}
-            onTouchStart={handleStageTouchStart}
-            onTouchMove={handleStageTouchMove}
-            onTouchEnd={handleStageTouchEnd}
-            onDblClick={handleStageDblClick}
-            onContextMenu={handlePointsStageContextMenu}
-            onWheel={handleWheel}
-          >
-            {pointsLayer}
-          </Stage>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
-      {/* Single overlay when not in refinement mode */}
       <div
         ref={containerRef}
         className="absolute inset-0 pointer-events-none"
@@ -589,12 +527,16 @@ const EditableContourOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, 
         </Stage>
       </div>
 
-      {/* Discoverability hint for the insert/delete gestures. */}
-      <div
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[62] pointer-events-none px-3 py-1.5 rounded-lg bg-scrim text-white text-xs font-medium shadow-lg backdrop-blur-sm"
-      >
-        Drag a point to reshape · Click the outline to add a point · Double-click a point to remove · Esc to discard
-      </div>
+      {/* Discoverability hint for the insert/delete gestures. Suppressed inside
+          Refinement mode, where the banner carries the same hint and Esc leaves
+          the mode (saving) rather than discarding this edit. */}
+      {!refinementModeActive && (
+        <div
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[62] pointer-events-none px-3 py-1.5 rounded-lg bg-scrim text-white text-xs font-medium shadow-lg backdrop-blur-sm"
+        >
+          Drag a point to reshape · Click the outline to add a point · Double-click a point to remove · Esc to discard
+        </div>
+      )}
     </>
   );
 };

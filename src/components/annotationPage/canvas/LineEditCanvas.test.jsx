@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   onFinalize: null,
   objects: [],
   polygonPoints: [{ x: 12, y: 12 }],
+  refinementModeActive: false,
   resetDrawing: vi.fn(),
   setMode: vi.fn(),
   stopLineEdit: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock('../../../stores/selectors/annotationSelectors', () => ({
   useLineEditObjectId: () => 1,
   useLineEditOriginal: () => ({ x: [0, 0.2, 0.2], y: [0, 0, 0.2] }),
   useManualDrawMode: () => mocks.mode,
+  useRefinementModeActive: () => mocks.refinementModeActive,
   useObjectsList: () => mocks.objects,
   usePanOffset: () => ({ x: 0, y: 0 }),
   useSetManualDrawMode: () => mocks.setMode,
@@ -118,6 +120,7 @@ describe('LineEditCanvas mode controls', () => {
       y: [0.1, 0.1, 0.5],
     }];
     mocks.mode = 'polygon';
+    mocks.refinementModeActive = false;
     mocks.polygonPoints = [{ x: 12, y: 12 }];
     mocks.mergeLineIntoContour.mockReturnValue([
       { x: 20, y: 20 },
@@ -174,6 +177,21 @@ describe('LineEditCanvas mode controls', () => {
 
     expect(mocks.stopLineEdit).toHaveBeenCalledOnce();
     expect(mocks.drawKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('gives up its banner and its Escape key inside Refinement mode', () => {
+    // There it is one of three tools, not a mode: RefinementOverlay carries the
+    // banner and the exit, and Escape leaves the whole mode rather than this tool.
+    mocks.refinementModeActive = true;
+    mocks.drawKeyDown.mockReturnValue(true);
+    render(<LineEditCanvas />);
+
+    expect(screen.queryByRole('button', { name: /Exit reshape/ })).not.toBeInTheDocument();
+    // The stroke choice is this canvas's own, so it stays.
+    expect(screen.getByRole('button', { name: 'Polygon drawing mode' })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
+    expect(mocks.stopLineEdit).not.toHaveBeenCalled();
   });
 
   it('does not let a late save failure overwrite a newer edit', async () => {
