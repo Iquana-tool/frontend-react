@@ -10,6 +10,7 @@ import {
   perLabelMetric,
   pickFeaturedMetric,
   relativeToBaseline,
+  standardizedMetricComparison,
 } from './perImageQuantification';
 
 /**
@@ -427,5 +428,86 @@ describe("findMetricOutliers", () => {
       const unusable = { metricKey: "area", mean: 20, std: 0, byLabel: {} };
       expect(findMetricOutliers([labelled(1, 1, 100)], unusable)).toEqual([]);
     });
+  });
+});
+
+/**
+ * The correction that makes a per-image comparison mean anything on a
+ * hierarchy. Labels here: 1 is a parent class, 2 the small children inside it.
+ */
+describe("standardizedMetricComparison", () => {
+  const entry = (count, mean) => ({ area: { unit: "cm", components: [{ count, mean }] } });
+
+  // Dataset: 10 parents averaging 100, 200 children averaging 5. Pooled mean is
+  // about 9.5, because children dominate the population.
+  const dataset = { 1: entry(10, 100), 2: entry(200, 5) };
+
+  it("does not punish an image for carrying only the larger class", () => {
+    // Three perfectly typical parents. Naively this is +950 % against the pooled
+    // mean; standardized it is zero, which is the true answer.
+    const image = { 1: entry(3, 100) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.observed).toBe(100);
+    expect(result.expected).toBe(100);
+    expect(result.delta).toBe(0);
+  });
+
+  it("still reports an image whose objects are atypical for their own class", () => {
+    const image = { 1: entry(3, 150) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBe(100);
+    expect(result.delta).toBeCloseTo(0.5);
+  });
+
+  it("weights the expectation by the image's own mix", () => {
+    // One parent and one child: expected is the mean of 100 and 5.
+    const image = { 1: entry(1, 100), 2: entry(1, 5) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBeCloseTo(52.5);
+    expect(result.observed).toBeCloseTo(52.5);
+    expect(result.delta).toBeCloseTo(0);
+  });
+
+  it("counts objects, not labels, when weighting", () => {
+    // Nine children and one parent should sit near the child mean.
+    const image = { 1: entry(1, 100), 2: entry(9, 5) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBeCloseTo(14.5);
+    expect(result.count).toBe(10);
+  });
+
+  // Including a label on one side only is exactly the bias this corrects.
+  it("drops a label the dataset cannot price, from both sides", () => {
+    const image = { 1: entry(2, 100), 99: entry(2, 9999) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.droppedLabels).toBe(1);
+    expect(result.observed).toBe(100);
+    expect(result.expected).toBe(100);
+    expect(result.labels.map((row) => row.labelId)).toEqual(["1"]);
+  });
+
+  it("keeps the value but withholds the comparison when nothing is shared", () => {
+    const result = standardizedMetricComparison({ 99: entry(2, 40) }, dataset, "area");
+    expect(result.observed).toBe(40);
+    expect(result.expected).toBeNull();
+    expect(result.delta).toBeNull();
+    expect(result.droppedLabels).toBe(1);
+  });
+
+  it("reports each label's own comparison, busiest first", () => {
+    const image = { 1: entry(2, 120), 2: entry(8, 4) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.labels.map((row) => row.labelId)).toEqual(["2", "1"]);
+    expect(result.labels[0].delta).toBeCloseTo(-0.2);
+    expect(result.labels[1].delta).toBeCloseTo(0.2);
+  });
+
+  it("carries the unit through", () => {
+    expect(standardizedMetricComparison({ 1: entry(1, 100) }, dataset, "area").unit).toBe("cm");
+  });
+
+  it("returns null when the metric is not measured on the image", () => {
+    expect(standardizedMetricComparison({ 1: entry(1, 100) }, dataset, "perimeter")).toBeNull();
+    expect(standardizedMetricComparison({}, dataset, "area")).toBeNull();
   });
 });

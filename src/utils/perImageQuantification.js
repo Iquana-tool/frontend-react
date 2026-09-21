@@ -279,6 +279,100 @@ export const formatDelta = (fraction) => {
 };
 
 /**
+ * One metric compared against the dataset, corrected for what is on the image.
+ *
+ * The naive comparison — this image's mean against the dataset's — is only
+ * honest when the image's mix of labels matches the dataset's, and on a
+ * hierarchy it never does. An image carrying three parent contours is measured
+ * against a population that is mostly the small children inside such parents,
+ * and reads several hundred percent high for no reason but its composition.
+ *
+ * So the baseline is standardized to this image: each label contributes the
+ * dataset's mean for *that* label, weighted by how many of that label this image
+ * actually has. `expected` is then what this image would measure if every object
+ * on it were typical for its class, and the delta against `observed` says the
+ * one thing worth knowing — whether this image is unusual given what is on it.
+ *
+ * Both sides are summed over the same labels. A label the dataset has no figure
+ * for is dropped from `observed` as well as `expected`, because including it on
+ * one side only would reintroduce exactly the bias this corrects; `droppedLabels`
+ * reports how many, so a caller can say so rather than quietly narrowing the
+ * claim.
+ *
+ * @param {Object} imageMetrics - The image-scoped summary's `metrics` mapping.
+ * @param {Object} datasetMetrics - The dataset-wide summary's `metrics` mapping.
+ * @param {string} metricKey
+ * @returns {{observed: number, expected: number|null, delta: number|null,
+ *   unit: string|null, count: number, droppedLabels: number,
+ *   labels: Array<{labelId, count, imageMean, datasetMean, delta}>}|null}
+ */
+export const standardizedMetricComparison = (imageMetrics, datasetMetrics, metricKey) => {
+  const onImage = perLabelMetric(imageMetrics, metricKey);
+  if (!onImage.length) return null;
+
+  const inDataset = new Map(
+    perLabelMetric(datasetMetrics, metricKey).map((row) => [String(row.labelId), row])
+  );
+
+  const shared = [];
+  let dropped = 0;
+  for (const row of onImage) {
+    const reference = inDataset.get(String(row.labelId));
+    if (reference && Number.isFinite(reference.mean)) shared.push({ row, reference });
+    else dropped += 1;
+  }
+
+  const unit = onImage[0].unit || null;
+
+  // Nothing on this image has a counterpart in the dataset — a one-image dataset,
+  // or labels used nowhere else. The value still stands; the comparison does not.
+  if (!shared.length) {
+    const fallback = aggregateMetric(imageMetrics, metricKey);
+    return {
+      observed: fallback.mean,
+      expected: null,
+      delta: null,
+      unit: fallback.unit || unit,
+      count: fallback.count,
+      droppedLabels: dropped,
+      labels: [],
+    };
+  }
+
+  let objects = 0;
+  let observedTotal = 0;
+  let expectedTotal = 0;
+  for (const { row, reference } of shared) {
+    objects += row.count;
+    observedTotal += row.count * row.mean;
+    expectedTotal += row.count * reference.mean;
+  }
+
+  const observed = observedTotal / objects;
+  const expected = expectedTotal / objects;
+
+  return {
+    observed,
+    expected,
+    delta: relativeToBaseline(observed, expected),
+    unit,
+    count: objects,
+    droppedLabels: dropped,
+    // Descending by how much of the image each label accounts for, so the label
+    // driving the headline number is the first one read.
+    labels: shared
+      .map(({ row, reference }) => ({
+        labelId: String(row.labelId),
+        count: row.count,
+        imageMean: row.mean,
+        datasetMean: reference.mean,
+        delta: relativeToBaseline(row.mean, reference.mean),
+      }))
+      .sort((a, b) => b.count - a.count),
+  };
+};
+
+/**
  * Objects on this image whose measurement sits far from the dataset's.
  *
  * The companion to {@link relativeToBaseline} one level down: that says whether

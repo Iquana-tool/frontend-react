@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getMetricsCatalog, getQuantificationSummary } from '../../../api/quantifications';
-import { buildMetricCatalogMap } from '../../../utils/quantificationUtils';
+import {
+  buildMetricCatalogMap,
+  createLabelIdToNameMap,
+} from '../../../utils/quantificationUtils';
 import {
   aggregateAllMetrics,
   aggregateMetric,
   pickFeaturedMetric,
+  standardizedMetricComparison,
 } from '../../../utils/perImageQuantification';
 import { useCurrentImageId } from '../../../stores/selectors/annotationSelectors';
 
@@ -83,23 +87,42 @@ export default function useImageMeasurements({ enabled = true } = {}) {
     [state.catalog]
   );
 
+  /** Label id → name, for the per-label breakdown under a row. */
+  const labelNames = useMemo(
+    () => (state.image?.labels ? createLabelIdToNameMap(state.image.labels) : {}),
+    [state.image]
+  );
+
   /**
-   * One row per metric measured on this image, each carrying the dataset's
-   * aggregate for the same metric so the drawer can render the comparison
-   * without reaching back into either response.
+   * One row per metric measured on this image, already compared.
+   *
+   * The comparison is standardized to the image's own label mix rather than
+   * being this image's mean against the dataset's — see
+   * standardizedMetricComparison for why the naive version reads several
+   * hundred percent high on a hierarchy. Each row also carries the per-label
+   * figures behind its headline, so the drawer can show which label is driving
+   * it without a second pass over the responses.
    */
   const rows = useMemo(() => {
     if (!state.image?.metrics) return [];
-    return aggregateAllMetrics(state.image.metrics, catalogMap).map(({ metricKey }) => ({
-      metricKey,
-      label: catalogMap[metricKey]?.name || metricKey,
-      tier: catalogMap[metricKey]?.tier || null,
-      image: aggregateMetric(state.image.metrics, metricKey),
-      dataset: state.dataset?.metrics
-        ? aggregateMetric(state.dataset.metrics, metricKey)
-        : null,
-    }));
-  }, [state.image, state.dataset, catalogMap]);
+    return aggregateAllMetrics(state.image.metrics, catalogMap).map(({ metricKey }) => {
+      const comparison = state.dataset?.metrics
+        ? standardizedMetricComparison(state.image.metrics, state.dataset.metrics, metricKey)
+        : null;
+      const image = aggregateMetric(state.image.metrics, metricKey);
+      return {
+        metricKey,
+        label: catalogMap[metricKey]?.name || metricKey,
+        tier: catalogMap[metricKey]?.tier || null,
+        image,
+        comparison,
+        labels: (comparison?.labels || []).map((entry) => ({
+          ...entry,
+          name: labelNames[entry.labelId] || `Label ${entry.labelId}`,
+        })),
+      };
+    });
+  }, [state.image, state.dataset, catalogMap, labelNames]);
 
   /**
    * The metric the outlier scan runs on.

@@ -1,5 +1,12 @@
-import React, { useMemo } from 'react';
-import { AlertTriangle, ChevronLeft, Loader2, Ruler, TriangleAlert } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Ruler,
+  TriangleAlert,
+} from 'lucide-react';
 import useImageMeasurements from './useImageMeasurements';
 import { getObjectDisplayName } from './objectViewModel';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
@@ -7,7 +14,6 @@ import {
   findMetricOutliers,
   formatDelta,
   formatMeasurement,
-  relativeToBaseline,
 } from '../../../utils/perImageQuantification';
 import {
   useObjectsList,
@@ -21,51 +27,121 @@ import {
 /** Deviations from the dataset mean before an object is worth pointing at. */
 const OUTLIER_THRESHOLD = 2;
 
-/**
- * One metric: what this image measures, and how that sits against the dataset.
- *
- * The bar is centred on the dataset mean rather than growing from zero, because
- * the question is not "how big" but "how far off" — a bar that fills half its
- * track says nothing until you know where the middle is.
- */
-const MetricRow = ({ row }) => {
-  const value = row.image?.mean ?? null;
-  const baseline = row.dataset?.mean ?? null;
-  const delta = relativeToBaseline(value, baseline);
-
+/** A centred bar: how far from the baseline, not how big. */
+const DeltaBar = ({ delta }) => {
   // Clamped at ±100 %: past that the bar has made its point, and letting one
-  // extreme image rescale the track would flatten every other row to nothing.
-  const offset = delta == null ? 0 : Math.max(-1, Math.min(1, delta));
+  // extreme value rescale the track would flatten every other row to nothing.
+  const offset = Math.max(-1, Math.min(1, delta));
   const width = Math.abs(offset) * 50;
   const high = offset > 0;
 
   return (
+    <div className="relative flex-1 h-[4px] rounded-full bg-well overflow-hidden">
+      <span className="absolute inset-y-0 left-1/2 w-px bg-ln2" />
+      <span
+        className={`absolute inset-y-0 ${high ? 'bg-warn' : 'bg-ac'}`}
+        style={{ left: high ? '50%' : `${50 - width}%`, width: `${width}%` }}
+      />
+    </div>
+  );
+};
+
+const DeltaValue = ({ delta, title }) => (
+  <span
+    className={`w-[52px] text-right font-mono text-meta tabular-nums flex-none ${
+      Math.abs(delta) >= 0.25 ? 'text-warn' : 'text-t3'
+    }`}
+    title={title}
+  >
+    {formatDelta(delta)}
+  </span>
+);
+
+/**
+ * One metric: what this image measures, and how that sits against the dataset.
+ *
+ * The headline compares like with like — the dataset's figures for the labels
+ * this image actually carries, weighted by how many of each it has. Expanding
+ * shows those per-label figures, which is where a surprising headline usually
+ * explains itself.
+ */
+const MetricRow = ({ row }) => {
+  const [open, setOpen] = useState(false);
+  const comparison = row.comparison;
+  const value = comparison?.observed ?? row.image?.mean ?? null;
+  const delta = comparison?.delta ?? null;
+  const unit = comparison?.unit || row.image?.unit;
+  // One list, named once: the breakdown below and the count in the tooltip are
+  // the same claim, and reading them from two places invites them to disagree.
+  const labels = row.labels || [];
+  const canExpand = labels.length > 1;
+
+  return (
     <div className="flex flex-col gap-[3px]">
-      <div className="flex items-baseline gap-[6px]">
-        <span className="flex-1 text-meta text-t2 truncate" title={row.label}>{row.label}</span>
+      <button
+        type="button"
+        disabled={!canExpand}
+        onClick={() => setOpen((current) => !current)}
+        className="flex items-baseline gap-[6px] text-left group disabled:cursor-default"
+      >
+        {canExpand ? (
+          <ChevronRight
+            size={11}
+            className={`text-t3 flex-none transition-transform ${open ? 'rotate-90' : ''}`}
+          />
+        ) : (
+          <span className="w-[11px] flex-none" />
+        )}
+        <span
+          className={`flex-1 text-meta text-t2 truncate ${canExpand ? 'group-hover:text-t1' : ''}`}
+          title={row.label}
+        >
+          {row.label}
+        </span>
         <span className="font-mono text-ctl text-t1 tabular-nums">
           {formatMeasurement(value)}
         </span>
-        {row.image?.unit && <span className="text-meta text-t3">{row.image.unit}</span>}
-      </div>
+        {unit && <span className="text-meta text-t3">{unit}</span>}
+      </button>
 
       {delta != null && (
-        <div className="flex items-center gap-[6px]">
-          <div className="relative flex-1 h-[4px] rounded-full bg-well overflow-hidden">
-            <span className="absolute inset-y-0 left-1/2 w-px bg-ln2" />
-            <span
-              className={`absolute inset-y-0 ${high ? 'bg-warn' : 'bg-ac'}`}
-              style={{ left: high ? '50%' : `${50 - width}%`, width: `${width}%` }}
-            />
-          </div>
-          <span
-            className={`w-[52px] text-right font-mono text-meta tabular-nums ${
-              Math.abs(delta) >= 0.25 ? 'text-warn' : 'text-t3'
-            }`}
-            title={`Dataset mean ${formatMeasurement(baseline)}${row.dataset?.unit ? ` ${row.dataset.unit}` : ''}`}
-          >
-            {formatDelta(delta)}
-          </span>
+        <div className="flex items-center gap-[6px] pl-[17px]">
+          <DeltaBar delta={delta} />
+          <DeltaValue
+            delta={delta}
+            title={
+              `Expected ${formatMeasurement(comparison.expected)}${unit ? ` ${unit}` : ''} `
+              + `for this image's mix of ${labels.length} `
+              + `label${labels.length === 1 ? '' : 's'}`
+              + (comparison.droppedLabels
+                ? ` — ${comparison.droppedLabels} label(s) on this image have no dataset figure and are excluded`
+                : '')
+            }
+          />
+        </div>
+      )}
+
+      {/* Where a headline explains itself: on a hierarchy the parents and the
+          children usually disagree, and the aggregate hides which is which. */}
+      {open && (
+        <div className="pl-[17px] flex flex-col gap-[3px] mt-[2px]">
+          {labels.map((entry) => (
+            <div key={entry.labelId} className="flex items-center gap-[6px]">
+              <span className="flex-1 text-meta text-t3 truncate" title={entry.name}>
+                {entry.name}
+                <span className="text-t3 opacity-70">{` ×${entry.count}`}</span>
+              </span>
+              <span className="font-mono text-meta text-t2 tabular-nums">
+                {formatMeasurement(entry.imageMean)}
+              </span>
+              {entry.delta != null && (
+                <DeltaValue
+                  delta={entry.delta}
+                  title={`Dataset mean for ${entry.name}: ${formatMeasurement(entry.datasetMean)}`}
+                />
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -150,7 +226,10 @@ const ReviewDrawer = () => {
 
         {rows.length > 0 && (
           <div className="flex flex-col gap-[9px]">
-            <span className="text-sect font-bold tracking-[.08em] uppercase text-t3">
+            <span
+              className="text-sect font-bold tracking-[.08em] uppercase text-t3"
+              title="Against the dataset's figures for the labels on this image, weighted by how many of each it carries"
+            >
               This image vs dataset
             </span>
             {rows.map((row) => <MetricRow key={row.metricKey} row={row} />)}
