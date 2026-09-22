@@ -10,6 +10,8 @@ import {
   useRefinementModeActive,
   useEditModeActive,
   useLineEditActive,
+  useCalibrationEntries,
+  useActiveCalibrationKind,
 } from '../../../stores/selectors/annotationSelectors';
 import { isReviewed } from './objectViewModel';
 import { ADDABLE_PROMPT_TYPES } from './toolModel';
@@ -37,6 +39,8 @@ export default function useActionBarState() {
   const refinementActive = useRefinementModeActive();
   const editActive = useEditModeActive();
   const lineEditActive = useLineEditActive();
+  const calibrationEntries = useCalibrationEntries();
+  const activeCalibrationKind = useActiveCalibrationKind();
 
   return useMemo(() => {
     const selection = objects.filter((object) => selectedIds.includes(object.id));
@@ -64,6 +68,24 @@ export default function useActionBarState() {
 
     if (mode === 'review') {
       return { state: 'review', selection, reviewQueue };
+    }
+
+    // Calibrate had no state of its own, so it fell through to the prompt/idle
+    // branches and the bar offered a model and a prompt action for work that
+    // involves neither — "Ready to annotate", on the one tab where annotating is
+    // not what you are doing.
+    //
+    // The entries come from the server's calibration registry rather than a list
+    // here, so a kind added server-side gets its button without a client change.
+    if (mode === 'calibrate') {
+      return {
+        state: 'calibrate',
+        selection,
+        reviewQueue,
+        calibrations: calibrationEntries,
+        activeCalibration:
+          calibrationEntries.find((entry) => entry.kind === activeCalibrationKind) || null,
+      };
     }
 
     // One prompt state, two possible actions: the bar offers Run AI always and
@@ -95,5 +117,7 @@ export default function useActionBarState() {
     refinementActive,
     editActive,
     lineEditActive,
+    calibrationEntries,
+    activeCalibrationKind,
   ]);
 }

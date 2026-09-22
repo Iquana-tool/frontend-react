@@ -4,6 +4,7 @@ import ObjectRow from './ObjectRow';
 import ObjectStatsPopover from './ObjectStatsPopover';
 import LabelPicker from './LabelPicker';
 import VisibilitySection from './VisibilitySection';
+import OutlineSection from './OutlineSection';
 import ConfirmDialog from './ConfirmDialog';
 import useObjectActions from './useObjectActions';
 import useLabelAssignment from './useLabelAssignment';
@@ -266,6 +267,8 @@ const ObjectsTab = () => {
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 min-h-0 overflow-y-auto px-[8px] pt-[9px] pb-[12px] flex flex-col gap-[9px]">
         <VisibilitySection />
+
+        <OutlineSection />
 
         <div className="h-px bg-ln" />
 

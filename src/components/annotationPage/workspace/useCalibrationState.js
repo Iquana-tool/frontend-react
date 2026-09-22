@@ -26,6 +26,7 @@ import {
   useSetCalibrationKinds,
   useSetCalibrationLoading,
   useSetImageScale,
+  useSetPixelLut,
   useSetPhaseStatus,
   useSetWedgeSample,
   useSetWedgeSampling,
@@ -61,6 +62,7 @@ export default function useCalibrationState() {
   const sampleRadius = useSampleRadius();
 
   const setEntries = useSetCalibrationEntries();
+  const setPixelLut = useSetPixelLut();
   const setLoading = useSetCalibrationLoading();
   const setError = useSetCalibrationError();
   const clearPending = useClearPendingSamples();
@@ -114,6 +116,7 @@ export default function useCalibrationState() {
     try {
       const data = await fetchImageCalibrations(currentImageId);
       setEntries(data.calibrations);
+      setPixelLut(data.pixel_lut);
       mirrorScaleIntoImageState(data.calibrations);
       mirrorCalibratePhase(data);
       setLoading(false);
@@ -122,8 +125,8 @@ export default function useCalibrationState() {
       setError(err.message || 'Could not load calibrations.');
       return null;
     }
-  }, [currentImageId, setEntries, setLoading, setError, mirrorScaleIntoImageState,
-      mirrorCalibratePhase]);
+  }, [currentImageId, setEntries, setPixelLut, setLoading, setError,
+      mirrorScaleIntoImageState, mirrorCalibratePhase]);
 
   /** Report how many stored measurements a change flagged for recomputation. */
   const reportInvalidated = useCallback((result, prefix) => {

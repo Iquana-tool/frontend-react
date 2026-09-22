@@ -3,12 +3,16 @@ import {
   aggregateMetric,
   aggregateMetricEntry,
   countMeasuredObjects,
+  findMetricOutliers,
   formatDelta,
   frameCoverage,
   isAdditiveMetric,
   perLabelMetric,
   pickFeaturedMetric,
   relativeToBaseline,
+  perLabelMetricVector,
+  standardizedColorComparison,
+  standardizedMetricComparison,
 } from './perImageQuantification';
 
 /**
@@ -291,5 +295,322 @@ describe('countMeasuredObjects', () => {
     };
     expect(countMeasuredObjects(metrics)).toBe(7);
     expect(countMeasuredObjects(metrics, { includeUnlabeled: false })).toBe(5);
+  });
+});
+
+describe("findMetricOutliers", () => {
+  const object = (id, area) => ({ id, quantification: { area } });
+  const baseline = { metricKey: "area", mean: 100, std: 10 };
+
+  it("flags objects beyond the threshold in either direction", () => {
+    const found = findMetricOutliers(
+      [object(1, 100), object(2, 130), object(3, 70), object(4, 105)],
+      baseline
+    );
+    expect(found.map((row) => row.object.id)).toEqual([2, 3]);
+    expect(found[0].z).toBeCloseTo(3);
+    expect(found[1].z).toBeCloseTo(-3);
+  });
+
+  it("orders by distance, worst first, regardless of sign", () => {
+    const found = findMetricOutliers([object(1, 125), object(2, 60)], baseline);
+    expect(found.map((row) => row.object.id)).toEqual([2, 1]);
+  });
+
+  it("honours a custom threshold", () => {
+    const objects = [object(1, 115)];
+    expect(findMetricOutliers(objects, baseline)).toHaveLength(0);
+    expect(findMetricOutliers(objects, baseline, { threshold: 1 })).toHaveLength(1);
+  });
+
+  // One distinct value across the dataset makes every deviation infinite; that
+  // is a statement about the dataset, not about these objects.
+  it("flags nothing when the dataset has no spread", () => {
+    expect(findMetricOutliers([object(1, 999)], { ...baseline, std: 0 })).toEqual([]);
+    expect(findMetricOutliers([object(1, 999)], { ...baseline, std: null })).toEqual([]);
+  });
+
+  it("returns nothing without a usable baseline", () => {
+    expect(findMetricOutliers([object(1, 999)], null)).toEqual([]);
+    expect(findMetricOutliers([object(1, 999)], { metricKey: "area", std: 10 })).toEqual([]);
+  });
+
+  it("skips objects that never measured the metric", () => {
+    const found = findMetricOutliers(
+      [{ id: 1 }, { id: 2, quantification: {} }, object(3, 200)],
+      baseline
+    );
+    expect(found.map((row) => row.object.id)).toEqual([3]);
+  });
+
+  // Area predates the quantification payload on some objects; the pixel count is
+  // the same measurement under an older name.
+  it("falls back to pixelCount for area", () => {
+    const found = findMetricOutliers([{ id: 7, pixelCount: 200 }], baseline);
+    expect(found).toHaveLength(1);
+    expect(found[0].value).toBe(200);
+  });
+
+  it("does not use pixelCount for any other metric", () => {
+    const found = findMetricOutliers([{ id: 7, pixelCount: 200 }], {
+      metricKey: "perimeter",
+      mean: 100,
+      std: 10,
+    });
+    expect(found).toEqual([]);
+  });
+
+  it("tolerates an empty or missing object list", () => {
+    expect(findMetricOutliers([], baseline)).toEqual([]);
+    expect(findMetricOutliers(undefined, baseline)).toEqual([]);
+  });
+
+  /**
+   * The hierarchy case this exists for: a parent contour pooled with the dozens
+   * of small children inside it reads as an outlier on every image, which flags
+   * everything and therefore says nothing.
+   */
+  describe("per-label baselines", () => {
+    const labelled = (id, labelId, area) => ({ id, labelId, quantification: { area } });
+    // Parents average 100, children 10; pooling them puts the mean between.
+    const nested = {
+      metricKey: "area",
+      mean: 20,
+      std: 5,
+      byLabel: {
+        1: { mean: 100, std: 10 },
+        2: { mean: 10, std: 2 },
+      },
+    };
+
+    it("clears an object that is normal for its own label", () => {
+      // 105 is +17 sigma against the pooled mean and +0.5 against its label's.
+      expect(findMetricOutliers([labelled(1, 1, 105)], nested)).toEqual([]);
+    });
+
+    it("still catches one that is abnormal for its own label", () => {
+      const found = findMetricOutliers([labelled(1, 1, 140)], nested);
+      expect(found).toHaveLength(1);
+      expect(found[0].z).toBeCloseTo(4);
+      expect(found[0].scope).toBe("1");
+    });
+
+    it("judges each label against its own distribution", () => {
+      const found = findMetricOutliers(
+        [labelled(1, 1, 100), labelled(2, 2, 10), labelled(3, 2, 30)],
+        nested
+      );
+      expect(found.map((row) => row.object.id)).toEqual([3]);
+    });
+
+    it("falls back to the pooled figures for a label with no baseline", () => {
+      const found = findMetricOutliers([labelled(1, 99, 100)], nested);
+      expect(found).toHaveLength(1);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("matches label ids across number and string forms", () => {
+      expect(findMetricOutliers([labelled(1, "1", 105)], nested)).toEqual([]);
+    });
+
+    it("falls back for an unlabelled object", () => {
+      const found = findMetricOutliers([{ id: 1, quantification: { area: 100 } }], nested);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("ignores a label baseline with no spread", () => {
+      const flat = { ...nested, byLabel: { 1: { mean: 100, std: 0 } } };
+      const found = findMetricOutliers([labelled(1, 1, 100)], flat);
+      // Falls through to the pooled figures rather than dividing by zero.
+      expect(found).toHaveLength(1);
+      expect(found[0].scope).toBe("dataset");
+    });
+
+    it("skips an object entirely when neither baseline is usable", () => {
+      const unusable = { metricKey: "area", mean: 20, std: 0, byLabel: {} };
+      expect(findMetricOutliers([labelled(1, 1, 100)], unusable)).toEqual([]);
+    });
+  });
+});
+
+/**
+ * The correction that makes a per-image comparison mean anything on a
+ * hierarchy. Labels here: 1 is a parent class, 2 the small children inside it.
+ */
+describe("standardizedMetricComparison", () => {
+  const entry = (count, mean) => ({ area: { unit: "cm", components: [{ count, mean }] } });
+
+  // Dataset: 10 parents averaging 100, 200 children averaging 5. Pooled mean is
+  // about 9.5, because children dominate the population.
+  const dataset = { 1: entry(10, 100), 2: entry(200, 5) };
+
+  it("does not punish an image for carrying only the larger class", () => {
+    // Three perfectly typical parents. Naively this is +950 % against the pooled
+    // mean; standardized it is zero, which is the true answer.
+    const image = { 1: entry(3, 100) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.observed).toBe(100);
+    expect(result.expected).toBe(100);
+    expect(result.delta).toBe(0);
+  });
+
+  it("still reports an image whose objects are atypical for their own class", () => {
+    const image = { 1: entry(3, 150) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBe(100);
+    expect(result.delta).toBeCloseTo(0.5);
+  });
+
+  it("weights the expectation by the image's own mix", () => {
+    // One parent and one child: expected is the mean of 100 and 5.
+    const image = { 1: entry(1, 100), 2: entry(1, 5) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBeCloseTo(52.5);
+    expect(result.observed).toBeCloseTo(52.5);
+    expect(result.delta).toBeCloseTo(0);
+  });
+
+  it("counts objects, not labels, when weighting", () => {
+    // Nine children and one parent should sit near the child mean.
+    const image = { 1: entry(1, 100), 2: entry(9, 5) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.expected).toBeCloseTo(14.5);
+    expect(result.count).toBe(10);
+  });
+
+  // Including a label on one side only is exactly the bias this corrects.
+  it("drops a label the dataset cannot price, from both sides", () => {
+    const image = { 1: entry(2, 100), 99: entry(2, 9999) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.droppedLabels).toBe(1);
+    expect(result.observed).toBe(100);
+    expect(result.expected).toBe(100);
+    expect(result.labels.map((row) => row.labelId)).toEqual(["1"]);
+  });
+
+  it("keeps the value but withholds the comparison when nothing is shared", () => {
+    const result = standardizedMetricComparison({ 99: entry(2, 40) }, dataset, "area");
+    expect(result.observed).toBe(40);
+    expect(result.expected).toBeNull();
+    expect(result.delta).toBeNull();
+    expect(result.droppedLabels).toBe(1);
+  });
+
+  it("reports each label's own comparison, busiest first", () => {
+    const image = { 1: entry(2, 120), 2: entry(8, 4) };
+    const result = standardizedMetricComparison(image, dataset, "area");
+    expect(result.labels.map((row) => row.labelId)).toEqual(["2", "1"]);
+    expect(result.labels[0].delta).toBeCloseTo(-0.2);
+    expect(result.labels[1].delta).toBeCloseTo(0.2);
+  });
+
+  it("carries the unit through", () => {
+    expect(standardizedMetricComparison({ 1: entry(1, 100) }, dataset, "area").unit).toBe("cm");
+  });
+
+  it("returns null when the metric is not measured on the image", () => {
+    expect(standardizedMetricComparison({ 1: entry(1, 100) }, dataset, "perimeter")).toBeNull();
+    expect(standardizedMetricComparison({}, dataset, "area")).toBeNull();
+  });
+});
+
+describe("perLabelMetricVector", () => {
+  const colour = (count, means) => ({
+    mean_color_lab: { unit: null, components: means.map((mean) => ({ count, mean })) },
+  });
+
+  // The scalar helpers take components[0], which on a colour is the L channel
+  // alone — "mean colour" silently reduced to "mean lightness".
+  it("keeps every channel, not just the first", () => {
+    expect(perLabelMetricVector({ 1: colour(4, [120, 130, 140]) }, "mean_color_lab")).toEqual([
+      { labelId: "1", count: 4, means: [120, 130, 140] },
+    ]);
+  });
+
+  it("skips labels that measured nothing", () => {
+    expect(perLabelMetricVector({ 1: colour(0, [1, 2, 3]) }, "mean_color_lab")).toEqual([]);
+    expect(perLabelMetricVector({ 1: {} }, "mean_color_lab")).toEqual([]);
+    expect(perLabelMetricVector(null, "mean_color_lab")).toEqual([]);
+  });
+});
+
+/**
+ * A colour is compared perceptually, not proportionally: see colorDifference for
+ * why a percentage on a channel is not a quantity at all.
+ */
+describe("standardizedColorComparison", () => {
+  const colour = (count, means) => ({
+    mean_color_lab: { components: means.map((mean) => ({ count, mean })) },
+  });
+  // Mid grey in OpenCV's packing: L 128 of 255, a and b at the 128 origin.
+  const grey = [128, 128, 128];
+
+  it("reports no difference when the image matches the dataset", () => {
+    const metrics = { 1: colour(3, grey) };
+    const result = standardizedColorComparison(metrics, metrics, "mean_color_lab", "opencv_lab");
+    expect(result.deltaE).toBeCloseTo(0, 10);
+    expect(result.kind).toBe("color");
+  });
+
+  it("measures a real shift in CIEDE2000 units", () => {
+    const image = { 1: colour(3, [128, 160, 100]) };
+    const dataset = { 1: colour(30, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.deltaE).toBeGreaterThan(10);
+    // Both sides converted, not compared in the packed encoding.
+    expect(result.observed.a).toBe(32);
+    expect(result.expected.a).toBe(0);
+  });
+
+  it("weights the expected colour by the image's own label mix", () => {
+    const image = { 1: colour(1, grey), 2: colour(3, grey) };
+    const dataset = { 1: colour(50, [255, 128, 128]), 2: colour(50, [0, 128, 128]) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    // Three parts black to one part white, in the packed L: 255/4 = 63.75.
+    expect(result.expected.L).toBeCloseTo((63.75 / 255) * 100, 6);
+  });
+
+  it("gives each label its own difference, busiest first", () => {
+    const image = { 1: colour(1, grey), 2: colour(5, [128, 190, 128]) };
+    const dataset = { 1: colour(9, grey), 2: colour(9, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.labels.map((row) => row.labelId)).toEqual(["2", "1"]);
+    expect(result.labels[0].deltaE).toBeGreaterThan(5);
+    expect(result.labels[1].deltaE).toBeCloseTo(0, 10);
+  });
+
+  it("drops a label the dataset has no colour for", () => {
+    const image = { 1: colour(2, grey), 99: colour(2, [255, 200, 40]) };
+    const dataset = { 1: colour(9, grey) };
+    const result = standardizedColorComparison(image, dataset, "mean_color_lab", "opencv_lab");
+    expect(result.droppedLabels).toBe(1);
+    expect(result.deltaE).toBeCloseTo(0, 10);
+  });
+
+  it("keeps the measured colour but withholds the difference when nothing is shared", () => {
+    const result = standardizedColorComparison(
+      { 99: colour(2, grey) }, { 1: colour(9, grey) }, "mean_color_lab", "opencv_lab"
+    );
+    expect(result.observed).not.toBeNull();
+    expect(result.expected).toBeNull();
+    expect(result.deltaE).toBeNull();
+  });
+
+  it("converts sRGB through its own path", () => {
+    const image = { 1: { mean_color_rgb: { components: [255, 255, 255].map((mean) => ({ count: 1, mean })) } } };
+    const dataset = { 1: { mean_color_rgb: { components: [0, 0, 0].map((mean) => ({ count: 9, mean })) } } };
+    const result = standardizedColorComparison(image, dataset, "mean_color_rgb", "srgb");
+    expect(result.observed.L).toBeCloseTo(100, 4);
+    expect(result.expected.L).toBeCloseTo(0, 4);
+    expect(result.deltaE).toBeGreaterThan(90);
+  });
+
+  it("refuses to guess at a space it was not given", () => {
+    const metrics = { 1: colour(1, grey) };
+    expect(standardizedColorComparison(metrics, metrics, "mean_color_lab", null)).toBeNull();
+  });
+
+  it("returns null when the metric is not on the image", () => {
+    expect(standardizedColorComparison({}, {}, "mean_color_lab", "opencv_lab")).toBeNull();
   });
 });

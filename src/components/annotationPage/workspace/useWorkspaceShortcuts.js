@@ -27,7 +27,14 @@ import {
   useFocusModeActive,
   useExitFocusMode,
   useCycleChipMode,
+  useCycleOutlinePreset,
+  useSetOutlinePeek,
+  useToggleCalibratedColors,
 } from '../../../stores/selectors/annotationSelectors';
+import { useCalibratedColorPreview } from '../canvas/CalibratedColorFilter';
+
+/** Held to take the annotation layer off the image. @see the peek effect below. */
+const PEEK_KEY = '`';
 
 /** Typing in a field must never trigger a tool change. */
 const isTypingTarget = (target) =>
@@ -66,6 +73,10 @@ export default function useWorkspaceShortcuts() {
   const focusModeActive = useFocusModeActive();
   const exitFocusMode = useExitFocusMode();
   const cycleChipMode = useCycleChipMode();
+  const cycleOutlinePreset = useCycleOutlinePreset();
+  const toggleCalibratedColors = useToggleCalibratedColors();
+  const calibratedColors = useCalibratedColorPreview();
+  const setOutlinePeek = useSetOutlinePeek();
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -122,6 +133,22 @@ export default function useWorkspaceShortcuts() {
           // since a crowded canvas is just as unreadable while reviewing.
           event.preventDefault();
           cycleChipMode();
+          break;
+        case 'O':
+          // Outlines: filled → no fill → hairline. Next to the chips for the
+          // same reason they are next to each other on the toolbar — both are
+          // about getting the overlay out of the way of the image.
+          event.preventDefault();
+          cycleOutlinePreset();
+          break;
+        case 'C':
+          // Matches the toolbar button exactly, including staying inert on an
+          // image with no correction to show: a shortcut that silently flips a
+          // preference nothing can act on is worse than one that does nothing.
+          if (calibratedColors.available && !calibratedColors.suppressed) {
+            event.preventDefault();
+            toggleCalibratedColors();
+          }
           break;
         case 'L':
           if (selectedIds.length > 0) {
@@ -202,6 +229,10 @@ export default function useWorkspaceShortcuts() {
     focusModeActive,
     exitFocusMode,
     cycleChipMode,
+    cycleOutlinePreset,
+    toggleCalibratedColors,
+    calibratedColors.available,
+    calibratedColors.suppressed,
     zoomLevel,
     setZoomLevel,
     setPanOffset,
@@ -211,4 +242,41 @@ export default function useWorkspaceShortcuts() {
     shortcutSheetOpen,
     nav,
   ]);
+
+  /**
+   * Peek — hold ` to take the annotation layer off the image.
+   *
+   * A held key rather than a fourth preset: "what is actually under all this?"
+   * is a question asked for a second at a time, and a sticky everything-hidden
+   * state would leave a canvas that cannot be clicked with nothing on screen to
+   * explain why.
+   *
+   * Its own listener rather than a case in the switch above, because it is the
+   * only shortcut here that needs the key's release as well as its press — and
+   * the blur handler is not optional: let go of the key over another window and
+   * the keyup never arrives, which strands exactly the state this avoids.
+   */
+  useEffect(() => {
+    const press = (event) => {
+      if (event.key !== PEEK_KEY || event.repeat) return;
+      if (isTypingTarget(event.target)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      event.preventDefault();
+      setOutlinePeek(true);
+    };
+    const release = (event) => {
+      if (event && event.type === 'keyup' && event.key !== PEEK_KEY) return;
+      setOutlinePeek(false);
+    };
+
+    window.addEventListener('keydown', press);
+    window.addEventListener('keyup', release);
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('keydown', press);
+      window.removeEventListener('keyup', release);
+      window.removeEventListener('blur', release);
+      setOutlinePeek(false);
+    };
+  }, [setOutlinePeek]);
 }

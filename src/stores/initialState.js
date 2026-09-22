@@ -1,3 +1,5 @@
+import { DEFAULT_OUTLINE } from '../utils/outlineSettings';
+
 /**
  * Initial state for the annotation store
  */
@@ -55,6 +57,22 @@ export const initialState = {
     cursor: null,
     /** Canvas label chips: 'all' | 'minimal' (hover/selection only) | 'off'. */
     chipMode: 'all',
+    /**
+     * Whether the canvas shows the image with its colour calibration applied.
+     *
+     * On by default, and deliberately so: the appearance metrics are already
+     * computed from corrected pixels, so leaving the canvas raw means the numbers
+     * and the picture describe different images. A preference rather than a fact
+     * about the image — it survives navigation, and does nothing on an image with
+     * no correction to show.
+     */
+    calibratedColors: true,
+    /**
+     * How object polygons are painted — the companion axis to the visibility
+     * filters above, which decide *which* objects are painted at all.
+     * See utils/outlineSettings.
+     */
+    outline: { ...DEFAULT_OUTLINE },
   },
 
   // Canvas State (needed for canvas components)
@@ -177,6 +195,15 @@ export const initialState = {
     kindsLoaded: false,
     /** One entry per kind for the current image, calibrated or not. */
     entries: [],
+    /**
+     * The image's pixel pipeline as three 256-entry lookup tables, or null when
+     * there is nothing to preview.
+     *
+     * Derived on the server by running a ramp through the real correction, so the
+     * canvas preview cannot drift from the transform the metrics are measured
+     * through. Arrives with `entries` on the same request.
+     */
+    pixelLut: null,
     loading: false,
     error: null,
     /** Which calibration the rail has selected in Calibrate mode. */

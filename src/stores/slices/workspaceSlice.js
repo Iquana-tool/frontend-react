@@ -1,11 +1,20 @@
+import {
+  DEFAULT_OUTLINE,
+  OUTLINE_PRESETS,
+  OUTLINE_PRESET_KEYS,
+  matchOutlinePreset,
+  nextOutlinePreset,
+  sanitizeOutline,
+} from '../../utils/outlineSettings';
+
 /**
  * Workspace slice — layout, mode and view state for the annotation workspace.
  *
  * Everything here is presentation state. Nothing in this slice is persisted to
  * the backend except through the actions that already own that concern
  * (label assignment, visibility filters, object mutation), which live in
- * `objectsSlice`. The exceptions are `theme` and `mode`, mirrored to localStorage
- * so the choices survive a reload.
+ * `objectsSlice`. The exceptions are `theme`, `mode` and the outline settings,
+ * mirrored to localStorage so the choices survive a reload.
  */
 
 const THEME_STORAGE_KEY = 'iquana.workspace.theme';
@@ -62,6 +71,43 @@ const persistMode = (mode) => {
     window.localStorage.setItem(MODE_STORAGE_KEY, mode);
   } catch {
     // Non-fatal: the mode simply won't survive a reload.
+  }
+};
+
+/**
+ * @see readStoredOutline
+ *
+ * Suffixed, and bumped when the defaults move: a blob written under the old
+ * defaults still sanitizes cleanly, so it would be restored verbatim and quietly
+ * pin the canvas to a default nobody chose — indistinguishable, from the user's
+ * side, from the new default not having been applied at all.
+ */
+export const OUTLINE_STORAGE_KEY = 'iquana.workspace.outline.v2';
+
+/**
+ * Reads the persisted outline settings.
+ *
+ * Persisted for a different reason than the theme: how heavy an overlay reads
+ * depends on the monitor, the eyes in front of it and the kind of imagery in
+ * the dataset, so someone who has dialled the fill down once should not have to
+ * do it again on every reload. `peek` is deliberately dropped — it is a held
+ * key, and restoring it would open the workspace with every object hidden.
+ */
+export const readStoredOutline = () => {
+  try {
+    return sanitizeOutline(JSON.parse(window.localStorage.getItem(OUTLINE_STORAGE_KEY)));
+  } catch {
+    // Private browsing, disabled storage or a corrupt blob — the default is fine.
+    return { ...DEFAULT_OUTLINE };
+  }
+};
+
+const persistOutline = (outline) => {
+  try {
+    const { peek, ...persistable } = outline;
+    window.localStorage.setItem(OUTLINE_STORAGE_KEY, JSON.stringify(persistable));
+  } catch {
+    // Non-fatal: the settings simply won't survive a reload.
   }
 };
 
@@ -163,12 +209,80 @@ export const createWorkspaceSlice = (set) => ({
     state.workspace.chipMode = mode;
   }),
 
+  /**
+   * Show the image as calibrated, or as it came off the camera.
+   *
+   * Purely what the canvas draws. Nothing measured moves with it — the metrics
+   * are computed from corrected pixels either way — so this switch answers
+   * "what did the calibration do?", never "what is measured?".
+   */
+  toggleCalibratedColors: () => set((state) => {
+    state.workspace.calibratedColors = !state.workspace.calibratedColors;
+  }),
+
   // Cycled rather than toggled: on a dense image the useful middle setting is
   // "only what I am pointing at", and a two-state switch would skip it.
   cycleChipMode: () => set((state) => {
     const order = ['all', 'minimal', 'off'];
     const next = order[(order.indexOf(state.workspace.chipMode) + 1) % order.length];
     state.workspace.chipMode = next;
+  }),
+
+  /**
+   * Apply one of the named outline presets.
+   *
+   * A preset is only ever a shortcut for a pair of slider values: the values
+   * are the real state, which is what lets the panel's sliders and this button
+   * describe the same thing without one of them lying about the other.
+   */
+  setOutlinePreset: (preset) => set((state) => {
+    const values = OUTLINE_PRESETS[preset];
+    if (!values) return;
+    Object.assign(state.workspace.outline, values, { preset });
+    persistOutline(state.workspace.outline);
+  }),
+
+  // Cycled rather than toggled, for the same reason as the chips: the useful
+  // middle setting — outline only, fill on hover — is one a two-state switch
+  // would skip.
+  cycleOutlinePreset: () => set((state) => {
+    const preset = nextOutlinePreset(state.workspace.outline.preset);
+    Object.assign(state.workspace.outline, OUTLINE_PRESETS[preset], { preset });
+    persistOutline(state.workspace.outline);
+  }),
+
+  /**
+   * Move one of the settings a preset covers — either slider, or the
+   * fill-on-hover switch.
+   *
+   * The preset is recomputed rather than cleared, so dragging back onto a
+   * preset's values re-lights its button instead of leaving the control stuck
+   * on "custom" with nothing to show for it.
+   */
+  setOutlineValue: (key, value) => set((state) => {
+    if (!OUTLINE_PRESET_KEYS.includes(key)) return;
+    state.workspace.outline[key] = value;
+    state.workspace.outline.preset = matchOutlinePreset(state.workspace.outline);
+    persistOutline(state.workspace.outline);
+  }),
+
+  // Orthogonal to the presets: it changes what a width *means* (screen pixels
+  // rather than image pixels), not how heavy the overlay is, so it deliberately
+  // does not knock the preset over to "custom".
+  setOutlineConstantWidth: (on) => set((state) => {
+    state.workspace.outline.constantWidth = !!on;
+    persistOutline(state.workspace.outline);
+  }),
+
+  /**
+   * Hide every object overlay while the peek key is held.
+   *
+   * Not persisted and not a preset: the question it answers — "what is actually
+   * under all this?" — is asked for a second at a time, and a sticky mode for it
+   * would leave the canvas unclickable with no visible reason why.
+   */
+  setOutlinePeek: (on) => set((state) => {
+    state.workspace.outline.peek = !!on;
   }),
 
   setActiveLabelId: (labelId) => set((state) => {

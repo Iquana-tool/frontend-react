@@ -8,7 +8,6 @@ import {
   useActiveCalibrationKind,
   useActivePatchPick,
   useSampleRadius,
-  useSetActiveCalibrationKind,
   useSetSampleRadius,
   useToggleLeftDrawer,
   useWedgeState,
@@ -44,7 +43,6 @@ const CalibrationDrawer = () => {
   } = useCalibrationState();
 
   const activeKind = useActiveCalibrationKind();
-  const setActiveKind = useSetActiveCalibrationKind();
   const toggleDrawer = useToggleLeftDrawer();
   const sampleRadius = useSampleRadius();
   const setSampleRadius = useSetSampleRadius();
@@ -57,13 +55,9 @@ const CalibrationDrawer = () => {
   const { datasetId: datasetIdParam } = useParams();
   const datasetId = datasetIdParam ? Number(datasetIdParam) : null;
 
-  // Land on the first uncalibrated kind rather than on nothing, so opening
-  // Calibrate mode already shows the thing most likely to need attention.
-  useEffect(() => {
-    if (activeKind || !entries.length) return;
-    const next = entries.find((entry) => !entry.calibrated) || entries[0];
-    setActiveKind(next.kind);
-  }, [activeKind, entries, setActiveKind]);
+  // Landing on the first uncalibrated kind is WorkspaceShell's job now: doing it
+  // here tied it to this component being mounted, so it never ran for the rail
+  // when the drawer was collapsed.
 
   const entry = entries.find((item) => item.kind === activeKind) || null;
   const Body = entry ? (BODIES[entry.kind] || FallbackBody) : null;

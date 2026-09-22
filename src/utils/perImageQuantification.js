@@ -12,6 +12,8 @@
  * ``{ [labelId]: { [metricKey]: { unit, components: [{count, mean, std, min, max}, ...] } } }``
  */
 
+import { deltaE2000, toLab } from "./colorDifference";
+
 /** The label id the endpoint uses for objects with no label assigned. */
 const UNLABELED_KEY = "null";
 
@@ -276,6 +278,282 @@ export const formatDelta = (fraction) => {
   const percent = fraction * 100;
   const rounded = Math.abs(percent) < 0.1 ? 0 : percent;
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} %`;
+};
+
+/**
+ * One metric's per-label component vectors — the multi-channel `perLabelMetric`.
+ *
+ * A colour is three numbers, and taking only the first (as the scalar helpers do)
+ * silently reduces "mean colour" to "mean lightness".
+ *
+ * @returns {Array<{labelId: string, count: number, means: number[]}>}
+ */
+export const perLabelMetricVector = (metricsByLabelId, metricKey) =>
+  Object.entries(metricsByLabelId || {})
+    .map(([labelId, metrics]) => {
+      const components = metrics?.[metricKey]?.components;
+      if (!Array.isArray(components) || !components.length) return null;
+      const count = components[0]?.count;
+      if (!count) return null;
+      return {
+        labelId: String(labelId),
+        count,
+        means: components.map((component) => component.mean),
+      };
+    })
+    .filter(Boolean);
+
+/**
+ * A colour metric compared against the dataset, corrected for what is on the image.
+ *
+ * The same standardization as {@link standardizedMetricComparison} — each label
+ * weighted by how many of it this image carries — but the difference at the end
+ * is CIEDE2000 rather than a percentage, because a percentage on a colour is not
+ * a quantity. See utils/colorDifference.
+ *
+ * The channel means are averaged in whatever space they were measured in and
+ * converted afterwards. That is not perceptually exact for sRGB, whose gamma
+ * makes a channel mean darker than the light it stands for, but it is the
+ * encoding the per-label means already arrived in and re-deriving them is not
+ * possible from an aggregate.
+ *
+ * @returns {{kind: 'color', observed, expected, deltaE, space, count,
+ *   droppedLabels, labels: Array}|null}
+ */
+export const standardizedColorComparison = (
+  imageMetrics,
+  datasetMetrics,
+  metricKey,
+  space
+) => {
+  if (!space) return null;
+  const onImage = perLabelMetricVector(imageMetrics, metricKey);
+  if (!onImage.length) return null;
+
+  const inDataset = new Map(
+    perLabelMetricVector(datasetMetrics, metricKey).map((row) => [row.labelId, row])
+  );
+
+  const shared = [];
+  let dropped = 0;
+  for (const row of onImage) {
+    const reference = inDataset.get(row.labelId);
+    if (reference) shared.push({ row, reference });
+    else dropped += 1;
+  }
+
+  const weightedMean = (rows, pick) => {
+    const channels = [];
+    let weight = 0;
+    for (const entry of rows) {
+      const means = pick(entry);
+      weight += entry.row.count;
+      means.forEach((value, index) => {
+        channels[index] = (channels[index] || 0) + entry.row.count * value;
+      });
+    }
+    return weight ? channels.map((total) => total / weight) : null;
+  };
+
+  const base = {
+    kind: 'color',
+    space,
+    droppedLabels: dropped,
+    count: onImage.reduce((total, row) => total + row.count, 0),
+  };
+
+  if (!shared.length) {
+    const observedOnly = weightedMean(
+      onImage.map((row) => ({ row })),
+      (entry) => entry.row.means
+    );
+    return {
+      ...base,
+      observed: toLab(observedOnly, space),
+      expected: null,
+      deltaE: null,
+      labels: [],
+    };
+  }
+
+  const observed = toLab(weightedMean(shared, (entry) => entry.row.means), space);
+  const expected = toLab(weightedMean(shared, (entry) => entry.reference.means), space);
+
+  return {
+    ...base,
+    observed,
+    expected,
+    deltaE: deltaE2000(observed, expected),
+    count: shared.reduce((total, entry) => total + entry.row.count, 0),
+    labels: shared
+      .map(({ row, reference }) => {
+        const labelObserved = toLab(row.means, space);
+        const labelExpected = toLab(reference.means, space);
+        return {
+          labelId: row.labelId,
+          count: row.count,
+          observed: labelObserved,
+          expected: labelExpected,
+          deltaE: deltaE2000(labelObserved, labelExpected),
+        };
+      })
+      .sort((a, b) => b.count - a.count),
+  };
+};
+
+/**
+ * One metric compared against the dataset, corrected for what is on the image.
+ *
+ * The naive comparison — this image's mean against the dataset's — is only
+ * honest when the image's mix of labels matches the dataset's, and on a
+ * hierarchy it never does. An image carrying three parent contours is measured
+ * against a population that is mostly the small children inside such parents,
+ * and reads several hundred percent high for no reason but its composition.
+ *
+ * So the baseline is standardized to this image: each label contributes the
+ * dataset's mean for *that* label, weighted by how many of that label this image
+ * actually has. `expected` is then what this image would measure if every object
+ * on it were typical for its class, and the delta against `observed` says the
+ * one thing worth knowing — whether this image is unusual given what is on it.
+ *
+ * Both sides are summed over the same labels. A label the dataset has no figure
+ * for is dropped from `observed` as well as `expected`, because including it on
+ * one side only would reintroduce exactly the bias this corrects; `droppedLabels`
+ * reports how many, so a caller can say so rather than quietly narrowing the
+ * claim.
+ *
+ * @param {Object} imageMetrics - The image-scoped summary's `metrics` mapping.
+ * @param {Object} datasetMetrics - The dataset-wide summary's `metrics` mapping.
+ * @param {string} metricKey
+ * @returns {{observed: number, expected: number|null, delta: number|null,
+ *   unit: string|null, count: number, droppedLabels: number,
+ *   labels: Array<{labelId, count, imageMean, datasetMean, delta}>}|null}
+ */
+export const standardizedMetricComparison = (imageMetrics, datasetMetrics, metricKey) => {
+  const onImage = perLabelMetric(imageMetrics, metricKey);
+  if (!onImage.length) return null;
+
+  const inDataset = new Map(
+    perLabelMetric(datasetMetrics, metricKey).map((row) => [String(row.labelId), row])
+  );
+
+  const shared = [];
+  let dropped = 0;
+  for (const row of onImage) {
+    const reference = inDataset.get(String(row.labelId));
+    if (reference && Number.isFinite(reference.mean)) shared.push({ row, reference });
+    else dropped += 1;
+  }
+
+  const unit = onImage[0].unit || null;
+
+  // Nothing on this image has a counterpart in the dataset — a one-image dataset,
+  // or labels used nowhere else. The value still stands; the comparison does not.
+  if (!shared.length) {
+    const fallback = aggregateMetric(imageMetrics, metricKey);
+    return {
+      kind: 'scalar',
+      observed: fallback.mean,
+      expected: null,
+      delta: null,
+      unit: fallback.unit || unit,
+      count: fallback.count,
+      droppedLabels: dropped,
+      labels: [],
+    };
+  }
+
+  let objects = 0;
+  let observedTotal = 0;
+  let expectedTotal = 0;
+  for (const { row, reference } of shared) {
+    objects += row.count;
+    observedTotal += row.count * row.mean;
+    expectedTotal += row.count * reference.mean;
+  }
+
+  const observed = observedTotal / objects;
+  const expected = expectedTotal / objects;
+
+  return {
+    kind: 'scalar',
+    observed,
+    expected,
+    delta: relativeToBaseline(observed, expected),
+    unit,
+    count: objects,
+    droppedLabels: dropped,
+    // Descending by how much of the image each label accounts for, so the label
+    // driving the headline number is the first one read.
+    labels: shared
+      .map(({ row, reference }) => ({
+        labelId: String(row.labelId),
+        count: row.count,
+        imageMean: row.mean,
+        datasetMean: reference.mean,
+        delta: relativeToBaseline(row.mean, reference.mean),
+      }))
+      .sort((a, b) => b.count - a.count),
+  };
+};
+
+/**
+ * Objects on this image whose measurement sits far from the dataset's.
+ *
+ * The companion to {@link relativeToBaseline} one level down: that says whether
+ * the image disagrees with the dataset, this says which contours are why. A
+ * reviewer's next click after "this image reads high" is to find the object
+ * responsible, and that is otherwise a manual sweep of the panel.
+ *
+ * Distance is in standard deviations of the *dataset* distribution, not the
+ * image's: an image where every object is oversized has a small internal spread
+ * and would report no outliers against itself, which is exactly the case worth
+ * catching. A zero or missing spread yields nothing rather than flagging
+ * everything — one distinct value across the dataset makes every deviation
+ * infinite, and that is a statement about the dataset, not about these objects.
+ *
+ * Each object is measured against its own label's distribution where one exists,
+ * falling back to the dataset-wide figures otherwise. On a hierarchy this is the
+ * difference between a useful answer and a useless one: pooling every label puts
+ * a parent contour in the same population as the dozens of small children inside
+ * it, and against that mean every parent on every image reads as an outlier —
+ * which flags everything and therefore says nothing.
+ *
+ * @param {Array<Object>} objects - Workspace objects, carrying `quantification`.
+ * @param {Object} baseline - `{metricKey, mean, std}` plus an optional
+ *   `byLabel` of `{[labelId]: {mean, std}}` preferred per object.
+ * @param {Object} [options]
+ * @param {number} [options.threshold=2] - Deviations before an object is flagged.
+ * @returns {Array<{object: Object, value: number, z: number, scope: string}>}
+ *   worst first; `scope` is the label id compared against, or 'dataset'.
+ */
+export const findMetricOutliers = (objects, baseline, { threshold = 2 } = {}) => {
+  const { metricKey, mean, std, byLabel } = baseline || {};
+  if (!metricKey) return [];
+
+  const usable = (stats) =>
+    stats && stats.mean != null && Number.isFinite(stats.std) && stats.std > 0;
+
+  const wide = usable({ mean, std }) ? { mean, std } : null;
+
+  return (objects || [])
+    .map((object) => {
+      const value = object?.quantification?.[metricKey]
+        ?? (metricKey === 'area' ? object?.pixelCount : null);
+      if (value == null || !Number.isFinite(value)) return null;
+
+      const labelKey = object?.labelId == null ? null : String(object.labelId);
+      const forLabel = labelKey ? byLabel?.[labelKey] : null;
+      const stats = usable(forLabel) ? forLabel : wide;
+      if (!stats) return null;
+
+      const z = (value - stats.mean) / stats.std;
+      return Math.abs(z) >= threshold
+        ? { object, value, z, scope: usable(forLabel) ? labelKey : 'dataset' }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => Math.abs(b.z) - Math.abs(a.z));
 };
 
 /**

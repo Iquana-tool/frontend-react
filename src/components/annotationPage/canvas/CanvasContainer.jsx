@@ -11,6 +11,7 @@ import RefinementOverlay from './RefinementOverlay';
 import EditableContourOverlay from './EditableContourOverlay';
 import LineEditCanvas from './LineEditCanvas';
 import ScaleCalibrationOverlay from './ScaleCalibrationOverlay';
+import CalibratedColorFilter, { useCalibratedColorPreview } from './CalibratedColorFilter';
 import PatchPickOverlay from './PatchPickOverlay';
 import ScaleBarIndicator from './ScaleBarIndicator';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
@@ -43,6 +44,11 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
   const lineEditActive = useLineEditActive();
   const setCursorPosition = useSetCursorPosition();
   const workspaceMode = useWorkspaceMode();
+
+  // Only the image is corrected, never the overlays drawn over it: a label colour
+  // is a chosen colour, not a measured one, and putting it through a camera's
+  // response curve would be meaningless.
+  const { filter: calibratedColorFilter } = useCalibratedColorPreview();
 
   // Calibrate mode borrows the canvas for measuring, not for annotating. The
   // drawing surfaces are gated on the mode rather than only on the tool, so a
@@ -102,12 +108,16 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
           willChange: 'transform',
         }}
       >
+        <CalibratedColorFilter />
         <img
           ref={canvasRef}
           src={imageObject.src}
           alt={currentImage?.name || 'Annotation Image'}
           className="object-contain w-full h-full block shadow-stage"
           draggable={false}
+          /* A filter changes no geometry, so every overlay's coordinate maths —
+             all of it measured off this element — is untouched by the preview. */
+          style={calibratedColorFilter ? { filter: calibratedColorFilter } : undefined}
         />
 
         {annotating && currentTool !== 'ai_annotation' && <PromptOverlay canvasRef={canvasRef} />}

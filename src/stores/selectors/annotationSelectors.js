@@ -272,6 +272,8 @@ export const useCancelCalibration = () => useAnnotationStore(state => state.canc
 export const useCalibrationKinds = () => useAnnotationStore(state => state.calibration.kinds);
 export const useCalibrationKindsLoaded = () => useAnnotationStore(state => state.calibration.kindsLoaded);
 export const useCalibrationEntries = () => useAnnotationStore(state => state.calibration.entries);
+export const usePixelLut = () => useAnnotationStore(state => state.calibration.pixelLut);
+export const useSetPixelLut = () => useAnnotationStore(state => state.setPixelLut);
 export const useCalibrationLoading = () => useAnnotationStore(state => state.calibration.loading);
 export const useCalibrationError = () => useAnnotationStore(state => state.calibration.error);
 export const useActiveCalibrationKind = () => useAnnotationStore(state => state.calibration.activeKind);
@@ -311,6 +313,16 @@ export const useShowApproved = () => useAnnotationStore(state => state.workspace
 export const useChipMode = () => useAnnotationStore(state => state.workspace.chipMode);
 export const useSetChipMode = () => useAnnotationStore(state => state.setChipMode);
 export const useCycleChipMode = () => useAnnotationStore(state => state.cycleChipMode);
+export const useCalibratedColors = () => useAnnotationStore(state => state.workspace.calibratedColors);
+export const useToggleCalibratedColors = () => useAnnotationStore(state => state.toggleCalibratedColors);
+export const useOutlineSettings = () => useAnnotationStore(state => state.workspace.outline);
+export const useOutlinePreset = () => useAnnotationStore(state => state.workspace.outline.preset);
+export const useOutlinePeek = () => useAnnotationStore(state => state.workspace.outline.peek);
+export const useSetOutlinePreset = () => useAnnotationStore(state => state.setOutlinePreset);
+export const useCycleOutlinePreset = () => useAnnotationStore(state => state.cycleOutlinePreset);
+export const useSetOutlineValue = () => useAnnotationStore(state => state.setOutlineValue);
+export const useSetOutlineConstantWidth = () => useAnnotationStore(state => state.setOutlineConstantWidth);
+export const useSetOutlinePeek = () => useAnnotationStore(state => state.setOutlinePeek);
 export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
 export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
 export const usePicker = () => useAnnotationStore(state => state.workspace.picker);

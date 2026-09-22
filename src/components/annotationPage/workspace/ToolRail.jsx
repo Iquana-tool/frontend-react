@@ -5,6 +5,7 @@ import {
   Crosshair,
   Hand,
   Hexagon,
+  Loader2,
   MousePointer2,
   Paintbrush,
   Palette,
@@ -31,6 +32,7 @@ import {
   useActiveCalibrationKind,
   useActiveLabelId,
   useCalibrationEntries,
+  useCalibrationLoading,
   useDatasetLabels,
   useLabelColorOverrides,
   useLeftDrawerOpen,
@@ -152,11 +154,16 @@ const ToolRail = () => {
   const mode = useWorkspaceMode();
 
   const calibrationEntries = useCalibrationEntries();
+  const calibrationsLoading = useCalibrationLoading();
   const activeCalibrationKind = useActiveCalibrationKind();
   const setActiveCalibrationKind = useSetActiveCalibrationKind();
 
   const tools = railToolsForMode(mode);
   const calibrating = mode === 'calibrate';
+  // The prompt actions and the armed label belong to making annotations, not to
+  // measuring an image or judging one — so they are gated on the mode that does
+  // it rather than on "not calibrating", which quietly kept them in Review.
+  const annotating = mode === 'annotate';
 
   // Picking a calibration is only useful if its controls are visible.
   const selectCalibration = (kind) => {
@@ -194,21 +201,45 @@ const ToolRail = () => {
         </div>
       ))}
 
-      {calibrating && calibrationEntries.length > 0 && (
+      {/* Rendered whenever the mode is Calibrate, not only when calibrations have
+          arrived. Gating the whole section on a loaded list meant the one moment
+          the rail had to explain itself — a fresh switch into the mode, before
+          the fetch lands — was the moment it showed two navigation buttons and
+          no sign that anything else was coming. */}
+      {calibrating && (
         <>
           <div className="w-[22px] h-px bg-ln2 my-[6px]" />
-          {calibrationEntries.map((entry) => (
-            <CalibrationRailButton
-              key={entry.kind}
-              entry={entry}
-              active={activeCalibrationKind === entry.kind}
-              onSelect={selectCalibration}
-            />
-          ))}
+          {calibrationEntries.length > 0 ? (
+            calibrationEntries.map((entry) => (
+              <CalibrationRailButton
+                key={entry.kind}
+                entry={entry}
+                active={activeCalibrationKind === entry.kind}
+                onSelect={selectCalibration}
+              />
+            ))
+          ) : (
+            <Tooltip
+              label={
+                calibrationsLoading
+                  ? 'Loading calibrations…'
+                  : 'No calibrations are available for this image'
+              }
+            >
+              <span
+                aria-label="Calibrations"
+                className="w-8 h-8 flex items-center justify-center rounded-8 border border-dashed border-ln2 text-t3"
+              >
+                {calibrationsLoading
+                  ? <Loader2 size={15} className="animate-spin" />
+                  : <SlidersHorizontal size={16} strokeWidth={1.7} />}
+              </span>
+            </Tooltip>
+          )}
         </>
       )}
 
-      {!calibrating && (
+      {annotating && (
         <>
           <div className="w-[22px] h-px bg-ln2 my-[6px]" />
 
@@ -267,9 +298,11 @@ const ToolRail = () => {
         </button>
       </Tooltip>
 
-      {/* The armed label has no meaning while calibrating, and the Labels tab it
-          jumps to is not among the panel's tabs in that mode. */}
-      {!calibrating && (
+      {/* Arming a label only means anything where something new can be drawn: it
+          is applied to whatever the model or the draw tool produces. Nothing in
+          Calibrate or Review produces one, so the swatch would be a control with
+          no effect in either. */}
+      {annotating && (
         <Tooltip
           label={activeLabel ? `Active label — ${activeLabel.name}` : 'No label armed'}
         >
