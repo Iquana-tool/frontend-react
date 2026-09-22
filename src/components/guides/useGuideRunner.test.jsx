@@ -91,11 +91,12 @@ describe('useGuideRunner', () => {
       state.objects.list = [{ id: 'a', label: 'coral' }];
       state.objects.selected = ['a'];
     });
+    // Step 0 ("Select an object") is already satisfied, so the guide lands on the
+    // step that points at the action bar's Refine button.
     act(() => useGuideStore.getState().startGuide('fix-outline'));
-    act(() => result.current.next()); // past "three ways", onto "Try Edit contour"
-    expect(result.current.step.anchor).toBe('action-edit-contour');
+    expect(result.current.step.anchor).toBe('action-refine');
 
-    // Esc clears the selection; the Edit contour button goes with it.
+    // Esc clears the selection; the Refine button goes with it.
     annotate((state) => {
       state.objects.selected = [];
     });

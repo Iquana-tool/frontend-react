@@ -25,12 +25,11 @@ import {
   useCurrentMaskId,
   useWebSocketIsReady,
   useImageObject,
-  useEnterEditMode,
   useExitEditMode,
   useSetCurrentTool,
-  useStartLineEdit,
   useStopLineEdit,
 } from '../../stores/selectors/annotationSelectors';
+import useRefinementSession from '../../hooks/useRefinementSession';
 
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
@@ -46,10 +45,13 @@ const OUTLINE_REASONS = new Set(['bad_outline', 'missing_parts']);
  * A correction session is a queue of open rejections (built on the launch page,
  * held in `CorrectionContext`). This bar walks it one item at a time: it keeps the
  * editor pointed at the current item's image, auto-selects the sent-back instance
- * and — for an outline complaint — drops into the manual contour editor (drag the
- * control points) so the annotator can reshape it immediately. "Mark as done" /
- * "Won't fix" resolve the rejection with the matching kind and advance; "Skip"
- * advances without resolving. Any pending point edit is saved on every advance.
+ * and — for an outline complaint — opens Refinement mode on it so the annotator can
+ * fix the boundary immediately. The two buttons here name a refinement tool rather
+ * than opening a mode of their own, so a correction lands in the same editor as
+ * every other route to fixing an outline, with the other two tools one click away.
+ * "Mark as done" / "Won't fix" resolve the rejection with the matching kind and
+ * advance; "Skip" advances without resolving. Any pending point edit is saved on
+ * every advance.
  *
  * Renders nothing when no session is active, so mounting it unconditionally in
  * `MainLayout` is free for ordinary annotation work.
@@ -74,13 +76,14 @@ const CorrectionBar = () => {
   const currentMaskId = useCurrentMaskId();
   const sessionReady = useWebSocketIsReady();
   const imageObject = useImageObject();
-  const enterEditMode = useEnterEditMode();
   const exitEditMode = useExitEditMode();
   const setCurrentTool = useSetCurrentTool();
-  const startLineEdit = useStartLineEdit();
   const stopLineEdit = useStopLineEdit();
   const { saveEditing, cancelAutoSave } = useContourEditing();
   const { zoomToObject } = useZoomToObject({ marginPct: 0.25, maxZoom: 4, minZoom: 1 });
+  const { enterRefinement, exitRefinement } = useRefinementSession({
+    zoomOptions: { marginPct: 0.25, maxZoom: 4, minZoom: 1 },
+  });
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -116,19 +119,25 @@ const CorrectionBar = () => {
     [imageObject, zoomToObject]
   );
 
-  // Bring one instance into focus: select it, frame it, and open the requested
-  // fixing tool — 'line' (draw a line merged into the boundary), 'points' (drag
-  // control points), or 'none' (just look).
+  // Bring one instance into focus: select it, frame it, and open Refinement mode
+  // on the requested tool — 'draw' (redraw a stretch of the boundary), 'points'
+  // (drag its control points), or 'none' (just look, no mode).
   const focusInstance = useCallback(
     (target, { tool }) => {
       clearSelection();
       selectObject(target.id);
-      setCurrentTool('selection');
-      zoomToInstance(target);
-      if (tool === 'line') startLineEdit(target.id, target.contour_id, target.x, target.y);
-      else if (tool === 'points') enterEditMode(target.id, target.contour_id, target.x, target.y);
+      if (tool === 'none') {
+        setCurrentTool('selection');
+        zoomToInstance(target);
+        return;
+      }
+      // Refinement frames the instance itself, so no separate zoom here.
+      enterRefinement(target, { tool }).catch((error) => {
+        console.error('[correction] Could not open refinement:', error);
+        zoomToInstance(target);
+      });
     },
-    [clearSelection, selectObject, setCurrentTool, zoomToInstance, startLineEdit, enterEditMode]
+    [clearSelection, selectObject, setCurrentTool, zoomToInstance, enterRefinement]
   );
 
   // -- Keep the editor on the current item's image ---------------------------
@@ -161,15 +170,18 @@ const CorrectionBar = () => {
     focusedRejectionRef.current = currentItem.rejection_id;
     // An outline complaint drops straight into the line tool (the user's primary
     // fix); other reasons just frame the instance.
-    focusInstance(target, { tool: OUTLINE_REASONS.has(currentItem.reason) ? 'line' : 'none' });
+    focusInstance(target, { tool: OUTLINE_REASONS.has(currentItem.reason) ? 'draw' : 'none' });
   }, [active, currentItem, sessionReady, currentMaskId, findTarget, focusInstance, clearSelection]);
 
-  // Persist any pending point edit, drop any in-progress line edit, then step to
-  // the next item (or finish).
+  // Persist any pending point edit, close the refinement session on this
+  // instance, then step to the next item (or finish). Leaving it open would
+  // carry the banner — and the backend's refinement selection — onto the next
+  // item, which is a different contour.
   const goNext = useCallback(() => {
     saveEditing().catch(() => {}); // no-op when not editing or nothing changed
     cancelAutoSave();
     stopLineEdit();
+    exitRefinement();
     if (index >= total - 1) {
       endSession();
       addToast({ type: 'success', message: 'Correction session complete.' });
@@ -177,7 +189,7 @@ const CorrectionBar = () => {
     } else {
       advance();
     }
-  }, [saveEditing, cancelAutoSave, stopLineEdit, index, total, advance, endSession, addToast, navigate, sessionDatasetId]);
+  }, [saveEditing, cancelAutoSave, stopLineEdit, exitRefinement, index, total, advance, endSession, addToast, navigate, sessionDatasetId]);
 
   const resolveAndAdvance = useCallback(
     async (resolution) => {
@@ -201,9 +213,10 @@ const CorrectionBar = () => {
     cancelAutoSave();
     exitEditMode();
     stopLineEdit();
+    exitRefinement();
     endSession();
     navigate(`/dataset/${sessionDatasetId}/datamanagement`);
-  }, [saveEditing, cancelAutoSave, exitEditMode, stopLineEdit, endSession, navigate, sessionDatasetId]);
+  }, [saveEditing, cancelAutoSave, exitEditMode, stopLineEdit, exitRefinement, endSession, navigate, sessionDatasetId]);
 
   if (!active || !currentItem) return null;
 
@@ -246,7 +259,7 @@ const CorrectionBar = () => {
           {currentItem.contour_id != null && isOutline && (
             <>
               <button
-                onClick={() => focusWith('line')}
+                onClick={() => focusWith('draw')}
                 disabled={busy}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-ac bg-p1 border border-acLn rounded-lg hover:bg-acS disabled:opacity-50 transition-colors"
                 title="Draw a line across the boundary to cut off or add a region"

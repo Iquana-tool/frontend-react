@@ -325,6 +325,7 @@ export const useSetOutlineConstantWidth = () => useAnnotationStore(state => stat
 export const useSetOutlinePeek = () => useAnnotationStore(state => state.setOutlinePeek);
 export const useActiveLabelId = () => useAnnotationStore(state => state.workspace.activeLabelId);
 export const useHoveredObjectId = () => useAnnotationStore(state => state.workspace.hoveredObjectId);
+export const useRefinementTool = () => useAnnotationStore(state => state.workspace.refinementTool);
 export const usePicker = () => useAnnotationStore(state => state.workspace.picker);
 export const useShortcutSheetOpen = () => useAnnotationStore(state => state.workspace.shortcutSheetOpen);
 export const useHiddenObjectIds = () => useAnnotationStore(state => state.workspace.hiddenObjectIds);
@@ -348,6 +349,7 @@ export const useSetFilmstripOpen = () => useAnnotationStore(state => state.setFi
 export const useToggleShowApproved = () => useAnnotationStore(state => state.toggleShowApproved);
 export const useSetActiveLabelId = () => useAnnotationStore(state => state.setActiveLabelId);
 export const useSetHoveredObjectId = () => useAnnotationStore(state => state.setHoveredObjectId);
+export const useSetRefinementTool = () => useAnnotationStore(state => state.setRefinementTool);
 export const useSetPicker = () => useAnnotationStore(state => state.setPicker);
 export const useSetShortcutSheetOpen = () => useAnnotationStore(state => state.setShortcutSheetOpen);
 export const useToggleObjectHidden = () => useAnnotationStore(state => state.toggleObjectHidden);

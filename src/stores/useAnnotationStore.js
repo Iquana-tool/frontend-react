@@ -18,6 +18,7 @@ import {
   createWorkspaceSlice,
   readStoredMode,
   readStoredOutline,
+  readStoredRefinementTool,
   readStoredTheme,
 } from './slices/workspaceSlice';
 import { createCalibrationSlice } from './slices/calibrationSlice';
@@ -46,13 +47,14 @@ const useAnnotationStore = create()(
       immer((set, get) => ({
         // Initial state
         ...initialState,
-        // theme, mode and the outline settings are the workspace choices that outlive
-        // a reload; all are read from localStorage here because the store is built
-        // once, at import.
+        // theme, mode, the refinement tool and the outline settings are the
+        // workspace choices that outlive a reload; all are read from localStorage
+        // here because the store is built once, at import.
         workspace: {
           ...initialState.workspace,
           theme: readStoredTheme(),
           mode: readStoredMode(),
+          refinementTool: readStoredRefinementTool(),
           outline: readStoredOutline(),
         },
 

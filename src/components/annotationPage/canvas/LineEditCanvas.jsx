@@ -20,6 +20,7 @@ import {
   useUpdateObject,
   useObjectsList,
   useCurrentMaskId,
+  useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
 import { pixelArrayToNormalized } from '../../../utils/coordinateUtils';
@@ -48,6 +49,12 @@ import ModeBanner from '../workspace/ModeBanner';
  *
  * The two share every part of the interaction except that last step, which is why they
  * share this canvas. The faint dashed outline is the contour being edited.
+ *
+ * Reshape is Refinement mode's `draw` tool, and inside that mode this canvas is a
+ * tool rather than a mode of its own: the banner, the exit and the Escape key all
+ * belong to `RefinementOverlay`, and only the freehand/polygon choice stays here.
+ * Split is never part of refinement — it ends with two objects rather than a
+ * better outline — so it keeps its own banner.
  *
  * Rendered at full container resolution with zoom applied to coordinates (via
  * `useCanvasViewport`), so the drawing stays crisp at any zoom. Only mounted while
@@ -79,6 +86,9 @@ const LineEditCanvas = () => {
   const maskId = useCurrentMaskId();
   const { addToast } = useToast();
   const isSplit = editMode === 'split';
+  const refinementModeActive = useRefinementModeActive();
+  // Inside Refinement mode the chrome above belongs to RefinementOverlay.
+  const ownsChrome = !refinementModeActive;
   const [isSaving, setIsSaving] = useState(false);
 
   const targetObject = useMemo(
@@ -267,7 +277,10 @@ const LineEditCanvas = () => {
     const onKeyDown = (e) => {
       const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable;
       if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+      // Inside Refinement mode, Escape leaves the whole mode — RefinementOverlay
+      // owns it, and this canvas must not swallow it or stop half of one.
       if (e.code === 'Escape') {
+        if (refinementModeActive) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         stopLineEdit();
@@ -278,13 +291,16 @@ const LineEditCanvas = () => {
         e.stopPropagation();
         return;
       }
+      // F / G pick the stroke here. They are also the rail's Freehand and Polygon
+      // keys, and letting them through would arm the prompt canvas on top of this
+      // one — so this listener, which runs in the capture phase, keeps them.
       const key = e.key.toLowerCase();
-      if (key === 'g') { e.preventDefault(); setMode('polygon'); }
-      else if (key === 'f') { e.preventDefault(); setMode('freehand'); }
+      if (key === 'g') { e.preventDefault(); e.stopPropagation(); setMode('polygon'); }
+      else if (key === 'f') { e.preventDefault(); e.stopPropagation(); setMode('freehand'); }
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [active, drawKeyDown, setMode, stopLineEdit]);
+  }, [active, drawKeyDown, setMode, stopLineEdit, refinementModeActive]);
 
   if (!active) return null;
   if (imageLoading || imageError || !imageObject) return null;
@@ -301,17 +317,23 @@ const LineEditCanvas = () => {
 
   return (
     <div ref={containerRef} className="absolute inset-0 z-[60]" style={{ cursor }}>
-      <ModeBanner
-        title={title}
-        subject={targetObject?.label || (objectId != null ? `Object #${objectId}` : null)}
-        hint={instruction}
-        dotClass="bg-ac"
-        exitLabel={isSplit ? 'Exit split' : 'Exit reshape'}
-        onExit={stopLineEdit}
-      />
+      {ownsChrome && (
+        <ModeBanner
+          title={title}
+          subject={targetObject?.label || (objectId != null ? `Object #${objectId}` : null)}
+          hint={instruction}
+          dotClass="bg-ac"
+          exitLabel={isSplit ? 'Exit split' : 'Exit reshape'}
+          onExit={stopLineEdit}
+        />
+      )}
 
-      {/* Mode selector */}
-      <div className="absolute top-[76px] left-3 z-[80] flex items-center gap-1 bg-p1 backdrop-blur-sm border border-ln rounded-xl shadow-lg p-1">
+      {/* Stroke selector. It sits under whichever control cluster is above it:
+          the banner alone when this canvas is its own mode, or the banner plus
+          Refinement mode's tool switch when it is one tool inside it. */}
+      <div
+        className={`absolute ${ownsChrome ? 'top-[76px]' : 'top-[120px]'} left-3 z-[80] flex items-center gap-1 bg-p1 backdrop-blur-sm border border-ln rounded-xl shadow-lg p-1`}
+      >
         {MODES.map(({ id, label, icon: Icon, hotkey }) => {
           const isActive = mode === id;
           return (

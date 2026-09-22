@@ -11,19 +11,17 @@ import {
   useImageObject,
   useUpdateObject,
   useRemoveObject,
-  useEnterRefinementMode,
   useCurrentTool,
   useSetCurrentTool,
   useRefinementModeActive,
   useFocusModeActive,
   useFocusModeObjectId,
   useExitFocusMode,
-  useEnterEditMode,
   useStartLineEdit,
   useSelectObject,
   useCurrentMaskId,
 } from '../../../stores/selectors/annotationSelectors';
-import { useRefinementMode } from '../../../hooks/useRefinementMode';
+import useRefinementSession from '../../../hooks/useRefinementSession';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
@@ -52,7 +50,6 @@ const ObjectContextMenu = () => {
   const imageObject = useImageObject();
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
-  const enterRefinementMode = useEnterRefinementMode();
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
   const refinementModeActive = useRefinementModeActive();
@@ -66,7 +63,6 @@ const ObjectContextMenu = () => {
     maxZoom: 4,
     minZoom: 1,
   });
-  const enterEditMode = useEnterEditMode();
   const startLineEdit = useStartLineEdit();
   const selectObject = useSelectObject();
   const maskId = useCurrentMaskId();
@@ -337,13 +333,9 @@ const ObjectContextMenu = () => {
     }
   };
 
-  // Use shared refinement mode hook
-  const enterRefinementModeForObject = useRefinementMode({
-    enterRefinementMode,
-    setCurrentTool,
-    exitFocusMode,
-    focusModeActive,
-    imageObject,
+  // One entry into Refinement mode; which of its three tools opens is the
+  // remembered choice, switched on the canvas rather than re-picked here.
+  const { enterRefinement } = useRefinementSession({
     containerRef: menuRef,
     zoomOptions: {
       marginPct: 0.25,
@@ -368,13 +360,7 @@ const ObjectContextMenu = () => {
     }
 
     try {
-      await enterRefinementModeForObject(targetObject);
-
-      // Also enter edit mode so control points are immediately available
-      if (targetObject.x && targetObject.y && targetObject.x.length > 0 && targetObject.contour_id != null) {
-        enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
-      }
-
+      await enterRefinement(targetObject);
       hideContextMenu();
     } catch (error) {
       alert(`Failed to enter refinement mode: ${error.message || 'Unknown error'}`);
@@ -387,7 +373,13 @@ const ObjectContextMenu = () => {
     await suggestSimilar.run();
   };
 
-  const handleLineEditContour = (lineMode = 'reshape') => {
+  /**
+   * Split this object along a drawn line (#43).
+   *
+   * Not part of Refinement mode: it is the one line-drawing action that does not
+   * end with a better outline for *this* object, but with two objects.
+   */
+  const handleSplitObject = () => {
     if (isMultiSelect) return;
     const targetObject = objectsList.find(obj => obj.id === targetObjectId);
     if (!targetObject || targetObject.contour_id == null ||
@@ -405,7 +397,7 @@ const ObjectContextMenu = () => {
 
     selectObject(targetObject.id);
     setCurrentTool('selection');
-    startLineEdit(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y, lineMode);
+    startLineEdit(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y, 'split');
 
     // Frame the instance so there is room to draw the line.
     if (imageObject && targetObject.x.length > 0) {
@@ -451,73 +443,6 @@ const ObjectContextMenu = () => {
     } finally {
       setIsMerging(false);
     }
-  };
-
-  const handleEditContour = () => {
-    // Disable edit mode for multiple objects
-    if (isMultiSelect) {
-      return;
-    }
-    
-    if (!targetObjectId) {
-      hideContextMenu();
-      return;
-    }
-
-    // Find the target object
-    const targetObject = objectsList.find(obj => obj.id === targetObjectId);
-    if (!targetObject) {
-      hideContextMenu();
-      return;
-    }
-
-    // Ensure object has valid coordinates
-    if (!targetObject.x || !targetObject.y || targetObject.x.length === 0 || targetObject.y.length === 0) {
-      alert('Cannot edit object: missing or invalid coordinates');
-      hideContextMenu();
-      return;
-    }
-    
-    // Ensure contour_id exists for backend communication
-    if (!targetObject.contour_id && targetObject.contour_id !== 0) {
-      alert('Cannot edit object: missing contour_id');
-      hideContextMenu();
-      return;
-    }
-
-    // Exit focus mode if active
-    if (focusModeActive) {
-      if (annotationSession.isReady()) {
-        annotationSession.unfocusImage().catch(err => 
-          console.error('Failed to send unfocus message:', err)
-        );
-      }
-      exitFocusMode();
-    }
-
-    // Enter edit mode
-    enterEditMode(targetObject.id, targetObject.contour_id, targetObject.x, targetObject.y);
-
-    // Zoom into the contour (like refinement mode does)
-    if (imageObject && targetObject.x && targetObject.y && targetObject.x.length > 0) {
-      const container = menuRef.current?.parentElement;
-      if (container) {
-        const containerWidth = container.offsetWidth;
-        const containerHeight = container.offsetHeight;
-        if (containerWidth && containerHeight) {
-          const renderedImageDimensions = calculateRenderedImageDimensions(imageObject, containerWidth, containerHeight);
-          zoomToObject(
-            targetObject,
-            { width: imageObject.width, height: imageObject.height },
-            { width: containerWidth, height: containerHeight },
-            renderedImageDimensions,
-            { animateMs: 300, immediate: false }
-          );
-        }
-      }
-    }
-    
-    hideContextMenu();
   };
 
   if (!visible) return null;
@@ -573,11 +498,16 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Refine Option - Disabled for multi-select */}
+      {/* Refine Option - the one way into Refinement mode, which carries all
+          three ways of fixing an outline behind its own tool switch. */}
       <ContextMenuItem
         onClick={handleRefine}
         disabled={isMultiSelect}
-        title={isMultiSelect ? 'Refinement mode is disabled for multiple selections' : 'Refine object'}
+        title={
+          isMultiSelect
+            ? 'Refinement mode is disabled for multiple selections'
+            : 'Fix this outline — with the AI, by dragging its points, or by redrawing a stretch'
+        }
         label="Refine Object"
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -586,22 +516,9 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Reshape by Line Option - draw a line that is merged into the boundary */}
-      <ContextMenuItem
-        onClick={() => handleLineEditContour('reshape')}
-        disabled={isMultiSelect}
-        title={isMultiSelect ? 'Reshape is disabled for multiple selections' : 'Draw a line across the boundary to cut off or add a region'}
-        label="Reshape by Line"
-        icon={
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 20l6-6m0 0l4-4 6-6M10 14l4 4m-4-4l-2-2" />
-          </svg>
-        }
-      />
-
       {/* Split Option - draw a line across the object to cut it in two */}
       <ContextMenuItem
-        onClick={() => handleLineEditContour('split')}
+        onClick={handleSplitObject}
         disabled={isMultiSelect}
         title={isMultiSelect ? 'Split works on one object at a time' : 'Draw a line across this object to cut it into two objects'}
         label="Split Object"
@@ -625,19 +542,6 @@ const ObjectContextMenu = () => {
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h5a3 3 0 013 3v6a3 3 0 003 3h5m0-12h-5a3 3 0 00-3 3" />
-          </svg>
-        }
-      />
-
-      {/* Edit Contour Option - Disabled for multi-select */}
-      <ContextMenuItem
-        onClick={handleEditContour}
-        disabled={isMultiSelect}
-        title={isMultiSelect ? 'Edit contour is disabled for multiple selections' : 'Drag the existing outline’s control points'}
-        label="Edit Contour"
-        icon={
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
           </svg>
         }
       />

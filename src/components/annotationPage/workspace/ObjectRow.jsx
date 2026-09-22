@@ -7,9 +7,9 @@ import {
   Eye,
   EyeOff,
   GripVertical,
-  Pencil,
   RotateCcw,
   Trash2,
+  Wand2,
   XCircle,
 } from 'lucide-react';
 import { getObjectDisplayName, getObjectState, isReviewed } from './objectViewModel';
@@ -108,7 +108,7 @@ const ObjectRow = ({
   onAssignLabel,
   onDiscard,
   onSendBack,
-  onEditContour,
+  onRefine,
   onDelete,
   onShowStats,
   onDragStart,
@@ -223,7 +223,7 @@ const ObjectRow = ({
           />
         )}
 
-        {canEdit && <RowAction icon={Pencil} label="Edit contour" onClick={onEditContour} />}
+        {canEdit && <RowAction icon={Wand2} label="Refine outline" onClick={onRefine} />}
 
         {canDelete && reviewed && (
           <RowAction icon={Trash2} label="Delete object" tone="err" onClick={onDelete} />

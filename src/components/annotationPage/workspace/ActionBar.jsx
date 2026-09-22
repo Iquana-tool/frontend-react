@@ -9,7 +9,6 @@ import {
   Loader2,
   Palette,
   Pencil,
-  PenLine,
   RotateCcw,
   Ruler,
   SlidersHorizontal,
@@ -403,15 +402,24 @@ const ActionBar = () => {
     sub = area;
     buttons = (
       <>
-        <BarButton icon={Wand2} label="Refine" onClick={() => actions.refine(single)} />
-        <BarButton
-          icon={Pencil}
-          label="Edit contour"
-          shortcut="E"
-          onClick={() => actions.editContour(single)}
-          guide="action-edit-contour"
-        />
-        <BarButton icon={PenLine} label="Reshape" onClick={() => actions.reshapeByLine(single)} />
+        {/* One way in. The three ways of fixing an outline — AI, control points,
+            redrawing a stretch — are tools inside Refinement mode now, switched
+            on the canvas, so the bar no longer has to offer them as three
+            competing buttons that each opened a different mode.
+
+            Hidden once the mode is open, which it can be while this state still
+            shows (the AI tool leaves the selection alone): a second Refine there
+            would only re-enter the mode it is already in. */}
+        {!refinementActive && (
+          <BarButton
+            icon={Wand2}
+            label="Refine"
+            shortcut="E"
+            title="Fix this outline — with the AI, by dragging its points, or by redrawing a stretch"
+            onClick={() => actions.refine(single)}
+            guide="action-refine"
+          />
+        )}
         <BarButton
           icon={Sparkles}
           label="Suggest similar"

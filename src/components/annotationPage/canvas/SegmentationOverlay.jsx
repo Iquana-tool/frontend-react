@@ -15,11 +15,9 @@ import {
   useFocusModeObjectId,
   useRefinementModeActive,
   useRefinementModeObjectId,
-  useEnterRefinementMode,
   useSetCurrentTool,
   useExitFocusMode,
   useObjectsVisibility,
-  useEnterEditMode,
   useExitEditMode,
   useUpdateObject,
   useHoveredObjectId,
@@ -32,6 +30,7 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
+import useRefinementSession from '../../../hooks/useRefinementSession';
 import annotationSession from '../../../services/annotationSession';
 import { getContourId } from '../../../utils/objectUtils';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
@@ -113,14 +112,17 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   // a focused parent, is every stroke.
   const manualDrawingActive = currentTool === 'manual_drawing';
   const pathsInert = refinementModeActive || manualDrawingActive;
-  const enterRefinementMode = useEnterRefinementMode();
   const setCurrentTool = useSetCurrentTool();
   const exitFocusMode = useExitFocusMode();
   const visibility = useObjectsVisibility();
-  
-  const enterEditMode = useEnterEditMode();
+
   const exitEditMode = useExitEditMode();
   const updateObject = useUpdateObject();
+
+  const { enterRefinement } = useRefinementSession({
+    containerRef,
+    zoomOptions: { marginPct: 0.25, maxZoom: 4, minZoom: 1 },
+  });
 
   // State for the "label required" prompt when clicking an unlabelled object
   const [unlabelledPromptObject, setUnlabelledPromptObject] = useState(null);
@@ -375,54 +377,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
-  // Handle double-click: enter refinement mode + edit mode + zoom
+  // Handle double-click: open Refinement mode on whichever of its three tools
+  // is armed. The session hook owns the backend selection, the tool set-up and
+  // the framing, so this path cannot drift from the menu's and the bar's.
   const handleObjectDoubleClick = async (object) => {
-    const contourId = object.contour_id || object.id;
-    
     try {
-      // If already editing a (possibly different) object, save first
-      saveAndExitEditMode();
-
-      // Exit focus mode if active (refinement mode replaces focus mode)
-      if (focusModeActive) {
-        if (annotationSession.isReady()) {
-          await annotationSession.unfocusImage();
-        }
-        exitFocusMode();
-      }
-      
-      // Send refinement selection to backend
-      await annotationSession.selectRefinementObject(contourId);
-      
-      // Enter refinement mode in the store
-      enterRefinementMode(object.id, contourId);
-
-      // Also enter edit mode so the user can drag control points immediately
-      if (object.x && object.y && object.x.length > 0 && object.contour_id != null) {
-        enterEditMode(object.id, object.contour_id, object.x, object.y);
-      }
-      
-      // Switch to AI annotation tool
-      setCurrentTool('ai_annotation');
-      
-      // Zoom and pan to the object
-      if (imageObject && object.x && object.y && object.x.length > 0) {
-        const container = containerRef.current;
-        if (container) {
-          const containerWidth = container.offsetWidth;
-          const containerHeight = container.offsetHeight;
-          
-          if (containerWidth && containerHeight) {
-            zoomToObject(
-              object,
-              { width: imageObject.width, height: imageObject.height },
-              { width: containerWidth, height: containerHeight },
-              { width: imageDimensions.width, height: imageDimensions.height, x: imageDimensions.x, y: imageDimensions.y },
-              { animateMs: 300, immediate: false }
-            );
-          }
-        }
-      }
+      await enterRefinement(object);
     } catch (error) {
       console.error('Failed to enter refinement mode:', error);
     }

@@ -24,7 +24,7 @@ const GROUPS = [
       { keys: '2', label: 'Suggest similar instances' },
       { keys: '3', label: 'Run instance segmentation' },
       { keys: 'L', label: 'Open the label picker' },
-      { keys: 'E', label: 'Edit the selected contour' },
+      { keys: 'E', label: 'Refine the selected outline, then cycle AI / Points / Draw' },
       { keys: 'R', label: 'Reject (review mode)' },
       { keys: '⌫', label: 'Remove last prompt, or delete the selection' },
       { keys: 'esc', label: 'Clear the selection, leave focus mode, or cancel a calibration measurement' },

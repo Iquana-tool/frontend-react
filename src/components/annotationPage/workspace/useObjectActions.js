@@ -8,18 +8,14 @@ import {
   useImageObject,
   useSetZoomLevel,
   useSetPanOffset,
-  useEnterRefinementMode,
-  useSetCurrentTool,
   useFocusModeActive,
   useExitFocusMode,
   useEnterFocusMode,
   useRefinementModeActive,
-  useEnterEditMode,
-  useStartLineEdit,
   useObjectsList,
 } from '../../../stores/selectors/annotationSelectors';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
-import { useRefinementMode } from '../../../hooks/useRefinementMode';
+import useRefinementSession from '../../../hooks/useRefinementSession';
 import { useToast } from '../../../contexts/ToastContext';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
@@ -43,6 +39,12 @@ import annotationSession from '../../../services/annotationSession';
  *    keeps a single focused contour per session;
  *  - contour edits require both coordinates and a contour id, so both are
  *    checked before the mode is entered.
+ *
+ * Fixing an outline is one action here, `refine`. The three ways of doing it are
+ * tools inside Refinement mode rather than separate modes, so `editContour` and
+ * `reshapeByLine` are the same call with a tool named — they exist so a caller
+ * that means a specific one (a correction item about a boundary, say) can say so
+ * without knowing how the mode is put together.
  */
 export default function useObjectActions() {
   const { addToast } = useToast();
@@ -58,24 +60,14 @@ export default function useObjectActions() {
   const setZoomLevel = useSetZoomLevel();
   const setPanOffset = useSetPanOffset();
 
-  const enterRefinementMode = useEnterRefinementMode();
-  const setCurrentTool = useSetCurrentTool();
   const focusModeActive = useFocusModeActive();
   const exitFocusMode = useExitFocusMode();
   const enterFocusMode = useEnterFocusMode();
   const refinementModeActive = useRefinementModeActive();
-  const enterEditMode = useEnterEditMode();
-  const startLineEdit = useStartLineEdit();
 
   const { zoomToObject } = useZoomToObject({ marginPct: 0.2, maxZoom: 4, minZoom: 1 });
 
-  const enterRefinementForObject = useRefinementMode({
-    enterRefinementMode,
-    setCurrentTool,
-    exitFocusMode,
-    focusModeActive,
-    imageObject,
-    containerRef: null,
+  const { enterRefinement } = useRefinementSession({
     zoomOptions: { marginPct: 0.2, maxZoom: 4, minZoom: 1 },
   });
 
@@ -184,10 +176,15 @@ export default function useObjectActions() {
     [selectedObjects, selectObject, deselectObject, leaveFocusMode, resetView, focusOn, frameObject]
   );
 
+  /**
+   * Open Refinement mode on an object, on whichever tool is armed.
+   * @param {Object} object
+   * @param {string} [tool] - force a tool (and arm it), instead of the armed one.
+   */
   const refine = useCallback(
-    async (object) => {
+    async (object, tool) => {
       try {
-        await enterRefinementForObject(object);
+        await enterRefinement(object, { tool });
       } catch (error) {
         addToast({
           type: 'error',
@@ -195,43 +192,14 @@ export default function useObjectActions() {
         });
       }
     },
-    [enterRefinementForObject, addToast]
+    [enterRefinement, addToast]
   );
 
-  const editContour = useCallback(
-    (object) => {
-      if (!object?.x?.length || !object?.y?.length) {
-        addToast({ type: 'error', message: 'This object has no editable outline.' });
-        return;
-      }
-      if (object.contour_id == null) {
-        addToast({ type: 'error', message: 'This object is not saved yet.' });
-        return;
-      }
+  /** Refine on the control-point tool. */
+  const editContour = useCallback((object) => refine(object, 'points'), [refine]);
 
-      leaveFocusMode();
-      enterEditMode(object.id, object.contour_id, object.x, object.y);
-      if (!selectedObjects.includes(object.id)) selectObject(object.id);
-      frameObject(object, 300);
-    },
-    [leaveFocusMode, enterEditMode, selectedObjects, selectObject, frameObject, addToast]
-  );
-
-  const reshapeByLine = useCallback(
-    (object) => {
-      if (object?.contour_id == null || !object?.x?.length) {
-        addToast({ type: 'error', message: 'This object cannot be reshaped.' });
-        return;
-      }
-      leaveFocusMode();
-      selectObject(object.id);
-      // The line tool draws on the selection canvas, not the prompt canvas.
-      setCurrentTool('selection');
-      startLineEdit(object.id, object.contour_id, object.x, object.y);
-      frameObject(object, 300);
-    },
-    [leaveFocusMode, selectObject, setCurrentTool, startLineEdit, frameObject, addToast]
-  );
+  /** Refine on the redraw-a-stretch tool. */
+  const reshapeByLine = useCallback((object) => refine(object, 'draw'), [refine]);
 
   const remove = useCallback(
     async (object) => {

@@ -6,6 +6,7 @@ import {
   nextOutlinePreset,
   sanitizeOutline,
 } from '../../utils/outlineSettings';
+import { DEFAULT_REFINEMENT_TOOL, isRefinementTool } from '../../utils/refinementTools';
 
 /**
  * Workspace slice — layout, mode and view state for the annotation workspace.
@@ -13,8 +14,8 @@ import {
  * Everything here is presentation state. Nothing in this slice is persisted to
  * the backend except through the actions that already own that concern
  * (label assignment, visibility filters, object mutation), which live in
- * `objectsSlice`. The exceptions are `theme`, `mode` and the outline settings,
- * mirrored to localStorage so the choices survive a reload.
+ * `objectsSlice`. The exceptions are `theme`, `mode`, `refinementTool` and the
+ * outline settings, mirrored to localStorage so the choices survive a reload.
  */
 
 const THEME_STORAGE_KEY = 'iquana.workspace.theme';
@@ -111,6 +112,37 @@ const persistOutline = (outline) => {
   }
 };
 
+/**
+ * @see readStoredRefinementTool
+ */
+export const REFINEMENT_TOOL_STORAGE_KEY = 'iquana.workspace.refinementTool';
+
+/**
+ * Reads the persisted refinement tool, falling back to the AI tool.
+ *
+ * Persisted for the reason the issue behind the tool switch gives: which of the
+ * three ways of fixing an outline someone reaches for is a working habit, not a
+ * per-object decision. Whatever was last selected stays selected — across
+ * objects, across images and across a reload.
+ */
+export const readStoredRefinementTool = () => {
+  try {
+    const stored = window.localStorage.getItem(REFINEMENT_TOOL_STORAGE_KEY);
+    return isRefinementTool(stored) ? stored : DEFAULT_REFINEMENT_TOOL;
+  } catch {
+    // Private browsing / disabled storage — the default is good enough.
+    return DEFAULT_REFINEMENT_TOOL;
+  }
+};
+
+const persistRefinementTool = (tool) => {
+  try {
+    window.localStorage.setItem(REFINEMENT_TOOL_STORAGE_KEY, tool);
+  } catch {
+    // Non-fatal: the choice simply won't survive a reload.
+  }
+};
+
 const toggleKey = (map, key) => {
   if (map[key]) delete map[key];
   else map[key] = true;
@@ -164,6 +196,19 @@ export const createWorkspaceSlice = (set) => ({
       state.images.scale.calibrationPoints = null;
       state.ui.currentTool = 'ai_annotation';
     }
+  }),
+
+  /**
+   * Arm one of the three refinement tools.
+   *
+   * Only the preference. Entering or leaving the matching canvas mode is
+   * `useRefinementSession`'s job, because that needs the object, the backend
+   * selection and whatever the previous tool left unsaved.
+   */
+  setRefinementTool: (tool) => set((state) => {
+    if (!isRefinementTool(tool)) return;
+    state.workspace.refinementTool = tool;
+    persistRefinementTool(tool);
   }),
 
   setPromptAction: (action) => set((state) => {
