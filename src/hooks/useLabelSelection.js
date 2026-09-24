@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { getContourId, extractLabelInfo } from '../utils/objectUtils';
 import annotationSession from '../services/annotationSession';
+import { trackAnnotation } from '../services/activityLog';
 
 /**
  * Shared hook for label selection logic
@@ -31,6 +32,10 @@ export function useLabelSelection(updateObject, onSuccess, onError) {
 
       // Extract reviewed_by from the response (backend echoes fields_to_be_updated)
       const reviewedBy = response?.data?.fields_to_be_updated?.reviewed_by || ['current_user'];
+
+      trackAnnotation('contour.relabel', {
+        payload: { contour_id: contourId, label_id: labelId },
+      });
 
       // Update the object in the store
       updateObject(object.id, {

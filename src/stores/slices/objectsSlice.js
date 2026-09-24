@@ -1,5 +1,6 @@
 import { getObjectColor } from '../utils/objectColors';
 import { hasValidLabel } from '../utils/labelValidation';
+import { trackAnnotation } from '../../services/activityLog';
 
 const normalizeDatasetId = (id) => (id != null ? String(id) : null);
 
@@ -117,6 +118,15 @@ export const createObjectsSlice = (set) => ({
     };
     state.objects.list.push(newObject);
     state.objects.colors[newObject.id] = newObject.color;
+    // `source` separates objects the participant drew by hand from ones an AI
+    // call produced -- the split most study questions turn on.
+    trackAnnotation('contour.create', {
+      payload: {
+        source: object.source ?? 'unknown',
+        has_parent: normalizedParentId != null,
+        labelled: hasValidLabel(newObject.label),
+      },
+    });
   }),
   
   /**
@@ -260,6 +270,12 @@ export const createObjectsSlice = (set) => ({
   }),
   
   removeObject: (id) => set((state) => {
+    const removed = state.objects.list.find(obj => obj.id === id);
+    if (removed) {
+      trackAnnotation('contour.delete', {
+        payload: { labelled: hasValidLabel(removed.label) },
+      });
+    }
     state.objects.list = state.objects.list.filter(obj => obj.id !== id);
     delete state.objects.colors[id];
     state.objects.selected = state.objects.selected.filter(objId => objId !== id);
@@ -295,6 +311,17 @@ export const createObjectsSlice = (set) => ({
       if (isNewLabelAssignment) {
         state.objects.labelAssignmentCounter += 1;
         updates.labelAssignmentOrder = state.objects.labelAssignmentCounter;
+      }
+
+      // Only the label *id* goes into the event, never the label text: class names
+      // in a dataset can be free-form and are not the tool's to redistribute.
+      if (updates.label !== undefined || updates.labelId !== undefined) {
+        trackAnnotation(isNewLabelAssignment ? 'label.assign' : 'label.change', {
+          payload: {
+            label_id: updates.labelId ?? null,
+            assignment_order: updates.labelAssignmentOrder ?? null,
+          },
+        });
       }
       
       // Merge updates into the existing object

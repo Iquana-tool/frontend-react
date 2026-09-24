@@ -59,7 +59,7 @@ const useAnnotationStore = create()(
         },
 
         // Combine all slices
-        ...createUISlice(set),
+        ...createUISlice(set, get),
         ...createModelsSlice(set, get),
         ...createCanvasSlice(set),
         ...createContextMenuSlice(set),

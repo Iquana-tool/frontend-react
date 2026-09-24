@@ -1,6 +1,7 @@
 import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 
 import { API_BASE_URL } from "./config";
+import { trackAnnotation } from "../services/activityLog";
 
 export const markMaskAsFinal = async (maskId) => {
     try {
@@ -16,7 +17,9 @@ export const markMaskAsFinal = async (maskId) => {
                 "Content-Type": "application/json",
             }),
         });
-        return handleApiError(response);
+        const result = await handleApiError(response);
+        trackAnnotation("mask.finished", { payload: { mask_id: maskId } });
+        return result;
     } catch (error) {
         throw error;
     }
@@ -36,7 +39,9 @@ export const markMaskAsUnfinished = async (maskId) => {
                 "Content-Type": "application/json",
             }),
         });
-        return handleApiError(response);
+        const result = await handleApiError(response);
+        trackAnnotation("mask.unfinished", { payload: { mask_id: maskId } });
+        return result;
     } catch (error) {
         throw error;
     }

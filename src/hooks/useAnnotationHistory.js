@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as api from '../api';
 import websocketService from '../services/websocket';
+import { trackAnnotation } from '../services/activityLog';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import { useToast } from '../contexts/ToastContext';
 import {
@@ -150,6 +151,7 @@ export default function useAnnotationHistory() {
         const response = direction === 'redo'
           ? await api.redoAnnotationAction(id)
           : await api.undoAnnotationAction(id);
+        trackAnnotation(direction === 'redo' ? 'history.redo' : 'history.undo', { imageId: id });
 
         // The user may have stepped to another image while this was in flight.
         // The hierarchy belongs to the image the request was made on, so applying
