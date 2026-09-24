@@ -10,6 +10,7 @@ import PreferenceSync from "./components/account/PreferenceSync";
 import useDocumentTheme from "./hooks/useDocumentTheme";
 import { useRouteActivity, useActivityLogInit } from "./hooks/useActivityLog";
 import Login from "./components/auth/Login";
+import Register from "./components/auth/Register";
 import InstanceLandingPage from "./pages/InstanceLandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
 import NewDatasetPage from "./pages/NewDatasetPage";
@@ -58,6 +59,7 @@ function App() {
           <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/" element={<InstanceLandingPage />} />
             <Route path="/docs" element={<DocumentationPage />} />
             <Route path="/models" element={<ModelZooPage />} />
