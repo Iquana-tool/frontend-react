@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Ruler, Wrench, Settings, HelpCircle, Wand2, Cpu } from 'lucide-react';
 import ManagementCard from './ManagementCard';
+import DatasetActivityCard from './DatasetActivityCard';
 import PhaseProgressBar from '../PhaseProgressBar';
 import RoleBadge from '../RoleBadge';
 import { usePermissions } from '../../../hooks/usePermissions';
@@ -379,6 +380,18 @@ const ManagementCardsView = ({
               </div>
             </section>
           ))}
+
+          {dataset?.id && can(Permission.DATASET_READ) && (
+            <section>
+              <div className="flex items-center gap-4 mb-4 sm:mb-5">
+                <h3 className="text-base sm:text-lg font-semibold text-t2 whitespace-nowrap">
+                  Activity
+                </h3>
+                <div className="flex-1 h-px bg-hv2" />
+              </div>
+              <DatasetActivityCard datasetId={dataset.id} />
+            </section>
+          )}
         </div>
       </div>
     </div>

@@ -92,6 +92,21 @@ export const getAnnotationProgress = async (datasetId) => {
     }
 };
 
+/**
+ * Who did what on a dataset: per-user counts over a time window.
+ *
+ * @param {number|string} datasetId
+ * @param {number} days - window in days; 0 for all time
+ * @returns {Promise<{success: boolean, since: string|null, users: Array<Object>}>}
+ */
+export const fetchDatasetActivity = async (datasetId, days = 7) => {
+    const response = await fetch(
+        `${API_BASE_URL}/datasets/${datasetId}/activity?days=${days}`,
+        { headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
 // Get sample images for a dataset (first few images)
 export const getSampleImages = async (datasetId, limit = 4) => {
     try {
