@@ -6,6 +6,7 @@ import useAnnotationServices from './useAnnotationServices';
 import useRailTools from './useRailTools';
 import { PROMPT_ACTIONS, getPromptAction, getRailTool } from './toolModel';
 import InstanceWarningModal from '../modals/InstanceWarningModal';
+import useAiTools from '../../../hooks/useAiTools';
 import { useToggleLeftDrawer } from '../../../stores/selectors/annotationSelectors';
 
 const ACTION_ICONS = { Ban, Sparkles, Pencil };
@@ -29,6 +30,7 @@ const ToolOptionsDrawer = () => {
     closeInstanceWarning,
     confirmInstanceRun,
   } = useAnnotationServices();
+  const { isEnabled: isToolEnabled } = useAiTools();
 
   const toolName = getRailTool(railTool).name;
 
@@ -58,7 +60,7 @@ const ToolOptionsDrawer = () => {
             aria-label="What happens when a prompt is placed"
             className="flex items-center gap-[2px] p-[2px] rounded-9 border border-ln2 bg-well"
           >
-            {PROMPT_ACTIONS.map((action) => {
+            {PROMPT_ACTIONS.filter((action) => action.id !== 'ai' || isToolEnabled('prompted')).map((action) => {
               const Icon = ACTION_ICONS[action.icon];
               const active = promptAction === action.id;
               return (
@@ -118,7 +120,7 @@ const ToolOptionsDrawer = () => {
             {services.map((service) => (
               <ServiceCard key={service.key} service={service} />
             ))}
-            <CrossImageSuggestionCard />
+            {isToolEnabled('cross_image') && <CrossImageSuggestionCard />}
           </div>
         </div>
       </div>

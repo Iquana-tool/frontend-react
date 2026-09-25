@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import useAnnotationStore from '../stores/useAnnotationStore';
+import useAiTools from './useAiTools';
 import annotationSession from '../services/annotationSession';
 import { useZoomToObject } from './useZoomToObject';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../utils/canvasUtils';
@@ -56,6 +57,7 @@ export default function useRefinementSession({
   containerRef = null,
   zoomOptions = { marginPct: 0.25, maxZoom: 4, minZoom: 1 },
 } = {}) {
+  const { isEnabled: isToolEnabled } = useAiTools();
   const enterRefinementMode = useEnterRefinementMode();
   const exitRefinementMode = useExitRefinementMode();
   const refinementTool = useRefinementTool();
@@ -137,12 +139,14 @@ export default function useRefinementSession({
    *   whose save call would have nothing to address.
    */
   const applyTool = useCallback((requested) => {
-    const tool = isRefinementTool(requested) ? requested : DEFAULT_REFINEMENT_TOOL;
     const state = useAnnotationStore.getState();
     const objectId = state.aiAnnotation.refinementMode.objectId;
     const object = state.objects.list.find((candidate) => candidate.id === objectId) || null;
 
     const editable = object && object.contour_id != null && object.x?.length > 0;
+    let tool = isRefinementTool(requested) ? requested : DEFAULT_REFINEMENT_TOOL;
+    // With AI refinement switched off for the dataset, open on the points tool instead.
+    if (tool === 'ai' && !isToolEnabled('refine') && editable) tool = 'points';
     const usable = refinementToolNeedsContourId(tool) && !editable ? DEFAULT_REFINEMENT_TOOL : tool;
 
     if (usable === 'points') {
@@ -158,7 +162,7 @@ export default function useRefinementSession({
     }
 
     return usable;
-  }, [enterEditMode, startLineEdit, setCurrentTool]);
+  }, [enterEditMode, startLineEdit, setCurrentTool, isToolEnabled]);
 
   /**
    * Enter refinement mode on an object.

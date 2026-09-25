@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDatasetAccess } from '../../hooks/useDatasetAccess';
 import InvitesPanel from './access/InvitesPanel';
 import MembersPanel from './access/MembersPanel';
+import AiToolsPanel from './access/AiToolsPanel';
 import ReviewPolicyPanel from './access/ReviewPolicyPanel';
 import PermissionMatrix from './PermissionMatrix';
 
@@ -104,7 +105,13 @@ const ManageAccessModal = ({ isOpen, dataset, onClose, onChange }) => {
               )}
               {tab === TABS.INVITES && canInvite && <InvitesPanel access={access} />}
               {tab === TABS.SETTINGS && canUpdateSettings && (
-                <ReviewPolicyPanel access={access} dataset={dataset} />
+                <div className="space-y-6">
+                  <ReviewPolicyPanel access={access} dataset={dataset} />
+                  <section>
+                    <h3 className="text-sm font-semibold text-t1 mb-1">AI tools</h3>
+                    <AiToolsPanel access={access} dataset={dataset} />
+                  </section>
+                </div>
               )}
               {tab === TABS.PERMISSIONS && (
                 <PermissionMatrix

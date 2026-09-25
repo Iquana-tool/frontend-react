@@ -157,6 +157,16 @@ export function useDatasetAccess(dataset, { enabled = true, onChange } = {}) {
     [dataset?.id, run]
   );
 
+  const setDisabledAiTools = useCallback(
+    (tools) =>
+      run(
+        'settings',
+        () => api.updateDatasetSettings(dataset.id, { disabledAiTools: tools }),
+        { fallbackError: 'Could not update the AI tools.', reload: false }
+      ),
+    [dataset?.id, run]
+  );
+
   return {
     role,
     members,
@@ -174,6 +184,7 @@ export function useDatasetAccess(dataset, { enabled = true, onChange } = {}) {
     createInvite,
     revokeInvite,
     setIndependentReview,
+    setDisabledAiTools,
   };
 }
 

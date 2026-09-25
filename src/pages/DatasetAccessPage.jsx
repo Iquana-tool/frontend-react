@@ -14,6 +14,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Permission } from '../utils/permissions';
 import InvitesPanel from '../components/datasets/access/InvitesPanel';
 import MembersPanel from '../components/datasets/access/MembersPanel';
+import AiToolsPanel from '../components/datasets/access/AiToolsPanel';
 import ReviewPolicyPanel from '../components/datasets/access/ReviewPolicyPanel';
 import TaskAssignmentPanel from '../components/datasets/access/TaskAssignmentPanel';
 import PermissionMatrix from '../components/datasets/PermissionMatrix';
@@ -199,7 +200,13 @@ const DatasetAccessPage = () => {
                   <TaskAssignmentPanel members={members} />
                 )}
                 {section === SECTIONS.POLICY && canUpdateSettings && (
+                  <div className="space-y-6">
                   <ReviewPolicyPanel access={access} dataset={dataset} />
+                  <section>
+                    <h3 className="text-sm font-semibold text-t1 mb-1">AI tools</h3>
+                    <AiToolsPanel access={access} dataset={dataset} />
+                  </section>
+                </div>
                 )}
                 {section === SECTIONS.PERMISSIONS && (
                   <PermissionMatrix highlightRole={role} />

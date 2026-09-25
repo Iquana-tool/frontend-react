@@ -10,6 +10,8 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 import { useSuggestionSegmentation } from '../../../hooks/useSuggestionSegmentation';
 import { useDataset } from '../../../contexts/DatasetContext';
+import useAiTools from '../../../hooks/useAiTools';
+import { aiToolOffReason } from '../../../utils/aiTools';
 import { useToast } from '../../../contexts/ToastContext';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
@@ -41,6 +43,7 @@ const getModelKey = (m) => m?.id || m?.registry_key || m?.identifier || null;
  * a contour id to seed from.
  */
 export default function useSuggestSimilar() {
+  const { isEnabled: isToolEnabled } = useAiTools();
   const objectsList = useObjectsList();
   const selectedIds = useSelectedObjects();
   const suggestionModel = useSuggestionModel();
@@ -165,7 +168,9 @@ export default function useSuggestSimilar() {
   const resolvedInputs = routing.inputs;
   const routingError = routing.error;
 
+  const available = isToolEnabled('instance_suggestion');
   const eligible =
+    available &&
     isHomogeneous &&
     hasSeeds &&
     policyResolved &&
@@ -175,7 +180,9 @@ export default function useSuggestSimilar() {
     wsReady &&
     !isRunning;
 
-  const reason = !isHomogeneous
+  const reason = !available
+    ? aiToolOffReason('instance_suggestion')
+    : !isHomogeneous
     ? 'Select samples of the same class (or all unlabelled)'
     : !hasSeeds
       ? 'Selected objects are missing contour data'
@@ -200,6 +207,7 @@ export default function useSuggestSimilar() {
   }, [eligible, contourIds, sharedLabelId, resolvedModelId, resolvedInputs, runSuggestion]);
 
   return {
+    available,
     eligible,
     reason,
     isRunning,
