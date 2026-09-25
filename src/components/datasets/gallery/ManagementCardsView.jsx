@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Ruler, Wrench, Settings, HelpCircle, Wand2, Cpu } from 'lucide-react';
 import ManagementCard from './ManagementCard';
 import DatasetActivityCard from './DatasetActivityCard';
+import ModelSuggestionsCard from './ModelSuggestionsCard';
+import TimeRangeToggle from './TimeRangeToggle';
+import { ACTIVITY_WINDOWS } from '../../../utils/datasetActivity';
 import PhaseProgressBar from '../PhaseProgressBar';
 import RoleBadge from '../RoleBadge';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { Permission } from '../../../utils/permissions';
+import { isAiToolEnabled } from '../../../utils/aiTools';
 import { OVERALL_STATES, getPhase } from '../../../utils/imageStatus';
 import { useGalleryStats } from '../../../stores/selectors';
 import { fetchReviewSummary, fetchCorrectionSummary } from '../../../api/reviews';
@@ -53,6 +57,8 @@ const ManagementCardsView = ({
   // layout's children, so the stats the layout already fetched cannot be handed
   // down without threading them through DatasetGallery first.
   const stats = useGalleryStats();
+  // One time range for both summaries in the Activity section.
+  const [activityDays, setActivityDays] = useState(ACTIVITY_WINDOWS[0].days);
   const canReview = can(Permission.REVIEW_APPROVE);
   const canCorrect = can(Permission.ANNOTATION_EDIT_OWN);
 
@@ -256,7 +262,7 @@ const ManagementCardsView = ({
       title: 'Model Training',
       description: 'Train an instance segmentation model on this dataset and watch progress live',
       onClick: onModelTrainingClick,
-      permitted: can(Permission.AI_TRAIN),
+      permitted: can(Permission.AI_TRAIN) && isAiToolEnabled(dataset, 'training'),
       color: 'indigo',
     },
     {
@@ -266,7 +272,7 @@ const ManagementCardsView = ({
       title: 'Batch Inference',
       description: 'Let your models annotate the whole dataset — one model per label, run in hierarchy order',
       onClick: onBatchInferenceClick,
-      permitted: can(Permission.AI_BATCH_INFER),
+      permitted: can(Permission.AI_BATCH_INFER) && isAiToolEnabled(dataset, 'batch_inference'),
       color: 'purple',
     },
     {
@@ -388,8 +394,18 @@ const ManagementCardsView = ({
                   Activity
                 </h3>
                 <div className="flex-1 h-px bg-hv2" />
+                <TimeRangeToggle days={activityDays} onChange={setActivityDays} />
               </div>
-              <DatasetActivityCard datasetId={dataset.id} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6 items-start">
+                <section aria-label="People">
+                  <h4 className="text-sm font-semibold text-t1 mb-2">People</h4>
+                  <DatasetActivityCard datasetId={dataset.id} days={activityDays} />
+                </section>
+                <section aria-label="Model suggestions">
+                  <h4 className="text-sm font-semibold text-t1 mb-2">Model suggestions</h4>
+                  <ModelSuggestionsCard datasetId={dataset.id} days={activityDays} />
+                </section>
+              </div>
             </section>
           )}
         </div>
