@@ -107,6 +107,21 @@ export const fetchDatasetActivity = async (datasetId, days = 7) => {
     return handleApiError(response);
 };
 
+/**
+ * How each model's AI suggestions on a dataset were treated.
+ *
+ * @param {number|string} datasetId
+ * @param {number} days - window in days; 0 for all time
+ * @returns {Promise<{success: boolean, since: string|null, models: Array<Object>}>}
+ */
+export const fetchSuggestionStats = async (datasetId, days = 7) => {
+    const response = await fetch(
+        `${API_BASE_URL}/datasets/${datasetId}/suggestion-stats?days=${days}`,
+        { headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
 // Get sample images for a dataset (first few images)
 export const getSampleImages = async (datasetId, limit = 4) => {
     try {

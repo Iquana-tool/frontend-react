@@ -181,13 +181,21 @@ export const acceptInvite = async (token) => {
  * created it. Off by default, because a single owner annotating their own
  * dataset would otherwise never be able to finish it.
  *
+ * `disabledAiTools` is the full list of AI tools to switch off (see
+ * `utils/aiTools.js`); an empty list switches every tool back on.
+ *
  * @param {number} datasetId
- * @param {{requireIndependentReview?: boolean}} settings
+ * @param {{requireIndependentReview?: boolean, disabledAiTools?: string[]}} settings
  */
-export const updateDatasetSettings = async (datasetId, { requireIndependentReview } = {}) => {
+export const updateDatasetSettings = async (
+    datasetId, { requireIndependentReview, disabledAiTools } = {},
+) => {
     const params = {};
     if (requireIndependentReview !== undefined) {
         params.require_independent_review = requireIndependentReview;
+    }
+    if (disabledAiTools !== undefined) {
+        params.disabled_ai_tools = disabledAiTools.join(",");
     }
     const url = buildUrl(API_BASE_URL, `/datasets/${datasetId}/settings`, params);
     const response = await fetch(url, { method: "PATCH", headers: getAuthHeaders() });

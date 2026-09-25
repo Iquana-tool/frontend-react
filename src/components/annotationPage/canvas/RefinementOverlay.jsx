@@ -7,6 +7,7 @@ import {
   useObjectsList,
 } from '../../../stores/selectors/annotationSelectors';
 import useRefinementSession from '../../../hooks/useRefinementSession';
+import useAiTools from '../../../hooks/useAiTools';
 import { getRefinementTool } from '../../../utils/refinementTools';
 
 /**
@@ -25,6 +26,7 @@ const RefinementOverlay = () => {
   const objectsList = useObjectsList();
 
   const { refinementTool, switchRefinementTool, exitRefinement } = useRefinementSession();
+  const { isEnabled: isToolEnabled } = useAiTools();
 
   const refinementObject = refinementModeActive && refinementModeObjectId != null
     ? objectsList.find((object) => object.id === refinementModeObjectId)
@@ -71,6 +73,7 @@ const RefinementOverlay = () => {
         value={refinementTool}
         onChange={switchRefinementTool}
         geometryDisabled={!editable}
+        aiDisabled={!isToolEnabled('refine')}
       />
     </>
   );

@@ -33,7 +33,15 @@ import {
 } from '../../../utils/inferenceRouting';
 import annotationSession from '../../../services/annotationSession';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
+import useAiTools from '../../../hooks/useAiTools';
 import { useInstanceSegmentation } from '../../../hooks/useInstanceSegmentation';
+
+/** The dataset AI tool switch behind each service card. */
+const SERVICE_TOOL = {
+  prompted: 'prompted',
+  instance: 'instance_segmentation',
+  suggestion: 'instance_suggestion',
+};
 
 const getModelKey = (model) => model?.id || model?.registry_key || model?.identifier || null;
 
@@ -65,6 +73,7 @@ const getMatchingBindingInputs = (resolved, task, selectedModel) => {
 export default function useAnnotationServices() {
   const { currentDataset } = useDataset();
   const datasetId = currentDataset?.id;
+  const { isEnabled: isToolEnabled } = useAiTools();
   const activeLabelId = useActiveLabelId();
   const favorites = useModelFavorites();
   const {
@@ -343,7 +352,7 @@ export default function useAnnotationServices() {
       usageHint:
         'Select exemplars of one class, then press “Suggest similar” (2) in the action bar.',
     },
-  ];
+  ].filter((service) => isToolEnabled(SERVICE_TOOL[service.key]));
 
   return {
     services,

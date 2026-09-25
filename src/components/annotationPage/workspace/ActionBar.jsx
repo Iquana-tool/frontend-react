@@ -35,6 +35,7 @@ import { formatArea, getObjectDisplayName, getObjectState } from './objectViewMo
 import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
 import { trackSuggestionVerdict } from '../../../services/activityLog';
+import useAiTools from '../../../hooks/useAiTools';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import annotationSession from '../../../services/annotationSession';
 import { useToast } from '../../../contexts/ToastContext';
@@ -105,6 +106,7 @@ const ActionBar = () => {
   const supportedPromptTypes = useSupportedPromptTypes();
   const { promptAction, cyclePromptAction } = useRailTools();
   const { runSegmentation } = useAISegmentation();
+  const { isEnabled: isToolEnabled } = useAiTools();
   const { addToast } = useToast();
 
   const prompts = useAIPrompts();
@@ -150,7 +152,10 @@ const ActionBar = () => {
   }, [prompts, supportedPromptTypes]);
 
   const runAIBlockedReason = !promptedModel ? 'Select a model first' : unsupportedPrompt;
-  const canRunAI = !runAIBlockedReason;
+  // Hidden rather than disabled when the dataset switches the tool off: there is
+  // nothing the annotator could do to enable it.
+  const runAIAvailable = isToolEnabled(refinementActive ? 'refine' : 'prompted');
+  const canRunAI = runAIAvailable && !runAIBlockedReason;
   const addLabel = bar.addableCount > 1 ? `Add ${bar.addableCount} objects` : 'Add this object';
 
   const single = bar.selection.length === 1 ? bar.selection[0] : null;
@@ -375,16 +380,18 @@ const ActionBar = () => {
             guide="action-add-object"
           />
         )}
-        <BarButton
-          icon={Sparkles}
-          label={refinementActive ? 'Refine object' : 'Run AI'}
-          shortcut="⏎"
-          variant={canRunAI ? 'primary' : undefined}
-          disabled={!canRunAI}
-          title={runAIBlockedReason || undefined}
-          onClick={() => runSegmentation()}
-          guide="action-run-ai"
-        />
+        {runAIAvailable && (
+          <BarButton
+            icon={Sparkles}
+            label={refinementActive ? 'Refine object' : 'Run AI'}
+            shortcut="⏎"
+            variant={canRunAI ? 'primary' : undefined}
+            disabled={!canRunAI}
+            title={runAIBlockedReason || undefined}
+            onClick={() => runSegmentation()}
+            guide="action-run-ai"
+          />
+        )}
       </>
     );
     if (promptAction === 'ai') {
@@ -423,15 +430,17 @@ const ActionBar = () => {
             guide="action-refine"
           />
         )}
-        <BarButton
-          icon={Sparkles}
-          label="Suggest similar"
-          shortcut="2"
-          disabled={!suggest.eligible}
-          title={suggest.reason || undefined}
-          onClick={suggest.run}
-          guide="action-suggest-similar"
-        />
+        {suggest.available && (
+          <BarButton
+            icon={Sparkles}
+            label="Suggest similar"
+            shortcut="2"
+            disabled={!suggest.eligible}
+            title={suggest.reason || undefined}
+            onClick={suggest.run}
+            guide="action-suggest-similar"
+          />
+        )}
         <BarButton
           icon={Trash2}
           label="Delete"
@@ -471,15 +480,17 @@ const ActionBar = () => {
     buttons = (
       <>
         <BarButton icon={Layers} label="Group under…" onClick={() => setPicker('parent')} />
-        <BarButton
-          icon={Sparkles}
-          label="Suggest similar"
-          shortcut="2"
-          disabled={!suggest.eligible}
-          title={suggest.reason || undefined}
-          onClick={suggest.run}
-          guide="action-suggest-similar"
-        />
+        {suggest.available && (
+          <BarButton
+            icon={Sparkles}
+            label="Suggest similar"
+            shortcut="2"
+            disabled={!suggest.eligible}
+            title={suggest.reason || undefined}
+            onClick={suggest.run}
+            guide="action-suggest-similar"
+          />
+        )}
         <BarButton
           icon={Trash2}
           label="Delete"
