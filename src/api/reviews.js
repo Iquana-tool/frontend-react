@@ -7,6 +7,7 @@
  */
 import { handleApiError, getAuthHeaders, buildUrl } from "./util";
 import { API_BASE_URL } from "./config";
+import { trackAnnotation } from "../services/activityLog";
 
 const jsonHeaders = () => getAuthHeaders({ "Content-Type": "application/json" });
 
@@ -45,7 +46,12 @@ export const rejectMask = async (maskId, { reason, note = null, contourId = null
         headers: jsonHeaders(),
         body: JSON.stringify({ reason, note, contour_id: contourId }),
     });
-    return handleApiError(response);
+    const result = await handleApiError(response);
+    // The reason is a fixed code; the free-text note is never logged.
+    trackAnnotation("review.reject", {
+        payload: { mask_id: maskId, contour_id: contourId, reason },
+    });
+    return result;
 };
 
 /**
@@ -179,7 +185,11 @@ export const approveMask = async (maskId, { includeReviewed = false } = {}) => {
         method: "POST",
         headers: getAuthHeaders(),
     });
-    return handleApiError(response);
+    const result = await handleApiError(response);
+    trackAnnotation("review.approve", {
+        payload: { mask_id: maskId, count: result?.approved?.length ?? null },
+    });
+    return result;
 };
 
 /**

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import * as authApi from '../../api/auth';
+import { trackNavigation } from '../../services/activityLog';
+import { endSession, startSession } from '../../services/activityLogSession';
 
 const TOKEN_STORAGE_KEY = 'auth_token';
 const USER_STORAGE_KEY = 'auth_user';
@@ -74,6 +76,11 @@ export const useAuthStore = create((set, get) => ({
               isLoading: false,
               error: null,
             });
+            // A study session is one login. Start it before the first event so
+            // `session.login` is already inside the session it opens, and so
+            // every request from here on carries the id on its header.
+            startSession();
+            trackNavigation('session.login');
             return { success: true, user };
           } else {
             throw new Error(response.message || 'Login failed');
@@ -110,6 +117,12 @@ export const useAuthStore = create((set, get) => ({
       },
 
       logout: () => {
+        // Emitted before the token is cleared, so the event is still attributed
+        // to the participant who is leaving rather than to nobody. `endSession`
+        // comes after it for the same reason: `session.logout` is the last event
+        // of the session, so it has to carry that session's id.
+        trackNavigation('session.logout');
+        endSession();
         setStoredToken(null);
         setStoredUser(null);
         set({

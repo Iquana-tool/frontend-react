@@ -19,3 +19,4 @@ export * from "./api/annotation_queue";
 export * from "./api/annotationHistory";
 export * from "./api/admin";
 export * from "./api/scale";
+export * from "./api/activityLog";

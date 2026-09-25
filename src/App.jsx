@@ -7,6 +7,7 @@ import { ToastProvider } from "./contexts/ToastContext";
 import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import useDocumentTheme from "./hooks/useDocumentTheme";
+import { useRouteActivity, useActivityLogInit } from "./hooks/useActivityLog";
 import Login from "./components/auth/Login";
 import InstanceLandingPage from "./pages/InstanceLandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
@@ -23,17 +24,31 @@ import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminPage from "./pages/AdminPage";
+import ActivityLogPage from "./pages/ActivityLogPage";
 import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
 
+/**
+ * Records route changes for the activity log. Rendered inside <Router> because
+ * `useLocation` is only available under a router context; it draws nothing.
+ */
+function ActivityRouteTracker() {
+  useRouteActivity();
+  return null;
+}
+
 function App() {
   useDocumentTheme();
+  // Fetches the capture config once. On a deployment with the activity log off this
+  // resolves to "capture nothing" and every track() call downstream is a no-op.
+  useActivityLogInit();
 
   return (
     <AuthProvider>
       <ToastProvider>
       <DatasetProvider>
         <Router basename={BASE_PATH}>
+          <ActivityRouteTracker />
           <CorrectionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -62,6 +77,14 @@ function App() {
             {/* The account table used to be the whole admin surface and lived
                 here; keep the old path working for anyone who bookmarked it. */}
             <Route path="/admin/users" element={<Navigate to="/admin" replace />} />
+            <Route
+              path="/admin/activity-log"
+              element={
+                <ProtectedRoute>
+                  <ActivityLogPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/dataset/:datasetId/datamanagement"
               element={

@@ -18,6 +18,7 @@ import { Permission } from '../../../utils/permissions';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useToast } from '../../../contexts/ToastContext';
 import annotationSession from '../../../services/annotationSession';
+import { trackSuggestionVerdict } from '../../../services/activityLog';
 import {
   useObjectsList,
   useObjectsVisibility,
@@ -258,6 +259,7 @@ const ObjectsTab = () => {
       confirmLabel: 'Discard all',
       onConfirm: async () => {
         await actions.removeMany(unreviewed);
+        trackSuggestionVerdict('suggestion.reject', unreviewed);
         setConfirm(null);
       },
     });

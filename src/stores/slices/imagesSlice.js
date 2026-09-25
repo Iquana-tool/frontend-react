@@ -3,6 +3,8 @@ import { combineStatuses } from '../../utils/imageStatus';
 /**
  * Images slice - manages image state, loading, zoom, and pan
  */
+import { trackNavigation } from '../../services/activityLog';
+
 export const createImagesSlice = (set) => ({
   setCurrentImage: (image) => set((state) => {
     // Check if image is actually changing
@@ -77,6 +79,9 @@ export const createImagesSlice = (set) => ({
       if (state.ui.currentTool === 'set_scale') {
         state.ui.currentTool = 'ai_annotation';
       }
+      // Marks the boundary between images. Time-on-image is derived at analysis
+      // time from the gap between consecutive open events in a session.
+      trackNavigation('image.open', { imageId: image?.id ?? null });
     }
   }),
   

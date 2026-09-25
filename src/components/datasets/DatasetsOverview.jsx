@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useDataset } from "../../contexts/DatasetContext";
-import { Plus, FolderOpen, User, UserCog, Upload } from "lucide-react";
+import { Plus, FolderOpen, ClipboardList, User, UserCog, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { usePermissions } from "../../hooks/usePermissions";
@@ -26,7 +26,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
   const { isAuthenticated, user } = useAuth();
   // Global capabilities: creating datasets and administering accounts are decided
   // by the account's platform role, not by any one dataset.
-  const { canCreateDatasets, canManageUsers, globalRole } = usePermissions();
+  const { canCreateDatasets, canManageUsers, canManageActivityLog, globalRole } = usePermissions();
   const {
     datasets,
     loading,
@@ -233,6 +233,15 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 >
                   <UserCog className="w-4 h-4" />
                   <span>Admin</span>
+                </button>
+              )}
+              {canManageActivityLog && (
+                <button
+                  onClick={() => navigate("/admin/activity-log")}
+                  className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  <span>Activity log</span>
                 </button>
               )}
               <DocsLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />

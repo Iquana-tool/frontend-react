@@ -9,6 +9,8 @@
 import websocketService from './websocket';
 import { getAuthToken } from '../api/util';
 import { MessageBuilders, SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
+import activityLog from './activityLog';
+import { getSessionId } from './activityLogSession';
 
 /**
  * Session states
@@ -75,6 +77,7 @@ class AnnotationSession {
   constructor() {
     this.sessionState = SessionState.UNINITIALIZED;
     this.currentImageId = null;
+    this.refinementContourId = null;
     this.currentUserId = null;
     this.runningServices = [];
     this.failedServices = [];
@@ -226,6 +229,7 @@ class AnnotationSession {
       );
 
       this.currentImageId = newImageId;
+      this.refinementContourId = null;
       // Keep the reconnect target in step, so a dropped connection comes back on the
       // image the user is looking at rather than the one the socket was opened with.
       const token = getAuthToken();
@@ -414,7 +418,16 @@ class AnnotationSession {
   async runSegmentation(modelIdentifier, prompts, inputs = null) {
     this._ensureReady();
     const message = MessageBuilders.runSegmentation(modelIdentifier, prompts, inputs);
-    return websocketService.send(message, true);
+    // Timed client-side as well as server-side: the backend measures the model
+    // call, this measures the wait the participant actually sat through, which
+    // includes the round trip and is what perceived-latency questions are about.
+    // A run while an object is selected for refinement refines it rather than
+    // creating a new one; the study separates the two.
+    return activityLog.trackAiRequest(
+      this.refinementContourId != null ? 'refine' : 'prompted',
+      () => websocketService.send(message, true),
+      { imageId: this.currentImageId, payload: { model: modelIdentifier } },
+    );
   }
 
   // ==================== OBJECT OPERATIONS ====================
@@ -506,6 +519,7 @@ class AnnotationSession {
   async selectRefinementObject(contourId) {
     this._ensureReady();
     const message = MessageBuilders.selectRefinementObject(contourId);
+    this.refinementContourId = contourId;
     return websocketService.send(message, true);
   }
 
@@ -516,6 +530,7 @@ class AnnotationSession {
   async unselectRefinementObject() {
     this._ensureReady();
     const message = MessageBuilders.unselectRefinementObject();
+    this.refinementContourId = null;
     return websocketService.send(message, true);
   }
 
@@ -536,7 +551,14 @@ class AnnotationSession {
     }
     
     const message = MessageBuilders.runSuggestion(seedContourIds, modelKey, labelId, inputs);
-    return websocketService.send(message, true);
+    return activityLog.trackAiRequest(
+      'suggest',
+      () => websocketService.send(message, true),
+      {
+        imageId: this.currentImageId,
+        payload: { model: modelKey, seed_count: seedContourIds?.length ?? 0 },
+      },
+    );
   }
 
   // ==================== INSTANCE SEGMENTATION ====================
@@ -557,7 +579,11 @@ class AnnotationSession {
     }
 
     const message = MessageBuilders.runInstance(modelKey, writeMode, inputs);
-    return websocketService.send(message, true);
+    return activityLog.trackAiRequest(
+      'instance',
+      () => websocketService.send(message, true),
+      { imageId: this.currentImageId, payload: { model: modelKey } },
+    );
   }
 
   // ==================== SESSION MANAGEMENT ====================
@@ -679,8 +705,14 @@ class AnnotationSession {
    */
   _buildUrl(imageId, token) {
     const imageSegment = imageId != null ? `/${imageId}` : '';
+    // A WebSocket handshake cannot carry custom headers, so the activity-log
+    // session travels as a query parameter instead of the header the HTTP calls
+    // use. Without it the events this socket emits server-side (ws_open,
+    // ws.message, AI latency) could not be joined to the session.
+    const logSession = getSessionId();
     return `${this.wsBaseUrl}/annotation_session/ws/${this.currentUserId}` +
-      `${imageSegment}?token=${encodeURIComponent(token)}`;
+      `${imageSegment}?token=${encodeURIComponent(token)}` +
+      (logSession ? `&activity_session=${encodeURIComponent(logSession)}` : '');
   }
 
   /**

@@ -34,6 +34,7 @@ import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
 import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
+import { trackSuggestionVerdict } from '../../../services/activityLog';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import annotationSession from '../../../services/annotationSession';
 import { useToast } from '../../../contexts/ToastContext';
@@ -243,6 +244,7 @@ const ActionBar = () => {
       // Already toasted; stay on the instance the server refused to approve.
       return;
     }
+    trackSuggestionVerdict('suggestion.accept', [reviewTarget]);
     advanceReview();
   };
 
@@ -254,6 +256,7 @@ const ActionBar = () => {
       // The action has already toasted; stay on the instance that failed.
       return;
     }
+    trackSuggestionVerdict('suggestion.reject', [reviewTarget]);
     advanceReview();
   };
 
