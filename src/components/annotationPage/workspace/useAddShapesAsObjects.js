@@ -7,7 +7,6 @@ import {
   useAIPrompts,
   useImageObject,
   useConsumePrompts,
-  useFocusedParentContourId,
 } from '../../../stores/selectors/annotationSelectors';
 
 /**
@@ -38,7 +37,6 @@ export default function useAddShapesAsObjects() {
   // These shapes just became objects, so they are spent rather than discarded:
   // the next Ctrl+Z should remove the object, not redraw the outline.
   const consumePrompts = useConsumePrompts();
-  const parentContourId = useFocusedParentContourId();
   const { addToast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
 
@@ -51,15 +49,19 @@ export default function useAddShapesAsObjects() {
     if (!imageObject || shapePrompts.length === 0 || isAdding) return;
 
     setIsAdding(true);
+    const savedIds = new Set();
+    let skipped = 0;
     try {
       if (!annotationSession.isReady()) {
         throw new Error('Session is not ready yet. Please wait for the image to load.');
       }
 
-      let added = 0;
       for (const prompt of shapePrompts) {
         const contour = promptToContour(prompt);
-        if (!contour) continue;
+        if (!contour) {
+          skipped += 1;
+          continue;
+        }
         const normalized = pixelArrayToNormalized(
           contour.x,
           contour.y,
@@ -68,25 +70,37 @@ export default function useAddShapesAsObjects() {
         );
         // Sequential: each add is acknowledged individually over the socket.
         // eslint-disable-next-line no-await-in-loop
-        await annotationSession.addObject(normalized.x, normalized.y, null, parentContourId);
-        added += 1;
+        const response = await annotationSession.addObject(
+          normalized.x, normalized.y, null, prompt.parentContourId ?? null
+        );
+        if (response?.data?.skipped) {
+          skipped += 1;
+          continue;
+        }
+        if (response?.type !== 'object_added' || response.success !== true || !response.data) {
+          throw new Error(response?.message || 'Failed to add as object');
+        }
+        savedIds.add(prompt.id);
       }
 
-      // Only the outlines are spent. A box or a point on the canvas is still a
-      // prompt waiting for Run AI, and clearing it here would delete work the
-      // user never asked to discard.
-      consumePrompts((prompt) => ADDABLE_PROMPT_TYPES.has(prompt.type));
-      addToast({
-        type: 'success',
-        message: added === 1 ? 'Added 1 annotation as an object' : `Added ${added} annotations as objects`,
-      });
+      if (savedIds.size) {
+        addToast({
+          type: 'success',
+          message: savedIds.size === 1 ? 'Added 1 annotation as an object' : `Added ${savedIds.size} annotations as objects`,
+        });
+      }
+      if (skipped) {
+        addToast({ type: 'error', message: `${skipped} ${skipped === 1 ? 'outline was not saved and remains' : 'outlines were not saved and remain'} on the canvas.` });
+      }
     } catch (error) {
       console.error('[workspace] Failed to add shapes as objects:', error);
       addToast({ type: 'error', message: error.message || 'Failed to add as object' });
     } finally {
+      // Consume only confirmed saves, including when a later request fails.
+      if (savedIds.size) consumePrompts((prompt) => savedIds.has(prompt.id));
       setIsAdding(false);
     }
-  }, [imageObject, shapePrompts, isAdding, parentContourId, consumePrompts, addToast]);
+  }, [imageObject, shapePrompts, isAdding, consumePrompts, addToast]);
 
   return { shapeCount: shapePrompts.length, isAdding, addShapes };
 }
