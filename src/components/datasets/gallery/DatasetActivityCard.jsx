@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { fetchDatasetActivity } from '../../../api/datasets';
 import { ACTIVITY_WINDOWS, activityPhrases, formatLastActive } from '../../../utils/datasetActivity';
+import TimeRangeToggle from './TimeRangeToggle';
 
 /** Rows shown before "Show all"; most datasets have a handful of people. */
 const COLLAPSED_ROWS = 5;
@@ -12,9 +13,14 @@ const COLLAPSED_ROWS = 5;
  * Read from the stored annotation data rather than the activity log, so it works
  * on every deployment. A failed load collapses to a short message instead of
  * taking the page down with it -- this is context, not a control.
+ *
+ * The time range is its own unless `days` is passed, in which case the parent
+ * owns it (the dataset page shares one switch between its summaries).
  */
-const DatasetActivityCard = ({ datasetId }) => {
-  const [days, setDays] = useState(ACTIVITY_WINDOWS[0].days);
+const DatasetActivityCard = ({ datasetId, days: controlledDays }) => {
+  const [ownDays, setOwnDays] = useState(ACTIVITY_WINDOWS[0].days);
+  const controlled = controlledDays !== undefined;
+  const days = controlled ? controlledDays : ownDays;
   const [users, setUsers] = useState(null);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -36,6 +42,9 @@ const DatasetActivityCard = ({ datasetId }) => {
     };
   }, [datasetId, days]);
 
+  // A new range starts collapsed again, whoever changed it.
+  useEffect(() => { setExpanded(false); }, [days]);
+
   const range = ACTIVITY_WINDOWS.find((w) => w.days === days) ?? ACTIVITY_WINDOWS[0];
   const active = (users ?? []).filter((row) => activityPhrases(row).length > 0);
   const visible = expanded ? active : active.slice(0, COLLAPSED_ROWS);
@@ -44,25 +53,7 @@ const DatasetActivityCard = ({ datasetId }) => {
     <div className="bg-p1 border border-ln rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <p className="text-sm text-t2">Who worked on this dataset, from its annotations and reviews.</p>
-        <div className="inline-flex items-center p-0.5 rounded-lg bg-well" role="group" aria-label="Time range">
-          {ACTIVITY_WINDOWS.map((option) => {
-            const selected = option.days === days;
-            return (
-              <button
-                key={option.days}
-                type="button"
-                onClick={() => { setDays(option.days); setExpanded(false); }}
-                aria-pressed={selected}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-ac ${
-                  selected ? 'bg-p1 shadow-sm text-t1' : 'text-t2 hover:text-t1'
-                }`}
-              >
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
+        {!controlled && <TimeRangeToggle days={days} onChange={setOwnDays} />}
       </div>
 
       {error && <p className="text-sm text-t3 py-2">Activity could not be loaded.</p>}

@@ -20,7 +20,7 @@ const ICONS = { Sparkles, Pencil, PenLine };
  *   contour, which Points and Draw both need; they render unavailable rather
  *   than silently bouncing back to AI.
  */
-const RefinementToolSwitch = ({ value, onChange, geometryDisabled = false }) => (
+const RefinementToolSwitch = ({ value, onChange, geometryDisabled = false, aiDisabled = false }) => (
   <div
     className="absolute top-[76px] left-3 z-[80] pointer-events-auto flex items-center gap-[2px] p-[3px] rounded-9 bg-glass border border-ln2 shadow-ctx backdrop-blur-sm"
     role="group"
@@ -29,7 +29,7 @@ const RefinementToolSwitch = ({ value, onChange, geometryDisabled = false }) => 
     {REFINEMENT_TOOLS.map((tool) => {
       const Icon = ICONS[tool.icon];
       const active = value === tool.id;
-      const disabled = geometryDisabled && tool.id !== 'ai';
+      const disabled = tool.id === 'ai' ? aiDisabled : geometryDisabled;
       return (
         <button
           key={tool.id}
@@ -37,7 +37,9 @@ const RefinementToolSwitch = ({ value, onChange, geometryDisabled = false }) => 
           onClick={() => !disabled && onChange(tool.id)}
           disabled={disabled}
           aria-pressed={active}
-          title={disabled ? 'This object has no saved outline to edit yet' : tool.name}
+          title={!disabled ? tool.name
+            : tool.id === 'ai' ? 'AI refinement is switched off for this dataset'
+              : 'This object has no saved outline to edit yet'}
           className={`flex items-center gap-[5px] h-[26px] px-[10px] rounded-5 text-btn font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
             active ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv2 hover:text-t1'
           }`}

@@ -15,6 +15,7 @@ import {
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
+import useAiTools from './useAiTools';
 import { deleteObject } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
 
@@ -34,6 +35,7 @@ import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } f
  *   reject the selected objects. See deleteRouting.js for why prompts come first.
  */
 export default function useAnnotationKeyboardShortcuts() {
+  const { isEnabled: isToolEnabled } = useAiTools();
   const currentTool = useCurrentTool();
   const prompts = useAIPrompts();
   const promptedModel = usePromptedModel();
@@ -113,7 +115,7 @@ export default function useAnnotationKeyboardShortcuts() {
           break;
         }
         case '3': {
-          if (!isModifier) {
+          if (!isModifier && isToolEnabled('instance_segmentation')) {
             e.preventDefault();
             runInstanceRequest(true);
           }

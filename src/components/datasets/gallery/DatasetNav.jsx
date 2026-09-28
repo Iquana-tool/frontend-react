@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { usePermissions } from "../../../hooks/usePermissions";
 import { Permission } from "../../../utils/permissions";
+import { isAiToolEnabled } from "../../../utils/aiTools";
 
 /**
  * Where a dataset can be navigated to, grouped the way the overview cards are.
@@ -143,7 +144,7 @@ const NAV_GROUPS = [
         description: "Train a model on this dataset",
         icon: GraduationCap,
         path: (datasetId) => `/dataset/${datasetId}/training`,
-        permitted: ({ can }) => can(Permission.AI_TRAIN),
+        permitted: ({ can }, ds) => can(Permission.AI_TRAIN) && isAiToolEnabled(ds, "training"),
       },
       {
         id: "inference",
@@ -151,7 +152,7 @@ const NAV_GROUPS = [
         description: "Let your models annotate the whole dataset",
         icon: Wand2,
         path: (datasetId) => `/dataset/${datasetId}/inference`,
-        permitted: ({ can }) => can(Permission.AI_BATCH_INFER),
+        permitted: ({ can }, ds) => can(Permission.AI_BATCH_INFER) && isAiToolEnabled(ds, "batch_inference"),
       },
     ],
   },
@@ -239,7 +240,7 @@ const DatasetNav = ({ dataset, datasetId }) => {
   // rather than opening onto an empty menu.
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => item.permitted(permissions)),
+    items: group.items.filter((item) => item.permitted(permissions, dataset)),
   })).filter((group) => group.items.length > 0);
 
   const go = (item) => {

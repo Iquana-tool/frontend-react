@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import annotationSession from '../services/annotationSession';
 import { pixelToNormalized } from '../utils/coordinateUtils';
 import { useDataset } from '../contexts/DatasetContext';
+import { aiToolOffReason, isAiToolEnabled } from '../utils/aiTools';
 import {
   useAIPrompts,
   usePromptedModel,
@@ -144,6 +145,14 @@ const useAISegmentation = () => {
 
     // Note: promptedModelId is just a string ID, we don't need to set model_status here
     // The status is handled by the backend
+    // The one path every Run AI trigger takes (button, Enter, instant mode), so the
+    // dataset's tool switch is enforced here once. The server refuses it as well.
+    const tool = refinementModeActive ? 'refine' : 'prompted';
+    if (!isAiToolEnabled(currentDataset, tool)) {
+      setError(aiToolOffReason(tool));
+      return { success: false, error: aiToolOffReason(tool) };
+    }
+
     if (!currentImage || !promptedModelId || prompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
@@ -346,6 +355,7 @@ const useAISegmentation = () => {
       setIsSubmitting(false);
     }
   }, [
+    currentDataset,
     currentImage,
     promptedModelId,
     prompts,
