@@ -45,11 +45,13 @@ import {
 } from '../../../stores/selectors/annotationSelectors';
 
 /** Where in a row a drop lands: top third before, bottom third after, middle nests. */
-const dropZoneFor = (event, element) => {
+const dropZoneFor = (event, element, dragged, target) => {
   const rect = element.getBoundingClientRect();
   const ratio = (event.clientY - rect.top) / rect.height;
   if (ratio < 0.3) return 'before';
   if (ratio > 0.7) return 'after';
+  // Dropping a child onto its current parent moves it up one level.
+  if (dragged?.parent_id != null && String(dragged.parent_id) === String(target.id)) return 'after';
   return 'into';
 };
 
@@ -184,6 +186,48 @@ const ObjectsTab = () => {
     [labelTargets, labelling]
   );
 
+  const promoteOneLevel = async (object, targetId, position = 'after') => {
+    const contourId = getContourId(object);
+    const parent = actions.getObjectById(object.parent_id);
+    const nextParentId = parent?.parent_id ?? null;
+    const nextParent = nextParentId == null ? null : actions.getObjectById(nextParentId);
+    const nextParentContourId = nextParent ? getContourId(nextParent) : null;
+    if (contourId == null || !parent || (nextParentId != null && nextParentContourId == null)) {
+      addToast({ type: 'error', message: 'This object cannot be moved out of its parent.' });
+      return;
+    }
+    try {
+      await annotationSession.modifyObject(contourId, { parent_id: nextParentContourId });
+      if (nextParentId == null && targetId != null) {
+        initRootOrder(rows.filter((row) => row.depth === 0).map((row) => row.object.id));
+      }
+      updateObject(object.id, { parent_id: nextParentId });
+      if (nextParentId == null && targetId != null) reorderRootObject(object.id, targetId, position);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: `Could not move this object out of its parent: ${error.message || 'not supported by the server'}`,
+      });
+    }
+  };
+
+  const rootBefore = (id) => {
+    const index = rows.findIndex((row) => row.object.id === id);
+    return rows.slice(0, Math.max(index, 0)).reverse().find((row) => row.depth === 0);
+  };
+
+  const isOutdentDrop = (event, object) => {
+    const depth = rows.find((row) => row.object.id === object?.id)?.depth ?? 0;
+    return object?.parent_id != null
+      && event.clientX < event.currentTarget.getBoundingClientRect().left + 2 + depth * 14;
+  };
+
+  const canPromoteBeside = (dragged, target) => {
+    const parent = actions.getObjectById(dragged.parent_id);
+    return parent && (String(target.id) === String(parent.id)
+      || String(target.parent_id ?? null) === String(parent.parent_id ?? null));
+  };
+
   // --- drag and drop --------------------------------------------------------
 
   const handleDragStart = (object) => (event) => {
@@ -196,23 +240,45 @@ const ObjectsTab = () => {
   };
 
   const handleDragOver = (object) => (event) => {
-    if (drag.id == null || drag.id === object.id) return;
+    if (drag.id == null) return;
+    const dragged = actions.getObjectById(drag.id);
+    if (drag.id === object.id) {
+      if (!isOutdentDrop(event, dragged)) return;
+      event.preventDefault();
+      setDrag((current) => ({ ...current, overId: dragged.parent_id, zone: 'after' }));
+      return;
+    }
+    const zone = dropZoneFor(event, event.currentTarget, dragged, object);
+    if (dragged?.parent_id != null && zone !== 'into' && !canPromoteBeside(dragged, object)) {
+      setDrag((current) => ({ ...current, overId: null, zone: null }));
+      return;
+    }
     event.preventDefault();
     setDrag((current) => ({
       ...current,
       overId: object.id,
-      zone: dropZoneFor(event, event.currentTarget),
+      zone,
     }));
   };
 
   const handleDrop = (target) => async (event) => {
     event.preventDefault();
-    const { id: dragId, zone } = drag;
-    setDrag({ id: null, overId: null, zone: null });
-    if (dragId == null || dragId === target.id) return;
+    const { id: dragId } = drag;
+    if (dragId == null) return;
 
     const dragged = actions.getObjectById(dragId);
     if (!dragged) return;
+    if (dragId === target.id) {
+      if (isOutdentDrop(event, dragged)) {
+        setDrag({ id: null, overId: null, zone: null });
+        await promoteOneLevel(dragged, rootBefore(dragId)?.object.id);
+      }
+      return;
+    }
+    const zone = dropZoneFor(event, event.currentTarget, dragged, target);
+    setDrag({ id: null, overId: null, zone: null });
+
+    if (dragged.parent_id != null && zone !== 'into' && !canPromoteBeside(dragged, target)) return;
 
     if (zone === 'into') {
       const contourId = getContourId(dragged);
@@ -236,10 +302,27 @@ const ObjectsTab = () => {
       return;
     }
 
+    // Dropping a child beside a shallower row moves it up one level.
+    const draggedDepth = rows.find((row) => row.object.id === dragId)?.depth ?? 0;
+    const targetDepth = rows.find((row) => row.object.id === target.id)?.depth ?? 0;
+    if (dragged.parent_id != null && targetDepth < draggedDepth && (zone === 'before' || zone === 'after')) {
+      await promoteOneLevel(dragged, targetDepth === 0 ? target.id : null, zone);
+      return;
+    }
+
     // Reordering roots is a view-only concern; the backend has no order field.
     if (!dragged.parent_id && !target.parent_id) {
       reorderRootObject(dragId, target.id, zone);
     }
+  };
+
+  const handleDropOutsideRow = async (event) => {
+    if (event.target.closest?.('[role="treeitem"]')) return;
+    const dragged = actions.getObjectById(drag.id);
+    if (!dragged?.parent_id) return;
+    event.preventDefault();
+    setDrag({ id: null, overId: null, zone: null });
+    await promoteOneLevel(dragged, rootBefore(dragged.id)?.object.id);
   };
 
   // --- bulk actions ---------------------------------------------------------
@@ -274,7 +357,13 @@ const ObjectsTab = () => {
 
         <div className="h-px bg-ln" />
 
-        <div>
+        <div
+          className="flex-1"
+          onDragOver={(event) => {
+            if (drag.id != null && !event.target.closest?.('[role="treeitem"]')) event.preventDefault();
+          }}
+          onDrop={handleDropOutsideRow}
+        >
           <div className="flex items-center gap-[6px] h-[22px]">
             <Layers size={13} strokeWidth={1.9} className="text-t3 flex-none" />
             <span className="text-sect font-bold tracking-[.08em] uppercase text-t3">Objects</span>
