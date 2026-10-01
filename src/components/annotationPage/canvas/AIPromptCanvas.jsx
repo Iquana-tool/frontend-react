@@ -24,7 +24,7 @@ import {
   useExitRefinementMode,
 } from '../../../stores/selectors/annotationSelectors';
 import annotationSession from '../../../services/annotationSession';
-import { isPointInFocusedObject, isBoxInFocusedObject } from '../../../utils/geometryUtils';
+import { isPointInFocusedObject } from '../../../utils/geometryUtils';
 import useCanvasViewport from '../../../hooks/useCanvasViewport';
 import usePromptDrawing from '../../../hooks/usePromptDrawing';
 import PointPromptMarker from './prompts/PointPromptMarker';
@@ -273,11 +273,7 @@ const AIPromptCanvas = ({ width, height, renderBackground = true }) => {
         const h = Math.abs(coords.imageY - dragStart.imageY);
 
         if (w >= 3 && h >= 3) {
-          if (!isBoxInFocusedObject(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY, focusedObjectMask)) {
-            showFocusModeWarning('Box annotation is outside the focused object boundary');
-          } else {
-            addBoxPrompt(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY);
-          }
+          addBoxPrompt(dragStart.imageX, dragStart.imageY, coords.imageX, coords.imageY);
         } else if (promptMode === 'point') {
           // Pointer moved enough to look like a drag, but the resulting box is
           // degenerate (common when zoomed out). Fall back to the point the
