@@ -78,31 +78,6 @@ export const isPointInFocusedObject = (x, y, focusedObjectMask) => {
 };
 
 /**
- * Check if a box is within the focused object boundary
- * @param {number} x1 - Box start x coordinate
- * @param {number} y1 - Box start y coordinate
- * @param {number} x2 - Box end x coordinate
- * @param {number} y2 - Box end y coordinate
- * @param {Object} focusedObjectMask - The mask of the focused object
- * @returns {boolean} True if box is within focused object
- */
-export const isBoxInFocusedObject = (x1, y1, x2, y2, focusedObjectMask) => {
-  if (!focusedObjectMask || !focusedObjectMask.points) {
-    return true; // If no focus mode, allow all boxes
-  }
-  
-  // Check if all four corners of the box are within the focused object
-  const corners = [
-    [x1, y1], // top-left
-    [x2, y1], // top-right
-    [x1, y2], // bottom-left
-    [x2, y2]  // bottom-right
-  ];
-  
-  return corners.every(([x, y]) => isPointInPolygon(x, y, focusedObjectMask.points));
-};
-
-/**
  * Calculate focus transform using the existing zoom/pan system
  * This works with the CSS transform: scale(zoomLevel) translate(panOffset.x, panOffset.y)
  * with transformOrigin: 'center center'
