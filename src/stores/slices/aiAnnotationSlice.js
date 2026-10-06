@@ -43,10 +43,14 @@ export const createAIAnnotationSlice = (set) => ({
     // Clear redo stack (new action invalidates redo)
     state.aiAnnotation.redoStack = [];
 
+    const focusedObject = state.focusMode.active
+      ? state.objects.list.find((object) => object.id === state.focusMode.objectId)
+      : null;
     state.aiAnnotation.prompts.push({
       id: `${Date.now()}-${Math.random()}`,
       type: 'polygon',
       freehand: !!options.freehand,
+      parentContourId: focusedObject?.contour_id ?? focusedObject?.id ?? null,
       coords: {
         points: points.map((p) => ({ x: p.x, y: p.y })),
       },
