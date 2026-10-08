@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import readableError from '../../utils/readableError';
 
 // Matches the backend's `PasswordChange.new_password` minimum, so a short
 // password is caught before the round trip rather than as a 422.
 export const MIN_PASSWORD_LENGTH = 8;
-
-const readableError = (err, fallback) =>
-  (err?.message || '').replace(/^API (Validation )?Error:\s*/i, '') || fallback;
 
 const inputClass =
   'w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 text-t1 placeholder-t3 ' +

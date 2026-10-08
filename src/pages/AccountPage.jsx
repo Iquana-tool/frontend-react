@@ -9,6 +9,7 @@ import { useToast } from '../contexts/ToastContext';
 import { GLOBAL_ROLE_LABELS } from '../utils/permissions';
 import ChangePasswordForm from '../components/account/ChangePasswordForm';
 import LlmKeyEditor from '../components/account/LlmKeyEditor';
+import readableError from '../utils/readableError';
 
 const TABS = [
   { key: 'profile', label: 'Profile', icon: UserCircle2 },
@@ -16,9 +17,6 @@ const TABS = [
   { key: 'keys', label: 'API keys', icon: KeyRound },
   { key: 'organizations', label: 'Organisations', icon: Building2 },
 ];
-
-const readableError = (err, fallback) =>
-  (err?.message || '').replace(/^API (Validation )?Error:\s*/i, '') || fallback;
 
 const inputClass =
   'w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 text-t1 placeholder-t3 ' +

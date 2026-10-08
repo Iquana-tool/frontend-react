@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, Loader2, Save, Trash2 } from 'lucide-react';
 import { formatServerDateTime } from '../../utils/serverTime';
-
-const readableError = (err, fallback) =>
-  (err?.message || '').replace(/^API (Validation )?Error:\s*/i, '') || fallback;
+import readableError from '../../utils/readableError';
 
 const inputClass =
   'w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 text-t1 placeholder-t3 ' +

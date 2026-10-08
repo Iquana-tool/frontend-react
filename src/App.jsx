@@ -26,6 +26,7 @@ import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminPage from "./pages/AdminPage";
 import AccountPage from "./pages/AccountPage";
+import OrganizationPage from "./pages/OrganizationPage";
 import ActivityLogPage from "./pages/ActivityLogPage";
 import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
@@ -75,6 +76,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AccountPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/organizations/:organizationId"
+              element={
+                <ProtectedRoute>
+                  <OrganizationPage />
                 </ProtectedRoute>
               }
             />
