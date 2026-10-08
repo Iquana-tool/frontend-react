@@ -47,10 +47,16 @@ const AuthButtons = ({
     return (
       <>
         {!showLogoutOnly && (
-          <div className={finalUsernameClass}>
+          <button
+            onClick={() => navigate('/account')}
+            title="Your account"
+            className={`${finalUsernameClass} rounded-6 hover:bg-hv transition-colors duration-150`}
+          >
             <User className={iconSize} />
-            <span className={`font-medium ${isMobile ? 'hidden sm:inline' : ''}`}>{user?.username}</span>
-          </div>
+            <span className={`font-medium ${isMobile ? 'hidden sm:inline' : ''}`}>
+              {user?.display_name || user?.username}
+            </span>
+          </button>
         )}
         <button
           onClick={handleLogout}

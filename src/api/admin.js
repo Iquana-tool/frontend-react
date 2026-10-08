@@ -9,7 +9,7 @@ const jsonHeaders = () => getAuthHeaders({ "Content-Type": "application/json" })
 
 /**
  * List every account with its global role and dataset count.
- * @returns {Promise<{success: boolean, users: Array<{username: string, global_role: string, is_active: boolean, dataset_count: number}>}>}
+ * @returns {Promise<{success: boolean, users: Array<{username: string, global_role: string, display_name: string|null, email: string|null, is_active: boolean, must_change_password: boolean, created_at: string|null, last_login_at: string|null, dataset_count: number}>}>}
  */
 export const fetchUsers = async () => {
     const response = await fetch(`${API_BASE_URL}/admin/users`, {
@@ -67,7 +67,7 @@ export const setUserActive = async (username, isActive) => {
  * chosen here and passed on out of band — iquana sends no mail, so there is
  * nowhere to deliver an activation link to.
  *
- * @param {{username: string, password: string, global_role?: string, is_active?: boolean}} account
+ * @param {{username: string, password: string, display_name?: string|null, email?: string|null, global_role?: string, is_active?: boolean}} account
  */
 export const createUser = async (account) => {
     const response = await fetch(`${API_BASE_URL}/admin/users`, {

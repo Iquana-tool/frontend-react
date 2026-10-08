@@ -36,6 +36,8 @@ const readableError = (err, fallback) =>
  */
 const CreateUserModal = ({ isOpen, onClose, onCreated }) => {
   const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState(generatePassword);
   const [globalRole, setGlobalRole] = useState(GlobalRole.MEMBER);
   const [revealed, setRevealed] = useState(true);
@@ -47,6 +49,8 @@ const CreateUserModal = ({ isOpen, onClose, onCreated }) => {
 
   const reset = () => {
     setUsername('');
+    setDisplayName('');
+    setEmail('');
     setPassword(generatePassword());
     setGlobalRole(GlobalRole.MEMBER);
     setCopied(false);
@@ -77,6 +81,8 @@ const CreateUserModal = ({ isOpen, onClose, onCreated }) => {
     try {
       const response = await api.createUser({
         username: username.trim(),
+        display_name: displayName.trim() || null,
+        email: email.trim() || null,
         password,
         global_role: globalRole,
         is_active: true,
@@ -132,6 +138,32 @@ const CreateUserModal = ({ isOpen, onClose, onCreated }) => {
             />
           </label>
 
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-sm font-medium text-t2">Display name</span>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={100}
+                autoComplete="off"
+                className="mt-1 w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 text-t1 focus:ring-2 focus:ring-ac focus:outline-none"
+                placeholder="Optional"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-t2">Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="off"
+                className="mt-1 w-full px-3 py-2 border border-ln2 rounded-lg bg-p1 text-t1 focus:ring-2 focus:ring-ac focus:outline-none"
+                placeholder="Optional"
+              />
+            </label>
+          </div>
+
           <div>
             <span className="text-sm font-medium text-t2">Password</span>
             <div className="mt-1 flex items-stretch gap-2">
@@ -170,7 +202,7 @@ const CreateUserModal = ({ isOpen, onClose, onCreated }) => {
             <p className={`mt-1 text-xs ${tooShort ? 'text-err' : 'text-t3'}`}>
               {tooShort
                 ? `At least ${MIN_PASSWORD_LENGTH} characters.`
-                : 'Copy it before saving — it cannot be read back afterwards.'}
+                : 'Copy it before saving — it cannot be read back afterwards. They choose their own when they first sign in.'}
             </p>
           </div>
 

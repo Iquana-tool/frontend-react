@@ -6,6 +6,7 @@ import { DatasetProvider } from "./contexts/DatasetContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { CorrectionProvider } from "./contexts/CorrectionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PreferenceSync from "./components/account/PreferenceSync";
 import useDocumentTheme from "./hooks/useDocumentTheme";
 import { useRouteActivity, useActivityLogInit } from "./hooks/useActivityLog";
 import Login from "./components/auth/Login";
@@ -24,6 +25,7 @@ import AcceptInvitePage from "./pages/AcceptInvitePage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminPage from "./pages/AdminPage";
+import AccountPage from "./pages/AccountPage";
 import ActivityLogPage from "./pages/ActivityLogPage";
 import ReviewPage from "./pages/ReviewPage";
 import CorrectionPage from "./pages/CorrectionPage";
@@ -45,6 +47,8 @@ function App() {
 
   return (
     <AuthProvider>
+      {/* Theme, outline and tool choices follow the account across machines. */}
+      <PreferenceSync />
       <ToastProvider>
       <DatasetProvider>
         <Router basename={BASE_PATH}>
@@ -66,6 +70,14 @@ function App() {
             {/* Dataset invite links land here. The page itself bounces to
                 /login?next=... when the invitee is not signed in yet. */}
             <Route path="/invites/:token" element={<AcceptInvitePage />} />
+            <Route
+              path="/account"
+              element={
+                <ProtectedRoute>
+                  <AccountPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/admin"
               element={
