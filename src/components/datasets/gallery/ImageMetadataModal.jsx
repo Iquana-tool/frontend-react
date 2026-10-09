@@ -103,12 +103,18 @@ const ImageMetadataModal = ({ isOpen, images = [], facets = [], onClose, onSaved
     try {
       // The bulk endpoint is additive plus explicit removals, which is exactly
       // what the form means — so one image and forty take the same path.
-      const response = await api.setMetadataForImages(
-        images.map((image) => image.id),
-        payload.entries,
-        payload.removeKeys
-      );
-      onSaved?.(response);
+      // A stack's tags live on the stack, so every slice inherits them; writing
+      // them onto the frame the entry happens to carry would tag one slice.
+      const stacks = images.filter((image) => image.kind === 'stack');
+      const plain = images.filter((image) => image.kind !== 'stack');
+      const responses = await Promise.all([
+        plain.length
+          ? api.setMetadataForImages(plain.map((image) => image.id), payload.entries, payload.removeKeys)
+          : null,
+        ...stacks.map((stack) =>
+          api.updateStackMetadata(stack.stackId, payload.entries, payload.removeKeys)),
+      ]);
+      onSaved?.(responses[0] ?? responses[1]);
       onClose();
     } catch (err) {
       setError(err.message || 'Could not save the metadata.');
@@ -118,7 +124,7 @@ const ImageMetadataModal = ({ isOpen, images = [], facets = [], onClose, onSaved
   };
 
   const subtitle = isBulk
-    ? `${images.length} images selected`
+    ? `${images.length} items selected`
     : images[0]?.file_name || images[0]?.name || `Image ${images[0]?.id}`;
 
   return (

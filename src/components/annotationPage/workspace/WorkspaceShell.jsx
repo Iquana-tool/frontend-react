@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import TopToolbar from './TopToolbar';
 import ToolRail from './ToolRail';
@@ -11,6 +11,13 @@ import Filmstrip from './Filmstrip';
 import StatusBar from './StatusBar';
 import ReviewBanner from './ReviewBanner';
 import ShortcutSheet from './ShortcutSheet';
+import OverviewDrawer from './stack/OverviewDrawer';
+import ViewSettingsDrawer from './stack/ViewSettingsDrawer';
+import SliceBar from './stack/SliceBar';
+import SliceHud from './stack/SliceHud';
+import TimelineDrawer from './stack/TimelineDrawer';
+import useStackData from './stack/useStackData';
+import useStackNav from './stack/useStackNav';
 import useWorkspaceShortcuts from './useWorkspaceShortcuts';
 import useRailTools from './useRailTools';
 import { DEFAULT_RAIL_TOOL_BY_MODE, railToolAllowedInMode } from './toolModel';
@@ -22,12 +29,14 @@ import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 import { useDataset } from '../../../contexts/DatasetContext';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
 import '../../../styles/workspace.css';
 import {
   useWorkspaceTheme,
   useWorkspaceMode,
   useLeftDrawerOpen,
+  useLeftDrawerContent,
   useFilmstripOpen,
   useCurrentImageId,
   useCurrentMaskId,
@@ -49,6 +58,50 @@ import {
  */
 const MEASUREMENT_TOOLS = ['set_scale'];
 
+/** A wheel delta at least this big is a mouse notch: one slice, whatever its size. */
+const WHEEL_NOTCH = 50;
+/** Smaller deltas (a trackpad) add up until they reach this, then step one slice. */
+const WHEEL_SLICE_PX = 40;
+
+/**
+ * On a stack, the wheel steps through slices and Ctrl + wheel (which is also
+ * what a trackpad pinch sends) zooms, as in the clinic's own viewer. A plain
+ * image keeps the wheel for zooming.
+ *
+ * Listens in the capture phase on the canvas area, so it runs before the zoom
+ * handlers of the canvas and its Konva stages and can stop them; only wheels
+ * over the stage itself count, so the timeline and pickers above it scroll as
+ * usual.
+ */
+const useSliceWheel = (areaRef) => {
+  const { step } = useStackNav();
+  useEffect(() => {
+    const area = areaRef.current;
+    if (!area) return undefined;
+    let accumulated = 0;
+    const onWheel = (event) => {
+      if (useAnnotationStore.getState().images.currentImage?.stackId == null) return;
+      if (event.ctrlKey || event.metaKey) return;
+      if (!event.target.closest?.('[data-canvas-stage]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
+      if (Math.abs(delta) >= WHEEL_NOTCH) {
+        accumulated = 0;
+        step(Math.sign(delta));
+        return;
+      }
+      accumulated += delta;
+      if (Math.abs(accumulated) >= WHEEL_SLICE_PX) {
+        step(Math.sign(accumulated));
+        accumulated = 0;
+      }
+    };
+    area.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    return () => area.removeEventListener('wheel', onWheel, { capture: true });
+  }, [areaRef, step]);
+};
+
 /**
  * The annotation workspace shell.
  *
@@ -63,6 +116,8 @@ const WorkspaceShell = () => {
   const theme = useWorkspaceTheme();
   const mode = useWorkspaceMode();
   const leftDrawerOpen = useLeftDrawerOpen();
+  const leftDrawerContent = useLeftDrawerContent();
+  const canvasAreaRef = useRef(null);
   const filmstripOpen = useFilmstripOpen();
   const currentImageId = useCurrentImageId();
   const maskId = useCurrentMaskId();
@@ -84,6 +139,9 @@ const WorkspaceShell = () => {
   // Loads the image's calibrations here rather than in the Calibrate tab, so the
   // status bar can report them without the tab ever having been opened.
   useCalibrationSync();
+  // The current stack's frames and objects, for the slice bar, timeline and overview.
+  useStackData();
+  useSliceWheel(canvasAreaRef);
 
   // Per-image view state (hidden rows, manual ordering, collapse) must not
   // carry over when the user steps to another image.
@@ -163,16 +221,23 @@ const WorkspaceShell = () => {
             drawing tool while annotating, the selected calibration's controls
             while calibrating, and — since reviewing configures nothing — what the
             image measures, for judging it against the dataset it belongs to. */}
+        {/* The overview and the view settings are rail entries of their own and
+            look the same in every mode. */}
         {leftDrawerOpen && (
-          mode === 'calibrate' ? <CalibrationDrawer />
-            : mode === 'review' ? <ReviewDrawer />
-              : <ToolOptionsDrawer />
+          leftDrawerContent === 'overview' ? <OverviewDrawer />
+            : leftDrawerContent === 'view' ? <ViewSettingsDrawer />
+              : mode === 'calibrate' ? <CalibrationDrawer />
+                : mode === 'review' ? <ReviewDrawer />
+                  : <ToolOptionsDrawer />
         )}
 
         <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">
-          <div data-guide="canvas" className="flex-1 relative overflow-hidden">
+          <div ref={canvasAreaRef} data-guide="canvas" className="flex-1 relative overflow-hidden">
             <MainCanvas />
+            <SliceHud />
             <ActionBar />
+            {/* Over the bottom of the image, above the action bar, for a stack item. */}
+            <TimelineDrawer />
             {/* Mode ring. The stage fills the screen and the eye lives on it, so
                 the mode has to be answerable without looking back at the toolbar.
                 An inset border in the phase's hue does that at the edge of vision
@@ -184,6 +249,7 @@ const WorkspaceShell = () => {
             />
           </div>
 
+          <SliceBar />
           {filmstripOpen && <Filmstrip />}
           <StatusBar />
         </div>

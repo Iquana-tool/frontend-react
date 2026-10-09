@@ -33,6 +33,16 @@ export const initialState = {
      */
     promptAction: 'nothing',    // 'nothing' | 'ai' | 'manual'
     leftDrawerOpen: true,
+    /**
+     * What the left drawer holds: the armed tool's options (in Calibrate and
+     * Review, that mode's own drawer), the item overview with its tags, or the
+     * view settings. One at a time; the rail picks which.
+     */
+    leftDrawerContent: 'tools', // 'tools' | 'overview' | 'view'
+    /** The object timeline drawer over the canvas, for stack items. */
+    timelineOpen: false,
+    /** Draw the neighbouring slices' outlines dashed (stack items only). */
+    showNeighbours: true,
     rightPanelOpen: true,
     rightTab: 'objects',        // 'objects' | 'labels'
     filmstripOpen: true,
@@ -165,6 +175,17 @@ export const initialState = {
   },
   
   // Image State
+  // The stack the current frame belongs to, for the stack-aware views (slice bar,
+  // timeline, overview). Empty while a plain image is open.
+  stack: {
+    /** `GET /stacks/{id}`: frames with overview geometry, overview size, metadata. */
+    details: null,
+    /** `GET /stacks/{id}/objects`: every frame's objects with outlines. */
+    objects: [],
+    /** Stack the objects were fetched for, so a late answer for another is dropped. */
+    objectsFor: null,
+  },
+
   images: {
     currentImage: null,
     currentImageId: null,

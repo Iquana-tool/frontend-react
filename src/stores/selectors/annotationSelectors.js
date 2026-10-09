@@ -306,6 +306,17 @@ export const useWorkspaceTheme = () => useAnnotationStore(state => state.workspa
 export const useWorkspaceMode = () => useAnnotationStore(state => state.workspace.mode);
 export const usePromptAction = () => useAnnotationStore(state => state.workspace.promptAction);
 export const useLeftDrawerOpen = () => useAnnotationStore(state => state.workspace.leftDrawerOpen);
+export const useLeftDrawerContent = () => useAnnotationStore(state => state.workspace.leftDrawerContent);
+export const useToggleLeftDrawerContent = () => useAnnotationStore(state => state.toggleLeftDrawerContent);
+export const useTimelineOpen = () => useAnnotationStore(state => state.workspace.timelineOpen);
+export const useSetTimelineOpen = () => useAnnotationStore(state => state.setTimelineOpen);
+export const useToggleTimeline = () => useAnnotationStore(state => state.toggleTimeline);
+export const useShowNeighbours = () => useAnnotationStore(state => state.workspace.showNeighbours);
+export const useToggleNeighbours = () => useAnnotationStore(state => state.toggleNeighbours);
+export const useStackDetails = () => useAnnotationStore(state => state.stack.details);
+export const useStackObjects = () => useAnnotationStore(state => state.stack.objects);
+export const useSetStackDetails = () => useAnnotationStore(state => state.setStackDetails);
+export const useSetStackObjects = () => useAnnotationStore(state => state.setStackObjects);
 export const useRightPanelOpen = () => useAnnotationStore(state => state.workspace.rightPanelOpen);
 export const useRightTab = () => useAnnotationStore(state => state.workspace.rightTab);
 export const useFilmstripOpen = () => useAnnotationStore(state => state.workspace.filmstripOpen);

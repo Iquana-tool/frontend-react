@@ -4,6 +4,7 @@ import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import useAppStore from '../stores/useAppStore';
+import { buildItemList } from '../utils/stackItems';
 
 /**
  * Normalizes a raw image object from the API into the shape expected by the UI.
@@ -26,9 +27,28 @@ export const normalizeImage = (img) => ({
   // Grouping key/values, shipped with the listing so the gallery can filter on a
   // subgroup without a second request. Empty object for an untagged image.
   metadata: img.metadata || {},
+  // Set on a stack's frames only (listed with `includeFrames`).
+  stackId: img.stack_id ?? null,
+  frameIndex: img.frame_index ?? null,
   thumbnail: null,
   isFromAPI: true,
 });
+
+/**
+ * The dataset's items for the gallery: plain images, and each stack (an OCT
+ * volume, a video) once, as the entry `buildItemList` folds its frames into.
+ *
+ * @returns {Promise<Array<Object>|null>} null when the listing failed.
+ */
+export const fetchGalleryItems = async (datasetId) => {
+  const [imagesResponse, stacksResponse] = await Promise.all([
+    api.fetchImages(datasetId, { includeFrames: true }),
+    api.fetchStacks(datasetId).catch(() => ({ stacks: [] })),
+  ]);
+  if (!imagesResponse.success) return null;
+  const rows = imagesResponse.image_data || imagesResponse.images || [];
+  return buildItemList(rows.map(normalizeImage), stacksResponse?.stacks || []);
+};
 
 /**
  * Custom hook to handle dataset gallery data fetching and initialization
@@ -75,16 +95,13 @@ export const useDatasetGalleryData = (datasetId, galleryActions) => {
       galleryActions.setGalleryError(null);
 
       try {
-        const [imagesResponse, labelsResponse, statsResponse] = await Promise.all([
-          api.fetchImages(currentDataset.id),
+        const [items, labelsResponse, statsResponse] = await Promise.all([
+          fetchGalleryItems(currentDataset.id),
           api.fetchLabels(currentDataset.id).catch(() => []),
           getAnnotationProgress(currentDataset.id)
         ]);
 
-        if (imagesResponse.success) {
-          const imageDataList = imagesResponse.image_data || imagesResponse.images || [];
-          galleryActions.setImages(imageDataList.map(normalizeImage));
-        }
+        if (items) galleryActions.setImages(items);
 
         const labelsArray = extractLabelsFromResponse(labelsResponse);
         galleryActions.setLabels(labelsArray);

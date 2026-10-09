@@ -4,6 +4,8 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import { useSetImageList, useSetCurrentImage } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { fetchImages } from '../../../api/images';
+import { fetchStacks } from '../../../api/stacks';
+import { buildItemList, resolveImage } from '../../../utils/stackItems';
 import { fetchAnnotationQueue } from '../../../api/annotation_queue';
 import { getPhaseStatus } from '../../../utils/imageStatus';
 
@@ -94,7 +96,8 @@ const DatasetLoader = ({ children }) => {
 
         // Only update if the target image is different from the current one
         if (currentImageList.length > 0 && (!currentImg || currentImg.id !== imageIdNum)) {
-          const targetImage = currentImageList.find(img => img.id === imageIdNum);
+          // The id may be a slice of a stack, which is not an entry of its own.
+          const targetImage = resolveImage(currentImageList, imageIdNum);
           if (targetImage) {
             setCurrentImage(targetImage);
           }
@@ -106,10 +109,13 @@ const DatasetLoader = ({ children }) => {
   // Load images for the dataset
   const loadDatasetImages = async (dataset) => {
     try {
-      // Fetch images from API
-      const response = await fetchImages(dataset.id);
+      // Frames included: a stack is folded into one entry below, but the canvas
+      // works on its frames, which are images. The stack list only adds names.
+      const [response, stacksResponse] = await Promise.all([
+        fetchImages(dataset.id, { includeFrames: true }),
+        fetchStacks(dataset.id).catch(() => ({ stacks: [] })),
+      ]);
 
-      
       const imageDataList = response.image_data || response.images || [];
 
       if (response.success && imageDataList.length > 0) {
@@ -128,14 +134,19 @@ const DatasetLoader = ({ children }) => {
           // below both read. Absent on legacy payloads.
           phases: img.phases || null,
           mask_id: img.mask_id,
+          // Set on a stack's frames only.
+          stackId: img.stack_id ?? null,
+          frameIndex: img.frame_index ?? null,
+          metadata: img.metadata,
           isFromAPI: true,
         }));
+        const items = buildItemList(apiImages, stacksResponse?.stacks || []);
 
         // Apply the annotator's saved queue order. The queue ids are seeded from
         // navigation state when we just came from the builder (avoids a reorder
         // flash and a race with the just-saved row); on a refresh or a direct link
         // there is no state, so fall back to re-reading the saved queue.
-        let orderedImages = apiImages;
+        let orderedImages = items;
         try {
           let queueIds = location.state?.queueImageIds;
           if (!queueIds) {
@@ -144,10 +155,10 @@ const DatasetLoader = ({ children }) => {
               ? queueResponse.queue.image_ids
               : null;
           }
-          orderedImages = orderImagesByQueue(apiImages, queueIds);
+          orderedImages = orderImagesByQueue(items, queueIds);
         } catch (queueError) {
           // No queue (or it failed to load) — keep upload order.
-          orderedImages = apiImages;
+          orderedImages = items;
         }
 
         setImageList(orderedImages);
@@ -155,7 +166,7 @@ const DatasetLoader = ({ children }) => {
         // Set current image if imageId is provided
         if (imageId) {
           const imageIdNum = parseInt(imageId);
-          const targetImage = orderedImages.find(img => img.id === imageIdNum);
+          const targetImage = resolveImage(orderedImages, imageIdNum);
           if (targetImage) {
             setCurrentImage(targetImage);
           } else {

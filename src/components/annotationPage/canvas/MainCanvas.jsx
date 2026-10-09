@@ -75,6 +75,7 @@ const MainCanvas = forwardRef((props, ref) => {
   return (
     <div
       ref={containerRef}
+      data-canvas-stage
       className={`absolute inset-0 flex items-center justify-center bg-canvasbg ${getCursorClass()}`}
       onClick={handleBackgroundClick}
       onDragStart={(e) => e.preventDefault()}
