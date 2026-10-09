@@ -56,6 +56,18 @@ const GROUPS = [
       { keys: '⌘⇧C', label: 'Clear all prompts' },
     ],
   },
+  {
+    // Scans with slices (OCT volumes). On a plain image these keys do nothing.
+    title: 'Slices',
+    items: [
+      { keys: '↑ ↓', label: 'Previous / next slice (⇧ for five)' },
+      { keys: 'scroll', label: 'Previous / next slice — Ctrl + scroll zooms' },
+      { keys: 'Home End', label: 'First / last slice' },
+      { keys: '[ ]', label: 'Previous / next slice with a suggestion to check' },
+      { keys: 'N', label: 'Show the neighbouring slices, dashed' },
+      { keys: 'Y', label: 'Open the object timeline' },
+    ],
+  },
 ];
 
 /** Keyboard reference, opened from the app menu or `?`. */

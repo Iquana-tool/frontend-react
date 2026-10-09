@@ -39,6 +39,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { PHASES, getStateDescriptor, phaseIconClass, stateLabel } from '../../../utils/imageStatus';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP, clampZoom } from './constants';
 import { CHIP_MODE_LABELS } from '../canvas/chipLayout';
+import { stackKindLabel } from '../../../utils/stackItems';
 import { OUTLINE_PRESET_LABELS } from '../../../utils/outlineSettings';
 import { useCalibratedColorPreview } from '../canvas/CalibratedColorFilter';
 import {
@@ -57,6 +58,8 @@ import {
   useWorkspaceTheme,
   useToggleTheme,
   useLeftDrawerOpen,
+  useLeftDrawerContent,
+  useSetLeftDrawerOpen,
   useToggleLeftDrawer,
   useRightPanelOpen,
   useToggleRightPanel,
@@ -117,6 +120,8 @@ const TopToolbar = () => {
   const theme = useWorkspaceTheme();
   const toggleTheme = useToggleTheme();
   const leftDrawerOpen = useLeftDrawerOpen();
+  const leftDrawerContent = useLeftDrawerContent();
+  const setLeftDrawerOpen = useSetLeftDrawerOpen();
   const toggleLeftDrawer = useToggleLeftDrawer();
   const rightPanelOpen = useRightPanelOpen();
   const toggleRightPanel = useToggleRightPanel();
@@ -260,6 +265,11 @@ const TopToolbar = () => {
         <span className="text-btn font-semibold text-t1 truncate max-w-[180px]">
           {nav.currentImage?.name || '—'}
         </span>
+        {nav.currentImage?.kind === 'stack' && (
+          <span className="inline-flex items-center h-[19px] px-[7px] rounded-5 bg-well text-sect font-semibold text-t2 flex-none">
+            {stackKindLabel(nav.currentImage.stackKind)}
+          </span>
+        )}
         {/* Combined status, with the three phases behind it on hover. Three pills
             in the breadcrumb would crowd out the image name; one plus a tooltip
             still lets the annotator see which phase is holding the image back. */}
@@ -453,7 +463,7 @@ const TopToolbar = () => {
         icon={PanelLeft}
         label="Tool options"
         shortcut="⌥1"
-        active={leftDrawerOpen}
+        active={leftDrawerOpen && leftDrawerContent === 'tools'}
         onClick={toggleLeftDrawer}
       />
       <ToolbarButton
@@ -466,9 +476,7 @@ const TopToolbar = () => {
       <ToolbarButton
         icon={Settings}
         label="Annotation services"
-        onClick={() => {
-          if (!leftDrawerOpen) toggleLeftDrawer();
-        }}
+        onClick={() => setLeftDrawerOpen(true)}
       />
 
       {/* Account */}

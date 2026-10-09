@@ -14,6 +14,7 @@ import ScaleCalibrationOverlay from './ScaleCalibrationOverlay';
 import CalibratedColorFilter, { useCalibratedColorPreview } from './CalibratedColorFilter';
 import PatchPickOverlay from './PatchPickOverlay';
 import ScaleBarIndicator from './ScaleBarIndicator';
+import NeighbourOverlay from './NeighbourOverlay';
 import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
 import useMultiSelectShortcuts from '../../../hooks/useMultiSelectShortcuts';
@@ -119,6 +120,9 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
              all of it measured off this element — is untouched by the preview. */
           style={calibratedColorFilter ? { filter: calibratedColorFilter } : undefined}
         />
+
+        {/* A stack's neighbouring slices, dashed, under this slice's objects. */}
+        <NeighbourOverlay imageObject={imageObject} />
 
         {annotating && currentTool !== 'ai_annotation' && <PromptOverlay canvasRef={canvasRef} />}
       </div>

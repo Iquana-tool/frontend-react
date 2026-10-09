@@ -63,7 +63,7 @@ const GalleryHeader = ({
     <div className="p-3 sm:p-4 border-b border-ln bg-p1 sticky top-0 z-10">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg sm:text-xl font-bold text-t1">
-          Images ({imageCount})
+          Items ({imageCount})
         </h2>
 
         <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ const GalleryHeader = ({
         <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-t3 w-3.5 h-3.5 sm:w-4 sm:h-4" />
         <input
           type="text"
-          placeholder="Search images..."
+          placeholder="Search by name..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-sm border border-ln2 rounded-lg focus:ring-2 focus:ring-ac focus:border-transparent"

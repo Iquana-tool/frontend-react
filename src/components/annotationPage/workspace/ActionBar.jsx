@@ -59,6 +59,8 @@ import {
   useUpdateObject,
   useRefinementModeActive,
 } from '../../../stores/selectors/annotationSelectors';
+import { useCurrentImage, useTimelineOpen } from '../../../stores/selectors/annotationSelectors';
+import { TIMELINE_HEIGHT } from './stack/TimelineDrawer';
 
 /** Icons for the three prompt actions, keyed as PROMPT_ACTIONS names them. */
 const ACTION_ICONS = { Ban, Sparkles, Pencil };
@@ -98,6 +100,11 @@ const Dot = ({ color, className = '' }) => (
  * `draft` state on this backend.
  */
 const ActionBar = () => {
+  // The object timeline covers the bottom of a stack's canvas; the bar rides
+  // above it rather than over its lanes.
+  const timelineOpen = useTimelineOpen();
+  const onStack = useCurrentImage()?.stackId != null;
+  const liftAboveTimeline = timelineOpen && onStack;
   const bar = useActionBarState();
   const actions = useObjectActions();
   const labelling = useLabelAssignment();
@@ -640,7 +647,10 @@ const ActionBar = () => {
   // points (z65). Those overlays are full-bleed and pointer-events-auto, so
   // anything below them loses both the hover cursor and its clicks.
   return (
-    <div className="absolute left-1/2 bottom-4 -translate-x-1/2 z-[70] w-max max-w-[calc(100%-28px)] flex flex-col items-center gap-[8px] pointer-events-none">
+    <div
+      className="absolute left-1/2 bottom-4 -translate-x-1/2 z-[70] w-max max-w-[calc(100%-28px)] flex flex-col items-center gap-[8px] pointer-events-none"
+      style={liftAboveTimeline ? { bottom: TIMELINE_HEIGHT + 16 } : undefined}
+    >
       {picker && (
         <div className="pointer-events-auto">
           {picker === 'model' ? (

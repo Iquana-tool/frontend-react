@@ -45,7 +45,7 @@ const Filmstrip = () => {
       />
 
       <span className="flex-none font-mono text-meta text-t3 tabular-nums">
-        {imageList.length} images · {finishedCount} finished
+        {imageList.length} {imageList.length === 1 ? 'item' : 'items'} · {finishedCount} finished
       </span>
     </div>
   );

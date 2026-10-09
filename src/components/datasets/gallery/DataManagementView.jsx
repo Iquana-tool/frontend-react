@@ -2,6 +2,14 @@ import React, { useCallback, useState } from "react";
 import ImageGallery from "./ImageGallery";
 import { usePermissions, Permission } from "../../../hooks/usePermissions";
 import * as api from "../../../api";
+import { itemType } from "../../ui/ItemTypeBadge";
+
+/**
+ * Delete one gallery item. A stack goes as a whole -- its frames cannot be
+ * deleted one by one, as the numbering along the stack must stay contiguous.
+ */
+const deleteItem = (item) =>
+  item.kind === "stack" ? api.deleteStack(item.stackId) : api.deleteImage(item.id);
 
 const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpdated, onShowQuantifications }) => {
   // The selection itself lives in the gallery, next to the checkboxes and the
@@ -33,7 +41,7 @@ const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpd
       // rest, so each rejection is caught and counted instead of thrown.
       const results = await Promise.all(
         pendingDelete.map((image) =>
-          api.deleteImage(image.id).catch((err) => {
+          deleteItem(image).catch((err) => {
             console.error(`Failed to delete image ${image.id}:`, err);
             return { success: false, imageId: image.id };
           })
@@ -58,12 +66,16 @@ const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpd
   const handleDeleteSingle = async (imageId, e) => {
     e.stopPropagation(); // Prevent navigation to annotation
 
-    if (!window.confirm("Are you sure you want to delete this image?")) {
+    const item = images.find((candidate) => candidate.id === imageId) || { id: imageId };
+    const question = item.kind === "stack"
+      ? `Delete this ${itemType(item).label.toLowerCase()} with all ${item.frameCount} ${itemType(item).unit} and their annotations?`
+      : "Are you sure you want to delete this image?";
+    if (!window.confirm(question)) {
       return;
     }
 
     try {
-      const result = await api.deleteImage(imageId);
+      const result = await deleteItem(item);
       if (result.success) {
         refreshImages();
       } else {
@@ -113,11 +125,12 @@ const DataManagementView = ({ images, dataset, onBack, onImageClick, onImagesUpd
             <div className="inline-block align-bottom bg-p1 rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-p1 px-6 pt-6 pb-4">
                 <h3 className="text-lg font-medium text-t1 mb-4">
-                  Delete {pendingDelete.length} image{pendingDelete.length > 1 ? 's' : ''}?
+                  Delete {pendingDelete.length} item{pendingDelete.length > 1 ? 's' : ''}?
                 </h3>
                 <p className="text-sm text-t2 mb-6">
-                  This action cannot be undone. The selected image{pendingDelete.length > 1 ? 's' : ''} and
-                  {pendingDelete.length > 1 ? ' their' : ' its'} annotations will be permanently deleted.
+                  This action cannot be undone. The selected item{pendingDelete.length > 1 ? 's' : ''} and
+                  {pendingDelete.length > 1 ? ' their' : ' its'} annotations will be permanently deleted
+                  {pendingDelete.some((item) => item.kind === "stack") ? ", stacks with all their slices" : ""}.
                 </p>
 
                 <div className="flex justify-end space-x-3">

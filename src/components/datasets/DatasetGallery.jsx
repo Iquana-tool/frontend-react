@@ -8,7 +8,7 @@ import DatasetExportModal from "./gallery/DatasetExportModal";
 import AnnotationQueueModal from "./gallery/AnnotationQueueModal";
 import DatasetManagementLayout from "./gallery/DatasetManagementLayout";
 import * as api from "../../api";
-import { normalizeImage } from "../../hooks/useDatasetGalleryData";
+import { fetchGalleryItems } from "../../hooks/useDatasetGalleryData";
 import { usePermissions } from "../../hooks/usePermissions";
 import { Permission } from "../../utils/permissions";
 import { 
@@ -106,18 +106,16 @@ const DatasetGallery = () => {
     }
   };
 
-  // Refresh images list - uses normalizeImage to ensure consistent shape
-  // (the API returns image_id not id; without normalization data-image-id is
-  // undefined and the IntersectionObserver cannot load thumbnails)
+  // Refresh the item list - the same fetch the first load makes, so stacks stay
+  // folded into one entry and every entry has the normalised shape (the API
+  // returns image_id not id; without normalization data-image-id is undefined
+  // and the IntersectionObserver cannot load thumbnails)
   const refreshImages = useCallback(async () => {
     if (!dataset) return;
     
     try {
-      const imagesResponse = await api.fetchImages(dataset.id);
-      if (imagesResponse.success) {
-        const imageDataList = imagesResponse.image_data || imagesResponse.images || [];
-        galleryActions.setImages(imageDataList.map(normalizeImage));
-      }
+      const items = await fetchGalleryItems(dataset.id);
+      if (items) galleryActions.setImages(items);
     } catch (err) {
       console.error("Error refreshing images:", err);
     }

@@ -2,6 +2,9 @@ import { useEffect } from 'react';
 import useRailTools from './useRailTools';
 import useWorkspaceImageNav from './useWorkspaceImageNav';
 import useObjectActions from './useObjectActions';
+import useStackNav from './stack/useStackNav';
+import { useMergedStackObjects } from './stack/useStackData';
+import { buildTimeline, framesToCheck } from './stack/timelineModel';
 import {
   RAIL_TOOL_BY_KEY,
   getRailTool,
@@ -10,6 +13,7 @@ import {
 } from './toolModel';
 import { MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from './constants';
 import annotationSession from '../../../services/annotationSession';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 import {
   useZoomLevel,
   useSetZoomLevel,
@@ -32,6 +36,8 @@ import {
   useToggleCalibratedColors,
   useRefinementModeActive,
   useRefinementTool,
+  useToggleNeighbours,
+  useToggleTimeline,
 } from '../../../stores/selectors/annotationSelectors';
 import useRefinementSession from '../../../hooks/useRefinementSession';
 import { nextRefinementTool } from '../../../utils/refinementTools';
@@ -59,6 +65,10 @@ const isTypingTarget = (target) =>
 export default function useWorkspaceShortcuts() {
   const { setRailTool, promptAction, cyclePromptAction } = useRailTools();
   const nav = useWorkspaceImageNav();
+  const stack = useStackNav();
+  const stackObjects = useMergedStackObjects();
+  const toggleNeighbours = useToggleNeighbours();
+  const toggleTimeline = useToggleTimeline();
   const actions = useObjectActions();
 
   const zoomLevel = useZoomLevel();
@@ -192,8 +202,47 @@ export default function useWorkspaceShortcuts() {
             });
           }
           break;
+        case 'N':
+          // Neighbouring slices' outlines, on a stack only.
+          if (stack.isStack) {
+            event.preventDefault();
+            toggleNeighbours();
+          }
+          break;
+        case 'Y':
+          if (stack.isStack) {
+            event.preventDefault();
+            toggleTimeline();
+          }
+          break;
         default:
           break;
+      }
+
+      // Slices. ↑/↓ are free here: only the label picker uses them, and it owns
+      // the keyboard while open (see the early return above). ←/→ stay the scans.
+      if (stack.isStack) {
+        // Read when pressed, not from this render: a held arrow repeats faster
+        // than React re-renders.
+        const frameIndex = useAnnotationStore.getState().images.currentImage?.frameIndex ?? 0;
+        const toCheck = () => framesToCheck(buildTimeline({
+          frameCount: stack.frameCount, objects: stackObjects,
+        }));
+        let target = null;
+        switch (event.key) {
+          case 'ArrowUp': target = frameIndex - (event.shiftKey ? 5 : 1); break;
+          case 'ArrowDown': target = frameIndex + (event.shiftKey ? 5 : 1); break;
+          case 'Home': target = 0; break;
+          case 'End': target = stack.frameCount - 1; break;
+          case '[': target = [...toCheck()].reverse().find((index) => index < frameIndex) ?? null; break;
+          case ']': target = toCheck().find((index) => index > frameIndex) ?? null; break;
+          default: break;
+        }
+        if (['ArrowUp', 'ArrowDown', 'Home', 'End', '[', ']'].includes(event.key)) {
+          event.preventDefault();
+          if (target != null) stack.goToFrame(target);
+          return;
+        }
       }
 
       switch (event.key) {
@@ -234,6 +283,10 @@ export default function useWorkspaceShortcuts() {
   }, [
     picker,
     instanceModalOpen,
+    stack,
+    stackObjects,
+    toggleNeighbours,
+    toggleTimeline,
     mode,
     promptAction,
     setRailTool,

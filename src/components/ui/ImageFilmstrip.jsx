@@ -6,6 +6,12 @@ import {
   getPhaseStatuses,
   getStateDescriptor,
 } from '../../utils/imageStatus';
+import { itemType } from './ItemTypeBadge';
+
+const TypeIcon = ({ item }) => {
+  const { Icon, key } = itemType(item);
+  return <Icon size={9} strokeWidth={2.4} fill={key === 'video' ? 'currentColor' : 'none'} />;
+};
 
 /**
  * The scrollable strip of image tiles, shared by the annotation workspace and the
@@ -146,6 +152,17 @@ const ImageFilmstrip = ({ images, selectedId, onSelect, size = 'sm', className =
             >
               <StatusIcon size={10} strokeWidth={3} />
             </span>
+            {/* Only stacks are marked: on a strip of images, a badge on every tile
+                would say nothing. */}
+            {image.kind === 'stack' && (
+              <span
+                className="absolute top-[3px] left-[3px] h-[14px] px-[3px] rounded-full flex items-center gap-[2px] bg-p1 text-t2 font-mono text-badge"
+                title={`${itemType(image).label} · ${image.frameCount} ${itemType(image).unit}`}
+              >
+                <TypeIcon item={image} />
+                {image.frameCount}
+              </span>
+            )}
             <span className="absolute bottom-0 left-0 max-w-full px-[3px] font-mono text-badge text-white bg-black/60 truncate">
               {image.name}
             </span>

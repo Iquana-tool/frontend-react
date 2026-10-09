@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart3, Image as ImageIcon, Tag, Trash2 } from 'lucide-react';
 import {
   PHASES,
@@ -6,8 +6,35 @@ import {
   getPhaseStatuses,
   getStateDescriptor,
 } from '../../../utils/imageStatus';
+import ItemTypeBadge, { itemType } from '../../ui/ItemTypeBadge';
+import { fetchStackThumbnailUrl } from '../../../api/stacks';
 
 const PLACEHOLDER_SVG = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDEySDNNMjEgMTJDMjEgMTYuOTc4NiAxNi45NzA2IDIxIDEyIDIxQzcuMDI5NDQgMjEgMyAxNi45Nzg2IDMgMTJNMjEgMTJDMjEgNy4wMjE0NCAxNi45NzA2IDMgMTIgM0M3LjAyOTQ0IDMgMyA3LjAyMTQ0IDMgMTIiIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CjxwYXRoIGQ9Ik0xMiAxN0g5TDEyIDEySDlNMTIgMTdWMjFIMTVWMTciIHN0cm9rZT0iIzlCA0E0QTQiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+Cjwvc3ZnPgo=';
+
+/**
+ * A stack's own thumbnail -- its overview (an OCT volume's IR-SLO), which says
+ * more about the scan than any single slice. Null until loaded or for an image.
+ */
+const useStackThumbnail = (stackId) => {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    if (stackId == null) return undefined;
+    let cancelled = false;
+    let created = null;
+    fetchStackThumbnailUrl(stackId)
+      .then((objectUrl) => {
+        created = objectUrl;
+        if (cancelled) URL.revokeObjectURL(objectUrl);
+        else setUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [stackId]);
+  return url;
+};
 
 /**
  * @param {Function} [onShowQuantifications] - Opens this image's measurements (issue #15).
@@ -25,8 +52,12 @@ const ImageThumbnail = ({
   selected = false,
   onToggleSelect,
 }) => {
-  const imageSrc = thumbnailUrl || image.thumbnail || PLACEHOLDER_SVG;
-  const isLoading = !thumbnailUrl && !image.thumbnail && !isLoaded;
+  // A stack's entry carries a frame's id, so the lazy loader would fetch a slice;
+  // its own thumbnail wins once it is here.
+  const stackThumbnail = useStackThumbnail(image.kind === 'stack' ? image.stackId : null);
+  const imageSrc = stackThumbnail || thumbnailUrl || image.thumbnail || PLACEHOLDER_SVG;
+  const isLoading = !stackThumbnail && !thumbnailUrl && !image.thumbnail && !isLoaded;
+  const typeLabel = itemType(image).label.toLowerCase();
   const status = getImageStatus(image);
   // `smallIcon` rather than `icon`: the glyph carries the state on its own now,
   // and the small set (cross / ring / tick) is the one drawn to read without a
@@ -61,6 +92,8 @@ const ImageThumbnail = ({
             <ImageIcon className="w-8 h-8 text-t3" />
           </div>
         )}
+        {/* What the tile is: an image, a stack of slices, a video. */}
+        <ItemTypeBadge item={image} className="absolute bottom-1.5 left-1.5" />
       </div>
 
       {/* Selection + status, in one row so the checkbox does not cover the badge.
@@ -124,7 +157,7 @@ const ImageThumbnail = ({
               onDeleteImage(image.id, e);
             }}
             className="opacity-0 group-hover:opacity-100 transition-opacity bg-err hover:bg-err text-onAccent p-1.5 rounded-full shadow-lg"
-            title="Delete image"
+            title={`Delete ${typeLabel}`}
           >
             <Trash2 size={14} />
           </button>

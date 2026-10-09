@@ -187,6 +187,7 @@ export const createWorkspaceSlice = (set) => ({
       // The calibration controls live in the left drawer, so opening the mode
       // with it collapsed would show a rail with nowhere to configure anything.
       state.workspace.leftDrawerOpen = true;
+      state.workspace.leftDrawerContent = 'tools';
       state.ui.currentTool = 'pan';
       state.workspace.picker = null;
     } else if (previous === 'calibrate') {
@@ -216,11 +217,58 @@ export const createWorkspaceSlice = (set) => ({
   }),
 
   toggleLeftDrawer: () => set((state) => {
+    // The toolbar button and ⌥1 mean the tool options, so a drawer showing the
+    // overview switches to them rather than closing.
+    if (state.workspace.leftDrawerOpen && state.workspace.leftDrawerContent !== 'tools') {
+      state.workspace.leftDrawerContent = 'tools';
+      return;
+    }
+    state.workspace.leftDrawerContent = 'tools';
     state.workspace.leftDrawerOpen = !state.workspace.leftDrawerOpen;
   }),
 
+  /**
+   * Open the left drawer on one of its contents, or close it when it already
+   * shows that one -- the rail entries behave like tabs that also collapse.
+   */
+  toggleLeftDrawerContent: (content) => set((state) => {
+    if (state.workspace.leftDrawerOpen && state.workspace.leftDrawerContent === content) {
+      state.workspace.leftDrawerOpen = false;
+      return;
+    }
+    state.workspace.leftDrawerContent = content;
+    state.workspace.leftDrawerOpen = true;
+  }),
+
+  setTimelineOpen: (open) => set((state) => {
+    state.workspace.timelineOpen = !!open;
+  }),
+
+  toggleTimeline: () => set((state) => {
+    state.workspace.timelineOpen = !state.workspace.timelineOpen;
+  }),
+
+  toggleNeighbours: () => set((state) => {
+    state.workspace.showNeighbours = !state.workspace.showNeighbours;
+  }),
+
+  setStackDetails: (details) => set((state) => {
+    state.stack.details = details;
+    if (!details) {
+      state.stack.objects = [];
+      state.stack.objectsFor = null;
+    }
+  }),
+
+  setStackObjects: (stackId, objects) => set((state) => {
+    state.stack.objects = objects;
+    state.stack.objectsFor = stackId;
+  }),
+
+  // Callers open the drawer for a tool's or a calibration's controls.
   setLeftDrawerOpen: (open) => set((state) => {
     state.workspace.leftDrawerOpen = !!open;
+    if (open) state.workspace.leftDrawerContent = 'tools';
   }),
 
   toggleRightPanel: () => set((state) => {

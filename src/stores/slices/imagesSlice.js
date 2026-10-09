@@ -9,12 +9,17 @@ export const createImagesSlice = (set) => ({
   setCurrentImage: (image) => set((state) => {
     // Check if image is actually changing
     const isImageChanging = state.images.currentImageId !== (image?.id || null);
-    
+
+    // Reset zoom and pan when switching to a different image -- but not between
+    // slices of one stack: they share one size and one place, and a reader who
+    // zoomed into the fovea wants to stay there while scrolling through it.
+    const previousStackId = state.images.currentImage?.stackId ?? null;
+    const sameStack = previousStackId != null && previousStackId === (image?.stackId ?? null);
+
     state.images.currentImage = image;
     state.images.currentImageId = image?.id || null;
-    
-    // Reset zoom and pan when switching to a different image
-    if (isImageChanging) {
+
+    if (isImageChanging && !sameStack) {
       state.images.zoomLevel = 1;
       state.images.panOffset = { x: 0, y: 0 };
     }
