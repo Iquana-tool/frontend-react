@@ -20,6 +20,8 @@ export const AuthProvider = ({ children }) => {
     login: storeLogin, 
     register: storeRegister, 
     logout: storeLogout,
+    updateProfile,
+    changePassword,
     checkAuth 
   } = useAuthStore();
 
@@ -73,6 +75,8 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    updateProfile,
+    changePassword,
   };
 
   return (

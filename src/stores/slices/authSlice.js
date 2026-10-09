@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as authApi from '../../api/auth';
+import * as accountApi from '../../api/account';
 import { trackNavigation } from '../../services/activityLog';
 import { endSession, startSession } from '../../services/activityLogSession';
 
@@ -154,6 +155,37 @@ export const useAuthStore = create((set, get) => ({
           get().logout();
           return false;
         }
+      },
+
+      /**
+       * Save changes to one's own profile or preferences.
+       *
+       * The server answers with the whole account, so it replaces what is held
+       * rather than being merged into it.
+       */
+      updateProfile: async (changes) => {
+        const user = await accountApi.updateProfile(changes);
+        setStoredUser(user);
+        set({ user });
+        return user;
+      },
+
+      /**
+       * Change one's own password.
+       *
+       * The change revokes every token issued before it, this session's
+       * included, so the fresh token in the response has to replace the stored
+       * one before any other request goes out; otherwise the next call would
+       * 401 and sign the user out of the session they just secured.
+       */
+      changePassword: async (currentPassword, newPassword) => {
+        const response = await accountApi.changePassword(currentPassword, newPassword);
+        setStoredToken(response.access_token);
+        set({ token: response.access_token });
+        const user = await authApi.getCurrentUser(response.access_token);
+        setStoredUser(user);
+        set({ user });
+        return response;
       },
 
       clearError: () => {

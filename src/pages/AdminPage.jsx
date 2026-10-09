@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck, SlidersHorizontal, UserCog, Users } from 'lucide-react';
+import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Building2, ShieldCheck, SlidersHorizontal, UserCog, Users } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import AccountsPanel from '../components/admin/AccountsPanel';
 import SettingsPanel from '../components/admin/SettingsPanel';
+import OrganizationsPanel from '../components/admin/OrganizationsPanel';
 
 const TABS = [
   { key: 'accounts', label: 'Accounts', icon: Users },
+  { key: 'organizations', label: 'Organisations', icon: Building2 },
   { key: 'settings', label: 'Settings', icon: SlidersHorizontal },
 ];
 
@@ -21,7 +23,9 @@ const TABS = [
 const AdminPage = () => {
   const navigate = useNavigate();
   const { canManageUsers } = usePermissions();
-  const [tab, setTab] = useState('accounts');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'accounts';
+  const setTab = (key) => setSearchParams({ tab: key }, { replace: true });
 
   if (!canManageUsers) {
     return (
@@ -79,7 +83,9 @@ const AdminPage = () => {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {tab === 'accounts' ? <AccountsPanel /> : <SettingsPanel />}
+        {tab === 'accounts' && <AccountsPanel />}
+        {tab === 'organizations' && <OrganizationsPanel />}
+        {tab === 'settings' && <SettingsPanel />}
       </div>
     </div>
   );

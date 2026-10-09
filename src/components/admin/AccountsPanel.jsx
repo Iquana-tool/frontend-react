@@ -4,6 +4,7 @@ import * as api from '../../api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { GLOBAL_ROLE_LABELS, GlobalRole } from '../../utils/permissions';
+import { formatServerDate } from '../../utils/serverTime';
 import CreateUserModal from './CreateUserModal';
 
 const readableError = (err, fallback) =>
@@ -119,9 +120,10 @@ const AccountsPanel = () => {
             <table className="w-full text-sm">
               <thead className="bg-well text-t2">
                 <tr>
-                  <th className="text-left font-medium px-4 py-3">Username</th>
+                  <th className="text-left font-medium px-4 py-3">Account</th>
                   <th className="text-left font-medium px-4 py-3">Platform role</th>
                   <th className="text-left font-medium px-4 py-3">Datasets</th>
+                  <th className="text-left font-medium px-4 py-3">Last sign-in</th>
                   <th className="text-left font-medium px-4 py-3">Status</th>
                 </tr>
               </thead>
@@ -130,9 +132,24 @@ const AccountsPanel = () => {
                   const isSelf = account.username === user?.username;
                   return (
                     <tr key={account.username} className={account.is_active ? '' : 'bg-well'}>
-                      <td className="px-4 py-3 font-medium text-t1">
-                        {account.username}
-                        {isSelf && <span className="ml-2 text-xs text-t3">(you)</span>}
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-t1">
+                          {account.display_name || account.username}
+                          {isSelf && <span className="ml-2 text-xs font-normal text-t3">(you)</span>}
+                          {account.must_change_password && (
+                            <span
+                              className="ml-2 px-2 py-0.5 rounded-full bg-warnBg text-xs font-normal text-t2 border border-warnLn"
+                              title="Still has the password an admin set; asked to choose their own at next sign-in."
+                            >
+                              Password not changed yet
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-t3">
+                          {account.display_name && <span>{account.username}</span>}
+                          {account.display_name && account.email && <span> · </span>}
+                          {account.email && <span>{account.email}</span>}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <select
@@ -156,6 +173,12 @@ const AccountsPanel = () => {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-t2">{account.dataset_count}</td>
+                      <td
+                        className="px-4 py-3 text-t2 whitespace-nowrap"
+                        title={account.created_at ? `Created ${formatServerDate(account.created_at)}` : undefined}
+                      >
+                        {formatServerDate(account.last_login_at) || <span className="text-t3">Never</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => handleToggleActive(account.username, !account.is_active)}
@@ -186,9 +209,9 @@ const AccountsPanel = () => {
       )}
 
       <p className="mt-4 text-xs text-t3">
-        Deactivating an account revokes its access immediately. The annotations and
-        reviews it produced are kept. There is no password reset yet — an account
-        created here keeps the password you chose until that lands.
+        Deactivating an account revokes its access immediately and signs it out
+        everywhere. The annotations and reviews it produced are kept. An account
+        created here has to replace the password you chose when it first signs in.
       </p>
 
       <CreateUserModal

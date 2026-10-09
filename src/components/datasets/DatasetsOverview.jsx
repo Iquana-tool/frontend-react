@@ -214,16 +214,17 @@ const DatasetsOverview = ({ onOpenDataset }) => {
             </div>
             <div className="flex items-center space-x-4">
               {isAuthenticated && user && (
-                <div
-                  className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3"
-                  title={GLOBAL_ROLE_LABELS[globalRole]?.description}
+                <button
+                  onClick={() => navigate('/account')}
+                  className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3 rounded-lg hover:bg-hv transition-colors duration-150"
+                  title={`Your account · ${GLOBAL_ROLE_LABELS[globalRole]?.description || globalRole}`}
                 >
                   <User className="w-4 h-4" />
-                  <span className="font-medium text-t2">{user.username}</span>
+                  <span className="font-medium text-t2">{user.display_name || user.username}</span>
                   <span className="px-2 py-0.5 rounded-full bg-hv text-xs text-t2">
                     {GLOBAL_ROLE_LABELS[globalRole]?.label || globalRole}
                   </span>
-                </div>
+                </button>
               )}
               {canManageUsers && (
                 <button

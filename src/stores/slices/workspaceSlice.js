@@ -320,6 +320,17 @@ export const createWorkspaceSlice = (set) => ({
   }),
 
   /**
+   * Replace the outline settings wholesale, e.g. with the ones saved on the
+   * account. Sanitized like a stored blob, and `peek` is left as it is: it is a
+   * held key, not a setting.
+   */
+  setOutline: (outline) => set((state) => {
+    const { peek } = state.workspace.outline;
+    state.workspace.outline = { ...sanitizeOutline(outline), peek };
+    persistOutline(state.workspace.outline);
+  }),
+
+  /**
    * Hide every object overlay while the peek key is held.
    *
    * Not persisted and not a preset: the question it answers — "what is actually

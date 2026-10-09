@@ -6,6 +6,7 @@ import {
   Loader2,
   ShieldAlert,
   Table2,
+  Users,
   Users2,
 } from 'lucide-react';
 import { useDataset } from '../contexts/DatasetContext';
@@ -14,6 +15,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Permission } from '../utils/permissions';
 import InvitesPanel from '../components/datasets/access/InvitesPanel';
 import MembersPanel from '../components/datasets/access/MembersPanel';
+import TeamsPanel from '../components/datasets/access/TeamsPanel';
 import AiToolsPanel from '../components/datasets/access/AiToolsPanel';
 import ReviewPolicyPanel from '../components/datasets/access/ReviewPolicyPanel';
 import TaskAssignmentPanel from '../components/datasets/access/TaskAssignmentPanel';
@@ -23,6 +25,7 @@ import DatasetGalleryHeader from '../components/datasets/gallery/DatasetGalleryH
 
 const SECTIONS = {
   MEMBERS: 'members',
+  TEAMS: 'teams',
   INVITES: 'invites',
   ASSIGNMENTS: 'assignments',
   POLICY: 'policy',
@@ -112,6 +115,7 @@ const DatasetAccessPage = () => {
 
   const navItems = [
     { id: SECTIONS.MEMBERS, label: 'Members', icon: Users2, count: members.length },
+    ...(canList ? [{ id: SECTIONS.TEAMS, label: 'Teams', icon: Users }] : []),
     ...(canInvite
       ? [{ id: SECTIONS.INVITES, label: 'Invite links', icon: Link2, count: access.invites.length }]
       : []),
@@ -192,6 +196,9 @@ const DatasetAccessPage = () => {
               <>
                 {section === SECTIONS.MEMBERS && (
                   <MembersPanel access={access} datasetName={dataset.name} />
+                )}
+                {section === SECTIONS.TEAMS && canList && (
+                  <TeamsPanel dataset={dataset} onChanged={fetchDatasets} />
                 )}
                 {section === SECTIONS.INVITES && canInvite && (
                   <InvitesPanel access={access} />

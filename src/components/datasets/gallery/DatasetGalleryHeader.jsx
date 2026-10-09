@@ -73,10 +73,14 @@ const DatasetGalleryHeader = ({ dataset }) => {
 
         <div className="flex items-center space-x-4">
           {isAuthenticated && user && (
-            <div className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3">
+            <button
+              onClick={() => navigate('/account')}
+              title="Your account"
+              className="flex items-center space-x-2 px-3 py-1.5 text-sm text-t3 rounded-lg hover:bg-hv hover:text-t1 transition-colors"
+            >
               <User className="w-4 h-4" />
-              <span className="font-medium">{user.username}</span>
-            </div>
+              <span className="font-medium">{user.display_name || user.username}</span>
+            </button>
           )}
           <DocsLink className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors" />
           <ThemeToggle />
