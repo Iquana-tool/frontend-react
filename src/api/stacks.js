@@ -112,3 +112,23 @@ export const fetchStackThumbnailUrl = async (stackId) => {
     if (!response.ok) throw new Error(`Thumbnail of stack ${stackId} could not be loaded (${response.status}).`);
     return URL.createObjectURL(await response.blob());
 };
+
+/**
+ * Carry objects from the slices they are drawn on to the rest of the stack (#121).
+ *
+ * @param {number} stackId
+ * @param {{objects: number[][], start_frame?: number, end_frame?: number,
+ *   direction?: 'both'|'forward'|'backward', model_registry_key?: string}} body -
+ *   `objects` holds one list of contour ids per object (its outlines on the slices
+ *   it is drawn on); frames are 0-based and inclusive.
+ * @returns {Promise<{created: number, contour_ids: number[], frames: Object<string, number>,
+ *   to_check: number[], absent: number[], duplicates: number, unparented: number}>}
+ */
+export const propagateStack = async (stackId, body) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/propagate`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+    });
+    return handleApiError(response);
+};

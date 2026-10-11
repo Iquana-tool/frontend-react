@@ -1,11 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Lock, X } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import useStackNav from './useStackNav';
 import { useMergedStackObjects } from './useStackData';
 import { buildTimeline, formatSpan, framesToCheck } from './timelineModel';
 import { cellStyle, hasKeyMark } from './cellStyles';
 import { resolveLabelColor } from '../labelColorUtils';
-import { IssueTag } from '../../../datasets/creation/ui';
+import PropagatePanel from './PropagatePanel';
 import {
   useDatasetLabels,
   useLabelColorOverrides,
@@ -19,12 +19,6 @@ export const TIMELINE_HEIGHT = 262;
 /** Width of the lane name column; the ruler and the slice marker are offset by it. */
 const NAME_WIDTH = 176;
 
-const PROPAGATE_MODES = [
-  { id: 'object', title: 'Propagate this object', sub: 'The selected object, slice by slice' },
-  { id: 'all', title: 'Propagate all objects', sub: 'Every object on this slice' },
-  { id: 'predict', title: 'Predict and propagate', sub: 'Also what the AI finds missing' },
-];
-
 const LegendSwatch = ({ kind, children }) => (
   <span className="flex items-center gap-[4px]">
     <span className="relative w-3 h-[9px]" style={cellStyle(kind, 'var(--t3)')}>
@@ -35,83 +29,6 @@ const LegendSwatch = ({ kind, children }) => (
     {children}
   </span>
 );
-
-/**
- * Propagation's place in the drawer, shown but not yet usable.
- *
- * Carrying an outline from slice to slice needs SAM 2's video mode as an AI
- * service capability (#121), which does not exist yet. The options are here so
- * the drawer has its final shape and nobody wonders where propagation went.
- */
-const PropagatePanel = ({ frameCount }) => {
-  const [mode, setMode] = useState('object');
-  return (
-    <div className="w-[270px] flex-none px-[12px] py-[10px] border-r border-ln flex flex-col gap-[7px] overflow-y-auto">
-      <span className="flex items-center gap-[6px] text-sect font-bold tracking-[.08em] uppercase text-t3">
-        Propagate
-        <span className="flex-1" />
-        <IssueTag issue={121} className="!text-meta !py-0" />
-      </span>
-      <div role="radiogroup" aria-label="What to propagate" className="flex flex-col gap-[4px]">
-        {PROPAGATE_MODES.map((option) => {
-          const checked = option.id === mode;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              role="radio"
-              aria-checked={checked}
-              onClick={() => setMode(option.id)}
-              className={`flex items-start gap-[8px] px-[7px] py-[5px] rounded-6 border text-left ${
-                checked ? 'border-acLn bg-acS' : 'border-ln hover:bg-hv'
-              }`}
-            >
-              <span
-                className={`w-3 h-3 mt-px flex-none rounded-full border-2 ${checked ? 'border-ac bg-ac' : 'border-ln2'}`}
-              />
-              <span className="flex flex-col gap-px min-w-0">
-                <span className="text-row font-semibold text-t1">{option.title}</span>
-                <span className="text-meta text-t3 truncate">{option.sub}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-[5px] text-sect text-t3">
-        <span>Slices</span>
-        <input
-          type="number"
-          disabled
-          aria-label="First slice"
-          value={1}
-          readOnly
-          className="w-[38px] h-[22px] px-[3px] rounded-5 border border-ln2 bg-well font-mono text-ctl text-t1 disabled:opacity-60"
-        />
-        <span>–</span>
-        <input
-          type="number"
-          disabled
-          aria-label="Last slice"
-          value={frameCount}
-          readOnly
-          className="w-[38px] h-[22px] px-[3px] rounded-5 border border-ln2 bg-well font-mono text-ctl text-t1 disabled:opacity-60"
-        />
-      </div>
-      <button
-        type="button"
-        disabled
-        className="h-7 rounded-7 bg-well text-btn font-bold text-t3 cursor-not-allowed flex items-center justify-center gap-[6px]"
-      >
-        <Lock size={12} />
-        Propagate
-      </button>
-      <span className="text-sect leading-[1.45] text-t3">
-        Not available yet: carrying an outline through the slices needs the AI service to
-        segment a whole scan at once. Until then, draw or segment each slice.
-      </span>
-    </div>
-  );
-};
 
 /**
  * The object timeline: which slices each label's objects sit on, over the
@@ -213,7 +130,7 @@ const TimelineDrawer = () => {
       </div>
 
       <div className="flex-1 min-h-0 flex">
-        <PropagatePanel frameCount={frameCount} />
+        <PropagatePanel frameIndex={frameIndex} frameCount={frameCount} goToFrame={goToFrame} />
 
         <div className="flex-1 min-w-0 pl-[10px] pr-[14px] pt-[8px] pb-[10px] overflow-y-auto">
           <div className="relative flex flex-col gap-[4px]">
