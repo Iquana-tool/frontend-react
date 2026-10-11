@@ -132,3 +132,52 @@ export const propagateStack = async (stackId, body) => {
     });
     return handleApiError(response);
 };
+
+/**
+ * Propagate as `propagateStack`, receiving each slice as soon as it is saved.
+ *
+ * Events: `{type: 'frame', object_id, frame_index, presence, contour_id, label_id, x, y}`
+ * per finished slice, then `{type: 'done', ...summary}` or `{type: 'error', detail}`.
+ * Aborting `signal` stops the run; what was saved so far stays.
+ *
+ * @param {number} stackId
+ * @param {Object} body - As for `propagateStack`, plus `replace_contour_ids`.
+ * @param {{onEvent: (event: Object) => void, signal?: AbortSignal}} options
+ * @returns {Promise<Object|null>} The `done` summary, or null when stopped first.
+ */
+export const propagateStackStream = async (stackId, body, { onEvent, signal } = {}) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/propagate/stream`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+        signal,
+    });
+    if (!response.ok) await handleApiError(response);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let summary = null;
+    const handle = (line) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.type === "done") summary = event;
+        if (event.type === "error") throw new Error(event.detail || "Propagation failed.");
+        onEvent?.(event);
+    };
+    try {
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+            lines.forEach(handle);
+        }
+        handle(buffer);
+    } catch (error) {
+        if (error.name === "AbortError") return null;
+        throw error;
+    }
+    return summary;
+};

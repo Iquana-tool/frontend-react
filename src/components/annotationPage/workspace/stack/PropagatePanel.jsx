@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Loader2, Lock } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, RefreshCw, Square } from 'lucide-react';
 import { IssueTag } from '../../../datasets/creation/ui';
-import { fetchStackObjects, propagateStack } from '../../../../api/stacks';
+import { fetchStackObjects, propagateStackStream } from '../../../../api/stacks';
 import { deleteContour, markContourAsReviewed } from '../../../../api/contours';
 import { useToast } from '../../../../contexts/ToastContext';
 import useAiTools from '../../../../hooks/useAiTools';
@@ -12,6 +12,12 @@ import {
   useSelectedObjects,
   useSetStackObjects,
 } from '../../../../stores/selectors/annotationSelectors';
+import {
+  correctionsPlan,
+  expectedResults,
+  stackObjectFromEvent,
+  summaryFromEvents,
+} from './propagationModel';
 
 const MODES = [
   { id: 'object', title: 'Propagate this object', sub: 'The selected object, slice by slice' },
@@ -35,12 +41,17 @@ const contourIdOf = (object) => {
  * Propagation in the timeline drawer: carry objects from this slice through the
  * stack (#121).
  *
- * Three steps, as designed: choose what and how far, wait while the AI service
- * works through the slices, then check. The result is a set of AI suggestions on
- * the other slices -- they show hatched in the lanes, the low-confidence ones are
- * listed to look at first, and "Accept all" / "Discard" settle them in one go.
- * Slice by slice, they can also be accepted or fixed on the canvas like any
- * suggestion.
+ * The four steps of the design:
+ *
+ * 1. **Choose** what (the selected object, or all on this slice) and how far.
+ * 2. **Watch it fill in.** Slices arrive one by one, outward from the drawn
+ *    slice; the lanes fill as they come and "Follow along" moves the canvas with
+ *    them. Stop keeps what is done.
+ * 3. **Check.** The result is a set of AI suggestions; low-confidence slices are
+ *    listed to look at first, and "Accept all" / "Discard" settle the lot.
+ * 4. **Correct one, update the rest.** Fix or accept the slices that went wrong,
+ *    then "Update from my corrections" runs again with those as extra drawings
+ *    and replaces the suggestions nobody touched.
  */
 const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
   const currentImage = useCurrentImage();
@@ -55,18 +66,26 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
   const [from, setFrom] = useState(1);
   const [to, setTo] = useState(frameCount);
   const [direction, setDirection] = useState('both');
+  const [follow, setFollow] = useState(true);
   const [phase, setPhase] = useState('idle'); // 'idle' | 'running' | 'check' | 'settling'
-  const [result, setResult] = useState(null);
+  const [run, setRun] = useState(null); // { seeds, summary }
+  const [progress, setProgress] = useState({ done: 0, expected: 1 });
   const [error, setError] = useState(null);
+  const abortRef = useRef(null);
+  const followRef = useRef(follow);
+  followRef.current = follow;
 
   // A new scan resets the range and forgets the last run.
   useEffect(() => {
     setFrom(1);
     setTo(frameCount);
     setPhase('idle');
-    setResult(null);
+    setRun(null);
     setError(null);
   }, [stackId, frameCount]);
+
+  // Leaving the scan (or the drawer) stops a run in progress.
+  useEffect(() => () => abortRef.current?.abort(), [stackId]);
 
   const seeds = useMemo(() => {
     if (mode === 'object') {
@@ -96,60 +115,123 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
       if (useAnnotationStore.getState().images.currentImage?.stackId === stackId) {
         setStackObjects(stackId, stackObjects || []);
       }
+      return stackObjects || [];
     } catch {
-      // The timeline catches up on the next slice change.
+      return null; // The timeline catches up on the next slice change.
     }
   };
 
-  const run = async () => {
+  /** Run (or re-run) the stream for `objectSeeds`, removing `replace` first. */
+  const start = async (objectSeeds, replace = []) => {
     setError(null);
     setPhase('running');
+    const seedsByObject = Object.fromEntries(objectSeeds.map((ids) => [ids[0], ids]));
+    setProgress({
+      done: 0,
+      expected: expectedResults({ objectCount: objectSeeds.length, from, to, frameIndex, direction }),
+    });
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const events = [];
+
     try {
-      const response = await propagateStack(stackId, {
-        objects: seeds,
+      const summary = await propagateStackStream(stackId, {
+        objects: objectSeeds,
         start_frame: Math.max(0, Math.min(from, to) - 1),
         end_frame: Math.min(frameCount, Math.max(from, to)) - 1,
         direction,
+        replace_contour_ids: replace,
+      }, {
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (event.type !== 'frame') return;
+          events.push(event);
+          setProgress((current) => ({ ...current, done: current.done + 1 }));
+          if (event.contour_id == null) return;
+          // The lanes fill in as the slices arrive.
+          const state = useAnnotationStore.getState();
+          if (state.images.currentImage?.stackId === stackId) {
+            setStackObjects(stackId, [...state.stack.objects, stackObjectFromEvent(event)]);
+          }
+          if (followRef.current) goToFrame(event.frame_index);
+        },
       });
-      setResult(response);
-      setPhase(response.created > 0 ? 'check' : 'idle');
-      if (response.created === 0) {
+      // A stopped run reports nothing at the end; what came in is what it did.
+      const finished = summary || summaryFromEvents(events);
+      setRun({ seeds: seedsByObject, summary: finished });
+      setPhase(finished.created > 0 ? 'check' : 'idle');
+      if (finished.created === 0) {
         addToast?.({
           type: 'info',
-          message: response.duplicates
+          message: finished.duplicates
             ? 'Nothing new: the object is already on those slices.'
             : 'The AI did not find the object on any other slice.',
         });
       }
-      await refreshTimeline();
     } catch (exc) {
       setError(exc.message || 'Propagation failed.');
-      setPhase('idle');
+      const partial = summaryFromEvents(events);
+      if (partial.created > 0) {
+        setRun({ seeds: seedsByObject, summary: partial });
+        setPhase('check');
+      } else {
+        setPhase('idle');
+      }
+    } finally {
+      abortRef.current = null;
+      await refreshTimeline();
     }
   };
 
+  const updateFromCorrections = async () => {
+    const fresh = await refreshTimeline();
+    if (!fresh) return;
+    const plan = correctionsPlan(run, fresh);
+    if (plan.corrected === 0) {
+      addToast?.({ type: 'info', message: 'Accept or fix at least one suggested slice first.' });
+      return;
+    }
+    await start(plan.objects, plan.replace);
+  };
+
   const settle = async (action) => {
-    if (!result) return;
+    if (!run) return;
     setPhase('settling');
-    const calls = result.contour_ids.map((id) => (action === 'accept' ? markContourAsReviewed(id) : deleteContour(id))
-      .then(() => true, () => false));
-    const outcomes = await Promise.all(calls);
+    const ids = run.summary.contour_ids;
+    const outcomes = await Promise.all(ids.map((id) => (
+      action === 'accept' ? markContourAsReviewed(id) : deleteContour(id)
+    ).then(() => true, () => false)));
     const failed = outcomes.filter((ok) => !ok).length;
     if (failed) {
       addToast?.({
         type: 'error',
-        message: `${failed} of ${outcomes.length} could not be ${action === 'accept' ? 'accepted' : 'discarded'}.`,
+        message: `${failed} of ${outcomes.length} could not be ${action === 'accept' ? 'accepted' : 'discarded'} `
+          + '(already removed or settled).',
       });
     }
     await refreshTimeline();
-    setResult(null);
+    setRun(null);
     setPhase('idle');
   };
 
-  const toCheck = result?.to_check || [];
+  const summary = run?.summary;
+  const toCheck = summary?.to_check || [];
   const previous = [...toCheck].reverse().find((index) => index < frameIndex);
   const next = toCheck.find((index) => index > frameIndex);
-  const filledSlices = result ? Object.keys(result.frames).length : 0;
+  const filledSlices = summary ? Object.keys(summary.frames).length : 0;
+  const percent = Math.min(100, Math.round((progress.done / progress.expected) * 100));
+
+  const followToggle = (
+    <label className="flex items-center gap-[6px] text-sect text-t2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={follow}
+        onChange={(event) => setFollow(event.target.checked)}
+        className="accent-current"
+      />
+      Follow along on the canvas
+    </label>
+  );
 
   return (
     <div className="w-[270px] flex-none px-[12px] py-[10px] border-r border-ln flex flex-col gap-[7px] overflow-y-auto">
@@ -160,23 +242,31 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
           <div className="flex items-center gap-[8px] mt-[4px]">
             <Loader2 size={15} className="animate-spin text-ac" />
             <span className="text-btn font-semibold text-t1">
-              Propagating {seeds.length} object{seeds.length === 1 ? '' : 's'}
+              {progress.done === 0 ? 'Starting…' : `${progress.done} slice${progress.done === 1 ? '' : 's'} done`}
             </span>
           </div>
-          <span className="text-row text-t2">Slices {Math.min(from, to)}–{Math.max(from, to)}</span>
           <span className="h-1 rounded-[2px] bg-well overflow-hidden">
-            <span className="block h-full w-1/3 bg-accent animate-progress" />
+            <span className="block h-full bg-accent transition-[width] duration-200" style={{ width: `${percent}%` }} />
           </span>
           <span className="text-sect leading-[1.45] text-t3">
-            The AI works outward from the slice you drew on. This takes a few seconds per object.
+            Results arrive outward from the slice you drew on. Each is saved as it comes.
           </span>
+          {followToggle}
+          <button
+            type="button"
+            onClick={() => abortRef.current?.abort()}
+            className="self-start h-[26px] flex items-center gap-[6px] px-[12px] rounded-7 border border-ln2 text-row text-t1 hover:bg-hv"
+          >
+            <Square size={10} fill="currentColor" />
+            Stop, keep what is done
+          </button>
         </>
       )}
 
-      {(phase === 'check' || phase === 'settling') && result && (
+      {(phase === 'check' || phase === 'settling') && summary && (
         <>
           <span className="text-btn font-semibold text-t1 mt-[2px]">
-            {result.created} object{result.created === 1 ? '' : 's'} suggested on {filledSlices} slice{filledSlices === 1 ? '' : 's'}
+            {summary.created} object{summary.created === 1 ? '' : 's'} suggested on {filledSlices} slice{filledSlices === 1 ? '' : 's'}
           </span>
           {toCheck.length > 0 && (
             <>
@@ -203,14 +293,31 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
               </div>
             </>
           )}
-          {result.absent.length > 0 && (
+          {summary.duplicates > 0 && (
             <span className="text-sect text-t3">
-              Not found from slice {Math.min(...result.absent) + 1} on, so it stopped there.
+              {summary.duplicates} slice{summary.duplicates === 1 ? '' : 's'} already had the object, so
+              {summary.duplicates === 1 ? ' it was' : ' they were'} left alone.
             </span>
           )}
+          {summary.absent?.length > 0 && (
+            <span className="text-sect text-t3">
+              Not found on slice {summary.absent.map((index) => index + 1).join(', ')}, so it stopped there.
+            </span>
+          )}
+          {error && <span className="text-sect text-err" role="alert">Stopped early: {error}</span>}
           <span className="text-sect leading-[1.45] text-t3">
             Suggestions are AI work until confirmed. Accept them here, or slice by slice on the canvas.
+            Fix the slices that went wrong, then update the rest from your corrections.
           </span>
+          <button
+            type="button"
+            onClick={updateFromCorrections}
+            disabled={phase === 'settling'}
+            className="h-[26px] flex items-center justify-center gap-[6px] rounded-7 border border-ln2 text-row text-t1 hover:bg-hv disabled:opacity-60"
+          >
+            <RefreshCw size={12} />
+            Update from my corrections
+          </button>
           <div className="flex gap-[4px] mt-auto">
             <button
               type="button"
@@ -308,9 +415,11 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
             </div>
           </div>
 
+          {followToggle}
+
           <button
             type="button"
-            onClick={run}
+            onClick={() => start(seeds)}
             disabled={Boolean(reason)}
             title={reason || undefined}
             className="h-7 rounded-7 bg-accent text-onAccent text-btn font-bold hover:brightness-110 disabled:bg-well disabled:text-t3 disabled:cursor-not-allowed"
