@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   Camera, Eye, FlaskConical, Image as ImageIcon, Lock, Microscope, ScanLine,
 } from 'lucide-react';
@@ -62,15 +62,27 @@ export const NotAvailable = ({ children, issue }) => (
 /**
  * A selectable card. `disabled` cards stay visible -- the point is to show what
  * the tool will offer -- but cannot be chosen, and say why.
+ *
+ * Without explicit labelling the accessible name would be the whole card text,
+ * description and "not available" note included. The title names the option;
+ * the rest is announced as its description.
  */
 export const OptionCard = ({
   selected = false, disabled = false, disabledReason, issue, onClick, title, description,
   icon, badge, children, className = '', role = 'radio',
-}) => (
+}) => {
+  const id = useId();
+  const describedBy = [
+    description && `${id}-description`,
+    disabled && (disabledReason || issue) && `${id}-unavailable`,
+  ].filter(Boolean).join(' ');
+  return (
   <button
     type="button"
     role={role}
     aria-checked={role === 'radio' || role === 'checkbox' ? selected : undefined}
+    aria-labelledby={`${id}-title`}
+    aria-describedby={describedBy || undefined}
     aria-disabled={disabled || undefined}
     disabled={disabled}
     onClick={disabled ? undefined : onClick}
@@ -90,14 +102,15 @@ export const OptionCard = ({
         {badge && <span className="text-[11px] font-semibold tracking-wider uppercase text-ac">{badge}</span>}
       </div>
     )}
-    <div className="font-semibold text-t1">{title}</div>
-    {description && <div className="mt-1 text-sm text-t2 leading-snug">{description}</div>}
+    <div id={`${id}-title`} className="font-semibold text-t1">{title}</div>
+    {description && <div id={`${id}-description`} className="mt-1 text-sm text-t2 leading-snug">{description}</div>}
     {children}
     {disabled && (disabledReason || issue) && (
-      <div className="mt-3"><NotAvailable issue={issue}>{disabledReason}</NotAvailable></div>
+      <div id={`${id}-unavailable`} className="mt-3"><NotAvailable issue={issue}>{disabledReason}</NotAvailable></div>
     )}
   </button>
-);
+  );
+};
 
 /** A metric-style checkbox card. */
 export const CheckCard = ({ checked, onChange, title, description, disabled, children }) => (

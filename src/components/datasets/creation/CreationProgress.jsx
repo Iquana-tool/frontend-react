@@ -5,6 +5,7 @@ import { TASKS } from './createFromDraft';
 const StatusIcon = ({ status }) => {
   if (status === 'running') return <Loader2 className="w-4 h-4 text-ac animate-spin" aria-label="running" />;
   if (status === 'done') return <Check className="w-4 h-4 text-ok" aria-label="done" />;
+  if (status === 'partial') return <AlertTriangle className="w-4 h-4 text-warn" aria-label="partly applied" />;
   if (status === 'failed') return <X className="w-4 h-4 text-err" aria-label="failed" />;
   if (status === 'skipped') return <Minus className="w-4 h-4 text-t3" aria-label="nothing to do" />;
   return <Circle className="w-4 h-4 text-ln2" aria-label="waiting" />;
@@ -54,7 +55,8 @@ export const nextSteps = (draft) => {
  */
 const CreationProgress = ({ tasks, result, fatalError, draft, onOpen, onBackToRail, onDatasets }) => {
   const finished = Boolean(result);
-  const failures = Object.values(tasks).filter((task) => task.status === 'failed').length;
+  // A partly applied part still needs fixing by hand, so it counts here too.
+  const failures = Object.values(tasks).filter((task) => task.status === 'failed' || task.status === 'partial').length;
   const followUps = finished ? nextSteps(draft) : [];
 
   return (
@@ -69,7 +71,7 @@ const CreationProgress = ({ tasks, result, fatalError, draft, onOpen, onBackToRa
       {finished && failures > 0 && (
         <p className="mt-3 flex items-center gap-2 text-warn">
           <AlertTriangle className="w-4 h-4" />
-          {failures} part{failures === 1 ? '' : 's'} could not be applied. The dataset exists; fix them from the dataset page.
+          {failures} part{failures === 1 ? '' : 's'} could not be fully applied. The dataset exists; fix {failures === 1 ? 'it' : 'them'} from the dataset page.
         </p>
       )}
       {fatalError && <p className="mt-3 text-err">{fatalError}</p>}
@@ -94,7 +96,7 @@ const CreationProgress = ({ tasks, result, fatalError, draft, onOpen, onBackToRa
                 </div>
               )}
               {state.detail && (
-                <p className={`mt-1 ml-7 text-xs ${state.status === 'failed' ? 'text-err' : 'text-t3'}`}>{state.detail}</p>
+                <p className={`mt-1 ml-7 text-xs ${state.status === 'failed' ? 'text-err' : state.status === 'partial' ? 'text-warn' : 'text-t3'}`}>{state.detail}</p>
               )}
             </li>
           );

@@ -51,7 +51,7 @@ const message = (error) => error?.message || String(error);
  * @param {Object} draft - see wizardModel.initialDraft
  * @param {Object} options
  * @param {(update: Object) => void} options.onProgress - called with
- *   `{task, status, detail, progress}`; status is running|done|failed|skipped.
+ *   `{task, status, detail, progress}`; status is running|done|partial|failed|skipped.
  * @param {(name: string) => boolean} options.isStackFile
  * @param {string} options.inviteBaseUrl - prefix for invite links
  * @returns {Promise<{datasetId: number, inviteLinks: Array, results: Object}>}
@@ -65,17 +65,23 @@ export async function createDatasetFromDraft(draft, {
     onProgress({ task, status, detail, progress });
   };
 
-  /** Run one non-fatal task. `work` returns a detail string, or null to mark it skipped. */
+  /**
+   * Run one non-fatal task. `work` returns a detail string, null to mark it
+   * skipped, or the result of `partly(...)` when only some of its items went
+   * through -- that must not read as done, or the summary undercounts failures.
+   */
   const run = async (task, work) => {
     report(task, 'running');
     try {
-      const detail = await work();
-      if (detail === null) report(task, 'skipped');
-      else report(task, 'done', detail);
+      const outcome = await work();
+      if (outcome === null) report(task, 'skipped');
+      else if (outcome?.partial) report(task, 'partial', outcome.detail);
+      else report(task, 'done', outcome);
     } catch (error) {
       report(task, 'failed', message(error));
     }
   };
+  const partly = (detail) => ({ partial: true, detail });
 
   // -- the dataset itself: fatal ------------------------------------------------
   report('dataset', 'running');
@@ -115,7 +121,7 @@ export async function createDatasetFromDraft(draft, {
     }
     if (failed.length === images.length) throw new Error(`None of the ${images.length} images could be uploaded.`);
     return failed.length
-      ? `${uploadedImages} of ${images.length} uploaded; failed: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ' …' : ''}`
+      ? partly(`${uploadedImages} of ${images.length} uploaded; failed: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ' …' : ''}`)
       : `${uploadedImages} image${uploadedImages === 1 ? '' : 's'}`;
   });
 
@@ -137,7 +143,7 @@ export async function createDatasetFromDraft(draft, {
     }
     if (!uploadedStacks) throw new Error(failed.join('; ') || 'No volume could be read.');
     const summary = `${uploadedStacks} volume${uploadedStacks === 1 ? '' : 's'} from ${stacks.length} file${stacks.length === 1 ? '' : 's'}`;
-    return failed.length ? `${summary}; ${failed.join('; ')}` : summary;
+    return failed.length ? partly(`${summary}; ${failed.join('; ')}`) : summary;
   });
 
   await run('metadata', async () => {
@@ -220,7 +226,7 @@ export async function createDatasetFromDraft(draft, {
     const summary = [added && `${added} member${added === 1 ? '' : 's'}`, inviteLinks.length && `${inviteLinks.length} invite link${inviteLinks.length === 1 ? '' : 's'}`]
       .filter(Boolean).join(', ');
     if (failed.length && !added && !inviteLinks.length) throw new Error(failed.join('; '));
-    return failed.length ? `${summary}; ${failed.join('; ')}` : summary;
+    return failed.length ? partly(`${summary}; ${failed.join('; ')}`) : summary;
   });
 
   return { datasetId, inviteLinks, results };

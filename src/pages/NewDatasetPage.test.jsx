@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NewDatasetPage from './NewDatasetPage';
-import { DRAFT_STORAGE_KEY } from '../components/datasets/creation/wizardModel';
+import { DRAFT_STORAGE_KEY, initialDraft, serializeDraft } from '../components/datasets/creation/wizardModel';
 
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => ({ user: { username: 'r.leist' } }) }));
 vi.mock('../contexts/DatasetContext', () => ({
@@ -32,12 +32,19 @@ vi.mock('../api/calibration', () => ({
     ],
   }),
   fetchDatasetCalibrationDefaults: vi.fn(),
+  fetchImageCalibrations: vi.fn(),
   setDatasetCalibrationDefaults: vi.fn(),
 }));
 vi.mock('../api/label_space', () => ({
   getLabelSpaceConfig: vi.fn().mockResolvedValue({ enabled: false }),
   generateLabelSpace: vi.fn(),
   applyLabelSpace: vi.fn(),
+}));
+vi.mock('../api/organizations', () => ({
+  fetchOrganizations: vi.fn().mockResolvedValue({ organizations: [{ id: 1, my_role: 'member' }] }),
+  fetchOrganizationMembers: vi.fn().mockResolvedValue({
+    members: [{ username: 'r.leist', display_name: null }, { username: 'ann', display_name: 'Ann A' }],
+  }),
 }));
 vi.mock('../api/stacks', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -100,6 +107,43 @@ describe('NewDatasetPage', () => {
     expect(screen.getByText(/area · needs scale/)).toBeInTheDocument();
     fireEvent.click(colour);
     expect(screen.getByText('Color & intensity')).toBeInTheDocument();
+  });
+
+  it('names an option by its title and describes it with the rest', async () => {
+    renderPage();
+    fireEvent.click(railButton('Calibration profile'));
+    const known = await screen.findByRole('radio', { name: 'Known value' });
+    expect(known).toHaveAccessibleDescription(/Type the pixel size now/);
+    expect(screen.getByRole('radio', { name: 'From a DICOM header' })).toHaveAccessibleDescription(/DICOM files cannot be read yet/);
+  });
+
+  it('a restored draft says on the first screen that queued files were not kept', async () => {
+    localStorage.setItem(DRAFT_STORAGE_KEY, serializeDraft({
+      ...initialDraft(),
+      basics: { ...initialDraft().basics, title: 'Reef B' },
+      images: { files: [{ name: 'a.png' }, { name: 'b.png' }] },
+    }));
+    renderPage();
+    expect(screen.getByText(/2 queued files were not kept in the draft/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add them again' }));
+    expect(screen.getByText(/Your draft had 2 files queued/)).toBeInTheDocument();
+  });
+
+  it('suggests organisation members and flags names outside them before creation', async () => {
+    renderPage();
+    fireEvent.click(railButton('Access & roles'));
+    const input = screen.getByLabelText('Username');
+    await waitFor(() => expect(input).toHaveAttribute('list'));
+    const suggestions = [...document.getElementById(input.getAttribute('list')).options].map((option) => option.value);
+    // The caller is the owner, so only the other member is suggested.
+    expect(suggestions).toEqual(['ann']);
+
+    for (const name of ['ann', 'ghost']) {
+      fireEvent.change(input, { target: { value: name } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    }
+    expect(screen.getAllByText(/Not a member of your organisations/)).toHaveLength(1);
+    expect(screen.getByText('ghost').closest('li')).toHaveTextContent(/Not a member of your organisations/);
   });
 
   it('marks multi-mask annotation and extra reviewers as not available', () => {

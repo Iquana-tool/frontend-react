@@ -25,6 +25,7 @@ import {
 } from '../components/datasets/creation/WorkflowSteps';
 import { createDatasetFromDraft } from '../components/datasets/creation/createFromDraft';
 import { loadDatasetSetup } from '../components/datasets/creation/copySetup';
+import { loadKnownPeople } from '../components/datasets/creation/knownPeople';
 import {
   DRAFT_STORAGE_KEY, LAST_STEP_INDEX, STEPS, TEMPLATE_STEPS, deserializeDraft, draftHasContent, draftReducer,
   initialDraft, serializeDraft, stepByIndex, templateById,
@@ -66,7 +67,7 @@ const NewDatasetPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { datasets, fetchDatasets } = useDataset();
-  const { canCreateDatasets, globalRole } = usePermissions();
+  const { canCreateDatasets, globalRole, isAdmin } = usePermissions();
 
   const [restored] = useState(readStoredDraft);
   const [draft, dispatch] = useReducer(draftReducer, undefined, () => restored || initialDraft());
@@ -84,6 +85,8 @@ const NewDatasetPage = () => {
   const [labelSpaceConfig, setLabelSpaceConfig] = useState(null);
   const [stackExtensions, setStackExtensions] = useState(DEFAULT_STACK_EXTENSIONS);
   const [copyState, setCopyState] = useState({ loading: false, error: null });
+  // null until loaded, or when it could not be: the Access step then checks nothing.
+  const [knownPeople, setKnownPeople] = useState(null);
 
   useEffect(() => {
     getMetricsCatalog().then((response) => setMetrics(response.metrics || []))
@@ -94,6 +97,7 @@ const NewDatasetPage = () => {
       if (response?.extensions?.length) setStackExtensions(response.extensions);
     }).catch(() => {});
     if (!datasets?.length) fetchDatasets?.();
+    loadKnownPeople({ isAdmin, self: user?.username }).then(setKnownPeople).catch(() => setKnownPeople(null));
     // Load once on mount; the catalogs do not change while the page is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -198,7 +202,8 @@ const NewDatasetPage = () => {
     stackExtensions,
     isStackFile,
     goTo,
-  }), [datasets, copySetup, copyState, metrics, catalogError, kinds, labelSpaceConfig, stackExtensions, isStackFile, goTo]);
+    knownPeople,
+  }), [datasets, copySetup, copyState, metrics, catalogError, kinds, labelSpaceConfig, stackExtensions, isStackFile, goTo, knownPeople]);
 
   if (!canCreateDatasets) return <Navigate to="/datasets" replace />;
 
@@ -265,7 +270,19 @@ const NewDatasetPage = () => {
                   </select>
                 </label>
                 {showRestored && (
-                  <p className="mb-6 text-sm text-t3">Restored your unfinished setup. <button type="button" onClick={discard} className="text-t2 underline hover:text-err">Start over</button></p>
+                  <div className="mb-6 space-y-1 text-sm">
+                    <p className="text-t3">Restored your unfinished setup. <button type="button" onClick={discard} className="text-t2 underline hover:text-err">Start over</button></p>
+                    {/* The restore opens on Basics, so say here -- not only on the Images
+                        step -- that queued files did not survive the reload. */}
+                    {draft.lostFileCount > 0 && draft.images.files.length === 0 && (
+                      <p className="text-warn">
+                        {draft.lostFileCount} queued file{draft.lostFileCount === 1 ? ' was' : 's were'} not kept in the draft.{' '}
+                        <button type="button" onClick={() => goTo('images')} className="underline hover:text-t1">
+                          Add {draft.lostFileCount === 1 ? 'it' : 'them'} again
+                        </button>
+                      </p>
+                    )}
+                  </div>
                 )}
                 <div className={showSummary ? 'grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_22rem] gap-10' : ''}>
                   <div className="min-w-0">

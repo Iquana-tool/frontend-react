@@ -74,9 +74,23 @@ describe('createDatasetFromDraft', () => {
     });
     const result = await createDatasetFromDraft(fullDraft(), { api, isStackFile });
     expect(result.results.metadata).toEqual({ status: 'failed', detail: 'bad csv' });
-    expect(result.results.access.status).toBe('done'); // the invite link still worked
+    // The invite link still worked, but the unknown member must not read as done.
+    expect(result.results.access.status).toBe('partial');
     expect(result.results.access.detail).toMatch(/ann: no such user/);
     expect(api.updateDatasetSettings).toHaveBeenCalled();
+  });
+
+  it('marks a part partial when only some of its files went through', async () => {
+    const api = makeApi({
+      uploadImage: vi.fn()
+        .mockResolvedValueOnce({ success: true })
+        .mockResolvedValueOnce({ success: false }),
+      uploadStackFiles: vi.fn().mockResolvedValue({ stack_ids: [11], failed: [{ file_name: 'eye.vol', reason: 'second volume unreadable' }] }),
+    });
+    const result = await createDatasetFromDraft(fullDraft(), { api, isStackFile });
+    expect(result.results.images).toEqual({ status: 'partial', detail: '1 of 2 uploaded; failed: b.png' });
+    expect(result.results.stacks.status).toBe('partial');
+    expect(result.results.stacks.detail).toMatch(/second volume unreadable/);
   });
 
   it('only a failed dataset creation is fatal', async () => {

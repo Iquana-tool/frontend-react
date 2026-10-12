@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bot, Link2, Plus, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
+import React, { useId, useState } from 'react';
+import { AlertTriangle, Bot, Link2, Plus, ShieldCheck, Trash2, UserPlus, Users } from 'lucide-react';
 import Switch from '../../ui/Switch';
 import { AI_TOOLS } from '../../../utils/aiTools';
 import { ASSIGNABLE_DATASET_ROLES, DATASET_ROLE_LABELS } from '../../../utils/permissions';
@@ -124,8 +124,22 @@ const EXPIRY_OPTIONS = [
 
 const roleSelectClass = 'px-3 py-2.5 bg-p1 border border-ln text-t1 rounded-lg focus:outline-none focus:ring-2 focus:ring-ac';
 
-export const AccessStep = ({ draft, dispatch }) => {
+/**
+ * Why a queued member may not resolve to an account, or null when it will.
+ * `knownPeople` is null while loading or when it could not be loaded; nothing
+ * is flagged then, rather than flagging everybody.
+ */
+export const unknownMemberNote = (username, knownPeople) => {
+  if (!knownPeople || knownPeople.people.some((person) => person.username === username)) return null;
+  return knownPeople.complete
+    ? 'No account has this username. It will be skipped when the dataset is created.'
+    : 'Not a member of your organisations. Checked when the dataset is created.';
+};
+
+export const AccessStep = ({ draft, dispatch, ctx = {} }) => {
   const { members, invites } = draft.access;
+  const { knownPeople = null } = ctx;
+  const suggestionsId = useId();
   const [username, setUsername] = useState('');
   const [role, setRole] = useState('annotator');
   const [inviteRole, setInviteRole] = useState('annotator');
@@ -155,8 +169,21 @@ export const AccessStep = ({ draft, dispatch }) => {
             onKeyDown={(event) => event.key === 'Enter' && addMember()}
             placeholder="Username"
             aria-label="Username"
+            list={knownPeople?.people.length ? suggestionsId : undefined}
+            autoComplete="off"
             className="flex-1 min-w-[12rem] px-4 py-2.5 bg-p1 border border-ln text-t1 rounded-lg focus:outline-none focus:ring-2 focus:ring-ac placeholder-t3"
           />
+          {knownPeople?.people.length > 0 && (
+            <datalist id={suggestionsId}>
+              {knownPeople.people
+                .filter((person) => !members.some((member) => member.username === person.username))
+                .map((person) => (
+                  <option key={person.username} value={person.username}>
+                    {person.displayName && person.displayName !== person.username ? person.displayName : undefined}
+                  </option>
+                ))}
+            </datalist>
+          )}
           <select aria-label="Role" value={role} onChange={(event) => setRole(event.target.value)} className={roleSelectClass}>
             {ASSIGNABLE_DATASET_ROLES.map((entry) => <option key={entry} value={entry}>{DATASET_ROLE_LABELS[entry].label}</option>)}
           </select>
@@ -168,16 +195,26 @@ export const AccessStep = ({ draft, dispatch }) => {
         <p className="mt-2 text-xs text-t3">{DATASET_ROLE_LABELS[role]?.description}</p>
         {members.length > 0 && (
           <ul className="mt-3 rounded-xl border border-ln bg-p1 divide-y divide-ln">
-            {members.map((member) => (
-              <li key={member.username} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <span className="flex-1 text-t1">{member.username}</span>
-                <span className="text-t2">{DATASET_ROLE_LABELS[member.role]?.label}</span>
-                <button type="button" aria-label={`Remove ${member.username}`} className="text-t3 hover:text-err"
-                  onClick={() => set({ members: members.filter((entry) => entry !== member) })}>
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </li>
-            ))}
+            {members.map((member) => {
+              const note = unknownMemberNote(member.username, knownPeople);
+              return (
+                <li key={member.username} className="px-4 py-2.5 text-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="flex-1 text-t1">{member.username}</span>
+                    <span className="text-t2">{DATASET_ROLE_LABELS[member.role]?.label}</span>
+                    <button type="button" aria-label={`Remove ${member.username}`} className="text-t3 hover:text-err"
+                      onClick={() => set({ members: members.filter((entry) => entry !== member) })}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {note && (
+                    <p className="mt-1 flex items-center gap-1.5 text-xs text-warn">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {note}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
