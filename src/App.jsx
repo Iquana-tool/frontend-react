@@ -12,6 +12,7 @@ import { useRouteActivity, useActivityLogInit } from "./hooks/useActivityLog";
 import Login from "./components/auth/Login";
 import InstanceLandingPage from "./pages/InstanceLandingPage";
 import DatasetsPage from "./pages/DatasetsPage";
+import NewDatasetPage from "./pages/NewDatasetPage";
 import DatasetGalleryPage from "./pages/DatasetGalleryPage";
 import AnnotationPageV2 from "./pages/AnnotationPageV2";
 import DocumentationPage from "./pages/DocumentationPage";
@@ -65,6 +66,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DatasetsPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Dataset creation rail (#40): every setup decision once, up front. */}
+            <Route
+              path="/datasets/new"
+              element={
+                <ProtectedRoute>
+                  <NewDatasetPage />
                 </ProtectedRoute>
               }
             />

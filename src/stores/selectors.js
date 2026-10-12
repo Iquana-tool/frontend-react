@@ -34,10 +34,6 @@ export const useDownloadActions = () => useAppStore(state => state.downloadActio
 // Modal selectors
 export const useModals = () => useAppStore(state => state.modals);
 export const useDeleteConfirmText = () => useAppStore(state => state.modals.deleteConfirmText);
-export const useAddDatasetForm = () => useAppStore(state => state.modals.addDatasetForm);
-export const useModalFiles = () => useAppStore(state => state.modals.files);
-export const useUploadProgress = () => useAppStore(state => state.modals.uploadProgress);
-export const useUploadErrors = () => useAppStore(state => state.modals.uploadErrors);
 
 // Modal actions
 export const useModalActions = () => useAppStore(state => state.modalActions);

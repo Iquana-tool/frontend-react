@@ -38,15 +38,6 @@ const useAppStore = create()(
         modals: {
           // DeleteDatasetModal state
           deleteConfirmText: '',
-          // AddDatasetModal state (simple form fields)
-          addDatasetForm: {
-            title: '',
-            description: '',
-            datasetType: 'image'
-          },
-          files: [],
-          uploadProgress: { current: 0, total: 0 },
-          uploadErrors: []
         },
         
         // Quantification explore surfaces.
@@ -206,42 +197,6 @@ const useAppStore = create()(
           
           clearDeleteConfirmText: () => set(state => {
             state.modals.deleteConfirmText = '';
-          }),
-          
-          // AddDatasetModal actions
-          setAddDatasetFormField: (field, value) => set(state => {
-            state.modals.addDatasetForm[field] = value;
-          }),
-          
-          setAddDatasetForm: (formData) => set(state => {
-            state.modals.addDatasetForm = { ...formData };
-          }),
-          
-          setFiles: (files) => set(state => {
-            state.modals.files = files;
-          }),
-          
-          addFiles: (newFiles) => set(state => {
-            state.modals.files = [...state.modals.files, ...newFiles];
-          }),
-          
-          removeFile: (index) => set(state => {
-            state.modals.files = state.modals.files.filter((_, i) => i !== index);
-          }),
-          
-          setUploadProgress: (progress) => set(state => {
-            state.modals.uploadProgress = progress;
-          }),
-          
-          setUploadErrors: (errors) => set(state => {
-            state.modals.uploadErrors = errors;
-          }),
-          
-          resetAddDatasetModal: () => set(state => {
-            state.modals.addDatasetForm = { title: '', description: '', datasetType: 'image' };
-            state.modals.files = [];
-            state.modals.uploadProgress = { current: 0, total: 0 };
-            state.modals.uploadErrors = [];
           })
         },
         

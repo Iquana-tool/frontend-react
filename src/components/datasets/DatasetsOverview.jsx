@@ -8,9 +8,7 @@ import { GLOBAL_ROLE_LABELS } from "../../utils/permissions";
 import AuthButtons from "../auth/AuthButtons";
 import DocsLink from "../ui/DocsLink";
 import ReportBugLink from "../ui/ReportBugLink";
-import AddDatasetModal from "./AddDatasetModal";
 import IquanaImportModal from "./IquanaImportModal";
-import UploadingModal from "./UploadingDatasetModal"
 import CreateLabelsModal from "./CreateLabelsModal";
 import DeleteDatasetModal from "./DeleteDatasetModal";
 import DatasetCard from "./DatasetCard";
@@ -36,20 +34,12 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     getSampleImages,
     fetchDatasets,
   } = useDataset();
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showLabelsModal, setShowLabelsModal] = useState(false);
   const [selectedDatasetForLabels, setSelectedDatasetForLabels] = useState(null);
   const [datasetImages, setDatasetImages] = useState({});
   const [datasetStats, setDatasetStats] = useState({});
   const [loadingData, setLoadingData] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [uploadingDatasetInfo, setUploadingDatasetInfo] = useState({
-    title: "",
-    description: "",
-    total: 0
-  });
-  const [uploadingProgress, setUploadingProgress] = useState(0);
   useEffect(()=>{
     console.log(datasetStats)
   }, [datasetStats]);
@@ -63,9 +53,6 @@ const DatasetsOverview = ({ onOpenDataset }) => {
     confirmDelete,
     cancelDelete,
   } = useDeleteDataset();
-  useEffect(() => {
-    console.log("Is Creating", isCreating);
-  }, [isCreating]);
   // Fetch sample images immediately so cards display thumbnails without waiting for
   // progress calculations, and load annotation progress stats in the background.
   useEffect(() => {
@@ -274,7 +261,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                 <span>Import IQUANA</span>
               </button>
               <button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => navigate('/datasets/new')}
                 className="flex items-center space-x-2 bg-accent text-onAccent px-6 py-3 rounded-lg hover:brightness-110 transition-colors font-medium text-sm"
               >
                 <Plus className="w-5 h-5" />
@@ -319,7 +306,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
                     <span>Import IQUANA archive</span>
                   </button>
                   <button
-                    onClick={() => setShowAddModal(true)}
+                    onClick={() => navigate('/datasets/new')}
                     className="bg-accent text-onAccent px-6 py-3 rounded-lg hover:brightness-110 transition-colors font-medium text-sm"
                   >
                     Create your first dataset
@@ -356,28 +343,6 @@ const DatasetsOverview = ({ onOpenDataset }) => {
           </div>
         )}
       </div>
-
-      {/* Add Dataset Modal */}
-      {showAddModal && !isCreating && (
-        <AddDatasetModal
-          isOpen={showAddModal}
-          isCreating={isCreating}
-          setIsCreating={setIsCreating}
-          setCurrentProgress={setUploadingProgress}
-          setDataSetInfo={setUploadingDatasetInfo}
-          onClose={() => setShowAddModal(false)}
-        />
-      )}
-      {showAddModal && isCreating && (
-        <UploadingModal
-            onClose={() => {
-              setShowAddModal(false);
-              setIsCreating(false);
-            }}
-            currentProgress={uploadingProgress}
-            datasetInfo={uploadingDatasetInfo}
-        />
-      )}
 
       {/* Create Labels Modal */}
       {showLabelsModal && selectedDatasetForLabels && (
