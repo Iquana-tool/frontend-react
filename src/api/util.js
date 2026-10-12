@@ -73,6 +73,12 @@ export const buildUrl = (baseUrl, path, params = {}) => {
     }
 };
 
+/**
+ * An Error that also carries the HTTP status, so callers can tell e.g. "not
+ * allowed" (403) from "gone" (404) without parsing the message.
+ */
+const apiError = (message, status) => Object.assign(new Error(message), { status });
+
 // Function to handle API errors
 export const handleApiError = async (response) => {
     if (!response.ok) {
@@ -91,7 +97,7 @@ export const handleApiError = async (response) => {
             } catch (error) {
                 console.error('Error clearing auth state:', error);
             }
-            throw new Error('Unauthorized. Please log in again.');
+            throw apiError('Unauthorized. Please log in again.', response.status);
         }
 
         // Try to parse the error message from the response
@@ -105,22 +111,22 @@ export const handleApiError = async (response) => {
                     const errorMessage = errorData.detail
                         .map((err) => `${err.loc.join(".")}: ${err.msg}`)
                         .join(", ");
-                    throw new Error(`API Validation Error: ${errorMessage}`);
+                    throw apiError(`API Validation Error: ${errorMessage}`, response.status);
                 } else {
-                    throw new Error(`API Error: ${errorData.detail}`);
+                    throw apiError(`API Error: ${errorData.detail}`, response.status);
                 }
             }
 
             // Handle general error message
             if (errorData.message) {
-                throw new Error(`API Error: ${errorData.message}`);
+                throw apiError(`API Error: ${errorData.message}`, response.status);
             }
 
-            throw new Error(`API Error: ${response.status} ${response.statusText}`);
+            throw apiError(`API Error: ${response.status} ${response.statusText}`, response.status);
         } catch (parseError) {
             if (parseError instanceof SyntaxError) {
                 // Could not parse the error response as JSON
-                throw new Error(`API Error: ${response.status} ${response.statusText}`);
+                throw apiError(`API Error: ${response.status} ${response.statusText}`, response.status);
             }
             throw parseError;
         }
