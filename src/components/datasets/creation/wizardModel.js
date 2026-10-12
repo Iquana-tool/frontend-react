@@ -11,6 +11,7 @@
  *     issue that tracks them;
  *   - unavailable: the whole step is shown disabled with its issue number.
  */
+import { isImageFileName } from '../../../utils/uploadFiles';
 
 // ---------------------------------------------------------------------------
 // Steps
@@ -340,9 +341,11 @@ export const metricRequirements = (kinds) => {
   return result;
 };
 
+/** Queued files by what happens to them; `unsupported` ones are never uploaded. */
 export const splitQueuedFiles = (files, isStackFile) => ({
-  images: files.filter((file) => !isStackFile(file.name)),
+  images: files.filter((file) => !isStackFile(file.name) && isImageFileName(file.name)),
   stacks: files.filter((file) => isStackFile(file.name)),
+  unsupported: files.filter((file) => !isStackFile(file.name) && !isImageFileName(file.name)),
 });
 
 /**
