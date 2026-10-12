@@ -3,9 +3,11 @@ import {
   Ban,
   Check,
   Crosshair,
+  Eye,
   Hand,
   Hexagon,
   Loader2,
+  Map as MapIcon,
   MousePointer2,
   Paintbrush,
   Palette,
@@ -36,6 +38,8 @@ import {
   useDatasetLabels,
   useLabelColorOverrides,
   useLeftDrawerOpen,
+  useLeftDrawerContent,
+  useToggleLeftDrawerContent,
   useSetActiveCalibrationKind,
   useSetLeftDrawerOpen,
   useToggleLeftDrawer,
@@ -149,7 +153,10 @@ const ToolRail = () => {
     useRailTools();
   const supported = useSupportedPromptTypes();
   const leftDrawerOpen = useLeftDrawerOpen();
+  const leftDrawerContent = useLeftDrawerContent();
   const toggleLeftDrawer = useToggleLeftDrawer();
+  const toggleLeftDrawerContent = useToggleLeftDrawerContent();
+  const drawerShows = (content) => leftDrawerOpen && leftDrawerContent === content;
   const setLeftDrawerOpen = useSetLeftDrawerOpen();
   const setRightTab = useSetRightTab();
   const mode = useWorkspaceMode();
@@ -286,14 +293,36 @@ const ToolRail = () => {
 
       <div className="w-[22px] h-px bg-ln2 mb-[6px]" />
 
+      {/* The two drawer contents that belong to no tool: what the item is (its
+          overview, file details and tags) and how the canvas draws it. */}
+      {[
+        { content: 'overview', label: 'Overview and tags', Icon: MapIcon },
+        { content: 'view', label: 'View settings', Icon: Eye },
+      ].map(({ content, label, Icon }) => (
+        <Tooltip key={content} label={label}>
+          <button
+            type="button"
+            onClick={() => toggleLeftDrawerContent(content)}
+            aria-pressed={drawerShows(content)}
+            aria-label={label}
+            data-guide={`rail-${content}`}
+            className={`w-[30px] h-[30px] mb-[3px] flex items-center justify-center rounded-8 transition-colors ${
+              drawerShows(content) ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv hover:text-t1'
+            }`}
+          >
+            <Icon size={16} strokeWidth={1.7} />
+          </button>
+        </Tooltip>
+      ))}
+
       <Tooltip label="Tool options" shortcut="⌥1">
         <button
           type="button"
           onClick={toggleLeftDrawer}
-          aria-pressed={leftDrawerOpen}
+          aria-pressed={drawerShows('tools')}
           aria-label="Tool options"
           className={`w-[30px] h-[30px] flex items-center justify-center rounded-8 transition-colors ${
-            leftDrawerOpen ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv hover:text-t1'
+            drawerShows('tools') ? 'bg-acS text-ac' : 'text-t2 hover:bg-hv hover:text-t1'
           }`}
         >
           <Settings2 size={16} strokeWidth={1.7} />

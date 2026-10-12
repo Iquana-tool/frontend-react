@@ -120,8 +120,11 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
     uploadProgress,
     uploadErrors,
     isUploading,
+    stackExtensions,
+    kindOf,
     addFiles,
     removeFile,
+    removeUnsupported,
     clearFiles,
     handleUpload,
   } = useImageUpload(dataset, useCallback(() => {
@@ -311,8 +314,11 @@ const ImageGallery = ({ images, onImageClick, dataset, onDeleteImage, onImagesUp
         uploadProgress={uploadProgress}
         uploadErrors={uploadErrors}
         isUploading={isUploading}
+        stackExtensions={stackExtensions}
+        kindOf={kindOf}
         onAddFiles={addFiles}
         onRemoveFile={removeFile}
+        onRemoveUnsupported={removeUnsupported}
         onUpload={handleUpload}
         onClear={clearFiles}
       />

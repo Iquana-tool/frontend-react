@@ -22,3 +22,4 @@ export * from "./api/account";
 export * from "./api/organizations";
 export * from "./api/scale";
 export * from "./api/activityLog";
+export * from "./api/stacks";

@@ -2,8 +2,9 @@ import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
   Bookmark, Copy, Download, File as FileIcon, FileSpreadsheet, FileText, Image as ImageIcon,
-  Info, Layers, Loader2, Upload, X,
+  AlertTriangle, Info, Layers, Loader2, Upload, X,
 } from 'lucide-react';
+import { supportedFormatsText } from '../../../utils/uploadFiles';
 import {
   BUILTIN_TEMPLATES, DOMAINS, STEPS, metadataTemplateCsv, splitQueuedFiles, summarizeMetadataCsv,
 } from './wizardModel';
@@ -192,16 +193,9 @@ export const ImagesStep = ({ draft, dispatch, ctx }) => {
     dispatch({ type: 'set', step: 'images', patch: { files: [...files, ...fresh] } });
   }, [files, dispatch]);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    multiple: true,
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tif', '.tiff'],
-      'application/zip': ['.zip'],
-      'application/octet-stream': ctx.stackExtensions,
-    },
-  });
-  const { images, stacks } = splitQueuedFiles(files, ctx.isStackFile);
+  // Any file is accepted; ones nothing can read are flagged below and skipped.
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, multiple: true });
+  const { images, stacks, unsupported } = splitQueuedFiles(files, ctx.isStackFile);
   const remove = (target) => dispatch({ type: 'set', step: 'images', patch: { files: files.filter((file) => file !== target) } });
 
   return (
@@ -229,7 +223,7 @@ export const ImagesStep = ({ draft, dispatch, ctx }) => {
           <p className="text-base font-medium text-t1">
             {isDragActive ? 'Drop the files here…' : 'Drag and drop images or OCT files, or click to choose'}
           </p>
-          <p className="mt-1 text-sm text-t3">PNG, JPEG, TIFF, ZIP · Heidelberg {ctx.stackExtensions.join(' / ')}</p>
+          <p className="mt-1 text-sm text-t3">{supportedFormatsText(ctx.stackExtensions)}</p>
         </div>
 
         {files.length > 0 && (
@@ -239,21 +233,24 @@ export const ImagesStep = ({ draft, dispatch, ctx }) => {
                 {images.length} image{images.length === 1 ? '' : 's'}
                 {stacks.length > 0 && ` · ${stacks.length} OCT file${stacks.length === 1 ? '' : 's'}`}
                 {' queued'}
+                {unsupported.length > 0 && <span className="text-warn">{` · ${unsupported.length} not supported`}</span>}
               </span>
               <button type="button" className="text-t3 hover:text-err" onClick={() => dispatch({ type: 'set', step: 'images', patch: { files: [] } })}>
                 Clear all
               </button>
             </div>
             <ul className="max-h-72 overflow-y-auto divide-y divide-ln">
-              {[...stacks, ...images].map((file) => {
-                const isStack = ctx.isStackFile(file.name);
+              {[...unsupported, ...stacks, ...images].map((file) => {
+                const isStack = stacks.includes(file);
+                const isUnsupported = unsupported.includes(file);
                 return (
                   <li key={`${file.name}:${file.size}`} className="flex items-center gap-3 px-4 py-2 text-sm">
-                    {isStack
-                      ? <Layers className="w-4 h-4 text-ac shrink-0" aria-label="OCT volume" />
-                      : <ImageIcon className="w-4 h-4 text-t3 shrink-0" aria-hidden="true" />}
-                    <span className="truncate text-t1 flex-1">{file.name}</span>
+                    {isUnsupported && <AlertTriangle className="w-4 h-4 text-warn shrink-0" aria-label="Not supported" />}
+                    {isStack && <Layers className="w-4 h-4 text-ac shrink-0" aria-label="OCT volume" />}
+                    {!isStack && !isUnsupported && <ImageIcon className="w-4 h-4 text-t3 shrink-0" aria-hidden="true" />}
+                    <span className={`truncate flex-1 ${isUnsupported ? 'text-t3' : 'text-t1'}`}>{file.name}</span>
                     {isStack && <span className="text-xs text-ac">OCT volume</span>}
+                    {isUnsupported && <span className="text-xs text-warn">Not supported</span>}
                     <span className="text-xs text-t3 shrink-0">{formatSize(file.size)}</span>
                     <button type="button" aria-label={`Remove ${file.name}`} onClick={() => remove(file)} className="text-t3 hover:text-err">
                       <X className="w-4 h-4" />
@@ -263,6 +260,25 @@ export const ImagesStep = ({ draft, dispatch, ctx }) => {
               })}
             </ul>
           </div>
+        )}
+
+        {unsupported.length > 0 && (
+          <InfoBox
+            icon={AlertTriangle}
+            tone="warn"
+            action={(
+              <button
+                type="button"
+                className="text-xs text-t2 hover:text-err shrink-0"
+                onClick={() => dispatch({ type: 'set', step: 'images', patch: { files: files.filter((file) => !unsupported.includes(file)) } })}
+              >
+                Remove them
+              </button>
+            )}
+          >
+            {unsupported.length === 1 ? `${unsupported[0].name} is` : `${unsupported.length} files are`} not in a
+            supported format and will be skipped. Supported: {supportedFormatsText(ctx.stackExtensions)}.
+          </InfoBox>
         )}
 
         {stacks.length > 0 && (

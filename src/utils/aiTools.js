@@ -16,6 +16,7 @@ export const AI_TOOLS = [
   { id: 'cross_image', label: 'Cross-image suggestion', hint: 'Suggest instances from examples on other images' },
   { id: 'training', label: 'Model training', hint: 'Train a model on this dataset' },
   { id: 'batch_inference', label: 'Batch inference', hint: 'Run models over the whole dataset' },
+  { id: 'propagation', label: 'Propagation', hint: 'Carry an object from one slice of a scan to the others' },
 ];
 
 /** @param {Object|null} dataset @returns {Set<string>} */

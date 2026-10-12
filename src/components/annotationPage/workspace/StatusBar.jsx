@@ -1,6 +1,7 @@
 import React from 'react';
 import useRailTools from './useRailTools';
 import { getRailTool } from './toolModel';
+import useStackNav from './stack/useStackNav';
 import {
   useActiveLabelId,
   useCalibrationEntries,
@@ -38,6 +39,7 @@ const StatusBar = () => {
   const scale = useImageScale();
   const sessionReady = useWebSocketIsReady();
   const calibrationEntries = useCalibrationEntries();
+  const { isStack, frameIndex, frameCount } = useStackNav();
   const setWorkspaceMode = useSetWorkspaceMode();
 
   const activeLabel = labels.find((label) => String(label.id) === String(activeLabelId));
@@ -84,6 +86,10 @@ const StatusBar = () => {
 
       <span className="tabular-nums">{Math.round(zoomLevel * 100)}%</span>
 
+      {isStack && (
+        <span className="tabular-nums text-t1">slice {frameIndex + 1}/{frameCount}</span>
+      )}
+
       <span className="tabular-nums">
         {cursor ? `x ${cursor.x} y ${cursor.y}` : 'x –– y ––'}
       </span>
@@ -97,7 +103,7 @@ const StatusBar = () => {
       )}
 
       <span className="tabular-nums">
-        {objects.length} {objects.length === 1 ? 'object' : 'objects'}
+        {objects.length} {objects.length === 1 ? 'object' : 'objects'}{isStack ? ' here' : ''}
       </span>
 
       <span className="inline-flex items-center gap-[5px]">

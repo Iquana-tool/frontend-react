@@ -4,7 +4,9 @@ import {
   useImageList,
   useCurrentImageId,
   useSetCurrentImage,
+  useCurrentImage,
 } from '../../../stores/selectors/annotationSelectors';
+import { findItemIndex } from '../../../utils/stackItems';
 
 /**
  * Image navigation for the toolbar, filmstrip and arrow-key shortcuts.
@@ -19,11 +21,14 @@ export default function useWorkspaceImageNav() {
   const { datasetId } = useParams();
   const imageList = useImageList();
   const currentImageId = useCurrentImageId();
+  const currentImage = useCurrentImage();
   const setCurrentImage = useSetCurrentImage();
 
+  // A stack is one entry however many slices it has, so the current entry is the
+  // one the current image belongs to, not necessarily the one with its id.
   const currentIndex = useMemo(
-    () => imageList.findIndex((img) => img.id === currentImageId),
-    [imageList, currentImageId]
+    () => findItemIndex(imageList, currentImage ?? (currentImageId != null ? { id: currentImageId } : null)),
+    [imageList, currentImage, currentImageId]
   );
 
   const goToImage = useCallback(

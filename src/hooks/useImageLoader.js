@@ -9,8 +9,10 @@ import {
   useResetImageState,
   useSetImageScale,
 } from '../stores/selectors/annotationSelectors';
+import useAnnotationStore from '../stores/useAnnotationStore';
 import { getImageById } from '../api/images';
 import { getPixelScale } from '../api/scale';
+import { loadFrame, peekFrame, prefetchFrames } from '../utils/frameCache';
 
 export const useImageLoader = (currentImage) => {
   const imageObject = useImageObject();
@@ -26,6 +28,40 @@ export const useImageLoader = (currentImage) => {
   const loadImage = useCallback(async (image) => {
     if (!image || !image.id) {
       setImageObject(null);
+      return;
+    }
+
+    // A stack's frame: from the frame cache, and without the loading state when it
+    // is already decoded, so stepping through slices swaps the picture in place
+    // instead of flashing the spinner between every two.
+    if (image.stackId != null) {
+      const frameIds = (image.frames || []).map((frame) => frame.id);
+      prefetchFrames(frameIds, frameIds.indexOf(image.id));
+      try {
+        setImageError(null);
+        let frame = peekFrame(image.id);
+        if (!frame) {
+          setImageLoading(true);
+          frame = await loadFrame(image.id);
+        }
+        // A slower request for a slice already scrolled past must not land last.
+        if (useAnnotationStore.getState().images.currentImageId !== image.id) return;
+        setImageObject(frame);
+      } catch (error) {
+        console.error('Error loading frame:', error);
+        setImageError(error.message);
+        setImageObject(null);
+      } finally {
+        setImageLoading(false);
+      }
+      try {
+        const scaleData = await getPixelScale(image.id);
+        if (useAnnotationStore.getState().images.currentImageId === image.id) {
+          setImageScale(scaleData.scale_x, scaleData.scale_y, scaleData.unit);
+        }
+      } catch (scaleErr) {
+        console.warn('Could not load frame scale (will default to px):', scaleErr);
+      }
       return;
     }
 

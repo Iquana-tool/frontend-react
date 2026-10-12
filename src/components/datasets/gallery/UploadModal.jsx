@@ -1,6 +1,7 @@
 import React from 'react';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, Upload, Image as ImageIcon, Layers } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
+import { supportedFormatsText } from '../../../utils/uploadFiles';
 
 const UploadModal = ({
   isOpen,
@@ -10,21 +11,25 @@ const UploadModal = ({
   uploadProgress,
   uploadErrors,
   isUploading,
+  stackExtensions,
+  kindOf,
   onAddFiles,
   onRemoveFile,
+  onRemoveUnsupported,
   onUpload,
   onClear,
 }) => {
+  // Any file is accepted; ones nothing can read are flagged and skipped.
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: onAddFiles,
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff'],
-    },
     multiple: true,
     disabled: isUploading,
   });
 
   if (!isOpen) return null;
+
+  const unsupported = uploadingFiles.filter((file) => kindOf(file) === 'unsupported');
+  const uploadable = uploadingFiles.length - unsupported.length;
 
   const handleClose = () => {
     onClear();
@@ -61,6 +66,7 @@ const UploadModal = ({
                   ? 'Drop the files here...'
                   : 'Drag and drop files here, or click to select files'}
               </p>
+              <p className="mt-1 text-xs text-t3">{supportedFormatsText(stackExtensions)}</p>
             </div>
 
             {/* File List */}
@@ -68,14 +74,20 @@ const UploadModal = ({
               <div className="mt-4 space-y-2">
                 <h4 className="text-sm font-medium text-t2">Selected files:</h4>
                 <div className="max-h-40 overflow-y-auto space-y-1 border border-ln rounded-lg p-2 bg-well">
-                  {uploadingFiles.map((file, index) => (
+                  {uploadingFiles.map((file, index) => {
+                    const kind = kindOf(file);
+                    return (
                     <div
                       key={`${file.name}-${index}`}
                       className="flex items-center justify-between bg-p1 p-2 rounded border"
                     >
                       <div className="flex items-center space-x-2 flex-1 min-w-0">
-                        <ImageIcon className="w-4 h-4 text-ac flex-shrink-0" />
-                        <span className="text-sm text-t2 truncate">{file.name}</span>
+                        {kind === 'unsupported' && <AlertTriangle className="w-4 h-4 text-warn flex-shrink-0" aria-label="Not supported" />}
+                        {kind === 'stack' && <Layers className="w-4 h-4 text-ac flex-shrink-0" aria-label="OCT volume" />}
+                        {kind === 'image' && <ImageIcon className="w-4 h-4 text-ac flex-shrink-0" />}
+                        <span className={`text-sm truncate ${kind === 'unsupported' ? 'text-t3' : 'text-t2'}`}>{file.name}</span>
+                        {kind === 'stack' && <span className="text-xs text-ac flex-shrink-0">OCT volume</span>}
+                        {kind === 'unsupported' && <span className="text-xs text-warn flex-shrink-0">Not supported</span>}
                         <span className="text-xs text-t3 flex-shrink-0">
                           ({(file.size / 1024 / 1024).toFixed(2)} MB)
                         </span>
@@ -90,8 +102,26 @@ const UploadModal = ({
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              </div>
+            )}
+
+            {unsupported.length > 0 && !isUploading && (
+              <div className="mt-4 flex items-start gap-3 p-3 border rounded-lg bg-warnBg border-warnLn text-sm text-t2">
+                <AlertTriangle className="w-4 h-4 text-warn flex-shrink-0 mt-0.5" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  {unsupported.length === 1 ? `${unsupported[0].name} is` : `${unsupported.length} files are`} not in a
+                  supported format and will be skipped.
+                </div>
+                <button
+                  type="button"
+                  onClick={onRemoveUnsupported}
+                  className="text-xs text-t2 hover:text-err flex-shrink-0"
+                >
+                  Remove them
+                </button>
               </div>
             )}
 
@@ -142,7 +172,7 @@ const UploadModal = ({
               </button>
               <button
                 onClick={onUpload}
-                disabled={uploadingFiles.length === 0 || isUploading}
+                disabled={uploadable === 0 || isUploading}
                 className="px-4 py-2 text-sm text-onAccent bg-accent rounded-lg hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isUploading ? 'Uploading...' : 'Upload'}

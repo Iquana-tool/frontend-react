@@ -47,3 +47,162 @@ export const fetchStacks = async (datasetId) => {
     });
     return handleApiError(response);
 };
+
+/**
+ * A stack with its frames: where each lies on the overview, its scale and its
+ * workflow status. Stack metadata comes once, as `metadata`; each frame carries
+ * only its own keys.
+ */
+export const fetchStack = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}`, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/**
+ * Every object on every frame of a stack, with its outline (normalised x/y) and
+ * frame index. Feeds the object timeline and seeds the canvas
+ * when stepping to another slice.
+ *
+ * @returns {Promise<{objects: Array<Object>}>}
+ */
+export const fetchStackObjects = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/objects`, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/**
+ * Review rejections on any frame of the stack, in frame order, each with the
+ * frame's `image_id` and `frame_index`. A scan's feedback is shown once for the
+ * scan, not per slice.
+ *
+ * @param {number} stackId
+ * @param {boolean} [openOnly=false] - Only rejections that have not been resolved.
+ * @returns {Promise<{rejections: Array<Object>}>}
+ */
+export const fetchStackRejections = async (stackId, openOnly = false) => {
+    const url = buildUrl(API_BASE_URL, `/stacks/${stackId}/rejections`, { open_only: openOnly });
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/** Clear every open rejection on every frame of the stack. */
+export const resolveAllStackRejections = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/rejections/resolve`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+    });
+    return handleApiError(response);
+};
+
+/**
+ * Edit the stack's own metadata, which every frame inherits. An empty value
+ * removes the key, as `remove_keys` does.
+ */
+export const updateStackMetadata = async (stackId, entries = {}, removeKeys = []) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/metadata`, {
+        method: "PUT",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ entries, remove_keys: removeKeys }),
+    });
+    return handleApiError(response);
+};
+
+/**
+ * The stack's overview image (an OCT volume's IR-SLO) as an object URL.
+ *
+ * Fetched rather than linked because the request needs the auth header; the
+ * caller owns the URL and revokes it.
+ */
+export const fetchStackOverviewUrl = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/overview`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`Overview of stack ${stackId} could not be loaded (${response.status}).`);
+    return URL.createObjectURL(await response.blob());
+};
+
+/** Delete a stack with all its frames and their annotations. */
+export const deleteStack = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+    });
+    return handleApiError(response);
+};
+
+/**
+ * The stack's gallery thumbnail (the overview when there is one, else the
+ * middle frame) as an object URL the caller revokes.
+ */
+export const fetchStackThumbnailUrl = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/thumbnail`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error(`Thumbnail of stack ${stackId} could not be loaded (${response.status}).`);
+    return URL.createObjectURL(await response.blob());
+};
+
+/**
+ * Carry objects from the slices they are drawn on to the rest of the stack (#121).
+ *
+ * @param {number} stackId
+ * @param {{objects: number[][], start_frame?: number, end_frame?: number,
+ *   direction?: 'both'|'forward'|'backward', model_registry_key?: string}} body -
+ *   `objects` holds one list of contour ids per object (its outlines on the slices
+ *   it is drawn on); frames are 0-based and inclusive.
+ * @returns {Promise<{created: number, contour_ids: number[], frames: Object<string, number>,
+ *   to_check: number[], absent: number[], duplicates: number, unparented: number}>}
+ */
+export const propagateStack = async (stackId, body) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/propagate`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+    });
+    return handleApiError(response);
+};
+
+/**
+ * Propagate as `propagateStack`, receiving each slice as soon as it is saved.
+ *
+ * Events: `{type: 'frame', object_id, frame_index, presence, contour_id, label_id, x, y}`
+ * per finished slice, then `{type: 'done', ...summary}` or `{type: 'error', detail}`.
+ * Aborting `signal` stops the run; what was saved so far stays.
+ *
+ * @param {number} stackId
+ * @param {Object} body - As for `propagateStack`, plus `replace_contour_ids`.
+ * @param {{onEvent: (event: Object) => void, signal?: AbortSignal}} options
+ * @returns {Promise<Object|null>} The `done` summary, or null when stopped first.
+ */
+export const propagateStackStream = async (stackId, body, { onEvent, signal } = {}) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/propagate/stream`, {
+        method: "POST",
+        headers: getAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+        signal,
+    });
+    if (!response.ok) await handleApiError(response);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let summary = null;
+    const handle = (line) => {
+        if (!line.trim()) return;
+        const event = JSON.parse(line);
+        if (event.type === "done") summary = event;
+        if (event.type === "error") throw new Error(event.detail || "Propagation failed.");
+        onEvent?.(event);
+    };
+    try {
+        for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop();
+            lines.forEach(handle);
+        }
+        handle(buffer);
+    } catch (error) {
+        if (error.name === "AbortError") return null;
+        throw error;
+    }
+    return summary;
+};

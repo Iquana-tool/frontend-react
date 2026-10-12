@@ -5,6 +5,102 @@ import { trackAnnotation } from '../../services/activityLog';
 const normalizeDatasetId = (id) => (id != null ? String(id) : null);
 
 /**
+ * Walk a backend ContourHierarchy into the store's object list.
+ *
+ * Shared by `setObjectsFromHierarchy` and by `setCurrentImage`, which paints a
+ * stack slice's objects from the stack's cached copy before the session's arrive
+ * (see `seedObjectsFromStack`).
+ *
+ * @returns {{list: Array<Object>, colors: Object, labelAssignmentCounter: number}}
+ */
+export const objectsFromHierarchy = (hierarchy, labelsMap = null) => {
+  const list = [];
+  const colors = {};
+  let labelAssignmentCounter = 0;
+  
+  // labelsMap is always a Map or null (constructed in AnnotationPageV2)
+  const labelIdToNameMap = labelsMap;
+  const payload = hierarchy?.contours || hierarchy;
+  
+  if (payload && Array.isArray(payload.root_contours)) {
+    // Queue entries are { contour, parentId } so we preserve hierarchy when backend
+    // returns nested children without parent_id on each node (e.g. after page refresh)
+    const queue = payload.root_contours.map(c => ({ contour: c, parentId: null }));
+    let orderCounter = 0;
+
+    while (queue.length > 0) {
+      const { contour: c, parentId: queueParentId } = queue.shift();
+      const rawId = c.id ?? Date.now() + Math.random();
+
+      // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)
+      const id = typeof rawId === 'string' && !isNaN(rawId)
+        ? Number(rawId)
+        : (typeof rawId === 'number' ? rawId : rawId);
+
+      // Normalize contour_id as well
+      const rawContourId = c.id ?? null;
+      const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
+        ? Number(rawContourId)
+        : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
+
+      // Backend returns label_id
+      const labelId = c.label_id ?? null;
+
+      // Look up label name from labelsMap using label_id
+      let labelName = null;
+      if (labelId && labelIdToNameMap) {
+        const numericLabelId = Number(labelId);
+        labelName = labelIdToNameMap.get(numericLabelId) ?? labelIdToNameMap.get(String(labelId)) ?? null;
+      }
+
+      // If object has a valid label from backend, assign it an order
+      // We'll use the order they appear in the hierarchy as the assignment order
+      let labelAssignmentOrder = undefined;
+      if (hasValidLabel(labelName)) {
+        orderCounter += 1;
+        labelAssignmentOrder = orderCounter;
+      }
+
+      // Use backend parent_id if present, else the parent we tracked from nesting (for refresh load)
+      // Normalize parent_id to number to match the normalized id (Map keys must be same type)
+      const rawParentId = c.parent_id ?? queueParentId ?? null;
+      const parentId = rawParentId != null
+        ? (typeof rawParentId === 'string' && !isNaN(rawParentId) ? Number(rawParentId) : rawParentId)
+        : null;
+
+      const obj = {
+        id, // Normalized ID format
+        contour_id: contourId, // Normalized contour_id format
+        label: labelName, // Use label name if available, otherwise null
+        labelId: labelId, // Store label ID for future reference
+        labelAssignmentOrder,
+        x: c.x || [],
+        y: c.y || [],
+        path: c.path || null, // SVG path from backend
+        added_by: c.added_by || null,
+        reviewed_by: c.reviewed_by || [],
+        parent_id: parentId,
+        quantification: c.quantification || null,
+        // Use label-based color if labeled, otherwise use ID-based color for stability
+        color: getObjectColor({ labelId: labelId, label: labelName }, id),
+      };
+      list.push(obj);
+      colors[obj.id] = obj.color;
+      // Backend guarantees children is always an array (default=[])
+      if (c.children?.length > 0) {
+        for (const child of c.children) {
+          queue.push({ contour: child, parentId: id });
+        }
+      }
+    }
+    
+    // Update the global counter to continue from where backend objects left off
+    labelAssignmentCounter = orderCounter;
+  }
+  return { list, colors, labelAssignmentCounter };
+};
+
+/**
  * Objects slice - manages annotation objects, selection, visibility, and colors
  */
 export const createObjectsSlice = (set) => ({
@@ -142,100 +238,33 @@ export const createObjectsSlice = (set) => ({
    *   it and fall back to the current image.
    */
   setObjectsFromHierarchy: (hierarchy, labelsMap = null, imageId = undefined) => set((state) => {
-    const list = [];
-    const colors = {};
-    
-    // labelsMap is always a Map or null (constructed in AnnotationPageV2)
-    const labelIdToNameMap = labelsMap;
-    const payload = hierarchy?.contours || hierarchy;
-    
-    if (payload && Array.isArray(payload.root_contours)) {
-      // Queue entries are { contour, parentId } so we preserve hierarchy when backend
-      // returns nested children without parent_id on each node (e.g. after page refresh)
-      const queue = payload.root_contours.map(c => ({ contour: c, parentId: null }));
-      let orderCounter = 0;
+    const { list, colors, labelAssignmentCounter } = objectsFromHierarchy(hierarchy, labelsMap);
+    const forImageId = imageId !== undefined ? imageId : state.images.currentImageId;
 
-      while (queue.length > 0) {
-        const { contour: c, parentId: queueParentId } = queue.shift();
-        const rawId = c.id ?? Date.now() + Math.random();
-
-        // Normalize ID format to ensure consistent color calculation (prefer number for numeric IDs)
-        const id = typeof rawId === 'string' && !isNaN(rawId)
-          ? Number(rawId)
-          : (typeof rawId === 'number' ? rawId : rawId);
-
-        // Normalize contour_id as well
-        const rawContourId = c.id ?? null;
-        const contourId = rawContourId && typeof rawContourId === 'string' && !isNaN(rawContourId)
-          ? Number(rawContourId)
-          : (rawContourId && typeof rawContourId === 'number' ? rawContourId : rawContourId);
-
-        // Backend returns label_id
-        const labelId = c.label_id ?? null;
-
-        // Look up label name from labelsMap using label_id
-        let labelName = null;
-        if (labelId && labelIdToNameMap) {
-          const numericLabelId = Number(labelId);
-          labelName = labelIdToNameMap.get(numericLabelId) ?? labelIdToNameMap.get(String(labelId)) ?? null;
-        }
-
-        // If object has a valid label from backend, assign it an order
-        // We'll use the order they appear in the hierarchy as the assignment order
-        let labelAssignmentOrder = undefined;
-        if (hasValidLabel(labelName)) {
-          orderCounter += 1;
-          labelAssignmentOrder = orderCounter;
-        }
-
-        // Use backend parent_id if present, else the parent we tracked from nesting (for refresh load)
-        // Normalize parent_id to number to match the normalized id (Map keys must be same type)
-        const rawParentId = c.parent_id ?? queueParentId ?? null;
-        const parentId = rawParentId != null
-          ? (typeof rawParentId === 'string' && !isNaN(rawParentId) ? Number(rawParentId) : rawParentId)
-          : null;
-
-        const obj = {
-          id, // Normalized ID format
-          contour_id: contourId, // Normalized contour_id format
-          label: labelName, // Use label name if available, otherwise null
-          labelId: labelId, // Store label ID for future reference
-          labelAssignmentOrder,
-          x: c.x || [],
-          y: c.y || [],
-          path: c.path || null, // SVG path from backend
-          added_by: c.added_by || null,
-          reviewed_by: c.reviewed_by || [],
-          parent_id: parentId,
-          quantification: c.quantification || null,
-          // Use label-based color if labeled, otherwise use ID-based color for stability
-          color: getObjectColor({ labelId: labelId, label: labelName }, id),
-        };
-        list.push(obj);
-        colors[obj.id] = obj.color;
-        // Backend guarantees children is always an array (default=[])
-        if (c.children?.length > 0) {
-          for (const child of c.children) {
-            queue.push({ contour: child, parentId: id });
-          }
-        }
-      }
-      
-      // Update the global counter to continue from where backend objects left off
-      state.objects.labelAssignmentCounter = orderCounter;
-    } else {
-      // Reset counter if no hierarchy (or empty)
-      state.objects.labelAssignmentCounter = 0;
+    // The canvas already shows the current image's objects (seeded from the stack's
+    // copy) and this hierarchy is for another image: a reply to a switch the reader
+    // has already scrolled past. Taking it would paint the wrong slice's objects.
+    if (
+      forImageId !== state.images.currentImageId &&
+      state.objects.loadedForImageId != null &&
+      state.objects.loadedForImageId === state.images.currentImageId
+    ) {
+      return;
     }
-    
+
+    state.objects.labelAssignmentCounter = labelAssignmentCounter;
+    // The session's copy of a slice that was painted from the stack's: keep what is
+    // selected, so a click made in between is not undone.
+    const keepSelection = state.objects.seeded && state.objects.loadedForImageId === forImageId;
+    state.objects.seeded = false;
+    const ids = new Set(list.map((object) => object.id));
     state.objects.list = list;
-    state.objects.selected = [];
+    state.objects.selected = keepSelection ? state.objects.selected.filter((id) => ids.has(id)) : [];
     state.objects.colors = colors;
     // The hierarchy is the answer the spinner was waiting for, whether or not it is empty.
     state.objects.loading = false;
     state.objects.loadError = null;
-    state.objects.loadedForImageId =
-      imageId !== undefined ? imageId : state.images.currentImageId;
+    state.objects.loadedForImageId = forImageId;
   }),
 
   clearObjects: () => set((state) => {

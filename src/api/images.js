@@ -2,13 +2,16 @@ import { handleApiError, getAuthHeaders, buildUrl } from "../api/util";
 import { API_BASE_URL } from "./config";
 
 // Fetch list of available images
-export const fetchImages = async (datasetId) => {
+export const fetchImages = async (datasetId, { includeFrames = false } = {}) => {
     try {
         if (!datasetId) {
             throw new Error("Dataset ID is required");
         }
+        // Frames of stacks (OCT B-scans) are left out unless asked for; the
+        // workspace asks, and folds them back into one entry per stack.
         const response = await fetch(
-            `${API_BASE_URL}/datasets/${datasetId}/images`,
+            buildUrl(API_BASE_URL, `/datasets/${datasetId}/images`,
+                includeFrames ? { include_frames: true } : {}),
             {
                 headers: getAuthHeaders(),
             }
