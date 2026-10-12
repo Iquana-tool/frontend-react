@@ -104,3 +104,44 @@ export const correctionsPlan = (run, stackObjects) => {
   }
   return { objects, replace, corrected };
 };
+
+/** The server's reason without the generic prefix the API client adds. */
+const reasonOf = (error) => String(error?.message || error || 'unknown error').replace(/^API (Validation )?Error: /, '');
+
+/**
+ * What settling a run ("Accept all" / "Discard") amounts to, from one result per
+ * suggestion: `{id, ok, error}`.
+ *
+ * Accepting approves each suggestion as a review. Where the caller may not approve
+ * it -- the dataset requires independent review and they ran the propagation, or
+ * they have no review rights -- the server answers 403. That is not a failure: the
+ * mask is already saved and simply waits for a reviewer, so it is reported as kept.
+ * Anything else (the suggestion was deleted meanwhile, the server is down) failed,
+ * and its ids are returned so the run can stay open for another try.
+ *
+ * @param {'accept'|'discard'} action
+ * @param {Array<{id: number, ok: boolean, error?: Error}>} results
+ * @returns {{toasts: Array<{type: string, message: string}>, failedIds: number[]}}
+ */
+export const settleOutcome = (action, results) => {
+  const isBlocked = (result) => action === 'accept' && !result.ok && result.error?.status === 403;
+  const done = results.filter((result) => result.ok).length;
+  const kept = results.filter(isBlocked).length;
+  const failed = results.filter((result) => !result.ok && !isBlocked(result));
+  const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+  const toasts = [];
+
+  if (done) {
+    toasts.push({ type: 'success', message: action === 'accept'
+      ? `${plural(done, 'suggestion')} accepted.` : `${plural(done, 'suggestion')} discarded.` });
+  }
+  if (kept) {
+    toasts.push({ type: 'info', message: `${plural(kept, 'suggestion')} kept for a reviewer: `
+      + 'you cannot approve them yourself in this dataset.' });
+  }
+  if (failed.length) {
+    toasts.push({ type: 'error', message: `${failed.length} of ${results.length} could not be `
+      + `${action === 'accept' ? 'accepted' : 'discarded'}: ${reasonOf(failed[0].error)}` });
+  }
+  return { toasts, failedIds: failed.map((result) => result.id) };
+};

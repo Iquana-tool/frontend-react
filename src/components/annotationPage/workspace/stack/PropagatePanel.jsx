@@ -15,6 +15,7 @@ import {
 import {
   correctionsPlan,
   expectedResults,
+  settleOutcome,
   stackObjectFromEvent,
   summaryFromEvents,
 } from './propagationModel';
@@ -198,18 +199,19 @@ const PropagatePanel = ({ frameIndex, frameCount, goToFrame }) => {
     if (!run) return;
     setPhase('settling');
     const ids = run.summary.contour_ids;
-    const outcomes = await Promise.all(ids.map((id) => (
+    const results = await Promise.all(ids.map((id) => (
       action === 'accept' ? markContourAsReviewed(id) : deleteContour(id)
-    ).then(() => true, () => false)));
-    const failed = outcomes.filter((ok) => !ok).length;
-    if (failed) {
-      addToast?.({
-        type: 'error',
-        message: `${failed} of ${outcomes.length} could not be ${action === 'accept' ? 'accepted' : 'discarded'} `
-          + '(already removed or settled).',
-      });
-    }
+    ).then(() => ({ id, ok: true }), (error) => ({ id, ok: false, error }))));
+    const { toasts, failedIds } = settleOutcome(action, results);
+    toasts.forEach((toast) => addToast?.(toast));
     await refreshTimeline();
+    if (failedIds.length) {
+      // Keep the run open on what really failed, so it can be tried again or
+      // discarded, and "Update from my corrections" stays available.
+      setRun({ ...run, summary: { ...run.summary, contour_ids: failedIds } });
+      setPhase('check');
+      return;
+    }
     setRun(null);
     setPhase('idle');
   };

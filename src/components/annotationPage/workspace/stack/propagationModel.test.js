@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   correctionsPlan,
   expectedResults,
+  settleOutcome,
   stackObjectFromEvent,
   summaryFromEvents,
 } from './propagationModel';
@@ -52,5 +53,44 @@ describe('correctionsPlan', () => {
 
   it('has nothing to learn from when nobody corrected anything', () => {
     expect(correctionsPlan(run, [{ contour_id: 10 }]).corrected).toBe(0);
+  });
+});
+
+describe('settleOutcome', () => {
+  const forbidden = Object.assign(new Error('API Error: This dataset requires independent review'), { status: 403 });
+  const gone = Object.assign(new Error('API Error: Contour not found.'), { status: 404 });
+
+  it('reports a clean accept as accepted', () => {
+    const { toasts, failedIds } = settleOutcome('accept', [{ id: 1, ok: true }, { id: 2, ok: true }]);
+    expect(toasts).toEqual([{ type: 'success', message: '2 suggestions accepted.' }]);
+    expect(failedIds).toEqual([]);
+  });
+
+  it('keeps suggestions the caller may not approve, instead of failing them', () => {
+    const { toasts, failedIds } = settleOutcome('accept', [
+      { id: 1, ok: false, error: forbidden }, { id: 2, ok: false, error: forbidden },
+    ]);
+    expect(toasts).toEqual([{
+      type: 'info',
+      message: '2 suggestions kept for a reviewer: you cannot approve them yourself in this dataset.',
+    }]);
+    expect(failedIds).toEqual([]);
+  });
+
+  it('shows the real reason for anything else and returns what failed', () => {
+    const { toasts, failedIds } = settleOutcome('accept', [
+      { id: 1, ok: true }, { id: 2, ok: false, error: forbidden }, { id: 3, ok: false, error: gone },
+    ]);
+    expect(toasts.map((toast) => toast.type)).toEqual(['success', 'info', 'error']);
+    expect(toasts[2].message).toBe('1 of 3 could not be accepted: Contour not found.');
+    expect(failedIds).toEqual([3]);
+  });
+
+  it('treats a 403 on discard as a failure: deleting is not a review', () => {
+    const { toasts, failedIds } = settleOutcome('discard', [{ id: 4, ok: false, error: forbidden }]);
+    expect(toasts).toEqual([{
+      type: 'error', message: '1 of 1 could not be discarded: This dataset requires independent review',
+    }]);
+    expect(failedIds).toEqual([4]);
   });
 });
