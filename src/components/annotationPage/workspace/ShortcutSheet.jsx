@@ -64,7 +64,6 @@ const GROUPS = [
       { keys: 'scroll', label: 'Previous / next slice — Ctrl + scroll zooms' },
       { keys: 'Home End', label: 'First / last slice' },
       { keys: '[ ]', label: 'Previous / next slice with a suggestion to check' },
-      { keys: 'N', label: 'Show the neighbouring slices, dashed' },
       { keys: 'Y', label: 'Open the object timeline' },
     ],
   },

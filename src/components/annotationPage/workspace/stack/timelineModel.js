@@ -41,6 +41,7 @@ export const liveObjectsAsStackObjects = (objects, frameIndex, imageId) =>
     origin: object.origin ?? null,
     added_by: object.added_by ?? null,
     reviewed: (object.reviewed_by?.length ?? 0) > 0,
+    reviewed_by: object.reviewed_by ?? [],
     x: object.x,
     y: object.y,
   }));
@@ -55,6 +56,25 @@ export const mergeCurrentFrame = (stackObjects, frameIndex, liveObjects, imageId
   ...stackObjects.filter((object) => object.frame_index !== frameIndex),
   ...liveObjectsAsStackObjects(liveObjects, frameIndex, imageId),
 ];
+
+/**
+ * One slice's objects from the stack's copy, as a ContourHierarchy the canvas
+ * loads like any other (`parent_id` on each node, so it can stay flat).
+ */
+export const frameHierarchy = (stackObjects, frameIndex) => ({
+  root_contours: stackObjects
+    .filter((object) => object.frame_index === frameIndex)
+    .map((object) => ({
+      id: object.contour_id,
+      label_id: object.label_id,
+      parent_id: object.parent_id,
+      added_by: object.added_by,
+      reviewed_by: object.reviewed_by ?? [],
+      x: object.x,
+      y: object.y,
+      children: [],
+    })),
+});
 
 /**
  * @param {Object} args
@@ -125,18 +145,3 @@ export const framesToCheck = (timeline) => {
   }
   return [...frames].sort((a, b) => a - b);
 };
-
-/**
- * Outlines to draw dashed from the slices next to the current one.
- *
- * With an object selected, only that object's label -- "does this continue
- * above and below?". With nothing selected, everything on the neighbouring
- * slices, which is what an annotator scrolling through wants to see coming.
- *
- * @returns {Array<Object>} stack objects, each with `offset` -1 or +1.
- */
-export const neighbourOutlines = (objects, frameIndex, labelId = undefined) =>
-  objects
-    .filter((object) => Math.abs(object.frame_index - frameIndex) === 1)
-    .filter((object) => labelId === undefined || String(object.label_id) === String(labelId))
-    .map((object) => ({ ...object, offset: object.frame_index - frameIndex }));

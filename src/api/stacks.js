@@ -60,12 +60,37 @@ export const fetchStack = async (stackId) => {
 
 /**
  * Every object on every frame of a stack, with its outline (normalised x/y) and
- * frame index. Feeds the object timeline and the neighbouring-slice outlines.
+ * frame index. Feeds the object timeline and seeds the canvas
+ * when stepping to another slice.
  *
  * @returns {Promise<{objects: Array<Object>}>}
  */
 export const fetchStackObjects = async (stackId) => {
     const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/objects`, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/**
+ * Review rejections on any frame of the stack, in frame order, each with the
+ * frame's `image_id` and `frame_index`. A scan's feedback is shown once for the
+ * scan, not per slice.
+ *
+ * @param {number} stackId
+ * @param {boolean} [openOnly=false] - Only rejections that have not been resolved.
+ * @returns {Promise<{rejections: Array<Object>}>}
+ */
+export const fetchStackRejections = async (stackId, openOnly = false) => {
+    const url = buildUrl(API_BASE_URL, `/stacks/${stackId}/rejections`, { open_only: openOnly });
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/** Clear every open rejection on every frame of the stack. */
+export const resolveAllStackRejections = async (stackId) => {
+    const response = await fetch(`${API_BASE_URL}/stacks/${stackId}/rejections/resolve`, {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+    });
     return handleApiError(response);
 };
 

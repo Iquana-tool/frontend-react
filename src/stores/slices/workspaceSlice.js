@@ -248,10 +248,6 @@ export const createWorkspaceSlice = (set) => ({
     state.workspace.timelineOpen = !state.workspace.timelineOpen;
   }),
 
-  toggleNeighbours: () => set((state) => {
-    state.workspace.showNeighbours = !state.workspace.showNeighbours;
-  }),
-
   setStackDetails: (details) => set((state) => {
     state.stack.details = details;
     if (!details) {

@@ -4,6 +4,46 @@ import { combineStatuses } from '../../utils/imageStatus';
  * Images slice - manages image state, loading, zoom, and pan
  */
 import { trackNavigation } from '../../services/activityLog';
+import { objectsFromHierarchy } from './objectsSlice';
+import { frameHierarchy, mergeCurrentFrame } from '../../components/annotationPage/workspace/stack/timelineModel';
+
+/**
+ * Stepping between slices of one stack: paint the next slice's objects at once
+ * from the stack's copy (loaded in one request for the timeline) instead of
+ * waiting a round trip for the session's. The session's copy still follows and
+ * replaces it, with measurements and paths; the selection survives that.
+ *
+ * The slice being left is written back into the stack's copy first, so coming
+ * back to it before the next refetch shows what was just drawn there.
+ */
+const seedObjectsFromStack = (state, previous, image) => {
+  const { stack, objects } = state;
+  if (image?.stackId == null || stack.objectsFor !== image.stackId) return false;
+
+  if (previous?.stackId === image.stackId && objects.loadedForImageId === previous.id) {
+    stack.objects = mergeCurrentFrame(stack.objects, previous.frameIndex, objects.list, previous.id);
+  }
+
+  const labelsMap = new Map();
+  for (const label of objects.datasetLabels || []) {
+    if (label?.id != null && label.name) {
+      labelsMap.set(Number(label.id), label.name);
+      labelsMap.set(String(label.id), label.name);
+    }
+  }
+  const { list, colors, labelAssignmentCounter } = objectsFromHierarchy(
+    frameHierarchy(stack.objects, image.frameIndex), labelsMap
+  );
+  objects.list = list;
+  objects.selected = [];
+  objects.colors = colors;
+  objects.labelAssignmentCounter = labelAssignmentCounter;
+  objects.loading = false;
+  objects.loadError = null;
+  objects.loadedForImageId = image.id;
+  objects.seeded = true;
+  return true;
+};
 
 export const createImagesSlice = (set) => ({
   setCurrentImage: (image) => set((state) => {
@@ -13,7 +53,8 @@ export const createImagesSlice = (set) => ({
     // Reset zoom and pan when switching to a different image -- but not between
     // slices of one stack: they share one size and one place, and a reader who
     // zoomed into the fovea wants to stay there while scrolling through it.
-    const previousStackId = state.images.currentImage?.stackId ?? null;
+    const previous = state.images.currentImage;
+    const previousStackId = previous?.stackId ?? null;
     const sameStack = previousStackId != null && previousStackId === (image?.stackId ?? null);
 
     state.images.currentImage = image;
@@ -42,7 +83,8 @@ export const createImagesSlice = (set) => ({
       // so the contours can land first. Wiping them here would leave the canvas waiting for
       // a message the server has already sent: the session is by then pointed at that same
       // image and sends no other.
-      if (state.objects.loadedForImageId !== state.images.currentImageId) {
+      if (state.objects.loadedForImageId !== state.images.currentImageId
+        && !seedObjectsFromStack(state, previous, image)) {
         state.objects.list = [];
         state.objects.selected = [];
         state.objects.colors = {};

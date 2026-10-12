@@ -121,6 +121,7 @@ const WorkspaceShell = () => {
   const filmstripOpen = useFilmstripOpen();
   const currentImageId = useCurrentImageId();
   const maskId = useCurrentMaskId();
+  const stackId = useAnnotationStore((state) => state.images.currentImage?.stackId ?? null);
   const currentTool = useCurrentTool();
   const { railTool, setRailTool } = useRailTools();
   const calibrationEntries = useCalibrationEntries();
@@ -211,7 +212,11 @@ const WorkspaceShell = () => {
       {/* Annotator-facing review feedback and the correction queue. Both render
           nothing unless there is something to show, so they cost nothing in
           ordinary annotation work. */}
-      {maskId && <RejectionBanner maskId={maskId} dataset={dataset} />}
+      {/* Keyed to the scan on a stack, so stepping through slices neither reloads
+          it nor lets it blink out while the next slice's mask is looked up. */}
+      {stackId != null
+        ? <RejectionBanner stackId={stackId} dataset={dataset} />
+        : maskId && <RejectionBanner maskId={maskId} dataset={dataset} />}
       <CorrectionBar />
 
       <div className="flex-1 min-h-0 flex">

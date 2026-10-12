@@ -36,7 +36,6 @@ import {
   useToggleCalibratedColors,
   useRefinementModeActive,
   useRefinementTool,
-  useToggleNeighbours,
   useToggleTimeline,
 } from '../../../stores/selectors/annotationSelectors';
 import useRefinementSession from '../../../hooks/useRefinementSession';
@@ -67,7 +66,6 @@ export default function useWorkspaceShortcuts() {
   const nav = useWorkspaceImageNav();
   const stack = useStackNav();
   const stackObjects = useMergedStackObjects();
-  const toggleNeighbours = useToggleNeighbours();
   const toggleTimeline = useToggleTimeline();
   const actions = useObjectActions();
 
@@ -202,13 +200,6 @@ export default function useWorkspaceShortcuts() {
             });
           }
           break;
-        case 'N':
-          // Neighbouring slices' outlines, on a stack only.
-          if (stack.isStack) {
-            event.preventDefault();
-            toggleNeighbours();
-          }
-          break;
         case 'Y':
           if (stack.isStack) {
             event.preventDefault();
@@ -285,7 +276,6 @@ export default function useWorkspaceShortcuts() {
     instanceModalOpen,
     stack,
     stackObjects,
-    toggleNeighbours,
     toggleTimeline,
     mode,
     promptAction,

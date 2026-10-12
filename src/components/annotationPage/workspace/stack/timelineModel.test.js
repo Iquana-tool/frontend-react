@@ -4,7 +4,6 @@ import {
   formatSpan,
   framesToCheck,
   mergeCurrentFrame,
-  neighbourOutlines,
   objectKind,
 } from './timelineModel';
 
@@ -71,18 +70,6 @@ describe('mergeCurrentFrame', () => {
       101,
     );
     expect(merged.map((o) => [o.frame_index, o.label_id, o.reviewed])).toEqual([[0, 1, false], [1, 2, true]]);
-  });
-});
-
-describe('neighbourOutlines', () => {
-  const objects = [object(0, 1), object(1, 1), object(2, 2), object(3, 1)];
-
-  it('takes the slices on either side, tagged with their offset', () => {
-    expect(neighbourOutlines(objects, 1).map((o) => [o.frame_index, o.offset])).toEqual([[0, -1], [2, 1]]);
-  });
-
-  it('narrows to one label when an object is selected', () => {
-    expect(neighbourOutlines(objects, 1, 2).map((o) => o.frame_index)).toEqual([2]);
   });
 });
 

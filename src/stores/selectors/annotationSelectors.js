@@ -311,8 +311,6 @@ export const useToggleLeftDrawerContent = () => useAnnotationStore(state => stat
 export const useTimelineOpen = () => useAnnotationStore(state => state.workspace.timelineOpen);
 export const useSetTimelineOpen = () => useAnnotationStore(state => state.setTimelineOpen);
 export const useToggleTimeline = () => useAnnotationStore(state => state.toggleTimeline);
-export const useShowNeighbours = () => useAnnotationStore(state => state.workspace.showNeighbours);
-export const useToggleNeighbours = () => useAnnotationStore(state => state.toggleNeighbours);
 export const useStackDetails = () => useAnnotationStore(state => state.stack.details);
 export const useStackObjects = () => useAnnotationStore(state => state.stack.objects);
 export const useSetStackDetails = () => useAnnotationStore(state => state.setStackDetails);

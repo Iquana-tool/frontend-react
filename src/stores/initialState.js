@@ -41,8 +41,6 @@ export const initialState = {
     leftDrawerContent: 'tools', // 'tools' | 'overview' | 'view'
     /** The object timeline drawer over the canvas, for stack items. */
     timelineOpen: false,
-    /** Draw the neighbouring slices' outlines dashed (stack items only). */
-    showNeighbours: true,
     rightPanelOpen: true,
     rightTab: 'objects',        // 'objects' | 'labels'
     filmstripOpen: true,
@@ -316,6 +314,8 @@ export const initialState = {
      * waiting for a message the server has already sent.
      */
     loadedForImageId: null,
+    /** The list was painted from the stack's copy and the session's has not replaced it yet. */
+    seeded: false,
   },
   
   // WebSocket State
