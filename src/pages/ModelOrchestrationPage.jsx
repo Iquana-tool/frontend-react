@@ -11,6 +11,7 @@ import {
 } from "../api/inference";
 import { fetchLabels } from "../api/labels";
 import ModelOrchestrationPanel from "../components/inference/ModelOrchestrationPanel";
+import ModelLabelMappingEditor from "../components/inference/labelMapping/ModelLabelMappingEditor";
 import { calculateCoverage } from "../components/inference/orchestration/orchestrationViewModel";
 import { usePermissions } from "../hooks/usePermissions";
 import { Permission } from "../utils/permissions";
@@ -29,6 +30,7 @@ export default function ModelOrchestrationPage() {
     const { can } = usePermissions(datasetId);
 
     const canEdit = Boolean(can(Permission.AI_BATCH_INFER));
+    const canCreateLabels = Boolean(can(Permission.LABEL_MANAGE));
     const canView = Boolean(can(Permission.AI_INTERACTIVE) || can(Permission.AI_BATCH_INFER));
 
     const [labelsById, setLabelsById] = useState({});
@@ -141,6 +143,36 @@ export default function ModelOrchestrationPage() {
         }
     };
 
+    // Models with a fixed label space, once each (a model serving two tasks is listed twice).
+    const classedModels = useMemo(() => {
+        const byKey = new Map();
+        for (const model of catalog.models || []) {
+            if (model.classes?.length > 0 && !byKey.has(model.registry_key)) {
+                byKey.set(model.registry_key, model);
+            }
+        }
+        return [...byKey.values()];
+    }, [catalog]);
+
+    // A saved mapping changes which labels those models predict (the catalog) and may have
+    // added labels; refresh both without the full-page reload, so open editors stay put.
+    const refreshAfterMapping = async () => {
+        const targetDatasetId = datasetId;
+        try {
+            const [labelResponse, catalogResponse] = await Promise.all([
+                fetchLabels(targetDatasetId),
+                getInferenceModelCatalog(targetDatasetId),
+            ]);
+            if (!isMountedRef.current || datasetIdRef.current !== targetDatasetId) return;
+            setLabelsById(labelResponse?.labels?.id_to_label_object || {});
+            setCatalog(catalogResponse || { models: [], retrieval_strategies: [] });
+        } catch (e) {
+            if (isMountedRef.current && datasetIdRef.current === targetDatasetId) {
+                setError(e.message || "Saved, but could not refresh the models and labels.");
+            }
+        }
+    };
+
     const activeCoverage = useMemo(
         () => calculateCoverage(policy?.bindings || [], labelsById, catalog).overall,
         [policy?.bindings, labelsById, catalog]
@@ -243,17 +275,45 @@ export default function ModelOrchestrationPage() {
                             </button>
                         </div>
                     ) : (
-                        <ModelOrchestrationPanel
-                            datasetId={Number(datasetId)}
-                            policy={policy}
-                            labelsById={labelsById}
-                            catalog={catalog}
-                            onSavePolicy={handleSavePolicy}
-                            onDeletePolicy={handleDeletePolicy}
-                            isSaving={isSaving}
-                            isDeleting={isDeleting}
-                            canEdit={canEdit}
-                        />
+                        <>
+                            <ModelOrchestrationPanel
+                                datasetId={Number(datasetId)}
+                                policy={policy}
+                                labelsById={labelsById}
+                                catalog={catalog}
+                                onSavePolicy={handleSavePolicy}
+                                onDeletePolicy={handleDeletePolicy}
+                                isSaving={isSaving}
+                                isDeleting={isDeleting}
+                                canEdit={canEdit}
+                            />
+
+                            {classedModels.length > 0 && (
+                                <section className="mt-8 space-y-3" data-testid="model-label-spaces">
+                                    <div>
+                                        <h2 className="text-sm font-semibold text-t1">Model label spaces</h2>
+                                        <p className="text-xs text-t3 mt-0.5 max-w-3xl">
+                                            These models predict a fixed set of classes. Decide what each class
+                                            means in this dataset: one of its labels, a new label, or nothing
+                                            (discard). A class with a label of the same name uses it until you
+                                            choose otherwise; classes without a label arrive unlabelled.
+                                        </p>
+                                    </div>
+                                    {classedModels.map((model) => (
+                                        <ModelLabelMappingEditor
+                                            key={model.registry_key}
+                                            datasetId={Number(datasetId)}
+                                            registryKey={model.registry_key}
+                                            modelName={model.name}
+                                            labelsById={labelsById}
+                                            canEdit={canEdit}
+                                            canCreateLabels={canCreateLabels}
+                                            onSaved={refreshAfterMapping}
+                                        />
+                                    ))}
+                                </section>
+                            )}
+                        </>
                     )}
                 </main>
             </div>

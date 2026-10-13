@@ -201,10 +201,9 @@ export default function MatrixGrid({
         ? model.badges
         : [model.latency_badge, model.model_size].filter(Boolean);
       const perf = badgesList.length > 0 ? `${badgesList.join(" · ")} · ` : "";
+      const classCount = model.classes?.length || model.label_ids?.length || 0;
       const classText =
-        model.label_ids?.length > 0
-          ? `${model.label_ids.length} class${model.label_ids.length > 1 ? "es" : ""}`
-          : "class-agnostic";
+        classCount > 0 ? `${classCount} class${classCount > 1 ? "es" : ""}` : "class-agnostic";
       subtitle = `${perf}${classText}`;
       helpText = `${title} · Configured route for ${col.label}`;
     } else if (isInherited && model) {

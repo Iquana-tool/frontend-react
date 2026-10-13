@@ -420,3 +420,19 @@ describe("orchestrationViewModel", () => {
     });
   });
 });
+
+describe("class-aware compatibility", () => {
+  it("treats a model with a label space as classed even before any class is mapped", async () => {
+    const { isClassAgnosticModel, modelPredictsLabel } = await import("./orchestrationViewModel");
+    const sam = { registry_key: "sam2", label_ids: [] };
+    const unmapped = { registry_key: "choroidalyzer", label_ids: [], classes: [{ key: "region" }] };
+    const mapped = { ...unmapped, label_ids: [4] };
+
+    expect(isClassAgnosticModel(sam)).toBe(true);
+    expect(modelPredictsLabel(sam, 4)).toBe(true);
+    expect(isClassAgnosticModel(unmapped)).toBe(false);
+    expect(modelPredictsLabel(unmapped, 4)).toBe(false);
+    expect(modelPredictsLabel(mapped, "4")).toBe(true);
+    expect(modelPredictsLabel(mapped, 5)).toBe(false);
+  });
+});
