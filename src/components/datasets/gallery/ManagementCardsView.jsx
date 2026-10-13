@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Ruler, Wrench, Settings, HelpCircle, Wand2, Cpu } from 'lucide-react';
-import ManagementCard from './ManagementCard';
+import { Database, Brain, BarChart3, Tag, SquarePen, Download, Eye, GraduationCap, Users2, ClipboardCheck, Ruler, Wrench, Settings, HelpCircle, Wand2, Cpu, ChevronRight } from 'lucide-react';
+import WorkflowCard from './WorkflowCard';
+import ToolRow from './ToolRow';
 import DatasetActivityCard from './DatasetActivityCard';
 import ModelSuggestionsCard from './ModelSuggestionsCard';
 import TimeRangeToggle from './TimeRangeToggle';
@@ -16,16 +17,21 @@ import { fetchReviewSummary, fetchCorrectionSummary } from '../../../api/reviews
 import { DOCS, openDocs } from '../../../constants/docs';
 
 /**
- * The sections the cards are grouped under, in display order. Each card names its
- * `group` by id; a group with no permitted cards for the current role is not
- * rendered at all (see `groupsInOrder` below).
+ * The tool groups shown as side-by-side lists below the workflow, in display
+ * order. Each card names its `group` by id; a group with no permitted cards for
+ * the current role is not rendered at all (see `toolGroups` below). The
+ * annotation workflow is not listed here: it gets its own row of cards.
  */
-const GROUPS = [
-  { id: 'annotation', title: 'Annotation workflow' },
+const TOOL_GROUPS = [
   { id: 'data', title: 'Data & Analysis' },
   { id: 'models', title: 'Artificial Intelligence' },
-  { id: 'configurations', title: 'Configurations' },
+  { id: 'configurations', title: 'Configuration' },
 ];
+
+/** The small all-caps heading used above every section of the page. */
+const SectionHeading = ({ children }) => (
+  <h3 className="text-xs font-semibold uppercase tracking-wide text-t3 mb-2.5">{children}</h3>
+);
 
 /**
  * The dataset's action grid.
@@ -126,6 +132,7 @@ const ManagementCardsView = ({
   };
 
   const openRejections = correctionSummary?.open_rejections;
+  const correctTone = openRejections > 0 ? 'attention' : 'muted';
   const correctStat =
     openRejections == null
       ? null
@@ -137,6 +144,7 @@ const ManagementCardsView = ({
 
   const pendingInstances = reviewSummary?.pending_instances;
   const reviewedInstances = reviewSummary?.reviewed_instances ?? 0;
+  const reviewTone = pendingInstances > 0 ? 'attention' : 'muted';
   const reviewStat =
     pendingInstances == null
       ? null
@@ -161,7 +169,7 @@ const ManagementCardsView = ({
       phase: 'calibrate',
       icon: Ruler,
       title: 'Calibrate',
-      description: 'Set the scale, colour and intensity references so measurements compare across images',
+      description: 'Set scale and colour references',
       onClick: onCalibrateClick,
       permitted: canCalibrate,
       color: 'calibrate',
@@ -172,7 +180,7 @@ const ManagementCardsView = ({
       phase: 'annotate',
       icon: SquarePen,
       title: 'Annotation',
-      description: 'Annotate instances on images from this dataset',
+      description: 'Draw instances on the images',
       onClick: onAnnotationClick,
       permitted: canAnnotate,
       color: 'annotate',
@@ -183,8 +191,9 @@ const ManagementCardsView = ({
       phase: 'review',
       icon: ClipboardCheck,
       title: 'Review',
-      description: 'Go through annotated instances and approve them or send them back',
+      description: 'Approve or send back instances',
       stat: reviewStat,
+      statTone: reviewTone,
       onClick: onReviewClick,
       permitted: canReview,
       color: 'review',
@@ -194,8 +203,9 @@ const ManagementCardsView = ({
       group: 'annotation',
       icon: Wrench,
       title: 'Correct',
-      description: 'Correct sent back instances',
+      description: 'Fix instances sent back to you',
       stat: correctStat,
+      statTone: correctTone,
       onClick: onCorrectClick,
       permitted: canCorrect,
       color: 'rose',
@@ -211,76 +221,76 @@ const ManagementCardsView = ({
       description: 'Look through the images and their annotations without editing anything',
       onClick: onBrowseAnnotations,
       permitted: can(Permission.ANNOTATION_READ) && !can(Permission.ANNOTATION_CREATE),
-      color: 'teal',
+      color: 'accent',
     },
     {
       id: 'data-management',
       group: 'data',
       icon: Database,
       title: 'Data Management',
-      description: 'Upload, organize, and manage your dataset images and files',
+      description: 'Upload, organise and manage images and files',
       onClick: onDataManagementClick,
       // Viewing the gallery only needs read; the upload/delete controls inside it
       // are gated separately.
       permitted: can(Permission.IMAGE_READ),
-      color: 'blue',
+      color: 'accent',
     },
     {
       id: 'label-management',
       group: 'data',
       icon: Tag,
       title: 'Label Management',
-      description: 'Create, edit, and organize labels and their hierarchical structure',
+      description: 'Create, edit and organise the label hierarchy',
       onClick: onLabelManagementClick,
       permitted: can(Permission.LABEL_MANAGE),
-      color: 'pink',
+      color: 'accent',
     },
     {
       id: 'model-zoo',
       group: 'models',
       icon: Brain,
       title: 'Model Zoo',
-      description: 'Browse, select, and manage AI models for training and inference',
+      description: 'Browse and manage AI models for training and inference',
       onClick: onModelZooClick,
       permitted: canAny([Permission.AI_INTERACTIVE, Permission.AI_BATCH_INFER]),
-      color: 'purple',
+      color: 'accent',
     },
     {
       id: 'model-orchestration',
       group: 'models',
       icon: Cpu,
       title: 'Model Orchestration',
-      description: 'Configure default models and per-label routing policies for interactive tools, cross-image suggestions, and batch runs',
+      description: 'Default models and per-label routing',
       onClick: onModelOrchestrationClick,
       permitted: canAny([Permission.AI_INTERACTIVE, Permission.AI_BATCH_INFER]),
-      color: 'indigo',
+      color: 'accent',
     },
     {
       id: 'model-training',
       group: 'models',
       icon: GraduationCap,
       title: 'Model Training',
-      description: 'Train an instance segmentation model on this dataset and watch progress live',
+      description: 'Train a segmentation model and watch it live',
       onClick: onModelTrainingClick,
       permitted: can(Permission.AI_TRAIN) && isAiToolEnabled(dataset, 'training'),
-      color: 'indigo',
+      color: 'accent',
     },
     {
       id: 'batch-inference',
       group: 'models',
       icon: Wand2,
       title: 'Batch Inference',
-      description: 'Let your models annotate the whole dataset — one model per label, run in hierarchy order',
+      description: 'Run models over the whole dataset, label by label',
       onClick: onBatchInferenceClick,
       permitted: can(Permission.AI_BATCH_INFER) && isAiToolEnabled(dataset, 'batch_inference'),
-      color: 'purple',
+      color: 'accent',
     },
     {
       id: 'quantifications',
       group: 'data',
       icon: BarChart3,
       title: 'Quantifications',
-      description: 'Analyze and quantify your annotated data with statistical insights',
+      description: 'Measure and analyse your annotated data',
       onClick: onQuantificationsClick,
       permitted: can(Permission.EXPORT_QUANTIFICATION),
       color: 'green',
@@ -300,12 +310,12 @@ const ManagementCardsView = ({
       group: 'configurations',
       icon: Users2,
       title: 'Manage Access',
-      description: 'Control who can see, annotate and review this dataset, and how work is reviewed',
+      description: 'Who can see, annotate and review, and how work is reviewed',
       onClick: onManageAccessClick,
       // Curators can see and invite; only owners can change roles. Either is
       // enough to make the page worth opening.
       permitted: canAny([Permission.MEMBER_LIST, Permission.MEMBER_GRANT, Permission.INVITE_CREATE]),
-      color: 'teal',
+      color: 'accent',
     },
     {
       // Placeholder: will open a settings page. Dysfunctional for now.
@@ -326,93 +336,122 @@ const ManagementCardsView = ({
       group: 'configurations',
       icon: HelpCircle,
       title: 'Help',
-      description: 'Read the documentation and learn how everything works',
-      stat: 'Opens the documentation site in a new tab',
+      description: 'Read the documentation (opens in a new tab)',
       onClick: () => openDocs(DOCS.home),
+      external: true,
       permitted: true,
-      color: 'blue',
+      color: 'accent',
     },
   ].filter((card) => card.permitted);
 
-  // Cards are grouped into labelled sections so the grid reads as a few small
-  // workflows instead of one long wall of tiles. A section with no permitted
-  // cards for the current role is dropped entirely (header and divider included).
-  const groupsInOrder = GROUPS.map((group) => ({
+  // A description that is empty or just repeats the name says nothing new, so
+  // the line is left out rather than filled with generic text.
+  const description = dataset?.description?.trim();
+  const showDescription =
+    Boolean(description) && description !== dataset?.name?.trim();
+
+  // The workflow cards get their own row; everything else is a tool, listed
+  // under its group. A group with no permitted cards for the current role is
+  // dropped entirely, heading included.
+  const workflowCards = cards.filter((card) => card.group === 'annotation');
+  const toolGroups = TOOL_GROUPS.map((group) => ({
     ...group,
     cards: cards.filter((card) => card.group === group.id),
   })).filter((group) => group.cards.length > 0);
 
   return (
     <div className="overflow-y-auto bg-app p-4 sm:p-5 lg:p-6 h-full">
-      <div className="w-full mx-auto">
-        {/* The dataset's name and description used to live in the sidebar. This
-            is the one page with room for them, and the one where knowing which
-            dataset you are looking at actually decides what you click next. */}
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center gap-3 mb-1 sm:mb-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-t1">
-              {dataset?.name || 'Dataset Management'}
-            </h2>
+      <h2 className="sr-only">{dataset?.name || 'Dataset overview'}</h2>
+      <div className="w-full max-w-[1400px] mx-auto space-y-6">
+        {/* The dataset's name is already in the top bar, highlighted as the
+            current page, so it is not repeated as a visible heading here. The
+            heading stays for screen readers so the page still has a title. */}
+        {(role || showDescription) && (
+          <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
             {role && <RoleBadge role={role} showDescription />}
-          </div>
-          <p className="text-sm sm:text-base text-t2 max-w-3xl">
-            {dataset?.description || 'Manage your dataset, models, and annotations'}
-          </p>
-        </div>
+            {showDescription && (
+              <p className="text-sm text-t2 max-w-3xl">{description}</p>
+            )}
+          </header>
+        )}
 
-        <div className="space-y-8 sm:space-y-10">
-          {groupsInOrder.map((group) => (
-            <section key={group.id}>
-              <div className="flex items-center gap-4 mb-4 sm:mb-5">
-                <h3 className="text-base sm:text-lg font-semibold text-t2 whitespace-nowrap">
-                  {group.title}
-                </h3>
-                <div className="flex-1 h-px bg-hv2" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
-                {group.cards.map((card) => (
-                  <ManagementCard
-                    key={card.id}
+        {workflowCards.length > 0 && (
+          <section aria-label="Annotation workflow">
+            <SectionHeading>Annotation workflow</SectionHeading>
+            {/* Left to right in the order the work happens. On wide screens a
+                chevron sits in the gap between neighbours to make that order
+                explicit; on narrower screens the grid wraps and the chevrons
+                would point at nothing, so they are hidden. */}
+            <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {workflowCards.map((card, index) => (
+                <li key={card.id} className="relative">
+                  <WorkflowCard
                     icon={card.icon}
                     title={card.title}
                     description={card.description}
                     stat={card.stat}
+                    statTone={card.statTone}
                     onClick={card.onClick}
                     color={card.color}
-                    disabled={card.disabled}
                     progress={phaseBar(card.phase)}
                   />
-                ))}
-              </div>
-            </section>
-          ))}
+                  {index < workflowCards.length - 1 && (
+                    <ChevronRight
+                      className="hidden lg:block absolute top-1/2 -right-[14px] -translate-y-1/2 w-3 h-3 text-t3"
+                      aria-hidden="true"
+                    />
+                  )}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
 
-          {dataset?.id && can(Permission.DATASET_READ) && (
-            <section>
-              <div className="flex items-center gap-4 mb-4 sm:mb-5">
-                <h3 className="text-base sm:text-lg font-semibold text-t2 whitespace-nowrap">
-                  Activity
-                </h3>
-                <div className="flex-1 h-px bg-hv2" />
-                <TimeRangeToggle days={activityDays} onChange={setActivityDays} />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 lg:gap-6 items-start">
-                <section aria-label="People">
-                  <h4 className="text-sm font-semibold text-t1 mb-2">People</h4>
-                  <DatasetActivityCard datasetId={dataset.id} days={activityDays} />
-                </section>
-                <section aria-label="Model suggestions">
-                  <h4 className="text-sm font-semibold text-t1 mb-2">Model suggestions</h4>
-                  <ModelSuggestionsCard datasetId={dataset.id} days={activityDays} />
-                </section>
-              </div>
-            </section>
-          )}
-        </div>
+        {toolGroups.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+            {toolGroups.map((group) => (
+              <section key={group.id} aria-label={group.title}>
+                <SectionHeading>{group.title}</SectionHeading>
+                <div className="bg-p1 border border-ln rounded-xl overflow-hidden divide-y divide-ln">
+                  {group.cards.map((card) => (
+                    <ToolRow
+                      key={card.id}
+                      icon={card.icon}
+                      title={card.title}
+                      description={card.description}
+                      onClick={card.onClick}
+                      color={card.color}
+                      disabled={card.disabled}
+                      external={card.external}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+
+        {dataset?.id && can(Permission.DATASET_READ) && (
+          <section aria-label="Activity">
+            <div className="flex items-center justify-between gap-4 mb-2.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-t3">Activity</h3>
+              <TimeRangeToggle days={activityDays} onChange={setActivityDays} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <section aria-label="People">
+                <h4 className="text-sm font-semibold text-t1 mb-2">People</h4>
+                <DatasetActivityCard datasetId={dataset.id} days={activityDays} />
+              </section>
+              <section aria-label="Model suggestions">
+                <h4 className="text-sm font-semibold text-t1 mb-2">Model suggestions</h4>
+                <ModelSuggestionsCard datasetId={dataset.id} days={activityDays} />
+              </section>
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
 };
 
 export default ManagementCardsView;
-

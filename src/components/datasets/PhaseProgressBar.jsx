@@ -60,7 +60,7 @@ const PhaseProgressBar = ({ phase, counts, total, compact = false }) => {
 
       <div
         className={`flex flex-wrap items-center gap-y-0.5 text-t3 ${
-          compact ? 'gap-x-2 mt-1.5 text-[10px]' : 'gap-x-3 mt-1 text-[11px]'
+          compact ? 'gap-x-2 mt-1.5 text-[11px]' : 'gap-x-3 mt-1 text-[11px]'
         }`}
       >
         {segments.map((segment) => (

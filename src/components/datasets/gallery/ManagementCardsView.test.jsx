@@ -132,3 +132,36 @@ describe("ManagementCardsView - Export Dataset card", () => {
         expect(screen.queryByText("Export IQUANA ZIP")).not.toBeInTheDocument();
     });
 });
+
+describe("ManagementCardsView - layout", () => {
+    const dataset = { id: 101, name: "Test Dataset" };
+
+    it("shows Settings as a disabled placeholder row and Help as a row", () => {
+        mockUsePermissions.mockReturnValue({
+            can: () => false,
+            canAny: () => false,
+            role: "viewer",
+        });
+
+        render(<ManagementCardsView dataset={dataset} />);
+
+        const settings = screen.getByText("Settings").closest("button");
+        expect(settings).toBeDisabled();
+        expect(screen.getByText("Soon")).toBeInTheDocument();
+        expect(screen.getByText("Help").closest("button")).not.toBeDisabled();
+    });
+
+    it("renders an empty review queue in a muted tone, not the phase colour", async () => {
+        mockUsePermissions.mockReturnValue({
+            can: (perm) => perm === Permission.REVIEW_APPROVE,
+            canAny: () => false,
+            role: "reviewer",
+        });
+
+        render(<ManagementCardsView dataset={dataset} />);
+
+        const stat = await screen.findByText("Nothing waiting for review right now");
+        expect(stat).toHaveClass("text-t3");
+        expect(stat).not.toHaveClass("text-rev");
+    });
+});
