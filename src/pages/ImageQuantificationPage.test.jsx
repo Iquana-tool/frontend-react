@@ -68,6 +68,11 @@ vi.mock('../api/quantifications', () => ({
   getQuantificationSummary: vi.fn(),
 }));
 
+// The page names derived measurements from this list; none are defined in these tests.
+vi.mock('../api/derivedMetrics', () => ({
+  listDerivedMetrics: vi.fn().mockResolvedValue({ derived_metrics: [] }),
+}));
+
 const LocationProbe = () => {
   const location = useLocation();
   return (

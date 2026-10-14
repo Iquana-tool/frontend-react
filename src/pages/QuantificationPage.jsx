@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Download, AlertTriangle, Info, LayoutGrid, Table2, Image as ImageIcon } from "lucide-react";
+import { Download, AlertTriangle, Info, LayoutGrid, Table2, Image as ImageIcon, Sigma } from "lucide-react";
 import {
   getQuantificationSummary,
   getMetricsCatalog,
@@ -8,6 +8,9 @@ import {
   buildQuantificationDownloadUrl,
   fetchQuantificationRows,
 } from "../api/quantifications";
+import { listDerivedMetrics } from "../api/derivedMetrics";
+import DerivedMetricsPanel from "../components/quantification/derived/DerivedMetricsPanel";
+import { derivedCatalogEntries } from "../utils/derivedMetrics";
 import { getAuthHeaders } from "../api/util";
 import LabelTree from "../components/quantification/LabelTree";
 import SummaryCards from "../components/quantification/SummaryCards";
@@ -72,6 +75,12 @@ const QuantificationPage = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [catalog, setCatalog] = useState([]);
+  // The dataset's own derived measurements (see DerivedMetricsPanel). Their values arrive
+  // with the summary and the rows like any metric; this list names and describes them.
+  const [derivedMetrics, setDerivedMetrics] = useState([]);
+  const [derivedOpen, setDerivedOpen] = useState(false);
+  // Bumped after a derived measurement changes, so the summary and rows are re-read.
+  const [derivedVersion, setDerivedVersion] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,12 +112,13 @@ const QuantificationPage = () => {
   // the one tab that actually needs it, matching what the server enforces.
   const { can } = usePermissions(datasetId);
   const canExport = can(Permission.EXPORT_QUANTIFICATION);
+  const canEditDerived = can(Permission.DATASET_UPDATE);
 
-  const catalogMap = buildMetricCatalogMap(catalog);
+  const catalogMap = buildMetricCatalogMap([...catalog, ...derivedCatalogEntries(derivedMetrics)]);
 
   // Identifies the row set: everything that changes which contours are exported and which
   // columns they carry. The viewer reuses its loaded table while this holds steady.
-  const dataKey = `${datasetId}:${activeProfileId}:${includeInProgress}:${includeUnreviewed}`;
+  const dataKey = `${datasetId}:${activeProfileId}:${includeInProgress}:${includeUnreviewed}:${derivedVersion}`;
 
   // Load the catalog + profiles once per dataset. The default profile is auto-created
   // server-side (geometry on all labels), so an existing dataset renders unchanged.
@@ -116,11 +126,14 @@ const QuantificationPage = () => {
     if (!datasetId) return;
     const loadMeta = async () => {
       try {
-        const [catalogRes, profilesRes] = await Promise.all([
+        const [catalogRes, profilesRes, derivedRes] = await Promise.all([
           getMetricsCatalog(),
           getQuantificationProfiles(parseInt(datasetId)),
+          // A backend without derived measurements must not take the page down with it.
+          listDerivedMetrics(parseInt(datasetId)).catch(() => ({ derived_metrics: [] })),
         ]);
         setCatalog(catalogRes.metrics || []);
+        setDerivedMetrics(derivedRes.derived_metrics || []);
         const loadedProfiles = profilesRes.profiles || [];
         setProfiles(loadedProfiles);
         const def = loadedProfiles.find((p) => p.is_default) || loadedProfiles[0];
@@ -162,7 +175,7 @@ const QuantificationPage = () => {
       }
     };
     loadData();
-  }, [datasetId, activeProfileId, includeInProgress, includeUnreviewed]);
+  }, [datasetId, activeProfileId, includeInProgress, includeUnreviewed, derivedVersion]);
 
   // The per-contour rows.
   //
@@ -242,6 +255,16 @@ const QuantificationPage = () => {
     },
     [datasetId, activeProfileId, clearViewerConfigsForDataset]
   );
+
+  // After a derived measurement is added, edited, deleted or copied in: re-list them and
+  // re-read everything they appear in. A saved Objects-table layout may name a column that
+  // is gone, so it is dropped as it is when a profile changes.
+  const reloadDerived = useCallback(async () => {
+    const res = await listDerivedMetrics(parseInt(datasetId));
+    setDerivedMetrics(res.derived_metrics || []);
+    clearViewerConfigsForDataset(datasetId);
+    setDerivedVersion((v) => v + 1);
+  }, [datasetId, clearViewerConfigsForDataset]);
 
   const handleToggleLabel = (labelId) => {
     const newExpanded = new Set(expandedLabels);
@@ -406,6 +429,22 @@ const QuantificationPage = () => {
 
   return (
     <DatasetManagementLayout>
+      {derivedOpen && (
+        <DerivedMetricsPanel
+          datasetId={parseInt(datasetId)}
+          definitions={derivedMetrics}
+          catalog={catalog}
+          labels={data.labels}
+          canEdit={canEditDerived}
+          filters={{
+            excludeNotFullyAnnotated: !includeInProgress,
+            excludeUnreviewed: !includeUnreviewed,
+          }}
+          displayUnit={data.scale_status?.display_unit || "px"}
+          onChanged={reloadDerived}
+          onClose={() => setDerivedOpen(false)}
+        />
+      )}
       <div className="h-full flex flex-col bg-p1">
         {/* Page Header */}
         <div className="bg-p1 border-b border-ln flex-shrink-0">
@@ -442,6 +481,17 @@ const QuantificationPage = () => {
                 onSelect={setActiveProfileId}
                 onProfilesChanged={reloadProfiles}
               />
+              <button
+                onClick={() => setDerivedOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-medium text-t2 bg-well rounded-lg hover:bg-hv2 transition-colors"
+                title="Formulas over the measurements, defined for this dataset"
+              >
+                <Sigma className="w-4 h-4" />
+                <span>Derived measurements</span>
+                {derivedMetrics.length > 0 && (
+                  <span className="text-xs text-t3 bg-p1 px-1.5 rounded">{derivedMetrics.length}</span>
+                )}
+              </button>
               <div className="flex items-center gap-4">
                 {/* Inclusion toggles: by default only finalized work (fully-annotated masks
                     + reviewed objects) is quantified; these surface in-progress work. */}

@@ -20,6 +20,8 @@ import {
   getQuantificationProfiles,
   getQuantificationSummary,
 } from "../api/quantifications";
+import { listDerivedMetrics } from "../api/derivedMetrics";
+import { derivedCatalogEntries } from "../utils/derivedMetrics";
 import { getAuthHeaders } from "../api/util";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
 import AnnotationViewerCanvas from "../components/viewer/AnnotationViewerCanvas";
@@ -126,6 +128,7 @@ const ImageQuantificationPage = () => {
 
   const [images, setImages] = useState([]);
   const [catalog, setCatalog] = useState([]);
+  const [derivedMetrics, setDerivedMetrics] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [includeInProgress, setIncludeInProgress] = useState(false);
@@ -168,10 +171,12 @@ const ImageQuantificationPage = () => {
       setLoadingMeta(true);
       setMetaError(null);
       try {
-        const [imageResponse, catalogResponse, profileResponse] = await Promise.all([
+        const [imageResponse, catalogResponse, profileResponse, derivedResponse] = await Promise.all([
           api.fetchImages(datasetId),
           getMetricsCatalog(),
           getQuantificationProfiles(Number(datasetId)),
+          // A backend without derived measurements must not take the page down with it.
+          listDerivedMetrics(Number(datasetId)).catch(() => ({ derived_metrics: [] })),
         ]);
         if (cancelled) return;
 
@@ -179,6 +184,7 @@ const ImageQuantificationPage = () => {
         // filmstrip reads its per-phase status marks from.
         setImages((imageResponse.image_data || []).map(normalizeImage));
         setCatalog(catalogResponse.metrics || []);
+        setDerivedMetrics(derivedResponse.derived_metrics || []);
         const loadedProfiles = profileResponse.profiles || [];
         setProfiles(loadedProfiles);
         const preferred = loadedProfiles.find((p) => p.is_default) || loadedProfiles[0];
@@ -352,7 +358,12 @@ const ImageQuantificationPage = () => {
 
   // -- Derived ---------------------------------------------------------------
 
-  const catalogMap = useMemo(() => buildMetricCatalogMap(catalog), [catalog]);
+  // The dataset's derived measurements are named from their definitions; their values come
+  // with the summary like any other metric's.
+  const catalogMap = useMemo(
+    () => buildMetricCatalogMap([...catalog, ...derivedCatalogEntries(derivedMetrics)]),
+    [catalog, derivedMetrics]
+  );
   const labelIdToName = useMemo(
     () => (imageSummary?.labels ? createLabelIdToNameMap(imageSummary.labels) : {}),
     [imageSummary]
