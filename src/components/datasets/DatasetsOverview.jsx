@@ -8,6 +8,8 @@ import { GLOBAL_ROLE_LABELS } from "../../utils/permissions";
 import AuthButtons from "../auth/AuthButtons";
 import DocsLink from "../ui/DocsLink";
 import ReportBugLink from "../ui/ReportBugLink";
+import FeedbackLink, { FEEDBACK_URL } from "../ui/FeedbackLink";
+import { useToast } from "../../contexts/ToastContext";
 import IquanaImportModal from "./IquanaImportModal";
 import CreateLabelsModal from "./CreateLabelsModal";
 import DeleteDatasetModal from "./DeleteDatasetModal";
@@ -40,6 +42,41 @@ const DatasetsOverview = ({ onOpenDataset }) => {
   const [datasetImages, setDatasetImages] = useState({});
   const [datasetStats, setDatasetStats] = useState({});
   const [loadingData, setLoadingData] = useState(false);
+  const { addToast } = useToast();
+
+  // Point people at the community discussions once per browser session after
+  // they land here. The sessionStorage flag also absorbs StrictMode's double
+  // effect run; if storage is blocked the toast simply shows on every visit.
+  const username = isAuthenticated ? user?.username : null;
+  useEffect(() => {
+    if (!username) return;
+    const key = `iquana.feedbackToastShown.${username}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // storage unavailable — fall through and show it
+    }
+    addToast({
+      type: "info",
+      duration: 15000,
+      message: (
+        <>
+          Have a suggestion, feedback, or a feature request? Talk to us and the
+          community on{" "}
+          <a
+            href={FEEDBACK_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ac underline hover:brightness-110"
+          >
+            GitHub Discussions
+          </a>
+          !
+        </>
+      ),
+    });
+  }, [username, addToast]);
   useEffect(()=>{
     console.log(datasetStats)
   }, [datasetStats]);
@@ -234,6 +271,7 @@ const DatasetsOverview = ({ onOpenDataset }) => {
               )}
               <DocsLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />
               <ThemeToggle />
+              <FeedbackLink className="flex items-center space-x-2 bg-acS text-ac border border-acLn hover:brightness-105 py-2 px-4 rounded-lg transition-colors duration-150" />
           <ReportBugLink className="flex items-center space-x-2 bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-lg transition-colors duration-150" />
               <AuthButtons
                 textColor="text-t2"

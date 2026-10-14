@@ -14,6 +14,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import ReportBugLink from "../components/ui/ReportBugLink";
+import FeedbackLink from "../components/ui/FeedbackLink";
 import ThemeToggle from '../components/ui/ThemeToggle';
 
 import Wordmark from '../components/Wordmark';
@@ -165,6 +166,7 @@ const DocumentationPage = () => {
                 <span className="font-medium hidden sm:inline">{user.username}</span>
               </div>
             )}
+            <FeedbackLink variant="mobile" />
             <ReportBugLink variant="mobile" />
             <ThemeToggle />
             {isAuthenticated && (
@@ -217,6 +219,7 @@ const DocumentationPage = () => {
                 </button>
               )}
               <ThemeToggle />
+          <FeedbackLink />
           <ReportBugLink />
               <AuthButtons showLogoutOnly={true} />
             </div>

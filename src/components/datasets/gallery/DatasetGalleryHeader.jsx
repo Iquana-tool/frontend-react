@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import AuthButtons from '../../auth/AuthButtons';
 import DocsLink from '../../ui/DocsLink';
 import ReportBugLink from '../../ui/ReportBugLink';
+import FeedbackLink from '../../ui/FeedbackLink';
 import ThemeToggle from '../../ui/ThemeToggle';
 import Wordmark from '../../Wordmark';
 import DatasetNav from './DatasetNav';
@@ -84,6 +85,7 @@ const DatasetGalleryHeader = ({ dataset }) => {
           )}
           <DocsLink className="flex items-center space-x-2 py-2 px-4 rounded-lg bg-hv hover:bg-hv2 text-t2 hover:text-t1 transition-colors" />
           <ThemeToggle />
+          <FeedbackLink variant="default" />
           <ReportBugLink variant="default" />
 
           <AuthButtons showLogoutOnly={true} />

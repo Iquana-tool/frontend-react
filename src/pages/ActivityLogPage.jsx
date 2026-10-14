@@ -15,6 +15,7 @@ import { useToast } from '../contexts/ToastContext';
 import { usePermissions } from '../hooks/usePermissions';
 import AuthButtons from '../components/auth/AuthButtons';
 import ReportBugLink from '../components/ui/ReportBugLink';
+import FeedbackLink from '../components/ui/FeedbackLink';
 import ThemeToggle from '../components/ui/ThemeToggle';
 import CaptureControls from '../components/admin/CaptureControls';
 import EventTable from '../components/admin/EventTable';
@@ -311,6 +312,7 @@ const ActivityLogPage = () => {
                 Documentation
               </button>
               <ThemeToggle />
+              <FeedbackLink />
               <ReportBugLink />
               <AuthButtons showLogoutOnly={true} />
             </div>

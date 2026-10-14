@@ -6,6 +6,7 @@ import { useToast } from "../contexts/ToastContext";
 import AuthButtons from "../components/auth/AuthButtons";
 import DocsLink from "../components/ui/DocsLink";
 import ReportBugLink from "../components/ui/ReportBugLink";
+import FeedbackLink from "../components/ui/FeedbackLink";
 import ModelChip from "../components/models/ModelChip";
 import ModelDetailPanel from "../components/models/ModelDetailPanel";
 import { SORT_STRATEGIES, DEFAULT_SORT, hasAnyPerfStats } from "../components/models/modelStats";
@@ -636,6 +637,7 @@ const ModelZooPage = () => {
               )}
               <DocsLink className="flex items-center gap-[7px] bg-hv hover:bg-hv2 text-t2 hover:text-t1 py-2 px-4 rounded-6 transition-colors duration-150" />
               <ThemeToggle />
+          <FeedbackLink />
           <ReportBugLink />
               <AuthButtons showLogoutOnly={true} />
             </div>

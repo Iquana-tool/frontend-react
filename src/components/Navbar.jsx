@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import AuthButtons from "./auth/AuthButtons";
 import DocsLink from "./ui/DocsLink";
 import ReportBugLink from "./ui/ReportBugLink";
+import FeedbackLink from "./ui/FeedbackLink";
 import ThemeToggle from "./ui/ThemeToggle";
 import Wordmark from './Wordmark';
 
@@ -78,6 +79,8 @@ const Navbar = () => {
             </button>
 
             <DocsLink className={navItemClass(false)} />
+
+            <FeedbackLink className={navItemClass(false)} />
 
             <ReportBugLink
               className={navItemClass(false)}
