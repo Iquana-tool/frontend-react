@@ -88,7 +88,10 @@ const transformModel = (model) => ({
     : model.label_id != null
     ? [model.label_id]
     : [],
-  predictedLabelNames: parseTagList(getTagValue(model.tags, "trained_label_names")),
+  // A declared label space first; fine-tuned models record their classes in a tag.
+  predictedLabelNames: model.classes?.length
+    ? model.classes.map((modelClass) => modelClass.name)
+    : parseTagList(getTagValue(model.tags, "trained_label_names")),
   trainedOnDatasetId: getTagValue(model.tags, "trained_on_dataset_id")
     || getTagValue(model.tags, "dataset_id"),
   trainedOnDatasetName: getTagValue(model.tags, "trained_on_dataset_name")

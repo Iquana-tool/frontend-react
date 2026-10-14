@@ -8,6 +8,7 @@ import {
     updateStepConditioning,
     updateStepParameter,
 } from "./plannerContractUtils";
+import { isClassAgnosticModel, modelPredictsLabel } from "./orchestration/orchestrationViewModel";
 
 /**
  * The orchestration editor: the dataset's label hierarchy, with a model bound to each label.
@@ -62,7 +63,7 @@ export const modelsForLabel = (models, labelId, allowedTasks = BATCH_INFERENCE_T
     (models || []).filter(
         (model) =>
             (!allowedTasks || allowedTasks.includes(model.task)) &&
-            (!model.label_ids || model.label_ids.length === 0 || model.label_ids.includes(labelId))
+            modelPredictsLabel(model, labelId)
     );
 
 function ModelRow({ label, step, models, strategies, onChange }) {
@@ -153,11 +154,15 @@ function ModelRow({ label, step, models, strategies, onChange }) {
                                 <Star size={11} /> Trained on this dataset
                             </span>
                         )}
-                        {selected.label_ids?.length > 1 ? (
+                        {selected.classes?.length > 0 ? (
+                            <span className="text-t3">
+                                Fixed label space — only its predictions mapped to “{label.name}” are kept.
+                            </span>
+                        ) : selected.label_ids?.length > 1 ? (
                             <span className="text-t3">
                                 Predicts {selected.label_ids.length} classes — output filtered to “{label.name}”.
                             </span>
-                        ) : (!selected.label_ids || selected.label_ids.length === 0) ? (
+                        ) : isClassAgnosticModel(selected) ? (
                             <span className="text-t3">
                                 Class-agnostic — everything it finds is labelled “{label.name}”.
                             </span>

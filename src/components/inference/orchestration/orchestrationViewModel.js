@@ -5,6 +5,18 @@ import { TASK_ORDER, TASKS, getTaskMeta } from "../../../constants/tasks";
  * Aggregates 4 canonical backend task keys into 3 user-facing visual categories.
  * Backend routing policy and save payloads always retain the 4 canonical task keys.
  */
+/**
+ * A model is class-agnostic when it declares no label space (`classes`) and predicts no
+ * dataset labels: it can be bound to any label and its output takes that label. A model with
+ * classes is never class-agnostic -- with none of them mapped yet it predicts no label at all.
+ */
+export const isClassAgnosticModel = (model) =>
+  !(model?.classes?.length > 0) && !(model?.label_ids?.length > 0);
+
+/** Whether `model` can be bound to `labelId` in this dataset. */
+export const modelPredictsLabel = (model, labelId) =>
+  isClassAgnosticModel(model) || (model?.label_ids || []).includes(Number(labelId));
+
 export const ORCHESTRATION_CATEGORIES = [
   {
     key: "interactive",
@@ -224,11 +236,7 @@ export function calculateCoverage(draftBindings, labelsInput = {}, catalogInput 
         (m) => m.task === b.task && m.registry_key === b.model_registry_key
       );
       const isStale =
-        !model ||
-        (b.label_id != null &&
-          model.label_ids &&
-          model.label_ids.length > 0 &&
-          !model.label_ids.includes(Number(b.label_id)));
+        !model || (b.label_id != null && !modelPredictsLabel(model, b.label_id));
 
       if (isStale) {
         categoryStale += 1;
@@ -305,8 +313,7 @@ export function resolveEffectiveRoute({ task, labelId = null, bindings, catalog 
       };
     }
 
-    const isClassAgnostic = !model.label_ids || model.label_ids.length === 0;
-    const isCompatible = isClassAgnostic || model.label_ids.includes(numericLabelId);
+    const isCompatible = modelPredictsLabel(model, numericLabelId);
 
     if (!isCompatible) {
       return {
@@ -381,9 +388,7 @@ export function resolveEffectiveRoute({ task, labelId = null, bindings, catalog 
     };
   }
 
-  // Class-agnostic default: model has no label_ids or empty label_ids
-  const isClassAgnostic = !defaultModel.label_ids || defaultModel.label_ids.length === 0;
-  if (isClassAgnostic || defaultModel.label_ids.includes(numericLabelId)) {
+  if (modelPredictsLabel(defaultModel, numericLabelId)) {
     return {
       status: ROUTE_STATUS.INHERITED,
       binding: defaultBinding,

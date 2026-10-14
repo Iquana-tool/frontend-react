@@ -15,6 +15,7 @@ import {
   getDefaultConditioning,
   getDefaultParameters,
 } from "../../plannerContractUtils";
+import { isClassAgnosticModel, modelPredictsLabel } from "../orchestrationViewModel";
 import DynamicHyperParameter from "../../../datasets/training/DynamicHyperParameter";
 import { resolveLabelColor } from "../../../annotationPage/workspace/labelColorUtils";
 
@@ -33,11 +34,7 @@ const isModelCompatibleWithTarget = (model, task, labelId) => {
   if (!model || model.task !== task) return false;
   const numericLabelId = normalizeLabelId(labelId);
   if (numericLabelId == null) return true;
-  return (
-    !model.label_ids ||
-    model.label_ids.length === 0 ||
-    model.label_ids.includes(numericLabelId)
-  );
+  return modelPredictsLabel(model, numericLabelId);
 };
 
 const getActiveStrategies = (strategies) =>
@@ -789,7 +786,7 @@ export default function MatrixSideDrawer({
                             )}
                           </div>
                           <p className="text-[11px] text-t3 truncate mt-0.5">
-                            {m.description || (m.label_ids?.length ? `${m.label_ids.length} class model` : "Class-agnostic")}
+                            {m.description || (isClassAgnosticModel(m) ? "Class-agnostic" : `${m.classes?.length || m.label_ids.length} class model`)}
                           </p>
                         </div>
 
