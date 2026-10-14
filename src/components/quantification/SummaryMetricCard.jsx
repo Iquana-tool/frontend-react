@@ -31,16 +31,26 @@ const SummaryMetricCard = ({ metricKey, metric, catalog, footer }) => {
 
   const name = catalog?.name || metricKey;
   // Resolve the display unit. LENGTH -> the row unit (mm/px), AREA -> unit², others unitless.
+  // Derived measurements carry the unit their formula works out to ("/mm²", "" for a ratio).
   let unit = "";
-  if (unitKind === "length") unit = metric.unit || "";
-  else if (unitKind === "area") unit = metric.unit || "";
+  if (unitKind === "length" || unitKind === "area" || unitKind === "derived") unit = metric.unit || "";
 
   const isContextual = catalog?.tier === "contextual";
 
   return (
     <div className="bg-p1 rounded-lg border border-ln p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-t2 uppercase tracking-wide">{name}</h4>
+        <h4
+          className="text-sm font-semibold text-t2 uppercase tracking-wide"
+          title={catalog?.description || undefined}
+        >
+          {name}
+          {unitKind === "derived" && (
+            <span className="ml-2 normal-case tracking-normal text-[11px] font-medium text-ac bg-acS px-1.5 py-0.5 rounded">
+              derived
+            </span>
+          )}
+        </h4>
         <span
           className="text-xs text-t3 bg-well px-2 py-1 rounded"
           title={isContextual ? "Excludes isolated objects with no neighbour." : undefined}
