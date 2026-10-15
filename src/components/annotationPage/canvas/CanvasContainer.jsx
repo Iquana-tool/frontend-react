@@ -6,6 +6,7 @@ import InferenceScanOverlay from './InferenceScanOverlay';
 import ManualDrawCanvas from './ManualDrawCanvas';
 import ModelSelectionHint from './ModelSelectionHint';
 import ObjectContextMenu from './ObjectContextMenu';
+import SceneGraphPopover from '../sceneGraph/SceneGraphPopover';
 import FocusOverlay from './FocusOverlay';
 import RefinementOverlay from './RefinementOverlay';
 import EditableContourOverlay from './EditableContourOverlay';
@@ -146,6 +147,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
         panOffset={panOffset}
       />
       <ObjectContextMenu />
+      <SceneGraphPopover />
 
       {annotating && currentTool === 'ai_annotation' && (
         <div

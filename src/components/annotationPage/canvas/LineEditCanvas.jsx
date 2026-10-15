@@ -27,6 +27,7 @@ import { pixelArrayToNormalized } from '../../../utils/coordinateUtils';
 import { mergeLineIntoContour } from '../../../utils/contourEditing';
 import { splitObjectByLine } from '../../../utils/contourOperations';
 import { useToast } from '../../../contexts/ToastContext';
+import { useDataset } from '../../../contexts/DatasetContext';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import useCanvasViewport from '../../../hooks/useCanvasViewport';
 import usePromptDrawing from '../../../hooks/usePromptDrawing';
@@ -85,6 +86,7 @@ const LineEditCanvas = () => {
   const objectsList = useObjectsList();
   const maskId = useCurrentMaskId();
   const { addToast } = useToast();
+  const datasetId = useDataset().currentDataset?.id ?? null;
   const isSplit = editMode === 'split';
   const refinementModeActive = useRefinementModeActive();
   // Inside Refinement mode the chrome above belongs to RefinementOverlay.
@@ -173,6 +175,7 @@ const LineEditCanvas = () => {
         imageObject,
         linePixel,
         maskId,
+        datasetId,
         updateObject,
       });
       // A refusal changed nothing, so stay in the tool and let them redraw the line.
@@ -223,7 +226,7 @@ const LineEditCanvas = () => {
       setIsSaving(false);
     }
   }, [isSaving, imageObject, contourId, objectId, workingContour, updateObject, stopLineEdit,
-      addToast, isSplit, objectsList, maskId]);
+      addToast, isSplit, objectsList, maskId, datasetId]);
 
   const {
     polygonPoints,

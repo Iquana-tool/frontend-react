@@ -2,6 +2,8 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Layers, Tag } from 'lucide-react';
 import ObjectsTab from './ObjectsTab';
 import LabelsTab from './LabelsTab';
+import RelationshipsTab from './RelationshipsTab';
+import { RelationIcon } from '../sceneGraph/icons';
 import Tooltip from './primitives/Tooltip';
 import {
   useRightPanelOpen,
@@ -22,6 +24,7 @@ import {
 const TABS = [
   { id: 'objects', label: 'Objects', icon: Layers },
   { id: 'labels', label: 'Labels', icon: Tag },
+  { id: 'relationships', label: 'Relationships', icon: RelationIcon },
 ];
 
 /** The 38px strip the panel collapses to. */
@@ -68,7 +71,8 @@ const CollapsedStrip = ({ onExpand, onPickTab, activeTab, objectCount, tabs }) =
 );
 
 /**
- * The right panel: an Objects (layers) tab and a Labels (taxonomy) tab, with a
+ * The right panel: an Objects (layers) tab, a Labels (taxonomy) tab and a
+ * Relationships (scene graph) tab, with a
  * collapsed icon strip that still reports the object count.
  */
 const RightPanel = () => {
@@ -136,7 +140,9 @@ const RightPanel = () => {
         </button>
       </div>
 
-      {activeTab === 'objects' ? <ObjectsTab /> : <LabelsTab />}
+      {activeTab === 'objects' && <ObjectsTab />}
+      {activeTab === 'labels' && <LabelsTab />}
+      {activeTab === 'relationships' && <RelationshipsTab />}
     </div>
   );
 };

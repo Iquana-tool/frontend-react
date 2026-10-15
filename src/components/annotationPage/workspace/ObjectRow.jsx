@@ -12,6 +12,7 @@ import {
   Wand2,
   XCircle,
 } from 'lucide-react';
+import { RelationIcon } from '../sceneGraph/icons';
 import { getObjectDisplayName, getObjectState, isReviewed } from './objectViewModel';
 import { withAlpha } from './labelColorUtils';
 
@@ -99,6 +100,7 @@ const ObjectRow = ({
   isReviewMode,
   dragging,
   dropHint,
+  relationshipCount = 0,
   onToggleExpand,
   onSelect,
   onDoubleClick,
@@ -115,6 +117,7 @@ const ObjectRow = ({
   onDragOver,
   onDrop,
   onDragEnd,
+  onShowRelationships,
 }) => {
   const unlabelled = getObjectState(object) === 'unlabelled';
   const reviewed = isReviewed(object);
@@ -184,6 +187,22 @@ const ObjectRow = ({
       >
         {getObjectDisplayName(object)}
       </span>
+
+      {relationshipCount > 0 && (
+        <button
+          type="button"
+          aria-label={`${relationshipCount} relationship${relationshipCount === 1 ? '' : 's'}`}
+          title={`${relationshipCount} relationship${relationshipCount === 1 ? '' : 's'}: show them`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onShowRelationships?.();
+          }}
+          className="inline-flex items-center gap-[2px] h-[15px] px-[4px] rounded-4 bg-acS text-ac text-badge font-bold flex-none hover:brightness-95"
+        >
+          <RelationIcon size={10} strokeWidth={2.5} />
+          {relationshipCount}
+        </button>
+      )}
 
       <StateBadge object={object} />
 
