@@ -76,6 +76,10 @@ vi.mock('../../../contexts/ToastContext', () => ({
   useToast: () => ({ addToast: mocks.addToast }),
 }));
 
+vi.mock('../../../contexts/DatasetContext', () => ({
+  useDataset: () => ({ currentDataset: { id: 3 } }),
+}));
+
 vi.mock('../../../hooks/useCanvasViewport', () => ({
   default: () => ({
     containerRef: { current: null },

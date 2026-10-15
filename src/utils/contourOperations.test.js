@@ -1,6 +1,6 @@
 import { splitObjectByLine, mergeObjects } from './contourOperations';
 
-const { calls, session, reviews } = vi.hoisted(() => {
+const { calls, session, reviews, sceneGraph } = vi.hoisted(() => {
   const calls = [];
   return {
     calls,
@@ -27,11 +27,20 @@ const { calls, session, reviews } = vi.hoisted(() => {
         return {};
       },
     },
+    sceneGraph: {
+      fail: false,
+      transferSceneGraph: async (datasetId, fromIds, toId, moveRelationships) => {
+        if (sceneGraph.fail) throw new Error('down');
+        calls.push(['transfer', fromIds, toId, moveRelationships]);
+        return {};
+      },
+    },
   };
 });
 
 vi.mock('./../services/annotationSession', () => ({ default: session }));
 vi.mock('./../api/reviews', () => reviews);
+vi.mock('./../api/sceneGraph', () => sceneGraph);
 
 const image = { width: 100, height: 100 };
 
@@ -63,6 +72,7 @@ beforeEach(() => {
   calls.length = 0;
   session.ready = true;
   reviews.open = [];
+  sceneGraph.fail = false;
 });
 
 describe('splitObjectByLine', () => {
@@ -146,6 +156,34 @@ describe('splitObjectByLine', () => {
   });
 });
 
+describe('splitObjectByLine scene graph', () => {
+  const split = (extra = {}) => {
+    const object = objectAt(1, 0.1, 0.1, 0.9, 0.9);
+    return splitObjectByLine({
+      object, objectsList: [object], imageObject: image,
+      linePixel: [{ x: 70, y: 5 }, { x: 70, y: 95 }], ...extra,
+    });
+  };
+
+  test('copies the attributes to the new half and leaves the relationships', async () => {
+    const result = await split({ datasetId: 3 });
+    expect(result.success).toBe(true);
+    expect(calls.find((call) => call[0] === 'transfer')).toEqual(['transfer', [1], 99, false]);
+  });
+
+  test('still splits when the carry-over fails, and says so', async () => {
+    sceneGraph.fail = true;
+    const result = await split({ datasetId: 3 });
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/no attributes yet/);
+  });
+
+  test('skips the carry-over without a dataset', async () => {
+    await split();
+    expect(kinds()).not.toContain('transfer');
+  });
+});
+
 describe('mergeObjects', () => {
   const bigger = () => objectAt(1, 0.1, 0.1, 0.6, 0.9);
   const smaller = () => objectAt(2, 0.5, 0.3, 0.8, 0.7);
@@ -202,5 +240,14 @@ describe('mergeObjects', () => {
     expect((await mergeObjects({ objects, objectsList: objects, imageObject: image })).success)
       .toBe(false);
     expect(calls).toEqual([]);
+  });
+
+  test('moves attributes and relationships onto the survivor before the delete', async () => {
+    const objects = [smaller(), bigger()];
+    const result = await mergeObjects({ objects, objectsList: objects, imageObject: image, datasetId: 3 });
+
+    expect(result.success).toBe(true);
+    expect(kinds()).toEqual(['modify', 'transfer', 'delete']);
+    expect(calls[1]).toEqual(['transfer', [2], 1, true]);
   });
 });

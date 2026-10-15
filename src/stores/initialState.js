@@ -42,7 +42,7 @@ export const initialState = {
     /** The object timeline drawer over the canvas, for stack items. */
     timelineOpen: false,
     rightPanelOpen: true,
-    rightTab: 'objects',        // 'objects' | 'labels'
+    rightTab: 'objects',        // 'objects' | 'labels' | 'relationships'
     filmstripOpen: true,
     /** Review mode hides already-approved objects; this restores them. */
     showApproved: false,
@@ -134,6 +134,36 @@ export const initialState = {
     currentMask: null,
   },
   
+  // Scene graph of the current image: given attributes and named relationships.
+  // Keyed by contour id, because that is what the backend speaks. See
+  // slices/sceneGraphSlice.js and hooks/useSceneGraph.js.
+  sceneGraph: {
+    /** Image the graph below belongs to, so a late answer for another is dropped. */
+    imageId: null,
+    /** Attribute definitions of the dataset. */
+    definitions: [],
+    /** Relationship names of the dataset, with `usage_count`. */
+    relationshipTypes: [],
+    /** `{[contourId]: {attributes: [...], metrics: {...}}}` */
+    objects: {},
+    /** Every edge touching the image, `part_of` included (the views filter it out). */
+    relationships: [],
+    loading: false,
+    error: null,
+    /** Bumped after every graph edit and undo/redo; the loader refetches on it. */
+    version: 0,
+    /** The "pre-selection": the name `Add <name>` in the object menu uses. */
+    armedTypeName: null,
+    /** Hovering a row in the Relationships tab; wins over object hover on the canvas. */
+    hoveredRelationshipId: null,
+    /**
+     * The relate/describe popover opened from the object menu, anchored where the
+     * menu was: `{kind: 'relationship'|'attribute', x, y, objectIds}` (store ids, in
+     * selection order).
+     */
+    popover: null,
+  },
+
   // Context Menu State (for object labeling)
   contextMenu: {
     visible: false,

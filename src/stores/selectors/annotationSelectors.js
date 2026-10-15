@@ -369,3 +369,18 @@ export const useReorderRootObject = () => useAnnotationStore(state => state.reor
 export const useInitRootOrder = () => useAnnotationStore(state => state.initRootOrder);
 export const useSetCursorPosition = () => useAnnotationStore(state => state.setCursorPosition);
 export const useResetWorkspaceForImage = () => useAnnotationStore(state => state.resetWorkspaceForImage);
+
+// Scene graph selectors (see slices/sceneGraphSlice.js)
+export const useSceneGraph = () => useAnnotationStore(state => state.sceneGraph);
+export const useSceneGraphDefinitions = () => useAnnotationStore(state => state.sceneGraph.definitions);
+export const useRelationshipTypes = () => useAnnotationStore(state => state.sceneGraph.relationshipTypes);
+export const useSceneGraphObjects = () => useAnnotationStore(state => state.sceneGraph.objects);
+export const useSceneGraphRelationships = () => useAnnotationStore(state => state.sceneGraph.relationships);
+export const useArmedRelationshipName = () => useAnnotationStore(state => state.sceneGraph.armedTypeName);
+export const useHoveredRelationshipId = () => useAnnotationStore(state => state.sceneGraph.hoveredRelationshipId);
+export const useSceneGraphPopover = () => useAnnotationStore(state => state.sceneGraph.popover);
+export const useSetArmedRelationshipName = () => useAnnotationStore(state => state.setArmedRelationshipName);
+export const useSetHoveredRelationshipId = () => useAnnotationStore(state => state.setHoveredRelationshipId);
+export const useOpenSceneGraphPopover = () => useAnnotationStore(state => state.openSceneGraphPopover);
+export const useCloseSceneGraphPopover = () => useAnnotationStore(state => state.closeSceneGraphPopover);
+export const useBumpSceneGraph = () => useAnnotationStore(state => state.bumpSceneGraph);

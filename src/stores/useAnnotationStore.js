@@ -23,6 +23,7 @@ import {
 } from './slices/workspaceSlice';
 import { createCalibrationSlice } from './slices/calibrationSlice';
 import { createHistorySlice } from './slices/historySlice';
+import { createSceneGraphSlice } from './slices/sceneGraphSlice';
 
 /**
  * Combined annotation store using Zustand with Immer middleware
@@ -40,6 +41,7 @@ import { createHistorySlice } from './slices/historySlice';
  * - Objects: Annotation objects, selection, visibility
  * - Calibration: The Calibrate tab's per-image calibration state
  * - History: Undo/redo availability for the current image (the stack is the server's)
+ * - Scene graph: the current image's attributes and named relationships
  */
 const useAnnotationStore = create()(
   devtools(
@@ -72,6 +74,7 @@ const useAnnotationStore = create()(
         ...createWorkspaceSlice(set),
         ...createCalibrationSlice(set),
         ...createHistorySlice(set),
+        ...createSceneGraphSlice(set),
       }))
     ),
     { name: 'annotation-store' }

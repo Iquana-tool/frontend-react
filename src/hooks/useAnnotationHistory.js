@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import * as api from '../api';
 import websocketService from '../services/websocket';
+import useAnnotationStore from '../stores/useAnnotationStore';
 import { trackAnnotation } from '../services/activityLog';
 import { SERVER_MESSAGE_TYPES } from '../utils/messageTypes';
 import { useToast } from '../contexts/ToastContext';
@@ -130,6 +131,12 @@ export default function useAnnotationHistory() {
       SERVER_MESSAGE_TYPES.OBJECT_REMOVED,
       SERVER_MESSAGE_TYPES.OBJECT_MODIFIED,
     ].map((type) => websocketService.on(type, scheduleRefresh));
+    // Scene graph edits (attributes, relationships) are REST calls that never touch
+    // the socket, but they are steps in the same server-side history.
+    unsubscribes.push(useAnnotationStore.subscribe(
+      (state) => state.sceneGraph.version,
+      scheduleRefresh,
+    ));
     return () => {
       clearTimeout(refreshTimerRef.current);
       unsubscribes.forEach((unsubscribe) => unsubscribe());
@@ -164,6 +171,9 @@ export default function useAnnotationHistory() {
           setObjectsFromHierarchy(response.contours, labelsMapRef.current);
           clearSelection();
         }
+        // The step may have been an attribute or relationship change, which the
+        // hierarchy does not carry: re-read the scene graph too.
+        useAnnotationStore.getState().bumpSceneGraph();
         setHistoryStatus(response);
         addToast({ type: 'success', message: response?.message || 'Done.' });
       } catch (error) {
