@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { fetchSuggestionStats } from '../../../api/datasets';
 import { ACTIVITY_WINDOWS } from '../../../utils/datasetActivity';
 import { outcomeBreakdown, sourceLabel } from '../../../utils/suggestionStats';
+import { formatIou } from '../../../utils/usageStats';
 
 /** Bar colour per outcome: kept is good, a fix is a warning, a deletion an error. */
 const OUTCOME_TONE = { as_is: 'bg-ok', edited: 'bg-warn', rejected: 'bg-err' };
@@ -88,6 +89,13 @@ const ModelSuggestionsCard = ({ datasetId, days }) => {
                     </React.Fragment>
                   ))}
                 </p>
+                {row.edited > 0 && row.mean_edit_iou != null && (
+                  <p className="mt-0.5 text-xs text-t3">
+                    Edited outlines kept{' '}
+                    <span className="font-semibold text-t1">{formatIou(row.mean_edit_iou)}</span>{' '}
+                    overlap (IoU) with the suggestion on average.
+                  </p>
+                )}
               </li>
             );
           })}

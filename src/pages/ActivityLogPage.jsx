@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
@@ -20,12 +20,24 @@ import ThemeToggle from '../components/ui/ThemeToggle';
 import CaptureControls from '../components/admin/CaptureControls';
 import EventTable from '../components/admin/EventTable';
 import SessionList from '../components/admin/SessionList';
+import UsagePanel from '../components/admin/UsagePanel';
 
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
 
 const PAGE_SIZE = 100;
+const TABS = [
+  { id: 'events', label: 'Events' },
+  { id: 'usage', label: 'Usage' },
+];
 const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', end: '' };
+/**
+ * Stand-in config when the backend has no activity log. With USER_EVENTS_ENABLED
+ * off the backend does not mount `/activity-log` at all, so the config request
+ * fails and every other call here would answer 404 ("Not Found"). Treating that as
+ * the deployment lock lets the page say why instead of showing a raw error.
+ */
+const LOCKED_CONFIG = { enabled: false };
 
 /**
  * Activity log: what the tool captured, and whether it is capturing now.
@@ -33,12 +45,17 @@ const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', 
  * Sessions on the left are the index; selecting one scopes the event table on the
  * right. Export and delete always act on the *filtered* set shown, so what you
  * see is what you take away (or remove).
+ *
+ * The Usage tab summarises the same data per person. The tab lives in the URL
+ * (`?tab=usage`) so a link can open it directly.
  */
 const ActivityLogPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { canManageActivityLog, canManageUsers } = usePermissions();
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'usage' ? 'usage' : 'events';
 
   const [config, setConfig] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -61,7 +78,7 @@ const ActivityLogPage = () => {
   const requestSeq = useRef(0);
 
   const loadConfig = useCallback(async () => {
-    const next = await api.fetchActivityLogConfig();
+    const next = (await api.fetchActivityLogConfig()) ?? LOCKED_CONFIG;
     setConfig(next);
     desiredComponents.current = next?.components ?? null;
   }, []);
@@ -95,6 +112,11 @@ const ActivityLogPage = () => {
     }
   }, [filters, offset]);
 
+  const configLoaded = config !== null;
+  //: Whether the backend serves the activity log at all. Sessions and events are
+  //: only requested once this is known to be true.
+  const available = Boolean(config?.enabled);
+
   useEffect(() => {
     if (!canManageActivityLog) {
       setLoadingSessions(false);
@@ -102,12 +124,21 @@ const ActivityLogPage = () => {
       return;
     }
     loadConfig();
-    loadSessions();
-  }, [canManageActivityLog, loadConfig, loadSessions]);
+  }, [canManageActivityLog, loadConfig]);
 
   useEffect(() => {
-    if (canManageActivityLog) loadEvents();
-  }, [canManageActivityLog, loadEvents]);
+    if (!canManageActivityLog || !configLoaded) return;
+    if (!available) {
+      setLoadingSessions(false);
+      setLoadingEvents(false);
+      return;
+    }
+    loadSessions();
+  }, [canManageActivityLog, configLoaded, available, loadSessions]);
+
+  useEffect(() => {
+    if (canManageActivityLog && available) loadEvents();
+  }, [canManageActivityLog, available, loadEvents]);
 
   if (!canManageActivityLog) {
     return (
@@ -234,6 +265,7 @@ const ActivityLogPage = () => {
 
   const refresh = () => {
     loadConfig();
+    if (!available) return;
     loadSessions();
     loadEvents();
   };
@@ -327,6 +359,30 @@ const ActivityLogPage = () => {
           </div>
         )}
 
+        <div className="inline-flex items-center p-0.5 rounded-lg bg-p1 border border-ln" role="tablist"
+          aria-label="Activity log views">
+          {TABS.map((option) => {
+            const selected = option.id === tab;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setSearchParams(option.id === 'events' ? {} : { tab: option.id })}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors duration-150
+                  motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ac ${
+                  selected ? 'bg-acS text-t1' : 'text-t2 hover:text-t1'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === 'usage' ? <UsagePanel /> : (
+        <>
         <CaptureControls
           config={config}
           busy={busy}
@@ -335,6 +391,7 @@ const ActivityLogPage = () => {
           onChangeIdleThreshold={handleChangeIdleThreshold}
         />
 
+        {available && (
         <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
           <SessionList
             sessions={sessions}
@@ -358,6 +415,9 @@ const ActivityLogPage = () => {
             onPurge={handlePurge}
           />
         </div>
+        )}
+        </>
+        )}
 
         <p className="text-xs text-t3 max-w-prose">
           Timestamps are stored and shown in UTC. Event rows carry the username of
