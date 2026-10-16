@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BookOpen,
@@ -20,11 +20,16 @@ import ThemeToggle from '../components/ui/ThemeToggle';
 import CaptureControls from '../components/admin/CaptureControls';
 import EventTable from '../components/admin/EventTable';
 import SessionList from '../components/admin/SessionList';
+import UsagePanel from '../components/admin/UsagePanel';
 
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
 
 const PAGE_SIZE = 100;
+const TABS = [
+  { id: 'events', label: 'Events' },
+  { id: 'usage', label: 'Usage' },
+];
 const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', end: '' };
 
 /**
@@ -33,12 +38,17 @@ const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', 
  * Sessions on the left are the index; selecting one scopes the event table on the
  * right. Export and delete always act on the *filtered* set shown, so what you
  * see is what you take away (or remove).
+ *
+ * The Usage tab summarises the same data per person. The tab lives in the URL
+ * (`?tab=usage`) so a link can open it directly.
  */
 const ActivityLogPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { canManageActivityLog, canManageUsers } = usePermissions();
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') === 'usage' ? 'usage' : 'events';
 
   const [config, setConfig] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -327,6 +337,30 @@ const ActivityLogPage = () => {
           </div>
         )}
 
+        <div className="inline-flex items-center p-0.5 rounded-lg bg-p1 border border-ln" role="tablist"
+          aria-label="Activity log views">
+          {TABS.map((option) => {
+            const selected = option.id === tab;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => setSearchParams(option.id === 'events' ? {} : { tab: option.id })}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors duration-150
+                  motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-ac ${
+                  selected ? 'bg-acS text-t1' : 'text-t2 hover:text-t1'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {tab === 'usage' ? <UsagePanel /> : (
+        <>
         <CaptureControls
           config={config}
           busy={busy}
@@ -358,6 +392,8 @@ const ActivityLogPage = () => {
             onPurge={handlePurge}
           />
         </div>
+        </>
+        )}
 
         <p className="text-xs text-t3 max-w-prose">
           Timestamps are stored and shown in UTC. Event rows carry the username of
