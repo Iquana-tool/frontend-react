@@ -49,6 +49,8 @@ import {
   UNLABELLED_COLOR,
 } from '../workspace/annotationStyles';
 import { getObjectState } from '../workspace/objectViewModel';
+import RelationshipOverlay from './RelationshipOverlay';
+import useActiveRelationships from '../sceneGraph/useActiveRelationships';
 
 /**
  * Helper function to generate SVG path from x, y coordinate arrays
@@ -209,6 +211,10 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     return filtered;
   }, [objectsList, hiddenObjectIds, visibility, outline.peek, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
 
+  // Named relationships are only drawn while an object or a Relationships-tab row is
+  // hovered; everything outside the hovered edges' ends is dimmed meanwhile.
+  const relations = useActiveRelationships(refinementModeActive ? [] : visibleObjects);
+
   /**
    * Which objects get a chip, and where.
    *
@@ -234,7 +240,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
       const centroid = getCentroid(object);
       if (!centroid) continue;
 
-      const pinned = selectedObjects.includes(object.id) || hoveredObjectId === object.id;
+      const pinned = selectedObjects.includes(object.id)
+        || hoveredObjectId === object.id
+        || !!relations.focusIds?.has(object.id);
       // 'minimal' is the escape hatch for a dense image: only what you are
       // pointing at or working on is named.
       if (chipMode === 'minimal' && !pinned) continue;
@@ -279,6 +287,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     focusedObjectId,
     workspaceMode,
     showApproved,
+    relations.focusIds,
   ]);
 
   /**
@@ -637,6 +646,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           declutter is decided in chipPlan above. */}
       {chipPlan.candidates.map((candidate) => {
         if (!chipPlan.visible.has(candidate.id)) return null;
+        if (relations.focusIds && !relations.focusIds.has(candidate.id)) return null;
 
         const { object } = candidate;
         const color =
@@ -679,6 +689,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           </div>
         );
       })}
+
+      <RelationshipOverlay
+        edges={relations.edges}
+        imageDimensions={imageDimensions}
+        zoomLevel={zoomLevel}
+      />
 
       {/* Final Objects Masks */}
       {imageDimensions.width > 0 && visibleObjects.map((object) => {
@@ -763,7 +779,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               width: `${imageDimensions.width}px`,
               height: `${imageDimensions.height}px`,
               // SVG container has no pointer events - let it pass through
-              pointerEvents: 'none'
+              pointerEvents: 'none',
+              // While relationships are shown, the objects they do not touch step
+              // back. Parts of a highlighted object only half-dim: they are inside it.
+              opacity: !relations.focusIds || relations.focusIds.has(object.id)
+                ? undefined
+                : (relations.focusIds.has(object.parent_id) ? 0.6 : 0.22),
             }}
           >
             <defs>

@@ -28,6 +28,7 @@ import GuideLayer from '../../guides/GuideLayer';
 import CorrectionBar from '../../correction/CorrectionBar';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
+import useSceneGraph from '../../../hooks/useSceneGraph';
 import { useDataset } from '../../../contexts/DatasetContext';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
@@ -142,6 +143,9 @@ const WorkspaceShell = () => {
   useCalibrationSync();
   // The current stack's frames and objects, for the slice bar, timeline and overview.
   useStackData();
+  // The image's attributes and named relationships, for the canvas edges, the
+  // Relationships tab and the Attributes section.
+  useSceneGraph();
   useSliceWheel(canvasAreaRef);
 
   // Per-image view state (hidden rows, manual ordering, collapse) must not

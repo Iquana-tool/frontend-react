@@ -20,7 +20,15 @@ import {
   useStartLineEdit,
   useSelectObject,
   useCurrentMaskId,
+  useArmedRelationshipName,
+  useOpenSceneGraphPopover,
 } from '../../../stores/selectors/annotationSelectors';
+import { usePermissions } from '../../../hooks/usePermissions';
+import { Permission } from '../../../utils/permissions';
+import useSceneGraphActions from '../../../hooks/useSceneGraphActions';
+import { RelationIcon, AttributeIcon } from '../sceneGraph/icons';
+import Kbd from '../workspace/primitives/Kbd';
+import { getObjectDisplayName } from '../workspace/objectViewModel';
 import useRefinementSession from '../../../hooks/useRefinementSession';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
@@ -79,6 +87,22 @@ const ObjectContextMenu = () => {
   }, [objectsList, selectedObjects]);
   
   const isMultiSelect = targetObjects.length > 1;
+
+  // The same objects in the order they were selected: for a relationship, the first
+  // one picked is the subject.
+  const orderedTargets = React.useMemo(
+    () => selectedObjects
+      .map((id) => objectsList.find((obj) => obj.id === id))
+      .filter((obj) => obj && getContourId(obj) != null),
+    [objectsList, selectedObjects]
+  );
+
+  const { can } = usePermissions(currentDataset);
+  const canRelate = can(Permission.ANNOTATION_CREATE) && orderedTargets.length > 0;
+  const canDescribe = can(Permission.ANNOTATION_EDIT_OWN) && orderedTargets.length > 0;
+  const armedName = useArmedRelationshipName();
+  const openSceneGraphPopover = useOpenSceneGraphPopover();
+  const sceneGraphActions = useSceneGraphActions();
 
   // Check if the single target object is unlabelled (focus mode requires a label)
   const targetObjectIsUnlabelled = React.useMemo(() => {
@@ -435,6 +459,7 @@ const ObjectContextMenu = () => {
         objectsList,
         imageObject,
         maskId,
+        datasetId: currentDataset?.id ?? null,
         updateObject,
       });
       addToast({ type: result.success ? 'success' : 'error', message: result.message });
@@ -444,6 +469,56 @@ const ObjectContextMenu = () => {
       setIsMerging(false);
     }
   };
+
+  /** Open the relate/describe popover where the menu is, for the selection in order. */
+  const openPopover = (kind) => {
+    openSceneGraphPopover({
+      kind,
+      x: adjustedPosition.x,
+      y: adjustedPosition.y,
+      objectIds: orderedTargets.map((object) => object.id),
+    });
+    hideContextMenu();
+  };
+
+  /** The one-click path: relate the selection with the armed name. */
+  const handleAddArmedRelationship = async () => {
+    hideContextMenu();
+    const [subject, ...others] = orderedTargets;
+    if (!subject || !others.length || !armedName) return;
+    const result = await sceneGraphActions.addRelationships(
+      Number(getContourId(subject)),
+      others.map((object) => Number(getContourId(object))),
+      armedName,
+    );
+    if (result) {
+      addToast({
+        type: 'success',
+        message: `${getObjectDisplayName(subject)} ${armedName} ${
+          others.length === 1 ? getObjectDisplayName(others[0]) : `${others.length} objects`}.`,
+      });
+    }
+  };
+
+  // R / A while the menu is open, as the hints next to the items say. Captured on the
+  // window so they win over the workspace's own R and A shortcuts.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const handleKey = (event) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      const key = event.key.toUpperCase();
+      const kind = key === 'R' && canRelate && isMultiSelect ? 'relationship'
+        : key === 'A' && canDescribe ? 'attribute'
+          : null;
+      if (!kind) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openPopover(kind);
+    };
+    window.addEventListener('keydown', handleKey, true);
+    return () => window.removeEventListener('keydown', handleKey, true);
+  });
 
   if (!visible) return null;
 
@@ -563,6 +638,60 @@ const ObjectContextMenu = () => {
           </svg>
         }
       />
+
+      {/* Scene graph: relate the selection (in selection order: the first is the
+          subject) or describe it. Hidden for anyone who cannot annotate. */}
+      {(canRelate || canDescribe) && (
+        <>
+          <div className="mt-[4px] pt-[6px] px-[8px] pb-[3px] border-t border-ln">
+            <div className="text-sect font-bold tracking-[.08em] uppercase text-t3">Scene graph</div>
+            {orderedTargets.length > 1 && (
+              <div className="mt-[1px] text-meta text-t3 truncate">
+                {getObjectDisplayName(orderedTargets[0])} →{' '}
+                {orderedTargets.length === 2
+                  ? getObjectDisplayName(orderedTargets[1])
+                  : `${orderedTargets.length - 1} objects`}
+              </div>
+            )}
+          </div>
+          {canRelate && armedName && isMultiSelect && (
+            <ContextMenuItem
+              onClick={handleAddArmedRelationship}
+              title={`Add “${armedName}” from the first selected object to the others`}
+              label={<>Add <span className="font-mono font-semibold">{armedName}</span></>}
+              trailing={(
+                <span className="inline-flex items-center h-[15px] px-[5px] rounded-4 bg-acS text-ac text-badge font-bold tracking-[.04em]">
+                  ARMED
+                </span>
+              )}
+              icon={<RelationIcon size={14} className="text-ac" />}
+            />
+          )}
+          {canRelate && (
+            <ContextMenuItem
+              onClick={() => openPopover('relationship')}
+              disabled={!isMultiSelect}
+              title={isMultiSelect
+                ? 'Name a relationship from the first selected object to the others'
+                : 'Select two or more objects (the subject first) to relate them'}
+              label="Add relationship…"
+              icon={<RelationIcon size={14} />}
+              trailing={isMultiSelect ? <Kbd>R</Kbd> : null}
+            />
+          )}
+          {canDescribe && (
+            <ContextMenuItem
+              onClick={() => openPopover('attribute')}
+              title={isMultiSelect
+                ? `Set one attribute on all ${orderedTargets.length} objects`
+                : 'Set an attribute on this object'}
+              label="Add attribute…"
+              icon={<AttributeIcon size={14} />}
+              trailing={<Kbd>A</Kbd>}
+            />
+          )}
+        </>
+      )}
 
       {/* Label section header */}
       <div className="mt-[4px] pt-[6px] px-[8px] border-t border-ln">

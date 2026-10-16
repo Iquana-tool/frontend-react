@@ -12,7 +12,7 @@ const TONE = {
   danger: 'text-err hover:bg-errBg',
 };
 
-const ContextMenuItem = ({ onClick, disabled = false, tone = 'default', title, icon, label }) => (
+const ContextMenuItem = ({ onClick, disabled = false, tone = 'default', title, icon, label, trailing }) => (
   <button
     type="button"
     onClick={onClick}
@@ -22,7 +22,8 @@ const ContextMenuItem = ({ onClick, disabled = false, tone = 'default', title, i
       ${disabled ? 'text-t3 cursor-not-allowed opacity-50' : TONE[tone] || TONE.default}`}
   >
     {icon && <span className="w-[14px] h-[14px] flex-none flex items-center">{icon}</span>}
-    <span className="truncate">{label}</span>
+    <span className="flex-1 min-w-0 truncate">{label}</span>
+    {trailing}
   </button>
 );
 

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Eye, EyeOff, Layers, MoreHorizontal } from 'lucide-react';
 import ObjectRow from './ObjectRow';
 import ObjectStatsPopover from './ObjectStatsPopover';
+import AttributesSection from './AttributesSection';
 import LabelPicker from './LabelPicker';
 import ConfirmDialog from './ConfirmDialog';
 import useObjectActions from './useObjectActions';
@@ -40,7 +41,10 @@ import {
   useCurrentMaskId,
   useDatasetLabels,
   useUpdateObject,
+  useSceneGraphRelationships,
+  useSetRightTab,
 } from '../../../stores/selectors/annotationSelectors';
+import { namedEdges, relationshipCounts } from '../sceneGraph/sceneGraphModel';
 
 /** Where in a row a drop lands: top third before, bottom third after, middle nests. */
 const dropZoneFor = (event, element, dragged, target) => {
@@ -102,6 +106,9 @@ const ObjectsTab = () => {
   const toggleCollapsed = useToggleObjectCollapsed();
   const expandObject = useExpandObject();
   const hoveredId = useHoveredObjectId();
+  const relationships = useSceneGraphRelationships();
+  const setRightTab = useSetRightTab();
+  const relationCounts = useMemo(() => relationshipCounts(namedEdges(relationships)), [relationships]);
   const setHoveredId = useSetHoveredObjectId();
   const mode = useWorkspaceMode();
   const showApproved = useShowApproved();
@@ -442,6 +449,8 @@ const ObjectsTab = () => {
                   isReviewMode={isReviewMode}
                   dragging={drag.id === object.id}
                   dropHint={drag.overId === object.id ? drag.zone : null}
+                  relationshipCount={relationCounts.get(Number(getContourId(object))) || 0}
+                  onShowRelationships={() => setRightTab('relationships')}
                   onToggleExpand={() => toggleCollapsed(object.id)}
                   onSelect={(event) => {
                     if (event.shiftKey || event.metaKey || event.ctrlKey) {
@@ -496,6 +505,9 @@ const ObjectsTab = () => {
           )}
         </div>
       </div>
+
+      {/* The selected object's attributes, docked under the tree. */}
+      <AttributesSection />
 
       {/* Image-level actions, from the old left-sidebar Status section. */}
       <div className="h-[34px] flex-none flex items-center gap-[7px] px-[8px] border-t border-ln">

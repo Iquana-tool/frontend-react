@@ -24,6 +24,8 @@
  */
 import annotationSession from '../services/annotationSession';
 import { fetchMaskRejections, resolveRejection } from '../api/reviews';
+import { transferSceneGraph } from '../api/sceneGraph';
+import useAnnotationStore from '../stores/useAnnotationStore';
 import { splitContourByLine, polygonArea } from './contourEditing';
 import { unionContours } from './contourUnion';
 import { pixelArrayToNormalized } from './coordinateUtils';
@@ -106,11 +108,31 @@ async function resolveFixedRejections(maskId, contourIds, reasons) {
 }
 
 /**
+ * Carry the scene graph across the edit: the new half of a split gets the original's
+ * attributes, and the survivor of a merge takes over the absorbed objects' attributes
+ * and relationships (which the delete would otherwise cascade away).
+ *
+ * Best effort, like the rejections above: the outline is already saved. Returns
+ * whether it went through, so the caller can say so when it did not.
+ */
+async function carrySceneGraph(datasetId, fromIds, toId, moveRelationships) {
+  if (datasetId == null || toId == null || fromIds.length === 0) return true;
+  try {
+    await transferSceneGraph(datasetId, fromIds, toId, moveRelationships);
+    useAnnotationStore.getState().bumpSceneGraph();
+    return true;
+  } catch (error) {
+    console.warn('[contourOperations] Could not carry the scene graph over:', error);
+    return false;
+  }
+}
+
+/**
  * Split one object in two along a drawn line.
  *
  * The larger half stays on the original contour; the smaller becomes a new object
- * at the same level, with the same label. Children move to whichever half holds
- * most of them.
+ * at the same level, with the same label and attributes (relationships stay on the
+ * original, where they were drawn). Children move to whichever half holds most of them.
  *
  * @param {Object} params
  * @param {Object} params.object - the store object being split
@@ -118,6 +140,7 @@ async function resolveFixedRejections(maskId, contourIds, reasons) {
  * @param {Object} params.imageObject - the loaded image, for pixel conversion
  * @param {Array<{x:number,y:number}>} params.linePixel - the drawn line, in image pixels
  * @param {number|null} [params.maskId] - current mask, for closing its rejections
+ * @param {number|null} [params.datasetId] - for carrying the scene graph over
  * @param {Function} [params.updateObject] - store setter, for the optimistic redraw
  * @returns {Promise<{success: boolean, message: string, refused?: boolean}>}
  *   `refused` marks a rejection made before anything was saved, so the caller can
@@ -129,6 +152,7 @@ export async function splitObjectByLine({
   imageObject,
   linePixel,
   maskId = null,
+  datasetId = null,
   updateObject = null,
 }) {
   const contourId = object?.contour_id;
@@ -196,11 +220,14 @@ export async function splitObjectByLine({
     }
   }
 
+  const carried = newContourId == null
+    || await carrySceneGraph(datasetId, [contourId], newContourId, false);
   const closed = await resolveFixedRejections(maskId, [contourId], SPLIT_FIXES);
 
   const notes = [];
   if (moved > 0) notes.push(`${moved} nested object${moved === 1 ? '' : 's'} moved`);
   if (closed > 0) notes.push('review feedback closed');
+  if (!carried) notes.push('the new half has no attributes yet');
   return {
     success: true,
     newContourId,
@@ -219,6 +246,7 @@ export async function splitObjectByLine({
  * @param {Array<Object>} params.objectsList - every object on the image (for children)
  * @param {Object} params.imageObject - the loaded image, for pixel conversion
  * @param {number|null} [params.maskId] - current mask, for closing its rejections
+ * @param {number|null} [params.datasetId] - for carrying the scene graph over
  * @param {Function} [params.updateObject] - store setter, for the optimistic redraw
  * @returns {Promise<{success: boolean, message: string}>}
  */
@@ -227,6 +255,7 @@ export async function mergeObjects({
   objectsList = [],
   imageObject,
   maskId = null,
+  datasetId = null,
   updateObject = null,
 }) {
   if (!Array.isArray(objects) || objects.length < 2) {
@@ -288,7 +317,12 @@ export async function mergeObjects({
     return { success: false, message: error.message || 'Could not merge those objects.' };
   }
 
-  // 3. The rest are gone; the canvas drops them when object_removed comes back.
+  // 3. Attributes and relationships move onto the survivor before the delete cascades them away.
+  const carried = await carrySceneGraph(
+    datasetId, dissolved.map((object) => object.contour_id), survivor.contour_id, true
+  );
+
+  // 4. The rest are gone; the canvas drops them when object_removed comes back.
   for (const object of dissolved) {
     try {
       await annotationSession.deleteObject(object.contour_id);
@@ -304,6 +338,7 @@ export async function mergeObjects({
   const notes = [];
   if (moved > 0) notes.push(`${moved} nested object${moved === 1 ? '' : 's'} moved`);
   if (closed > 0) notes.push('review feedback closed');
+  if (!carried) notes.push('their attributes and relationships were not kept');
   return {
     success: true,
     survivorContourId: survivor.contour_id,
