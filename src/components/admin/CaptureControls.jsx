@@ -32,7 +32,8 @@ const CaptureControls = ({
             <p className="mt-1 text-sm text-t2 max-w-prose">
               <code className="px-1 py-0.5 rounded bg-well text-t1 text-xs">USER_EVENTS_ENABLED</code>{' '}
               is false, so no events are recorded and these switches cannot turn it on.
-              Set it to true and restart the backend to unlock the activity log.
+              Set it to true and restart the backend to unlock the activity log. The Usage
+              tab still shows how AI suggestions were used, which is recorded either way.
             </p>
           </div>
         </div>

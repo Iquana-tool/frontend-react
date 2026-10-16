@@ -31,6 +31,13 @@ const TABS = [
   { id: 'usage', label: 'Usage' },
 ];
 const EMPTY_FILTERS = { username: '', component: '', session_id: '', start: '', end: '' };
+/**
+ * Stand-in config when the backend has no activity log. With USER_EVENTS_ENABLED
+ * off the backend does not mount `/activity-log` at all, so the config request
+ * fails and every other call here would answer 404 ("Not Found"). Treating that as
+ * the deployment lock lets the page say why instead of showing a raw error.
+ */
+const LOCKED_CONFIG = { enabled: false };
 
 /**
  * Activity log: what the tool captured, and whether it is capturing now.
@@ -71,7 +78,7 @@ const ActivityLogPage = () => {
   const requestSeq = useRef(0);
 
   const loadConfig = useCallback(async () => {
-    const next = await api.fetchActivityLogConfig();
+    const next = (await api.fetchActivityLogConfig()) ?? LOCKED_CONFIG;
     setConfig(next);
     desiredComponents.current = next?.components ?? null;
   }, []);
@@ -105,6 +112,11 @@ const ActivityLogPage = () => {
     }
   }, [filters, offset]);
 
+  const configLoaded = config !== null;
+  //: Whether the backend serves the activity log at all. Sessions and events are
+  //: only requested once this is known to be true.
+  const available = Boolean(config?.enabled);
+
   useEffect(() => {
     if (!canManageActivityLog) {
       setLoadingSessions(false);
@@ -112,12 +124,21 @@ const ActivityLogPage = () => {
       return;
     }
     loadConfig();
-    loadSessions();
-  }, [canManageActivityLog, loadConfig, loadSessions]);
+  }, [canManageActivityLog, loadConfig]);
 
   useEffect(() => {
-    if (canManageActivityLog) loadEvents();
-  }, [canManageActivityLog, loadEvents]);
+    if (!canManageActivityLog || !configLoaded) return;
+    if (!available) {
+      setLoadingSessions(false);
+      setLoadingEvents(false);
+      return;
+    }
+    loadSessions();
+  }, [canManageActivityLog, configLoaded, available, loadSessions]);
+
+  useEffect(() => {
+    if (canManageActivityLog && available) loadEvents();
+  }, [canManageActivityLog, available, loadEvents]);
 
   if (!canManageActivityLog) {
     return (
@@ -244,6 +265,7 @@ const ActivityLogPage = () => {
 
   const refresh = () => {
     loadConfig();
+    if (!available) return;
     loadSessions();
     loadEvents();
   };
@@ -369,6 +391,7 @@ const ActivityLogPage = () => {
           onChangeIdleThreshold={handleChangeIdleThreshold}
         />
 
+        {available && (
         <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
           <SessionList
             sessions={sessions}
@@ -392,6 +415,7 @@ const ActivityLogPage = () => {
             onPurge={handlePurge}
           />
         </div>
+        )}
         </>
         )}
 

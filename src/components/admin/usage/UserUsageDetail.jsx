@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatDuration } from '../../../utils/activityLog';
 import { outcomeBreakdown, sourceLabel } from '../../../utils/suggestionStats';
-import { formatHours, formatIou, toolLabel } from '../../../utils/usageStats';
+import { formatHours, formatIou, sceneGraphActionLabel, toolLabel } from '../../../utils/usageStats';
 import UsageTimelineChart from './UsageTimelineChart';
 
 /** Same outcome colours as the dataset page's Model suggestions card. */
@@ -216,6 +216,30 @@ const UserUsageDetail = ({ detail }) => {
             {detail.model_selections.map((m) => `${m.model} (${m.count}×)`).join(', ')}
           </p>
         )}
+      </Section>
+
+      <Section
+        title="Scene graph"
+        hint="Relationships and attributes edited, with how many objects each touched."
+        className="lg:col-span-2"
+      >
+        {detail.scene_graph?.actions?.length ? (
+          <>
+            <BarList
+              rows={detail.scene_graph.actions}
+              valueOf={(a) => a.count}
+              labelOf={(a) => sceneGraphActionLabel(a.action)}
+              formatValue={(n) => `${n}×`}
+              extraOf={(a) => `${a.objects} ${a.objects === 1 ? 'object' : 'objects'}`}
+            />
+            {detail.scene_graph.relationships.length > 0 && (
+              <p className="mt-3 text-xs text-t3">
+                Relationships used:{' '}
+                {detail.scene_graph.relationships.map((r) => `${r.name} (${r.count}×)`).join(', ')}
+              </p>
+            )}
+          </>
+        ) : <Empty>{missing}</Empty>}
       </Section>
     </div>
   );

@@ -76,3 +76,17 @@ export const TOOL_LABELS = {
 };
 
 export const toolLabel = (tool) => TOOL_LABELS[tool] ?? tool;
+
+/** Readable names for the scene graph actions logged as `scene_graph.<action>`. */
+export const SCENE_GRAPH_ACTION_LABELS = {
+  'relationship.add': 'Relationships added',
+  'relationship.delete': 'Relationships deleted',
+  'relationship.swap': 'Relationships reversed',
+  'relationship.confirm': 'Suggested relationships accepted',
+  'attribute.set': 'Attribute values set',
+  'attribute.clear': 'Attribute values cleared',
+  'attribute.confirm': 'Suggested attribute values accepted',
+  'attribute.define': 'Attributes defined',
+};
+
+export const sceneGraphActionLabel = (action) => SCENE_GRAPH_ACTION_LABELS[action] ?? action;

@@ -35,6 +35,10 @@ const DETAIL = {
     median_active_ms: 400_000, mean_idle_ms: 20_000, mean_ai_wait_ms: 1500, mean_open_ms: 434_500,
     interactions: { clicks: 0, prompts: 14, edits: 3, creates: 0, deletes: 2, relabels: 0, undos: 1 },
   },
+  scene_graph: {
+    actions: [{ action: 'relationship.add', count: 4, objects: 6 }],
+    relationships: [{ name: 'touches', count: 6 }],
+  },
   timeline: [{ date: '2026-10-15', events: 40, active_ms: 3_720_000, suggestions: 10,
                workflows: { Annotation: 3_600_000 } }],
 };
@@ -63,6 +67,8 @@ describe('UsagePanel', () => {
     expect(screen.getByText('AI annotation')).toBeInTheDocument();
     expect(screen.getByText(/Models picked: sam2 \(2×\)/)).toBeInTheDocument();
     expect(screen.getByText('(1 failed)')).toBeInTheDocument();
+    expect(screen.getByText('Relationships added')).toBeInTheDocument();
+    expect(screen.getByText(/Relationships used: touches \(6×\)/)).toBeInTheDocument();
   });
 
   test('explains that only suggestion outcomes exist while capture is off', async () => {
