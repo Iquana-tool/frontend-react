@@ -5,6 +5,9 @@ import {
   getSelectedFragmentContourIds,
   resolvePolypProjectLabel,
   toAcceptedContour,
+  calculatePolygonIoU,
+  getExistingPolypsForScope,
+  suppressOverlappingPredictions,
   CELLPOSE_POLYP_REGISTRY_KEY,
 } from './cellposePreviewModel';
 
@@ -328,5 +331,78 @@ describe('Cellpose polyp preview contract', () => {
       scope: 'whole_image',
     })).toBe(21060);
   });
+
+  it('calculates polygon IoU with bounding box gating and grid sampling', () => {
+    // Identical unit squares
+    const a = { x: [0.1, 0.3, 0.3, 0.1], y: [0.1, 0.1, 0.3, 0.3] };
+    const b = { x: [0.1, 0.3, 0.3, 0.1], y: [0.1, 0.1, 0.3, 0.3] };
+    expect(calculatePolygonIoU(a, b)).toBe(1);
+
+    // Completely disjoint
+    const c = { x: [0.5, 0.7, 0.7, 0.5], y: [0.5, 0.5, 0.7, 0.7] };
+    expect(calculatePolygonIoU(a, c)).toBe(0);
+
+    // Adjacent / touching (shared edge x = 0.3)
+    const d = { x: [0.3, 0.5, 0.5, 0.3], y: [0.1, 0.1, 0.3, 0.3] };
+    expect(calculatePolygonIoU(a, d)).toBe(0);
+
+    // Substantial overlap (>0.5 IoU): shift x from [0.1, 0.3] to [0.15, 0.35]
+    // Width overlap = 0.15, Height overlap = 0.2, Intersection = 0.03, Union = 0.04 + 0.04 - 0.03 = 0.05, IoU = 0.6
+    const e = { x: [0.15, 0.35, 0.35, 0.15], y: [0.1, 0.1, 0.3, 0.3] };
+    const iou = calculatePolygonIoU(a, e);
+    expect(iou).toBeGreaterThan(0.55);
+    expect(iou).toBeLessThan(0.65);
+  });
+
+  it('filters existing polyps by labelId and scope parent matching', () => {
+    const objects = [
+      { id: 101, labelId: 43, parentId: 21060, x: [0.1, 0.2, 0.2], y: [0.1, 0.1, 0.2] }, // Polyp on coral 21060
+      { id: 102, labelId: 43, parentId: 21061, x: [0.5, 0.6, 0.6], y: [0.5, 0.5, 0.6] }, // Polyp on coral 21061
+      { id: 103, labelId: 41, parentId: null, x: [0.1, 0.9, 0.9], y: [0.1, 0.1, 0.9] },  // Coral outline (not a polyp)
+      { id: 104, labelId: 43, parentId: null, x: [0.8, 0.9, 0.9], y: [0.8, 0.8, 0.9] },  // Root polyp
+    ];
+
+    // Fragment scope: only returns polyps belonging to target coral 21060
+    const fragmentPolyps = getExistingPolypsForScope(objects, {
+      targetParentIds: [21060],
+      labelId: 43,
+      scope: 'fragment',
+    });
+    expect(fragmentPolyps.map((o) => o.id)).toEqual([101]);
+
+    // Whole image scope: returns all polyps with labelId 43 regardless of parent
+    const wholePolyps = getExistingPolypsForScope(objects, {
+      labelId: 43,
+      scope: 'whole',
+    });
+    expect(wholePolyps.map((o) => o.id)).toEqual([101, 102, 104]);
+  });
+
+  it('suppresses overlapping predictions against existing annotations and intra-batch candidates', () => {
+    // Existing polyp at [0.1..0.3, 0.1..0.3]
+    const existing = [
+      { id: 1, labelId: 43, x: [0.1, 0.3, 0.3, 0.1], y: [0.1, 0.1, 0.3, 0.3] },
+    ];
+
+    const predictions = [
+      // Pred 1: near-duplicate of existing polyp (IoU ~ 0.8), score 0.9
+      { id: 'p1', score: 0.9, x: [0.11, 0.3, 0.3, 0.11], y: [0.1, 0.1, 0.3, 0.3] },
+      // Pred 2: fresh polyp in a new location, score 0.85
+      { id: 'p2', score: 0.85, x: [0.5, 0.7, 0.7, 0.5], y: [0.5, 0.5, 0.7, 0.7] },
+      // Pred 3: near-duplicate of Pred 2 with lower score 0.7 (IoU ~ 0.9 with p2)
+      { id: 'p3', score: 0.7, x: [0.51, 0.7, 0.7, 0.51], y: [0.5, 0.5, 0.7, 0.7] },
+      // Pred 4: adjacent to Pred 2 (touching at x = 0.7, IoU = 0), score 0.65
+      { id: 'p4', score: 0.65, x: [0.7, 0.9, 0.9, 0.7], y: [0.5, 0.5, 0.7, 0.7] },
+    ];
+
+    const result = suppressOverlappingPredictions(predictions, existing, { iouThreshold: 0.5 });
+    // p1 suppressed by existing (IoU > 0.5)
+    // p2 kept (no overlap)
+    // p3 suppressed by p2 (intra-batch IoU > 0.5, p2 has higher score)
+    // p4 kept (adjacent, IoU = 0 < 0.5)
+    expect(result.kept.map((p) => p.id)).toEqual(['p2', 'p4']);
+    expect(result.suppressedCount).toBe(2);
+  });
 });
+
 

@@ -20,6 +20,8 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
   const {
     scope,
     setScope,
+    writeMode,
+    setWriteMode,
     roiCount,
     mappedLabel,
     canRun,
@@ -119,6 +121,30 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
               Select a coral outline to run on, or choose Whole image.
             </p>
           )}
+        </div>
+
+        {/* Existing Polyps / Mode Selector */}
+        <div className="iq-field iq-field-mode">
+          <label className="block text-sect font-medium text-t2">
+            Existing polyps
+            <select
+              data-write-mode
+              aria-label="How to handle existing polyps"
+              value={writeMode}
+              onChange={(e) => setWriteMode(e.target.value)}
+              className="w-full h-[27px] px-[8px] mt-[3px] rounded-6 border border-ln2 bg-well2 text-row text-t1 outline-none focus:border-ac"
+            >
+              <option value="replace">
+                {scope === 'fragment' ? 'Replace existing on coral' : 'Replace existing polyps'}
+              </option>
+              <option value="add">Add to existing (suppress overlaps)</option>
+            </select>
+          </label>
+          <p className="mt-[3px] text-meta text-t3 leading-tight">
+            {writeMode === 'replace'
+              ? 'Removes previous polyp annotations before saving new ones.'
+              : 'Preserves existing polyps; suppresses overlapping duplicate predictions.'}
+          </p>
         </div>
       </div>
 

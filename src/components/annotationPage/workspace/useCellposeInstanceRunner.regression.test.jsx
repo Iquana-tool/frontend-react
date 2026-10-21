@@ -262,3 +262,77 @@ describe('YOLO polyp uses the shared instance workflow', () => {
     expect(api.cancelInferenceJob).toHaveBeenCalledWith(991);
   });
 });
+
+describe('writeMode: replace vs add with overlap suppression', () => {
+  it('replaces existing polyps on the coral when writeMode is replace', async () => {
+    // Coral 21060 has an existing polyp 30001
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .9, .9, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parentId: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 995, status: 'succeeded' });
+    const newPred = { x: [.5, .6, .6, .5], y: [.5, .5, .6, .6], label_id: 43, parent_id: 21060, confidence: .95 };
+    api.getInferenceJobItems.mockResolvedValue(results([newPred]));
+    annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30002 } });
+    annotationSession.deleteObject.mockResolvedValue({ success: true });
+
+    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    expect(result.current.writeMode).toBe('replace');
+
+    await act(async () => {
+      await result.current.run();
+    });
+
+    // Existing polyp on that coral was deleted
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    // New prediction was added
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('done');
+    expect(mocks.toast.mock.calls.some(([t]) => /replaced/i.test(t.message))).toBe(true);
+  });
+
+  it('keeps existing polyps and suppresses overlapping predictions when writeMode is add', async () => {
+    // Coral 21060 has an existing polyp at [0.2..0.3, 0.2..0.3]
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .9, .9, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parentId: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 996, status: 'succeeded' });
+    // Pred 1: near-duplicate of existing polyp 30001 (IoU > 0.8)
+    const duplicatePred = { x: [.2, .3, .3, .2], y: [.2, .2, .3, .3], label_id: 43, parent_id: 21060, confidence: .95 };
+    // Pred 2: genuine new polyp elsewhere on coral
+    const freshPred = { x: [.6, .7, .7, .6], y: [.6, .6, .7, .7], label_id: 43, parent_id: 21060, confidence: .85 };
+
+    api.getInferenceJobItems.mockResolvedValue(results([duplicatePred, freshPred]));
+    annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30003 } });
+    annotationSession.deleteObject.mockResolvedValue({ success: true });
+
+    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    act(() => {
+      result.current.setWriteMode('add');
+    });
+    expect(result.current.writeMode).toBe('add');
+
+    await act(async () => {
+      await result.current.run();
+    });
+
+    // Existing polyp was NOT deleted
+    expect(annotationSession.deleteObject).not.toHaveBeenCalled();
+    // Only the non-overlapping fresh prediction was added! Duplicate was suppressed.
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
+    expect(annotationSession.addObject.mock.calls[0][0]).toEqual([.6, .7, .7, .6]);
+    expect(result.current.status).toBe('done');
+    expect(result.current.suppressedCount).toBe(1);
+    expect(mocks.toast.mock.calls.some(([t]) => /suppressed/i.test(t.message))).toBe(true);
+  });
+});
+

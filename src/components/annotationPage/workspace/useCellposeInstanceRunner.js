@@ -8,6 +8,8 @@ import {
   extractPreviewPredictions,
   resolveParentContourId,
   toAcceptedContour,
+  getExistingPolypsForScope,
+  suppressOverlappingPredictions,
 } from './cellposePreviewModel';
 import {
   startInferenceJob,
@@ -106,6 +108,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   const clearLastInstanceRun = useClearLastInstanceRun();
 
   const [scope, setScope] = useState('fragment');
+  const [writeMode, setWriteMode] = useState('replace'); // 'replace' | 'add'
   const [status, setStatus] = useState('ready'); // 'ready' | 'starting' | 'running' | 'saving' | 'done' | 'failed' | 'cancelled'
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -197,11 +200,63 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       setProgress(90);
       setProgressMessage('Saving objects…');
 
+      // Determine target parent contour IDs for scope matching
+      const targetParentIds = scope === 'fragment'
+        ? new Set([
+            ...(focusedContourId != null ? [Number(focusedContourId)] : []),
+            ...roiContourIds.map(Number),
+          ])
+        : null;
+
+      let predictionsToSave = predictions;
+      let overlapSuppressedCount = 0;
+      let replacedCount = 0;
+
+      if (writeMode === 'replace') {
+        const existingPolypsToDelete = getExistingPolypsForScope(objectsList, {
+          targetParentIds,
+          labelId: mappedLabel.labelId,
+          scope,
+        });
+
+        if (existingPolypsToDelete.length > 0) {
+          setProgressMessage(`Replacing ${existingPolypsToDelete.length} existing polyps…`);
+          for (const existingObj of existingPolypsToDelete) {
+            if (!isCurrentRun()) {
+              console.warn('Context changed during replacement; halting');
+              break;
+            }
+            const cid = existingObj.contour_id ?? existingObj.id;
+            if (cid != null) {
+              try {
+                await annotationSession.deleteObject(cid);
+                replacedCount++;
+              } catch (e) {
+                console.warn('Failed to delete existing polyp on replace', cid, e);
+              }
+            }
+          }
+        }
+      } else {
+        // 'add' mode: suppress overlapping predictions against existing polyps
+        const existingPolyps = getExistingPolypsForScope(objectsList, {
+          targetParentIds,
+          labelId: mappedLabel.labelId,
+          scope,
+        });
+
+        const suppressionResult = suppressOverlappingPredictions(predictions, existingPolyps, {
+          iouThreshold: 0.5,
+        });
+        predictionsToSave = suppressionResult.kept;
+        overlapSuppressedCount = suppressionResult.suppressedCount;
+      }
+
       const createdIds = [];
       const unresolved = [];
       let skippedCount = 0;
 
-      for (const prediction of predictions) {
+      for (const prediction of predictionsToSave) {
         if (!isCurrentRun()) {
           console.warn('Context changed during persistence; halting further saves');
           break;
@@ -265,7 +320,8 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
 
       if (!isCurrentRun()) return;
 
-      setSuppressedCount(skippedCount);
+      const totalSuppressed = skippedCount + overlapSuppressedCount;
+      setSuppressedCount(totalSuppressed);
       const allCreatedIds = [...new Set([...previousCreatedIdsRef.current, ...createdIds])];
       previousCreatedIdsRef.current = allCreatedIds;
 
@@ -277,6 +333,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
           modelName: selectedModelObj?.name || modelInfo.name,
           imageId,
           datasetId,
+          writeMode,
         });
         setCurrentTool?.('selection');
       }
@@ -287,20 +344,24 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
         setIsRunning(false);
         setError(null);
         pendingUnresolvedRef.current = [];
-        if (createdIds.length > 0 && skippedCount > 0) {
-          addToast?.({
-            type: 'success',
-            message: `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added (${skippedCount} duplicates skipped).`,
-          });
-        } else if (createdIds.length > 0) {
-          addToast?.({
-            type: 'success',
-            message: `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added to Objects.`,
-          });
-        } else if (skippedCount > 0) {
+
+        if (createdIds.length > 0) {
+          let msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added to Objects`;
+          if (replacedCount > 0) {
+            msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} saved (${replacedCount} previous replaced)`;
+          } else if (totalSuppressed > 0) {
+            msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added (${totalSuppressed} overlapping duplicate${totalSuppressed === 1 ? '' : 's'} suppressed)`;
+          }
+          addToast?.({ type: 'success', message: `${msg}.` });
+        } else if (totalSuppressed > 0) {
           addToast?.({
             type: 'info',
-            message: `${skippedCount} ${skippedCount === 1 ? 'polyp was' : 'polyps were'} skipped as duplicates.`,
+            message: `All ${totalSuppressed} detected polyps overlapped with existing annotations and were suppressed.`,
+          });
+        } else if (replacedCount > 0) {
+          addToast?.({
+            type: 'info',
+            message: `${replacedCount} existing polyps removed.`,
           });
         }
       } else {
@@ -309,8 +370,8 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
         pendingUnresolvedRef.current = unresolved;
         const msg =
           allCreatedIds.length > 0
-            ? `Added ${allCreatedIds.length} of ${predictions.length} polyps. ${unresolved.length} could not be saved.`
-            : `Could not save ${predictions.length} polyps.`;
+            ? `Added ${allCreatedIds.length} of ${predictionsToSave.length} polyps. ${unresolved.length} could not be saved.`
+            : `Could not save ${predictionsToSave.length} polyps.`;
         setError(msg);
       }
     },
@@ -321,6 +382,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       mappedLabel,
       focusedContourId,
       scope,
+      writeMode,
       roiContourIds,
       objectsList,
       datasetLabelsMap,
@@ -570,6 +632,8 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   return {
     scope,
     setScope,
+    writeMode,
+    setWriteMode,
     roiCount,
     mappedLabel,
     canRun,
