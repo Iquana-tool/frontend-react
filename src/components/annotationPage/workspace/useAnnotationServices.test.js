@@ -59,6 +59,7 @@ vi.mock("../../../stores/selectors/annotationSelectors", () => ({
     useSetPromptedModel: () => mockSetPromptedModel,
     useSetSuggestionModel: () => mockSetSuggestionModel,
     useSetInstanceModel: () => mockSetInstanceModel,
+    useAutoSelectedInstanceModel: () => mockState.autoSelectedInstanceModel ?? null,
     useInstanceRunRequested: () => false,
     useSetInstanceRunRequested: () => vi.fn(),
     useSetInstanceWarningModalOpen: () => vi.fn(),

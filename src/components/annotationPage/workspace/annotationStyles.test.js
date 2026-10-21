@@ -56,6 +56,27 @@ describe('getPolygonStyle outline settings', () => {
     expect(p).toBeGreaterThan(a);
   });
 
+  it('renders solid closed stroke for small pending objects to avoid open gap illusion', () => {
+    const smallPending = {
+      id: 20,
+      label: 'polyp',
+      labelId: 7,
+      reviewed_by: [],
+      x: [0.20, 0.22, 0.22, 0.20],
+      y: [0.30, 0.30, 0.32, 0.32],
+    };
+    const largePending = {
+      id: 21,
+      label: 'coral surface',
+      labelId: 8,
+      reviewed_by: [],
+      x: [0.10, 0.80, 0.80, 0.10],
+      y: [0.10, 0.10, 0.80, 0.80],
+    };
+    expect(getPolygonStyle(smallPending, { color: COLOR }).strokeDasharray).toBe('none');
+    expect(getPolygonStyle(largePending, { color: COLOR }).strokeDasharray).toBe('30 8');
+  });
+
   describe('the outline preset', () => {
     const outline = OUTLINE_PRESETS.outline;
 

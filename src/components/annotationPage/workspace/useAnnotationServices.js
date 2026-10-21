@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   useAvailablePromptedModels,
   useAvailableSuggestionModels,
@@ -17,6 +17,7 @@ import {
   useSetPromptedModel,
   useSetSuggestionModel,
   useSetInstanceModel,
+  useAutoSelectedInstanceModel,
   useInstanceRunRequested,
   useSetInstanceRunRequested,
   useSetInstanceWarningModalOpen,
@@ -35,6 +36,25 @@ import annotationSession from '../../../services/annotationSession';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 import useAiTools from '../../../hooks/useAiTools';
 import { useInstanceSegmentation } from '../../../hooks/useInstanceSegmentation';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
+import { useCellposeInstanceRunnerContext } from './CellposeInstanceRunnerContext';
+import { isPolypInstanceModel } from './cellposePreviewModel';
+
+// Module-level map tracking explicit user selections per dataset: datasetKey -> modelId
+const manualInstanceOverridesByDataset = new Map();
+
+export const clearManualInstanceOverrides = () => {
+  manualInstanceOverridesByDataset.clear();
+};
+
+export const setManualInstanceOverride = (datasetId, modelId) => {
+  const datasetKey = datasetId != null ? String(datasetId) : '__default__';
+  if (modelId) {
+    manualInstanceOverridesByDataset.set(datasetKey, modelId);
+  } else {
+    manualInstanceOverridesByDataset.delete(datasetKey);
+  }
+};
 
 /** The dataset AI tool switch behind each service card. */
 const SERVICE_TOOL = {
@@ -138,9 +158,14 @@ export default function useAnnotationServices() {
         : null,
     [policy, policyReady, availableInstanceModels]
   );
+  const cellposeRunner = useCellposeInstanceRunnerContext();
   const selectedInstanceModel = availableInstanceModels.find((model) =>
     matchesModelKey(model, 'instance-segmentation', instanceModel)
   );
+  const isCellposeSelected =
+    isPolypInstanceModel(instanceModel) ||
+    isPolypInstanceModel(selectedInstanceModel?.id) ||
+    isPolypInstanceModel(selectedInstanceModel?.registry_key);
   const hasUsableSelectedInstanceModel = Boolean(selectedInstanceModel);
   const instanceInputs = getMatchingBindingInputs(
     instanceRouting,
@@ -160,6 +185,24 @@ export default function useAnnotationServices() {
       ? 'Session override for this image — dataset default remains unchanged.'
       : null;
 
+  const autoSelectedInstanceModel = useAutoSelectedInstanceModel();
+  const isAutoDefaultInstanceModel = Boolean(
+    autoSelectedInstanceModel && instanceModel === autoSelectedInstanceModel
+  );
+
+  const handleSetInstanceModel = useCallback(
+    (modelId) => {
+      const datasetKey = datasetId != null ? String(datasetId) : '__default__';
+      if (modelId) {
+        manualInstanceOverridesByDataset.set(datasetKey, modelId);
+      } else {
+        manualInstanceOverridesByDataset.delete(datasetKey);
+      }
+      setInstanceModel(modelId);
+    },
+    [datasetId, setInstanceModel]
+  );
+
   const suggestionSelectionNotice =
     policyResolved &&
     suggestionModel &&
@@ -175,10 +218,26 @@ export default function useAnnotationServices() {
 
   useEffect(() => {
     if (instanceRunRequested) {
-      if (canRunInstance) setShowInstanceWarning(true);
+      if (isCellposeSelected && cellposeRunner) {
+        if (
+          cellposeRunner.canRun &&
+          !cellposeRunner.isRunning &&
+          cellposeRunner.status !== 'saving'
+        ) {
+          cellposeRunner.run();
+        }
+      } else if (canRunInstance) {
+        setShowInstanceWarning(true);
+      }
       setInstanceRunRequested(false);
     }
-  }, [instanceRunRequested, canRunInstance, setInstanceRunRequested]);
+  }, [
+    instanceRunRequested,
+    isCellposeSelected,
+    cellposeRunner,
+    canRunInstance,
+    setInstanceRunRequested,
+  ]);
 
   // Mirrored to the store so keyboard shortcuts don't steal Enter while the
   // modal has focus.
@@ -196,9 +255,21 @@ export default function useAnnotationServices() {
   // Clear model selections immediately on dataset changes. The shared page-level
   // policy loader then resolves either configured routes or the normal fallbacks.
   useEffect(() => {
+    const currentStoredDatasetId = useAnnotationStore?.getState?.()?.models?.modelsDatasetId;
+    if (
+      datasetId != null &&
+      currentStoredDatasetId != null &&
+      String(datasetId) === String(currentStoredDatasetId)
+    ) {
+      return;
+    }
+    const prevKey = currentStoredDatasetId != null ? String(currentStoredDatasetId) : null;
+    if (prevKey) manualInstanceOverridesByDataset.delete(prevKey);
+    if (datasetId != null) manualInstanceOverridesByDataset.delete(String(datasetId));
     setPromptedModel(null);
     setSuggestionModel(null);
-    setInstanceModel(null);
+    setInstanceModel(null, false);
+    fetchInstanceModels(datasetId);
   }, [datasetId, setPromptedModel, setSuggestionModel, setInstanceModel]);
 
   // Prompted Segmentation model resolution (active label override -> task default -> favorite/first compatible)
@@ -260,10 +331,32 @@ export default function useAnnotationServices() {
   // Whole-image Instance Segmentation model resolution (task default -> favorite/first)
   useEffect(() => {
     if (!policyResolved || availableInstanceModels.length === 0) return;
+    const datasetKey = datasetId != null ? String(datasetId) : '__default__';
+    const manualOverride = manualInstanceOverridesByDataset.get(datasetKey);
+    const hasManualOverride = Boolean(
+      manualOverride &&
+        availableInstanceModels.some((m) =>
+          matchesModelKey(m, 'instance-segmentation', manualOverride)
+        )
+    );
+
+    if (hasManualOverride) {
+      if (instanceModel !== manualOverride) {
+        setInstanceModel(manualOverride);
+      }
+      return;
+    }
+
+    if (hasUsableSelectedInstanceModel && !isAutoDefaultInstanceModel) {
+      return;
+    }
+
     if (instanceRouting?.binding && isUsableBinding(instanceRouting)) {
       const modelId = getModelKey(instanceRouting.model);
-      if (modelId) setInstanceModel(modelId);
-      return;
+      if (modelId) {
+        if (instanceModel !== modelId) setInstanceModel(modelId);
+        return;
+      }
     }
 
     const modelId = getFallbackModelId(
@@ -271,12 +364,16 @@ export default function useAnnotationServices() {
       'instance-segmentation',
       favorites?.['instance-segmentation']
     );
-    if (modelId) setInstanceModel(modelId);
+    if (modelId && instanceModel !== modelId) setInstanceModel(modelId);
   }, [
     policyResolved,
     instanceRouting,
     availableInstanceModels,
     favorites,
+    datasetId,
+    hasUsableSelectedInstanceModel,
+    isAutoDefaultInstanceModel,
+    instanceModel,
     setInstanceModel,
   ]);
 
@@ -331,11 +428,24 @@ export default function useAnnotationServices() {
       models: availableInstanceModels,
       isLoading: isLoadingInstance,
       selectedModel: instanceModel,
-      setSelectedModel: setInstanceModel,
-      isRunning: isRunningInstance,
-      canRun: canRunInstance,
+      setSelectedModel: handleSetInstanceModel,
+      isRunning:
+        isCellposeSelected && cellposeRunner
+          ? Boolean(cellposeRunner.isRunning || cellposeRunner.status === 'saving')
+          : isRunningInstance,
+      canRun: isCellposeSelected && cellposeRunner ? cellposeRunner.canRun : canRunInstance,
       onRun: () => {
-        if (canRunInstance) setShowInstanceWarning(true);
+        if (isCellposeSelected && cellposeRunner) {
+          if (
+            cellposeRunner.canRun &&
+            !cellposeRunner.isRunning &&
+            cellposeRunner.status !== 'saving'
+          ) {
+            cellposeRunner.run();
+          }
+        } else if (canRunInstance) {
+          setShowInstanceWarning(true);
+        }
       },
       selectionNotice: instanceSelectionNotice,
     },

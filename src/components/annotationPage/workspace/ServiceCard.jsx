@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Loader2, Play, Star } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
+import CellposeInstancePanel from './CellposeInstancePanel';
+import { isPolypInstanceModel } from './cellposePreviewModel';
 import { getPromptTypeInfo } from '../../../utils/promptTypes';
 import {
   useModelFavorites,
@@ -72,6 +74,12 @@ const ServiceCard = ({ service }) => {
   const canRun =
     service.canRun ?? (hasModels && !service.isLoading && !service.isRunning);
 
+  const isCellpose =
+    service.key === 'instance' &&
+    (isPolypInstanceModel(service.selectedModel) ||
+      isPolypInstanceModel(selectedModelObj?.id) ||
+      isPolypInstanceModel(selectedModelObj?.registry_key));
+
   return (
     <div className="rounded-9 border border-ln2 bg-well px-[10px] py-[9px]">
       <button
@@ -90,6 +98,9 @@ const ServiceCard = ({ service }) => {
       </button>
 
       {open && (
+        isCellpose ? (
+          <CellposeInstancePanel service={service} selectedModelObj={selectedModelObj} />
+        ) : (
         <div className="mt-[8px]">
           {service.isLoading ? (
             <div className="h-[27px] rounded-6 bg-hv animate-pulse" />
@@ -208,6 +219,7 @@ const ServiceCard = ({ service }) => {
             </div>
           )}
         </div>
+        )
       )}
     </div>
   );

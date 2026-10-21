@@ -100,6 +100,9 @@ export const initialState = {
   aiAnnotation: {
     prompts: [],
     activePreview: null,
+    cellposePreview: null,
+    /** Last completed instance-segmentation run: { count, objectIds, labelName, imageId, datasetId } */
+    lastInstanceRun: null,
     isSubmitting: false,
     // Active drawing mode for prompts: 'point' | 'box' | 'polygon' | 'freehand'
     promptMode: 'point',
@@ -296,6 +299,7 @@ export const initialState = {
     promptedModel: null, // Store model ID as string, not object
     suggestionModel: null, // Store model ID as string, not object
     instanceModel: null, // Store model ID as string, not object
+    autoSelectedInstanceModel: null, // Tracks automatic fallback selection to distinguish from explicit user selection
     availablePromptedModels: [], // List of available AI models from backend
     availableSuggestionModels: [], // List of available suggestion models from backend
     availableInstanceModels: [], // List of available instance segmentation models from backend
@@ -306,6 +310,7 @@ export const initialState = {
     isRunningInstance: false, // Track when instance segmentation is running
     favorites: {}, // User's favorite model per task: { task: registry_key }. Preselected in the selectors.
     favoritesLoaded: false, // Guards a single favorites fetch before defaults are computed.
+    modelsDatasetId: null, // Dataset ID that owns the currently loaded instance models
   },
   
   // Objects State
@@ -360,4 +365,3 @@ export const initialState = {
     isReconnecting: false,
   },
 };
-
