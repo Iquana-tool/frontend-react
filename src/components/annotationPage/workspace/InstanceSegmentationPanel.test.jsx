@@ -289,6 +289,18 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
       fireEvent.click(runBtn);
     });
 
+    // Verify InstanceWarningModal appears with standard uniform options
+    expect(screen.getByText('Choose how to apply predictions')).toBeInTheDocument();
+    expect(
+      screen.getByText(/keeps existing annotations and adds only non-overlapping predictions/i)
+    ).toBeInTheDocument();
+
+    // Confirm with "Patch and run"
+    const patchBtn = screen.getByRole('button', { name: /Patch and run/i });
+    await act(async () => {
+      fireEvent.click(patchBtn);
+    });
+
     // Verify startInferenceJob was called with native ROI 21060 and result_mode: 'preview'
     await waitFor(() => {
       expect(inferenceApi.startInferenceJob).toHaveBeenCalledWith(
@@ -343,6 +355,134 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
 
     // Verify neither panel nor canvas display an 'Undo run' button
     expect(screen.queryByRole('button', { name: /Undo run/i })).not.toBeInTheDocument();
+  });
+
+  it('prompts with InstanceWarningModal on Run and dismisses cleanly when Cancel is clicked', async () => {
+    render(<IntegrationHarness service={mockService} />);
+
+    // Open card
+    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
+
+    // Click "Run model"
+    const runBtn = screen.getByRole('button', { name: /Run model/i });
+    await act(async () => {
+      fireEvent.click(runBtn);
+    });
+
+    // Modal appears: "Choose how to apply predictions"
+    expect(screen.getByText('Choose how to apply predictions')).toBeInTheDocument();
+    expect(
+      screen.getByText(/keeps existing annotations and adds only non-overlapping predictions/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/replaces all current contours with the new predictions/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Patch and run/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Override and run/i })).toBeInTheDocument();
+
+    // Click Cancel
+    const cancelBtn = screen.getByRole('button', { name: /^Cancel$/i });
+    await act(async () => {
+      fireEvent.click(cancelBtn);
+    });
+
+    // Modal is dismissed and no inference job started
+    expect(screen.queryByText('Choose how to apply predictions')).not.toBeInTheDocument();
+    expect(inferenceApi.startInferenceJob).not.toHaveBeenCalled();
+  });
+
+  it('deletes existing polyps and saves new ones when Override and run is chosen', async () => {
+    // Set up existing polyp attached to parent fragment 21060
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        {
+          id: 21060,
+          contour_id: 21060,
+          label: 'Coral Fragment',
+          labelId: 41,
+          parent_id: null,
+          color: '#3b82f6',
+          x: [0.1, 0.9, 0.9, 0.1],
+          y: [0.1, 0.1, 0.9, 0.9],
+        },
+        {
+          id: 21061,
+          contour_id: 21061,
+          label: 'Coral Polyp',
+          labelId: 43,
+          parent_id: 21060,
+          color: '#f59e0b',
+          x: [0.2, 0.3, 0.3, 0.2],
+          y: [0.2, 0.2, 0.3, 0.3],
+        },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    inferenceApi.startInferenceJob.mockResolvedValue({
+      id: 992,
+      status: 'succeeded',
+    });
+
+    inferenceApi.getInferenceJobItems.mockResolvedValue([
+      {
+        image_id: 385,
+        predictions: {
+          contours: [
+            {
+              id: 'pred-new',
+              x: [0.4, 0.5, 0.5, 0.4],
+              y: [0.4, 0.4, 0.5, 0.5],
+              label_id: 43,
+              score: 0.95,
+              source_instance_id: 'cpsam_polyp_v3_b_seed17:t0002:new',
+            },
+          ],
+        },
+      },
+    ]);
+
+    annotationSession.deleteObject.mockResolvedValue({ success: true });
+    annotationSession.addObject.mockResolvedValue({
+      type: 'object_added',
+      success: true,
+      data: { id: 21062, contour_id: 21062, parent_id: 21060, label_id: 43 },
+    });
+
+    render(<IntegrationHarness service={mockService} />);
+
+    // Open card
+    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
+
+    // Click "Run model"
+    const runBtn = screen.getByRole('button', { name: /Run model/i });
+    await act(async () => {
+      fireEvent.click(runBtn);
+    });
+
+    // Confirm with "Override and run"
+    const overrideBtn = screen.getByRole('button', { name: /Override and run/i });
+    await act(async () => {
+      fireEvent.click(overrideBtn);
+    });
+
+    // Verify existing polyp 21061 was deleted before saving
+    await waitFor(() => {
+      expect(annotationSession.deleteObject).toHaveBeenCalledWith(21061);
+    });
+
+    // Verify new prediction was added
+    await waitFor(() => {
+      expect(annotationSession.addObject).toHaveBeenCalledWith(
+        [0.4, 0.5, 0.5, 0.4],
+        [0.4, 0.4, 0.5, 0.5],
+        'Coral Polyp',
+        21060,
+        0.95,
+        43,
+        expect.any(Object)
+      );
+    });
   });
 
   it('does not display Undo run notice or badge even if previous run state exists', () => {

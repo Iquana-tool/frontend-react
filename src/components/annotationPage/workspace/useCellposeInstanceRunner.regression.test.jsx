@@ -90,6 +90,7 @@ describe('live Cellpose runner regressions', () => {
     render(<CellposeInstanceRunnerProvider><Probe /><ServiceCard service={service} /></CellposeInstanceRunnerProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
     fireEvent.click(screen.getByRole('button', { name: 'Run model' }));
+    fireEvent.click(screen.getByRole('button', { name: /Patch and run/i }));
     await waitFor(() => expect(api.startInferenceJob).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
     expect(flow.isRunning).toBe(true);
@@ -281,10 +282,10 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
     const { result } = renderHook(() => useCellposeInstanceRunner(model));
-    expect(result.current.writeMode).toBe('replace');
+    expect(result.current.writeMode).toBe('patch');
 
     await act(async () => {
-      await result.current.run();
+      await result.current.run('override');
     });
 
     // Existing polyp on that coral was deleted
@@ -295,7 +296,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     expect(mocks.toast.mock.calls.some(([t]) => /replaced/i.test(t.message))).toBe(true);
   });
 
-  it('keeps existing polyps and suppresses overlapping predictions when writeMode is add', async () => {
+  it('keeps existing polyps and suppresses overlapping predictions when writeMode is patch (add)', async () => {
     // Coral 21060 has an existing polyp at [0.2..0.3, 0.2..0.3]
     useAnnotationStore.setState((state) => {
       state.objects.list = [
@@ -317,9 +318,9 @@ describe('writeMode: replace vs add with overlap suppression', () => {
 
     const { result } = renderHook(() => useCellposeInstanceRunner(model));
     act(() => {
-      result.current.setWriteMode('add');
+      result.current.setWriteMode('patch');
     });
-    expect(result.current.writeMode).toBe('add');
+    expect(result.current.writeMode).toBe('patch');
 
     await act(async () => {
       await result.current.run();
