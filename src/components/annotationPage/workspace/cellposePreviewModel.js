@@ -327,6 +327,162 @@ export function polygonArea(polyX, polyY) {
   return Math.abs(area) / 2;
 }
 
+/**
+ * Compute the Intersection-over-Union (IoU) of two polygons with normalized coordinates.
+ * Uses bounding-box gating, upper-bound early exit, and regular grid sampling over intersection.
+ */
+export function calculatePolygonIoU(polyA, polyB, gridSize = 20) {
+  if (!polyA?.x || !polyA?.y || !polyB?.x || !polyB?.y) return 0;
+  const ax = polyA.x;
+  const ay = polyA.y;
+  const bx = polyB.x;
+  const by = polyB.y;
+  if (ax.length < 3 || ay.length < 3 || bx.length < 3 || by.length < 3) return 0;
+
+  let minX1 = Infinity, maxX1 = -Infinity, minY1 = Infinity, maxY1 = -Infinity;
+  for (let i = 0; i < ax.length; i++) {
+    if (ax[i] < minX1) minX1 = ax[i];
+    if (ax[i] > maxX1) maxX1 = ax[i];
+    if (ay[i] < minY1) minY1 = ay[i];
+    if (ay[i] > maxY1) maxY1 = ay[i];
+  }
+  let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+  for (let i = 0; i < bx.length; i++) {
+    if (bx[i] < minX2) minX2 = bx[i];
+    if (bx[i] > maxX2) maxX2 = bx[i];
+    if (by[i] < minY2) minY2 = by[i];
+    if (by[i] > maxY2) maxY2 = by[i];
+  }
+
+  const intMinX = Math.max(minX1, minX2);
+  const intMaxX = Math.min(maxX1, maxX2);
+  const intMinY = Math.max(minY1, minY2);
+  const intMaxY = Math.min(maxY1, maxY2);
+
+  if (intMinX >= intMaxX || intMinY >= intMaxY) return 0;
+
+  const areaA = polygonArea(ax, ay);
+  const areaB = polygonArea(bx, by);
+  if (areaA <= 0 || areaB <= 0) return 0;
+
+  // Upper bound early exit: if min(A, B) / max(A, B) < 0.05, IoU cannot exceed 0.05
+  const maxPossibleIoU = Math.min(areaA, areaB) / Math.max(areaA, areaB);
+  if (maxPossibleIoU <= 0) return 0;
+
+  const intBoxArea = (intMaxX - intMinX) * (intMaxY - intMinY);
+  const stepX = (intMaxX - intMinX) / gridSize;
+  const stepY = (intMaxY - intMinY) / gridSize;
+
+  let insideBoth = 0;
+  for (let i = 0; i < gridSize; i++) {
+    const px = intMinX + (i + 0.5) * stepX;
+    for (let j = 0; j < gridSize; j++) {
+      const py = intMinY + (j + 0.5) * stepY;
+      if (isPointInPolygon([px, py], ax, ay) && isPointInPolygon([px, py], bx, by)) {
+        insideBoth++;
+      }
+    }
+  }
+
+  const intArea = (insideBoth / (gridSize * gridSize)) * intBoxArea;
+  const unionArea = areaA + areaB - intArea;
+  return unionArea > 0 ? intArea / unionArea : 0;
+}
+
+/**
+ * Retrieve existing polyp objects matching the target parent coral or image scope.
+ */
+export function getExistingPolypsForScope(objects = [], {
+  targetParentIds = null,
+  labelId = null,
+  scope = 'fragment',
+} = {}) {
+  if (!Array.isArray(objects) || labelId == null) return [];
+  const targetLabelId = Number(labelId);
+  const parentIdSet = targetParentIds instanceof Set
+    ? targetParentIds
+    : Array.isArray(targetParentIds)
+      ? new Set(targetParentIds.map(Number))
+      : null;
+
+  return objects.filter((obj) => {
+    if (!obj) return false;
+    const objLabelId = Number(obj.labelId ?? obj.label_id);
+    if (objLabelId !== targetLabelId) return false;
+    if (scope === 'fragment') {
+      if (!parentIdSet || parentIdSet.size === 0) return false;
+      const rawPid = obj.parentId ?? obj.parent_id;
+      if (rawPid == null) return false;
+      return parentIdSet.has(Number(rawPid));
+    }
+    return true;
+  });
+}
+
+/**
+ * Filter predictions against existing annotations and intra-batch candidates using IoU suppression.
+ * Surviving predictions are returned; suppressed predictions are counted.
+ */
+export function suppressOverlappingPredictions(
+  predictions = [],
+  existingObjects = [],
+  { iouThreshold = 0.5, gridSize = 20 } = {}
+) {
+  if (!Array.isArray(predictions) || predictions.length === 0) {
+    return { kept: [], suppressedCount: 0 };
+  }
+
+  // Sort candidates by score descending for greedy NMS
+  const sorted = [...predictions].sort((a, b) => {
+    const sa = Number(a?.score ?? a?.confidence ?? 0);
+    const sb = Number(b?.score ?? b?.confidence ?? 0);
+    return sb - sa;
+  });
+
+  const validExisting = (existingObjects || []).filter(
+    (obj) => Array.isArray(obj?.x) && Array.isArray(obj?.y) && obj.x.length >= 3
+  );
+
+  const kept = [];
+  let suppressedCount = 0;
+
+  for (const candidate of sorted) {
+    if (!Array.isArray(candidate?.x) || !Array.isArray(candidate?.y) || candidate.x.length < 3) {
+      continue;
+    }
+
+    // 1. Check overlap against existing annotations (existing annotations take precedence)
+    let isSuppressed = false;
+    for (const existing of validExisting) {
+      const iou = calculatePolygonIoU(candidate, existing, gridSize);
+      if (iou >= iouThreshold) {
+        isSuppressed = true;
+        break;
+      }
+    }
+
+    // 2. If not suppressed by existing, check against higher-scoring accepted predictions in this batch
+    if (!isSuppressed) {
+      for (const accepted of kept) {
+        const iou = calculatePolygonIoU(candidate, accepted, gridSize);
+        if (iou >= iouThreshold) {
+          isSuppressed = true;
+          break;
+        }
+      }
+    }
+
+    if (isSuppressed) {
+      suppressedCount++;
+    } else {
+      kept.push(candidate);
+    }
+  }
+
+  return { kept, suppressedCount };
+}
+
+
 export function getLabelAncestors(labelId, datasetLabels = []) {
   if (labelId == null || !Array.isArray(datasetLabels) || datasetLabels.length === 0) {
     return { allowedAncestors: new Set(), ancestorDistance: new Map(), hasHierarchyInfo: false };
