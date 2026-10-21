@@ -1,14 +1,26 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Play, Loader2, Star } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
+import InstanceWarningModal from '../modals/InstanceWarningModal';
 import { useCellposeInstanceRunnerContext } from './CellposeInstanceRunnerContext';
 import {
   useModelFavorites,
   useSetFavoriteModel,
   useClearFavoriteModel,
+  useSetInstanceWarningModalOpen,
 } from '../../../stores/selectors/annotationSelectors';
 
 export default function CellposeInstancePanel({ service, selectedModelObj }) {
+  const [warningModalOpen, setWarningModalOpen] = useState(false);
+  const setInstanceWarningModalOpen = useSetInstanceWarningModalOpen();
+
+  useEffect(() => {
+    setInstanceWarningModalOpen(warningModalOpen);
+    return () => {
+      setInstanceWarningModalOpen(false);
+    };
+  }, [warningModalOpen, setInstanceWarningModalOpen]);
+
   const favorites = useModelFavorites();
   const setFavorite = useSetFavoriteModel();
   const clearFavorite = useClearFavoriteModel();
@@ -20,8 +32,6 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
   const {
     scope,
     setScope,
-    writeMode,
-    setWriteMode,
     roiCount,
     mappedLabel,
     canRun,
@@ -122,30 +132,6 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
             </p>
           )}
         </div>
-
-        {/* Existing Polyps / Mode Selector */}
-        <div className="iq-field iq-field-mode">
-          <label className="block text-sect font-medium text-t2">
-            Existing polyps
-            <select
-              data-write-mode
-              aria-label="How to handle existing polyps"
-              value={writeMode}
-              onChange={(e) => setWriteMode(e.target.value)}
-              className="w-full h-[27px] px-[8px] mt-[3px] rounded-6 border border-ln2 bg-well2 text-row text-t1 outline-none focus:border-ac"
-            >
-              <option value="replace">
-                {scope === 'fragment' ? 'Replace existing on coral' : 'Replace existing polyps'}
-              </option>
-              <option value="add">Add to existing (suppress overlaps)</option>
-            </select>
-          </label>
-          <p className="mt-[3px] text-meta text-t3 leading-tight">
-            {writeMode === 'replace'
-              ? 'Removes previous polyp annotations before saving new ones.'
-              : 'Preserves existing polyps; suppresses overlapping duplicate predictions.'}
-          </p>
-        </div>
       </div>
 
       {/* Primary Run Action, Progress, Error */}
@@ -154,7 +140,7 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
           <button
             data-run
             type="button"
-            onClick={run}
+            onClick={() => setWarningModalOpen(true)}
             disabled={!canRun}
             title={disableReason || 'Run model'}
             className="iq-primary w-full flex items-center justify-center gap-[6px] h-[28px] px-[10px] rounded-6 bg-accent text-onAccent text-row font-bold transition-[filter] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -230,6 +216,15 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
           </code>
         </p>
       </details>
+
+      <InstanceWarningModal
+        isOpen={warningModalOpen}
+        onClose={() => setWarningModalOpen(false)}
+        onConfirm={(mode) => {
+          setWarningModalOpen(false);
+          run(mode);
+        }}
+      />
     </div>
   );
 }

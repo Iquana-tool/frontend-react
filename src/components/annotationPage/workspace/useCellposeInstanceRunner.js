@@ -108,7 +108,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   const clearLastInstanceRun = useClearLastInstanceRun();
 
   const [scope, setScope] = useState('fragment');
-  const [writeMode, setWriteMode] = useState('replace'); // 'replace' | 'add'
+  const [writeMode, setWriteMode] = useState('patch');
   const [status, setStatus] = useState('ready'); // 'ready' | 'starting' | 'running' | 'saving' | 'done' | 'failed' | 'cancelled'
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -118,11 +118,17 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
 
   const runTokenRef = useRef(0);
   const activeJobIdRef = useRef(null);
+  const activeWriteModeRef = useRef('patch');
   const streamRef = useRef(null);
   const currentScopeRef = useRef({ datasetId, imageId });
   const pendingUnresolvedRef = useRef([]);
   const previousCreatedIdsRef = useRef([]);
   const handledJobIdsRef = useRef(new Set());
+
+  const handleSetWriteMode = useCallback((mode) => {
+    activeWriteModeRef.current = mode;
+    setWriteMode(mode);
+  }, []);
 
   useEffect(() => {
     currentScopeRef.current = { datasetId, imageId };
@@ -212,7 +218,10 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       let overlapSuppressedCount = 0;
       let replacedCount = 0;
 
-      if (writeMode === 'replace') {
+      const effectiveMode = activeWriteModeRef.current || 'patch';
+      const isOverride = effectiveMode === 'override' || effectiveMode === 'replace';
+
+      if (isOverride) {
         const existingPolypsToDelete = getExistingPolypsForScope(objectsList, {
           targetParentIds,
           labelId: mappedLabel.labelId,
@@ -238,7 +247,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
           }
         }
       } else {
-        // 'add' mode: suppress overlapping predictions against existing polyps
+        // 'patch' mode: suppress overlapping predictions against existing polyps
         const existingPolyps = getExistingPolypsForScope(objectsList, {
           targetParentIds,
           labelId: mappedLabel.labelId,
@@ -333,7 +342,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
           modelName: selectedModelObj?.name || modelInfo.name,
           imageId,
           datasetId,
-          writeMode,
+          writeMode: activeWriteModeRef.current,
         });
         setCurrentTool?.('selection');
       }
@@ -382,7 +391,6 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       mappedLabel,
       focusedContourId,
       scope,
-      writeMode,
       roiContourIds,
       objectsList,
       datasetLabelsMap,
@@ -468,10 +476,14 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
     [mappedLabel, persistPredictions, addToast, modelInfo]
   );
 
-  const run = useCallback(async () => {
-    if (!canRun) return false;
+  const run = useCallback(
+    async (selectedWriteMode = null) => {
+      if (!canRun) return false;
 
-    const token = ++runTokenRef.current;
+      const effectiveMode = selectedWriteMode || activeWriteModeRef.current || 'patch';
+      activeWriteModeRef.current = effectiveMode;
+      setWriteMode(effectiveMode);
+      const token = ++runTokenRef.current;
     streamRef.current?.abort();
     streamRef.current = null;
     setError(null);
@@ -633,7 +645,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
     scope,
     setScope,
     writeMode,
-    setWriteMode,
+    setWriteMode: handleSetWriteMode,
     roiCount,
     mappedLabel,
     canRun,

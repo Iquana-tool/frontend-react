@@ -224,7 +224,7 @@ export default function useAnnotationServices() {
           !cellposeRunner.isRunning &&
           cellposeRunner.status !== 'saving'
         ) {
-          cellposeRunner.run();
+          setShowInstanceWarning(true);
         }
       } else if (canRunInstance) {
         setShowInstanceWarning(true);
@@ -399,6 +399,16 @@ export default function useAnnotationServices() {
   };
 
   const confirmInstanceRun = (writeMode = 'patch') => {
+    if (isCellposeSelected && cellposeRunner) {
+      if (!cellposeRunner.canRun || cellposeRunner.isRunning || cellposeRunner.status === 'saving') {
+        return;
+      }
+      setShowInstanceWarning(false);
+      setInstanceRunRequested(false);
+      setInstanceWarningModalOpen(false);
+      cellposeRunner.run(writeMode);
+      return;
+    }
     if (!canRunInstance) return;
     setShowInstanceWarning(false);
     setInstanceRunRequested(false);
@@ -441,7 +451,7 @@ export default function useAnnotationServices() {
             !cellposeRunner.isRunning &&
             cellposeRunner.status !== 'saving'
           ) {
-            cellposeRunner.run();
+            setShowInstanceWarning(true);
           }
         } else if (canRunInstance) {
           setShowInstanceWarning(true);
