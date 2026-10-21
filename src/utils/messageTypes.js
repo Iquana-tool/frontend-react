@@ -221,8 +221,9 @@ export const MessageBuilders = {
    * @param {number|null} labelId - Label to create the object with. The backend
    *   validates a Contour, whose label field is `label_id`; a freshly drawn object
    *   has none, but a half produced by splitting inherits the original's.
+   * @param {object} options - Optional metadata (addedBy, source, modelKey)
    */
-  addObject: (x, y, label = null, parentId = null, confidence = 1.0, labelId = null) => createMessage(
+  addObject: (x, y, label = null, parentId = null, confidence = 1.0, labelId = null, options = {}) => createMessage(
     CLIENT_MESSAGE_TYPES.OBJECT_ADD_MANUAL,
     {
       x,
@@ -231,6 +232,9 @@ export const MessageBuilders = {
       label_id: labelId,
       parent_id: parentId,
       confidence,
+      ...(options.added_by || options.addedBy ? { added_by: options.added_by || options.addedBy } : {}),
+      ...(options.source ? { source: options.source } : {}),
+      ...(options.model_key || options.modelKey ? { model_key: options.model_key || options.modelKey } : {}),
     }
   ),
 

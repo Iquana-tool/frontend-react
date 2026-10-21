@@ -7,6 +7,35 @@ export const UNLABELLED_COLOR = '#f59e0b';
 
 export const HATCH_PATTERN_ID = 'iq-unlabelled-hatch';
 
+/** Centroid of a normalized contour, as a percentage of the image box. */
+export const getCentroid = (object) => {
+  if (!object?.x?.length) return null;
+  const n = object.x.length;
+  let sumX = 0;
+  let sumY = 0;
+  for (let i = 0; i < n; i += 1) {
+    sumX += object.x[i];
+    sumY += object.y[i];
+  }
+  return { x: (sumX / n) * 100, y: (sumY / n) * 100 };
+};
+
+/** Bounding box of a normalized contour, as percentages of the image box. */
+export const getBoundingBox = (object) => {
+  if (!object?.x?.length) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < object.x.length; i += 1) {
+    if (object.x[i] < minX) minX = object.x[i];
+    if (object.x[i] > maxX) maxX = object.x[i];
+    if (object.y[i] < minY) minY = object.y[i];
+    if (object.y[i] > maxY) maxY = object.y[i];
+  }
+  return { minX: minX * 100, maxX: maxX * 100, minY: minY * 100, maxY: maxY * 100 };
+};
+
 /**
  * Stroke and fill for one annotation polygon, per the design's state table.
  *
@@ -62,11 +91,21 @@ export const getPolygonStyle = (object, { hovered, selected, reviewMode, color, 
     };
   }
 
+  const bbox = getBoundingBox(object);
+  // An object is small if its bounding box spans less than 8% of the image in both dimensions.
+  // For small objects (such as polyps), a static '30 8' non-scaling dash creates a single dash
+  // and an 8px open gap that consumes ~25% of the loop, breaking the closed contour appearance.
+  const isSmallObject = !!bbox && (bbox.maxX - bbox.minX < 8) && (bbox.maxY - bbox.minY < 8);
+
   let strokeWidth = (state === 'pending' ? 3 : 2.5) * widthScale;
   let fillOpacity =
     (state === 'approved' ? 0.16 : state === 'pending' ? 0.1 : 0.18) * fillScale;
   let strokeDasharray =
-    state === 'pending' ? '30 8' : state === 'unlabelled' ? '18 10' : 'none';
+    state === 'pending'
+      ? (isSmallObject ? 'none' : '30 8')
+      : state === 'unlabelled'
+        ? '18 10'
+        : 'none';
 
   if (hovered) {
     strokeWidth += 1.5 * widthScale;
@@ -122,33 +161,4 @@ export const getChipBorder = (object, color) => {
   if (state === 'unlabelled') return `1px dashed ${withAlpha(UNLABELLED_COLOR, 0.85)}`;
   if (state === 'pending') return `1px dashed ${withAlpha(color, 0.75)}`;
   return `1px solid ${withAlpha(color, 0.6)}`;
-};
-
-/** Centroid of a normalized contour, as a percentage of the image box. */
-export const getCentroid = (object) => {
-  if (!object?.x?.length) return null;
-  const n = object.x.length;
-  let sumX = 0;
-  let sumY = 0;
-  for (let i = 0; i < n; i += 1) {
-    sumX += object.x[i];
-    sumY += object.y[i];
-  }
-  return { x: (sumX / n) * 100, y: (sumY / n) * 100 };
-};
-
-/** Bounding box of a normalized contour, as percentages of the image box. */
-export const getBoundingBox = (object) => {
-  if (!object?.x?.length) return null;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
-  for (let i = 0; i < object.x.length; i += 1) {
-    if (object.x[i] < minX) minX = object.x[i];
-    if (object.x[i] > maxX) maxX = object.x[i];
-    if (object.y[i] < minY) minY = object.y[i];
-    if (object.y[i] > maxY) maxY = object.y[i];
-  }
-  return { minX: minX * 100, maxX: maxX * 100, minY: minY * 100, maxY: maxY * 100 };
 };

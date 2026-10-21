@@ -1,3 +1,4 @@
+import { POLYP_MODEL_INFO, isPolypInstanceModel } from '../../components/annotationPage/workspace/cellposePreviewModel';
 import {
   getPromptedModels,
   getSuggestionModels,
@@ -6,6 +7,7 @@ import {
   clearModelFavorite,
 } from '../../api/models';
 import { getInstanceModels } from '../../api/instance_segmentation';
+import { getInferenceModelCatalog } from '../../api/inference';
 
 /**
  * Models slice - manages AI model selection, available models, and per-task
@@ -54,6 +56,8 @@ const reconcileFavorites = async (set, fallback) => {
   }
 };
 
+let instanceModelsRequestId = 0;
+
 export const createModelsSlice = (set, get) => ({
   setPromptedModel: (model) => set((state) => {
     state.models.promptedModel = model;
@@ -65,6 +69,7 @@ export const createModelsSlice = (set, get) => ({
 
   setInstanceModel: (model) => set((state) => {
     state.models.instanceModel = model;
+    state.models.autoSelectedInstanceModel = null;
   }),
 
   setIsRunningSuggestion: (isRunning) => set((state) => {
@@ -258,43 +263,95 @@ export const createModelsSlice = (set, get) => ({
     }
   },
 
-  fetchAvailableInstanceModels: async () => {
+  fetchAvailableInstanceModels: async (datasetId = null) => {
+    const reqId = ++instanceModelsRequestId;
+    const targetDatasetId = datasetId ?? get().objects?.labelDatasetId ?? null;
+
     set((state) => {
       state.models.isLoadingInstanceModels = true;
     });
     await get().ensureFavoritesLoaded();
+    if (reqId !== instanceModelsRequestId) return;
 
     try {
-      const result = await getInstanceModels();
-      const modelsList = Array.isArray(result?.result) ? result.result : [];
-      if (result?.success && modelsList.length > 0) {
-        const transformedModels = modelsList.map(model => ({
-          id: getModelId(model),
-          registry_key: getModelId(model),
+      let rawList = [];
+      try {
+        const result = await getInstanceModels();
+        if (result?.success && Array.isArray(result.result)) {
+          rawList = [...result.result];
+        }
+      } catch (_) {
+        // Fallback to catalog or local definition
+      }
+      if (reqId !== instanceModelsRequestId) return;
+
+      if (targetDatasetId != null) {
+        try {
+          const catalog = await getInferenceModelCatalog(targetDatasetId);
+          if (reqId !== instanceModelsRequestId) return;
+          if (Array.isArray(catalog?.models)) {
+            for (const catModel of catalog.models) {
+              if (catModel.task === 'instance-segmentation') {
+                const catId = getModelId(catModel);
+                const existingIndex = rawList.findIndex((m) => getModelId(m) === catId);
+                if (existingIndex >= 0) {
+                  const existing = rawList[existingIndex];
+                  rawList[existingIndex] = {
+                    ...existing,
+                    ...catModel,
+                    class_mappings: catModel.class_mappings ?? existing.class_mappings,
+                    label_ids: catModel.label_ids ?? existing.label_ids,
+                    classes: catModel.classes ?? existing.classes,
+                    tags: { ...existing.tags, ...catModel.tags },
+                  };
+                } else if (catId) {
+                  rawList.push(catModel);
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      if (reqId !== instanceModelsRequestId) return;
+
+      const transformedModels = rawList.map((model) => {
+        const id = getModelId(model);
+        const polypInfo = POLYP_MODEL_INFO[id];
+        const rawName = polypInfo?.name ?? model.name ?? '';
+        const displayName = isPolypInstanceModel(id)
+          ? (polypInfo?.name ?? rawName.replace(/\s*\([^)]*\)/g, '').trim())
+          : rawName;
+        const isExperimental = Boolean(model.is_experimental) || model.tags?.maturity === 'provisional';
+        return {
+          id,
+          registry_key: id,
           task: 'instance-segmentation',
-          name: model.name,
+          name: displayName,
           description: model.description,
           tags: model.tags,
           label_ids: extractLabelIds(model),
+          classes: model.classes,
+          class_mappings: model.class_mappings,
+          checkpoint_sha256: model.checkpoint_sha256 || polypInfo?.sha256,
+          is_experimental: isExperimental,
           model_status: model.model_status || 'ready',
-        }));
+        };
+      });
 
-        set((state) => {
-          state.models.availableInstanceModels = transformedModels;
-          state.models.isLoadingInstanceModels = false;
-          if (!state.models.instanceModel) {
-            const chosen = pickDefaultId(transformedModels, state.models.favorites?.['instance-segmentation']);
-            if (chosen) state.models.instanceModel = chosen;
-          }
-        });
-      } else {
-        console.warn('No instance models returned from backend');
-        set((state) => {
-          state.models.availableInstanceModels = [];
-          state.models.isLoadingInstanceModels = false;
-        });
-      }
+      if (reqId !== instanceModelsRequestId) return;
+
+      set((state) => {
+        state.models.availableInstanceModels = transformedModels;
+        state.models.isLoadingInstanceModels = false;
+        state.models.modelsDatasetId = targetDatasetId;
+        if (!state.models.instanceModel || !transformedModels.some((m) => m.id === state.models.instanceModel)) {
+          const chosen = pickDefaultId(transformedModels, state.models.favorites?.['instance-segmentation']);
+          state.models.instanceModel = chosen;
+          state.models.autoSelectedInstanceModel = chosen;
+        }
+      });
     } catch (error) {
+      if (reqId !== instanceModelsRequestId) return;
       console.error('Error fetching instance models:', error);
       set((state) => {
         state.models.availableInstanceModels = [];

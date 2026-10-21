@@ -97,6 +97,7 @@ export const createImagesSlice = (set) => ({
       // Prompt coordinates and their undo history belong to the image they were created on.
       state.aiAnnotation.prompts = [];
       state.aiAnnotation.activePreview = null;
+      state.aiAnnotation.cellposePreview = null;
       state.aiAnnotation.undoStack = [];
       state.aiAnnotation.redoStack = [];
       state.aiAnnotation.refinementMode.active = false;
