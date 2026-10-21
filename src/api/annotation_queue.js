@@ -56,18 +56,63 @@ export const fetchAnnotationQueue = async (datasetId) => {
  * @param {number|string} datasetId
  * @param {Object} options
  * @param {string} options.strategy - A key from the summary's `strategies` (must be `available`).
+ * @param {string} [options.model_key] - Trained model for strategies with `needs_model`.
  * @returns {Promise<{success: boolean, queue: {
- *   strategy: string, image_ids: number[], total: number, updated_at: string|null,
+ *   strategy: string, model_key: string|null, image_ids: number[], total: number,
+ *   details: Object<string, {reason: string, score: number|null}>, updated_at: string|null,
  * }}>}
  */
-export const buildAnnotationQueue = async (datasetId, { strategy }) => {
+export const buildAnnotationQueue = async (datasetId, { strategy, model_key = null }) => {
     const response = await fetch(
         `${API_BASE_URL}/annotation-queue/datasets/${datasetId}`,
         {
             method: "POST",
             headers: jsonHeaders(),
-            body: JSON.stringify({ strategy }),
+            body: JSON.stringify({ strategy, model_key }),
         }
+    );
+    return handleApiError(response);
+};
+
+/**
+ * Fill in what an ordering needs (image vectors, model scores). `ready: true` means
+ * build now; otherwise poll `fetchQueuePrepJob` until the job ends.
+ *
+ * @returns {Promise<{success: boolean, ready: boolean, job: null|{
+ *   id: number, status: string, total: number, done: number, failed: number,
+ * }}>}
+ */
+export const prepareAnnotationQueue = async (datasetId, { strategy, model_key = null }) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prepare`,
+        { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ strategy, model_key }) }
+    );
+    return handleApiError(response);
+};
+
+/** Progress of a preparation job. */
+export const fetchQueuePrepJob = async (datasetId, jobId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prep-jobs/${jobId}`,
+        { headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
+/** Stop a preparation job after its current image. */
+export const cancelQueuePrepJob = async (datasetId, jobId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prep-jobs/${jobId}/cancel`,
+        { method: "POST", headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
+/** Models trained on this dataset, for the model-based orderings: [{registry_key, name}]. */
+export const fetchScoringModels = async (datasetId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/scoring-models`,
+        { headers: getAuthHeaders() }
     );
     return handleApiError(response);
 };

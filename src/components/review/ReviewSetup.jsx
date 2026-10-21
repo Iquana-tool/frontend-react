@@ -201,7 +201,13 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
               {strategies.length > 1 && (
                 <select
                   value={strategy}
-                  onChange={(e) => setStrategy(e.target.value)}
+                  onChange={(e) => {
+                    // Each ordering preselects the direction that serves it (e.g.
+                    // Uncertainty: most borderline first); the buttons can still flip it.
+                    const next = strategies.find((option) => option.key === e.target.value);
+                    setStrategy(e.target.value);
+                    setDirection(next?.default_direction || 'asc');
+                  }}
                   className="border border-ln2 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ac focus:border-ac"
                 >
                   {strategies.map((option) => (
