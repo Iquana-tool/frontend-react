@@ -127,13 +127,14 @@ export function getSelectedFragmentContourIds(
   objects,
   labelsMap,
   targetLabelId = null,
-  datasetLabels = null
+  datasetLabels = null,
+  focusedContourId = null
 ) {
-  if (!Array.isArray(selectedIds) || selectedIds.length === 0 || !Array.isArray(objects) || objects.length === 0) {
+  if (!Array.isArray(objects) || objects.length === 0) {
     return [];
   }
 
-  const selected = new Set(selectedIds.map(String));
+  const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(String));
   const selectedObjects = objects.filter(
     (object) =>
       (selected.has(String(object.id)) || selected.has(String(object.contour_id))) &&
@@ -141,7 +142,11 @@ export function getSelectedFragmentContourIds(
       object.contour_id !== ''
   );
 
-  if (selectedObjects.length === 0) return [];
+  if (selectedObjects.length === 0) {
+    return focusedContourId == null
+      ? []
+      : getSelectedFragmentContourIds([focusedContourId], objects, labelsMap, targetLabelId, datasetLabels);
+  }
 
   let resolvedTargetId = targetLabelId != null ? Number(targetLabelId) : null;
   if (resolvedTargetId == null && Array.isArray(datasetLabels)) {
@@ -235,10 +240,138 @@ export function getSelectedFragmentContourIds(
     .map((object) => Number(object.contour_id))
     .filter(Number.isFinite);
 
-  return [...new Set(ids)];
+  const uniqueIds = [...new Set(ids)];
+  return uniqueIds.length > 0 || focusedContourId == null
+    ? uniqueIds
+    : getSelectedFragmentContourIds([focusedContourId], objects, labelsMap, targetLabelId, datasetLabels);
 }
 
-export function buildCellposePreviewRequest({ datasetId, imageId, labelId, roiContourIds = [], modelKey = CELLPOSE_POLYP_REGISTRY_KEY }) {
+export function resolvePolypInputs({
+  policy = null,
+  labelId = null,
+  modelKey = CELLPOSE_POLYP_REGISTRY_KEY,
+  inputs = null,
+  threshold = null,
+} = {}) {
+  // 1. Explicit inputs envelope provided (e.g. { parameters: { threshold: 0.9 } })
+  if (inputs && typeof inputs === 'object') {
+    if (inputs.parameters != null || inputs.conditioning != null) {
+      const result = {
+        ...(inputs.conditioning != null ? { conditioning: { ...inputs.conditioning } } : {}),
+        ...(inputs.parameters != null ? { parameters: { ...inputs.parameters } } : {}),
+      };
+      if (threshold != null && Number.isFinite(Number(threshold))) {
+        result.parameters = { ...(result.parameters || {}), threshold: Number(threshold) };
+      }
+      return result;
+    }
+    if (inputs.threshold != null && Number.isFinite(Number(inputs.threshold))) {
+      return { parameters: { threshold: Number(inputs.threshold) } };
+    }
+  }
+
+  // 2. Explicit direct threshold provided
+  if (threshold != null && Number.isFinite(Number(threshold))) {
+    return { parameters: { threshold: Number(threshold) } };
+  }
+
+  // 3. Resolve from dataset routing policy matching settings
+  if (policy && Array.isArray(policy.bindings)) {
+    const numLabelId = labelId != null ? Number(labelId) : null;
+    const task = 'instance-segmentation';
+
+    const getBindingModelKey = (b) =>
+      b.model_registry_key ??
+      b.registry_key ??
+      b.model?.registry_key ??
+      b.model?.id ??
+      b.model ??
+      b.id ??
+      null;
+
+    const matchesExactModel = (b) => {
+      const bKey = getBindingModelKey(b);
+      return bKey != null && (bKey === modelKey || String(bKey) === String(modelKey));
+    };
+
+    const isModelAgnostic = (b) => getBindingModelKey(b) == null;
+
+    let matchedBinding = null;
+
+    // 1. Label override explicitly matching modelKey
+    if (numLabelId != null) {
+      matchedBinding = policy.bindings.find(
+        (b) => b.task === task && Number(b.label_id) === numLabelId && matchesExactModel(b)
+      );
+    }
+
+    // 2. Task default explicitly matching modelKey
+    if (!matchedBinding) {
+      matchedBinding = policy.bindings.find(
+        (b) => b.task === task && (b.label_id == null || b.label_id === undefined) && matchesExactModel(b)
+      );
+    }
+
+    // 3. Model-agnostic label override
+    if (!matchedBinding && numLabelId != null) {
+      matchedBinding = policy.bindings.find(
+        (b) => b.task === task && Number(b.label_id) === numLabelId && isModelAgnostic(b)
+      );
+    }
+
+    // 4. Model-agnostic task default
+    if (!matchedBinding) {
+      matchedBinding = policy.bindings.find(
+        (b) => b.task === task && (b.label_id == null || b.label_id === undefined) && isModelAgnostic(b)
+      );
+    }
+
+    if (matchedBinding) {
+      const bInputs = matchedBinding.inputs;
+      const configuredThreshold =
+        bInputs?.parameters?.threshold ??
+        bInputs?.threshold ??
+        matchedBinding.threshold;
+
+      if (bInputs && typeof bInputs === 'object') {
+        const result = {
+          ...(bInputs.conditioning ? { conditioning: { ...bInputs.conditioning } } : {}),
+          parameters: {
+            ...(bInputs.parameters ? { ...bInputs.parameters } : {}),
+            ...(configuredThreshold != null ? { threshold: Number(configuredThreshold) } : {}),
+          },
+        };
+        if (Object.keys(result.parameters).length === 0) {
+          delete result.parameters;
+        }
+        if (Object.keys(result).length > 0) {
+          return result;
+        }
+      } else if (configuredThreshold != null && Number.isFinite(Number(configuredThreshold))) {
+        return { parameters: { threshold: Number(configuredThreshold) } };
+      }
+    }
+  }
+
+  // 4. Fallback if inputs was a generic non-empty object
+  if (inputs && typeof inputs === 'object' && Object.keys(inputs).length > 0) {
+    return { ...inputs };
+  }
+
+  return {};
+}
+
+export function buildCellposePreviewRequest({
+  datasetId,
+  imageId,
+  labelId,
+  roiContourIds = [],
+  modelKey = CELLPOSE_POLYP_REGISTRY_KEY,
+  inputs = null,
+  policy = null,
+  threshold = null,
+}) {
+  const resolvedInputs = resolvePolypInputs({ policy, labelId, modelKey, inputs, threshold });
   return {
     dataset_id: Number(datasetId),
     image_selection: 'custom',
@@ -248,7 +381,7 @@ export function buildCellposePreviewRequest({ datasetId, imageId, labelId, roiCo
       model_registry_key: modelKey,
       task: 'instance-segmentation',
       label_id: Number(labelId),
-      inputs: {},
+      inputs: resolvedInputs,
       roi_contour_ids: roiContourIds.map(Number),
     }],
   };
@@ -404,6 +537,9 @@ export function getExistingPolypsForScope(objects = [], {
     : Array.isArray(targetParentIds)
       ? new Set(targetParentIds.map(Number))
       : null;
+  const parentById = new Map(objects.filter(Boolean).map((obj) => [
+    Number(obj.contour_id ?? obj.id), obj.parentId ?? obj.parent_id,
+  ]));
 
   return objects.filter((obj) => {
     if (!obj) return false;
@@ -411,16 +547,24 @@ export function getExistingPolypsForScope(objects = [], {
     if (objLabelId !== targetLabelId) return false;
     if (scope === 'fragment') {
       if (!parentIdSet || parentIdSet.size === 0) return false;
-      const rawPid = obj.parentId ?? obj.parent_id;
-      if (rawPid == null) return false;
-      return parentIdSet.has(Number(rawPid));
+      let parentId = obj.parentId ?? obj.parent_id;
+      const visited = new Set();
+      // A selected fragment can contain surfaces which in turn contain the polyps.
+      while (parentId != null) {
+        parentId = Number(parentId);
+        if (visited.has(parentId)) return false;
+        if (parentIdSet.has(parentId)) return true;
+        visited.add(parentId);
+        parentId = parentById.get(parentId);
+      }
+      return false;
     }
     return true;
   });
 }
 
 /**
- * Filter predictions against existing annotations and intra-batch candidates using IoU suppression.
+ * Preserve existing annotations using overlap over the smaller area; use IoU for intra-batch NMS.
  * Surviving predictions are returned; suppressed predictions are counted.
  */
 export function suppressOverlappingPredictions(
@@ -455,7 +599,13 @@ export function suppressOverlappingPredictions(
     let isSuppressed = false;
     for (const existing of validExisting) {
       const iou = calculatePolygonIoU(candidate, existing, gridSize);
-      if (iou >= iouThreshold) {
+      const candidateArea = polygonArea(candidate.x, candidate.y);
+      const existingArea = polygonArea(existing.x, existing.y);
+      const intersection = iou * (candidateArea + existingArea) / (1 + iou);
+      const smallerArea = Math.min(candidateArea, existingArea);
+      // Different models can outline the same polyp at different sizes or offsets.
+      const overlapSmaller = smallerArea > 0 ? intersection / smallerArea : 0;
+      if (iou >= iouThreshold || overlapSmaller >= 0.3) {
         isSuppressed = true;
         break;
       }
@@ -576,21 +726,7 @@ export function resolveParentContourId(prediction, {
     const cx = prediction.x.reduce((a, b) => a + b, 0) / prediction.x.length;
     const cy = prediction.y.reduce((a, b) => a + b, 0) / prediction.y.length;
 
-    // If a focused contour is specified (in fragment scope), check compatibility and containment first
-    if (effectiveFocusedId != null) {
-      const focusedObj = (objects || []).find((obj) => Number(obj.contour_id ?? obj.id) === effectiveFocusedId);
-      if (focusedObj && isCompatibleParent(focusedObj)) {
-        if (Array.isArray(focusedObj.x) && Array.isArray(focusedObj.y) && focusedObj.x.length >= 3) {
-          if (isPointInPolygon([cx, cy], focusedObj.x, focusedObj.y)) {
-            return effectiveFocusedId;
-          }
-        } else {
-          return effectiveFocusedId;
-        }
-      }
-    }
-
-    // If explicit ROIs are specified (in fragment scope), check compatibility and containment in them
+    // If explicit ROIs are specified (in fragment scope), check compatibility and containment in them first
     if (effectiveRoiIds.length > 0) {
       for (const roiId of effectiveRoiIds) {
         const roiObj = (objects || []).find((obj) => Number(obj.contour_id ?? obj.id) === roiId);
@@ -606,6 +742,20 @@ export function resolveParentContourId(prediction, {
       }
       // Predictions outside the explicit ROI in fragment scope must not attach to unrelated objects
       return null;
+    }
+
+    // If a focused contour is specified (in fragment scope without explicit ROI), check compatibility and containment
+    if (effectiveFocusedId != null) {
+      const focusedObj = (objects || []).find((obj) => Number(obj.contour_id ?? obj.id) === effectiveFocusedId);
+      if (focusedObj && isCompatibleParent(focusedObj)) {
+        if (Array.isArray(focusedObj.x) && Array.isArray(focusedObj.y) && focusedObj.x.length >= 3) {
+          if (isPointInPolygon([cx, cy], focusedObj.x, focusedObj.y)) {
+            return effectiveFocusedId;
+          }
+        } else {
+          return effectiveFocusedId;
+        }
+      }
     }
 
     // For whole-image runs or general unparented resolution, find compatible containing parent

@@ -225,6 +225,16 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
   });
 
   it('runs model and directly saves objects without any Accept step, updating Objects panel and canvas', async () => {
+    // Neither an out-of-scope polyp nor another label inside the selected coral
+    // should prompt for a write mode.
+    useAnnotationStore.setState((state) => {
+      state.objects.list.push(
+        { id: 22060, contour_id: 22060, label: 'Coral Fragment', labelId: 41, parent_id: null },
+        { id: 22061, contour_id: 22061, label: 'Coral Polyp', labelId: 43, parent_id: 22060 },
+        { id: 21062, contour_id: 21062, label: 'Other annotation', labelId: 44, parent_id: 21060 }
+      );
+    });
+
     // Mock inference execution
     inferenceApi.startInferenceJob.mockResolvedValue({
       id: 991,
@@ -289,17 +299,7 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
       fireEvent.click(runBtn);
     });
 
-    // Verify InstanceWarningModal appears with standard uniform options
-    expect(screen.getByText('Choose how to apply predictions')).toBeInTheDocument();
-    expect(
-      screen.getByText(/keeps existing annotations and adds only non-overlapping predictions/i)
-    ).toBeInTheDocument();
-
-    // Confirm with "Patch and run"
-    const patchBtn = screen.getByRole('button', { name: /Patch and run/i });
-    await act(async () => {
-      fireEvent.click(patchBtn);
-    });
+    expect(screen.queryByText('Choose how to apply predictions')).not.toBeInTheDocument();
 
     // Verify startInferenceJob was called with native ROI 21060 and result_mode: 'preview'
     await waitFor(() => {
@@ -358,6 +358,15 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
   });
 
   it('prompts with InstanceWarningModal on Run and dismisses cleanly when Cancel is clicked', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list.push({
+        id: 21061,
+        contour_id: 21061,
+        label: 'Coral Polyp',
+        labelId: 43,
+        parent_id: 21060,
+      });
+    });
     render(<IntegrationHarness service={mockService} />);
 
     // Open card

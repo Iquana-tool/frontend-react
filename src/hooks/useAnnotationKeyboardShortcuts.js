@@ -121,7 +121,7 @@ export default function useAnnotationKeyboardShortcuts() {
           break;
         }
         case '3': {
-          if (!isModifier && isToolEnabled('instance_segmentation')) {
+          if (!isModifier && !instanceWarningModalOpen && isToolEnabled('instance_segmentation')) {
             e.preventDefault();
             if (isCellposeSelected) {
               if (

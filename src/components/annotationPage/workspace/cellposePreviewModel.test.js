@@ -9,6 +9,7 @@ import {
   getExistingPolypsForScope,
   suppressOverlappingPredictions,
   CELLPOSE_POLYP_REGISTRY_KEY,
+  resolvePolypInputs,
 } from './cellposePreviewModel';
 
 describe('Cellpose polyp preview contract', () => {
@@ -94,6 +95,170 @@ describe('Cellpose polyp preview contract', () => {
         roi_contour_ids: [88],
       }],
     });
+  });
+
+  it('forwards configured confidence thresholds from matching dataset settings', () => {
+    const policy = {
+      dataset_id: 15,
+      bindings: [
+        {
+          task: 'instance-segmentation',
+          label_id: 43,
+          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
+          inputs: { parameters: { threshold: 0.9 } },
+        },
+        {
+          task: 'instance-segmentation',
+          label_id: null,
+          model_registry_key: 'yolo_polyp_v3_c_seed1',
+          inputs: { parameters: { threshold: 0.85 } },
+        },
+        {
+          task: 'instance-segmentation',
+          label_id: null,
+          model_registry_key: 'mask2former',
+          inputs: { parameters: { threshold: 0.5 } },
+        },
+      ],
+    };
+
+    // 1. Matches exact label override for Cellpose
+    expect(resolvePolypInputs({ policy, labelId: 43, modelKey: CELLPOSE_POLYP_REGISTRY_KEY })).toEqual({
+      parameters: { threshold: 0.9 },
+    });
+
+    // 2. Matches model-default binding for YOLO
+    expect(resolvePolypInputs({ policy, labelId: 43, modelKey: 'yolo_polyp_v3_c_seed1' })).toEqual({
+      parameters: { threshold: 0.85 },
+    });
+
+    // 3. Does not adopt unrelated model's threshold (mask2former)
+    expect(resolvePolypInputs({
+      policy: {
+        bindings: [
+          {
+            task: 'instance-segmentation',
+            label_id: null,
+            model_registry_key: 'mask2former',
+            inputs: { parameters: { threshold: 0.5 } },
+          },
+        ],
+      },
+      labelId: 43,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+    })).toEqual({});
+
+    // 4. Direct inputs override takes precedence
+    expect(resolvePolypInputs({
+      policy,
+      labelId: 43,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+      inputs: { parameters: { threshold: 0.95 } },
+    })).toEqual({ parameters: { threshold: 0.95 } });
+
+    // 5. Direct threshold parameter takes precedence
+    expect(resolvePolypInputs({
+      policy,
+      labelId: 43,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+      threshold: 0.7,
+    })).toEqual({ parameters: { threshold: 0.7 } });
+
+    // 6. buildCellposePreviewRequest forwards threshold in request envelope
+    const req = buildCellposePreviewRequest({
+      datasetId: 15,
+      imageId: 385,
+      labelId: 43,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+      policy,
+    });
+    expect(req.steps[0].inputs).toEqual({ parameters: { threshold: 0.9 } });
+  });
+
+  it('does not apply unrelated label or task bindings for the same model', () => {
+    const policyWithUnrelatedBindings = {
+      dataset_id: 15,
+      bindings: [
+        {
+          task: 'instance-segmentation',
+          label_id: 44, // old remapped label
+          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
+          inputs: { parameters: { threshold: 0.99 } },
+        },
+        {
+          task: 'semantic-segmentation', // unrelated task
+          label_id: 43,
+          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
+          inputs: { parameters: { threshold: 0.88 } },
+        },
+      ],
+    };
+
+    // Label 43 run should not inherit threshold from label 44 binding of the same model
+    expect(
+      resolvePolypInputs({
+        policy: policyWithUnrelatedBindings,
+        labelId: 43,
+        modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+      })
+    ).toEqual({});
+
+    // buildCellposePreviewRequest sends empty inputs when only unrelated label bindings exist
+    const req = buildCellposePreviewRequest({
+      datasetId: 15,
+      imageId: 385,
+      labelId: 43,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
+      policy: policyWithUnrelatedBindings,
+    });
+    expect(req.steps[0].inputs).toEqual({});
+  });
+
+  it('prioritizes explicit surface ROI over containing focused fragment in resolveParentContourId', () => {
+    const { resolveParentContourId } = require('./cellposePreviewModel');
+    const objects = [
+      { id: 21060, contour_id: 21060, labelId: 41, x: [0.1, 0.9, 0.9, 0.1], y: [0.1, 0.1, 0.9, 0.9] },
+      { id: 21062, contour_id: 21062, labelId: 42, parent_id: 21060, x: [0.2, 0.5, 0.5, 0.2], y: [0.2, 0.2, 0.5, 0.5] },
+      { id: 21063, contour_id: 21063, labelId: 42, parent_id: 21060, x: [0.6, 0.8, 0.8, 0.6], y: [0.6, 0.6, 0.8, 0.8] },
+    ];
+    const datasetLabels = [
+      { id: 41, name: 'Coral Fragment', parent_id: null },
+      { id: 42, name: 'Coral Surface', parent_id: 41 },
+      { id: 43, name: 'Coral Polyp', parent_id: 42 },
+    ];
+    const pred = {
+      label_id: 43,
+      x: [0.3, 0.4, 0.4, 0.3],
+      y: [0.3, 0.3, 0.4, 0.4],
+      parent_id: null,
+    };
+
+    const parentId = resolveParentContourId(pred, {
+      focusedContourId: 21060,
+      roiContourIds: [21062],
+      scope: 'fragment',
+      objects,
+      datasetLabels,
+    });
+    expect(parentId).toBe(21062);
+  });
+
+  it('falls back to the focused saved coral when a result polyp is selected', () => {
+    const objects = [
+      { id: 21060, contour_id: 21060, labelId: 41 },
+      { id: 21061, contour_id: 21061, labelId: 42, parent_id: 21060 },
+      { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21061 },
+    ];
+    const labels = [
+      { id: 41, name: 'Coral Fragment', parent_id: null },
+      { id: 42, name: 'Coral Surface', parent_id: 41 },
+      { id: 43, name: 'Coral Polyp', parent_id: 42 },
+    ];
+    const labelsMap = new Map(labels.map(({ id, name }) => [id, name]));
+
+    expect(getSelectedFragmentContourIds([30001], objects, labelsMap, 43, labels, 21060)).toEqual([21060]);
+    expect(getSelectedFragmentContourIds([21060], objects, labelsMap, 43, labels, 21060)).toEqual([21060]);
+    expect(getSelectedFragmentContourIds([], objects, labelsMap, 43, labels, 30001)).toEqual([]);
   });
 
   it('keeps response contours in normalized editor coordinates and associates mask scores', () => {
@@ -378,6 +543,55 @@ describe('Cellpose polyp preview contract', () => {
     expect(wholePolyps.map((o) => o.id)).toEqual([101, 102, 104]);
   });
 
+  it('includes polyps nested below surfaces of the selected fragment', () => {
+    const objects = [
+      { id: 10, labelId: 41, parent_id: null },
+      { id: 20, labelId: 42, parent_id: 10 },
+      { id: 30, labelId: 43, parent_id: 20 },
+      { id: 40, labelId: 41, parent_id: null },
+      { id: 50, labelId: 43, parent_id: 40 },
+    ];
+    expect(getExistingPolypsForScope(objects, {
+      targetParentIds: new Set([10]), labelId: 43, scope: 'fragment',
+    }).map((object) => object.id)).toEqual([30]);
+  });
+
+  it('terminates safely when an object parent chain cycles', () => {
+    const objects = [
+      { id: 20, labelId: 42, parent_id: 30 },
+      { id: 30, labelId: 43, parent_id: 20 },
+    ];
+    expect(getExistingPolypsForScope(objects, {
+      targetParentIds: new Set([10]), labelId: 43, scope: 'fragment',
+    })).toEqual([]);
+  });
+
+  it.each([
+    ['smaller contained outline', [0.15, 0.2, 0.2, 0.15], [0.15, 0.15, 0.2, 0.2]],
+    ['larger containing outline', [0.05, 0.4, 0.4, 0.05], [0.05, 0.05, 0.4, 0.4]],
+    ['shifted outline', [0.22, 0.42, 0.42, 0.22], [0.1, 0.1, 0.3, 0.3]],
+  ])('suppresses a %s from a second model despite low IoU', (_name, x, y) => {
+    const existing = { x: [0.1, 0.3, 0.3, 0.1], y: [0.1, 0.1, 0.3, 0.3] };
+    const prediction = { x, y, confidence: 0.9 };
+    const before = JSON.stringify(existing);
+    expect(calculatePolygonIoU(prediction, existing)).toBeLessThan(0.5);
+    expect(suppressOverlappingPredictions([prediction], [existing])).toEqual({
+      kept: [], suppressedCount: 1,
+    });
+    expect(JSON.stringify(existing)).toBe(before);
+  });
+
+  it('preserves distinct nearby polyps with only slight edge overlap', () => {
+    const existing = { x: [0.1, 0.3, 0.3, 0.1], y: [0.1, 0.1, 0.3, 0.3] };
+    const adjacent = { x: [0.28, 0.48, 0.48, 0.28], y: [0.1, 0.1, 0.3, 0.3] };
+    expect(suppressOverlappingPredictions([adjacent], [existing])).toEqual({
+      kept: [adjacent], suppressedCount: 0,
+    });
+    // The stricter existing-annotation policy must not alter normal intra-batch NMS.
+    const shifted = { x: [0.22, 0.42, 0.42, 0.22], y: [0.1, 0.1, 0.3, 0.3] };
+    expect(suppressOverlappingPredictions([existing, shifted], []).kept).toHaveLength(2);
+  });
+
   it('suppresses overlapping predictions against existing annotations and intra-batch candidates', () => {
     // Existing polyp at [0.1..0.3, 0.1..0.3]
     const existing = [
@@ -404,5 +618,3 @@ describe('Cellpose polyp preview contract', () => {
     expect(result.suppressedCount).toBe(2);
   });
 });
-
-
