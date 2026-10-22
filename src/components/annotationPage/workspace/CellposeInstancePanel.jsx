@@ -42,6 +42,7 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
     progressMessage,
     error,
     run,
+    hasExistingPolypsInScope,
     retry,
     cancel,
     checkpointSha,
@@ -140,7 +141,11 @@ export default function CellposeInstancePanel({ service, selectedModelObj }) {
           <button
             data-run
             type="button"
-            onClick={() => setWarningModalOpen(true)}
+            onClick={() => {
+              if (!canRun || isRunning) return;
+              if (hasExistingPolypsInScope) setWarningModalOpen(true);
+              else run('patch');
+            }}
             disabled={!canRun}
             title={disableReason || 'Run model'}
             className="iq-primary w-full flex items-center justify-center gap-[6px] h-[28px] px-[10px] rounded-6 bg-accent text-onAccent text-row font-bold transition-[filter] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"

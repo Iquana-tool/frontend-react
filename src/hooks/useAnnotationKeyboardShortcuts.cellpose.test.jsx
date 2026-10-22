@@ -19,6 +19,7 @@ vi.mock('../api/inference', () => ({
   streamInferenceJob: vi.fn(() => ({ abort: vi.fn() })),
   getInferenceJobItems: vi.fn(),
   cancelInferenceJob: vi.fn().mockResolvedValue({}),
+  getInferenceRoutingPolicy: vi.fn().mockResolvedValue({ bindings: [] }),
 }));
 
 vi.mock('../contexts/DatasetContext', () => ({
@@ -196,6 +197,24 @@ describe('Shortcut "3" Cellpose workflow integration (Bug 3)', () => {
     await act(async () => {
       resolveJob({ id: 5002, status: 'succeeded' });
     });
+  });
+
+  it('does not bypass an open write-mode warning with the polyp shortcut', () => {
+    useAnnotationStore.setState((state) => {
+      state.ui.instanceWarningModalOpen = true;
+    });
+    render(
+      <CellposeInstanceRunnerProvider>
+        <Harness />
+      </CellposeInstanceRunnerProvider>
+    );
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true }));
+    });
+
+    expect(inferenceApi.startInferenceJob).not.toHaveBeenCalled();
+    expect(useAnnotationStore.getState().ui.instanceRunRequested).toBe(false);
   });
 
   it('preserves established behavior and write-mode modal request for non-Cellpose instance models', async () => {

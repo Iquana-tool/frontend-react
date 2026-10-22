@@ -40,6 +40,7 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { fetchLabels } from '../../../api/labels';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
+import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
 
 export const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'partial']);
 
@@ -81,6 +82,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   const expandObject = useExpandObject();
   const setCurrentTool = useSetCurrentTool();
   const { addToast } = useToast();
+  const { policy } = useAnnotationRoutingPolicy(datasetId);
 
   // If dataset is active but labels are not yet loaded in store, fetch them automatically
   useEffect(() => {
@@ -123,6 +125,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   const currentScopeRef = useRef({ datasetId, imageId });
   const pendingUnresolvedRef = useRef([]);
   const previousCreatedIdsRef = useRef([]);
+  const replacedCountRef = useRef(0);
   const handledJobIdsRef = useRef(new Set());
 
   const handleSetWriteMode = useCallback((mode) => {
@@ -146,11 +149,31 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
         objectsList,
         datasetLabelsMap,
         mappedLabel?.labelId,
-        datasetLabels
+        datasetLabels,
+        focusedContourId
       ),
-    [selectedObjectIds, objectsList, datasetLabelsMap, mappedLabel, datasetLabels]
+    [selectedObjectIds, objectsList, datasetLabelsMap, mappedLabel, datasetLabels, focusedContourId]
   );
   const roiCount = roiContourIds.length;
+
+  const targetParentIds = useMemo(
+    () => {
+      if (scope !== 'fragment') return null;
+      if (roiContourIds.length > 0) {
+        return new Set(roiContourIds.map(Number));
+      }
+      return focusedContourId != null ? new Set([Number(focusedContourId)]) : null;
+    },
+    [scope, focusedContourId, roiContourIds]
+  );
+  const hasExistingPolypsInScope = useMemo(
+    () => getExistingPolypsForScope(objectsList, {
+      targetParentIds,
+      labelId: mappedLabel?.labelId,
+      scope,
+    }).length > 0,
+    [objectsList, targetParentIds, mappedLabel, scope]
+  );
 
   const disableReason = useMemo(() => {
     if (isRunning) return 'Inference is running…';
@@ -183,11 +206,13 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       setSuppressedCount(0);
       pendingUnresolvedRef.current = [];
       previousCreatedIdsRef.current = [];
+      replacedCountRef.current = 0;
     };
   }, [datasetId, imageId]);
 
   const persistPredictions = useCallback(
-    async (predictions, jobId, token) => {
+    async (predictions, jobId, token, options = {}) => {
+      const isRetry = Boolean(options.isRetry);
       const isCurrentRun = () => {
         const storeImageId = useAnnotationStore.getState().images?.currentImageId;
         const wsImageId = annotationSession?.currentImageId;
@@ -202,18 +227,13 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
 
       if (!isCurrentRun()) return;
 
+      // Inference callbacks retain the run-start render; annotations can change before results arrive.
+      const currentObjects = useAnnotationStore.getState().objects?.list ?? objectsList;
       setStatus('saving');
       setProgress(90);
       setProgressMessage('Saving objects…');
 
       // Determine target parent contour IDs for scope matching
-      const targetParentIds = scope === 'fragment'
-        ? new Set([
-            ...(focusedContourId != null ? [Number(focusedContourId)] : []),
-            ...roiContourIds.map(Number),
-          ])
-        : null;
-
       let predictionsToSave = predictions;
       let overlapSuppressedCount = 0;
       let replacedCount = 0;
@@ -221,11 +241,14 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       const effectiveMode = activeWriteModeRef.current || 'patch';
       const isOverride = effectiveMode === 'override' || effectiveMode === 'replace';
 
-      if (isOverride) {
-        const existingPolypsToDelete = getExistingPolypsForScope(objectsList, {
+      if (isOverride && !isRetry) {
+        const existingPolypsToDelete = getExistingPolypsForScope(currentObjects, {
           targetParentIds,
           labelId: mappedLabel.labelId,
           scope,
+        }).filter((existingObj) => {
+          const cid = existingObj.contour_id ?? existingObj.id;
+          return cid != null && !previousCreatedIdsRef.current.some((id) => Number(id) === Number(cid));
         });
 
         if (existingPolypsToDelete.length > 0) {
@@ -245,10 +268,11 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
               }
             }
           }
+          replacedCountRef.current += replacedCount;
         }
       } else {
         // 'patch' mode: suppress overlapping predictions against existing polyps
-        const existingPolyps = getExistingPolypsForScope(objectsList, {
+        const existingPolyps = getExistingPolypsForScope(currentObjects, {
           targetParentIds,
           labelId: mappedLabel.labelId,
           scope,
@@ -272,9 +296,9 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
         }
 
         const parentId = resolveParentContourId(prediction, {
-          focusedContourId: scope === 'fragment' ? focusedContourId : null,
+          focusedContourId: scope === 'fragment' && roiContourIds.length === 0 ? focusedContourId : null,
           roiContourIds: scope === 'fragment' ? roiContourIds : [],
-          objects: objectsList,
+          objects: currentObjects,
           labelsMap: datasetLabelsMap,
           datasetLabels,
           scope,
@@ -354,12 +378,13 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
         setError(null);
         pendingUnresolvedRef.current = [];
 
-        if (createdIds.length > 0) {
-          let msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added to Objects`;
-          if (replacedCount > 0) {
-            msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} saved (${replacedCount} previous replaced)`;
+        if (allCreatedIds.length > 0) {
+          let msg = `${allCreatedIds.length} ${allCreatedIds.length === 1 ? 'polyp' : 'polyps'} added to Objects`;
+          const effectiveReplaced = replacedCount || replacedCountRef.current;
+          if (effectiveReplaced > 0) {
+            msg = `${allCreatedIds.length} ${allCreatedIds.length === 1 ? 'polyp' : 'polyps'} saved (${effectiveReplaced} previous replaced)`;
           } else if (totalSuppressed > 0) {
-            msg = `${createdIds.length} ${createdIds.length === 1 ? 'polyp' : 'polyps'} added (${totalSuppressed} overlapping duplicate${totalSuppressed === 1 ? '' : 's'} suppressed)`;
+            msg = `${allCreatedIds.length} ${allCreatedIds.length === 1 ? 'polyp' : 'polyps'} added (${totalSuppressed} overlapping duplicate${totalSuppressed === 1 ? '' : 's'} suppressed)`;
           }
           addToast?.({ type: 'success', message: `${msg}.` });
         } else if (totalSuppressed > 0) {
@@ -367,19 +392,21 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
             type: 'info',
             message: `All ${totalSuppressed} detected polyps overlapped with existing annotations and were suppressed.`,
           });
-        } else if (replacedCount > 0) {
+        } else if (replacedCount > 0 || replacedCountRef.current > 0) {
+          const effectiveReplaced = replacedCount || replacedCountRef.current;
           addToast?.({
             type: 'info',
-            message: `${replacedCount} existing polyps removed.`,
+            message: `${effectiveReplaced} existing polyps removed.`,
           });
         }
       } else {
         setStatus('failed');
         setIsRunning(false);
         pendingUnresolvedRef.current = unresolved;
+        const totalAttempts = allCreatedIds.length + unresolved.length;
         const msg =
           allCreatedIds.length > 0
-            ? `Added ${allCreatedIds.length} of ${predictionsToSave.length} polyps. ${unresolved.length} could not be saved.`
+            ? `Added ${allCreatedIds.length} of ${totalAttempts} polyps. ${unresolved.length} could not be saved.`
             : `Could not save ${predictionsToSave.length} polyps.`;
         setError(msg);
       }
@@ -392,6 +419,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       focusedContourId,
       scope,
       roiContourIds,
+      targetParentIds,
       objectsList,
       datasetLabelsMap,
       selectedModelObj,
@@ -477,32 +505,35 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
   );
 
   const run = useCallback(
-    async (selectedWriteMode = null) => {
+    async (selectedWriteMode = null, explicitInputs = null) => {
       if (!canRun) return false;
 
       const effectiveMode = selectedWriteMode || activeWriteModeRef.current || 'patch';
       activeWriteModeRef.current = effectiveMode;
       setWriteMode(effectiveMode);
       const token = ++runTokenRef.current;
-    streamRef.current?.abort();
-    streamRef.current = null;
-    setError(null);
-    setIsRunning(true);
-    setStatus('starting');
-    setProgress(15);
-    setProgressMessage('Finding polyps…');
-    pendingUnresolvedRef.current = [];
-    previousCreatedIdsRef.current = [];
-    setSuppressedCount(0);
+      streamRef.current?.abort();
+      streamRef.current = null;
+      setError(null);
+      setIsRunning(true);
+      setStatus('starting');
+      setProgress(15);
+      setProgressMessage('Finding polyps…');
+      pendingUnresolvedRef.current = [];
+      previousCreatedIdsRef.current = [];
+      replacedCountRef.current = 0;
+      setSuppressedCount(0);
 
-    try {
-      const request = buildCellposePreviewRequest({
-        datasetId,
-        imageId,
-        labelId: mappedLabel.labelId,
-        modelKey,
-        roiContourIds: scope === 'fragment' ? roiContourIds : [],
-      });
+      try {
+        const request = buildCellposePreviewRequest({
+          datasetId,
+          imageId,
+          labelId: mappedLabel.labelId,
+          modelKey,
+          roiContourIds: scope === 'fragment' ? roiContourIds : [],
+          inputs: explicitInputs,
+          policy,
+        });
 
       const snapshot = await startInferenceJob(request);
       if (runTokenRef.current !== token) {
@@ -542,14 +573,14 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
       }
       return false;
     }
-  }, [canRun, datasetId, imageId, mappedLabel, scope, roiContourIds, handleSnapshot, modelKey, modelInfo]);
+  }, [canRun, datasetId, imageId, mappedLabel, scope, roiContourIds, handleSnapshot, modelKey, modelInfo, policy]);
 
   const retry = useCallback(async () => {
     if (pendingUnresolvedRef.current.length > 0 && activeJobIdRef.current != null) {
       const token = ++runTokenRef.current;
       setError(null);
       setIsRunning(true);
-      await persistPredictions(pendingUnresolvedRef.current, activeJobIdRef.current, token);
+      await persistPredictions(pendingUnresolvedRef.current, activeJobIdRef.current, token, { isRetry: true });
       return;
     }
 
@@ -647,6 +678,7 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
     writeMode,
     setWriteMode: handleSetWriteMode,
     roiCount,
+    hasExistingPolypsInScope,
     mappedLabel,
     canRun,
     disableReason,
