@@ -6,6 +6,7 @@ import {
   getPhaseStatuses,
   getStateDescriptor,
 } from '../../utils/imageStatus';
+import { getImageDataUrl } from '../../utils/imageDataUrl';
 import { itemType } from './ItemTypeBadge';
 
 const TypeIcon = ({ item }) => {
@@ -54,7 +55,7 @@ const ImageFilmstrip = ({ images, selectedId, onSelect, size = 'sm', className =
       if (base64) {
         setThumbnails((current) => ({
           ...current,
-          [imageId]: `data:image/jpeg;base64,${base64}`,
+          [imageId]: getImageDataUrl(base64),
         }));
       }
     } catch (error) {

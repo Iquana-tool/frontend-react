@@ -13,6 +13,7 @@ import useAnnotationStore from '../stores/useAnnotationStore';
 import { getImageById } from '../api/images';
 import { getPixelScale } from '../api/scale';
 import { loadFrame, peekFrame, prefetchFrames } from '../utils/frameCache';
+import { getImageDataUrl } from '../utils/imageDataUrl';
 
 export const useImageLoader = (currentImage) => {
   const imageObject = useImageObject();
@@ -77,7 +78,7 @@ export const useImageLoader = (currentImage) => {
       }
 
       const base64Data = imageResponse[image.id];
-      const imageUrl = `data:image/jpeg;base64,${base64Data}`;
+      const imageUrl = getImageDataUrl(base64Data);
       const imgObject = new Image();
 
       // Wait for image to load

@@ -15,6 +15,7 @@ import { useDataset } from '../contexts/DatasetContext';
 import { usePermissions } from '../hooks/usePermissions';
 import { Permission } from '../utils/permissions';
 import { getStateDescriptor } from '../utils/imageStatus';
+import { getImageDataUrl } from '../utils/imageDataUrl';
 import { getLabelColor } from '../utils/labelColors';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import AnnotationViewerCanvas from '../components/viewer/AnnotationViewerCanvas';
@@ -127,7 +128,7 @@ const AnnotationViewerPage = () => {
             ([key]) => key !== 'success' && key !== 'message'
           )?.[1];
 
-        setImageSrc(base64 ? `data:image/png;base64,${base64}` : null);
+        setImageSrc(getImageDataUrl(base64));
         setContours(contourResponse.contours || []);
         setError(null);
       } catch (err) {
