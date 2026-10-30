@@ -33,6 +33,7 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
 import '../../../styles/workspace.css';
+import { CellposeInstanceRunnerProvider } from './CellposeInstanceRunnerContext';
 import {
   useWorkspaceTheme,
   useWorkspaceMode,
@@ -113,7 +114,7 @@ const useSliceWheel = (areaRef) => {
  * The theme is applied via `data-theme` on this element rather than the
  * document, so the surrounding light-themed app is unaffected.
  */
-const WorkspaceShell = () => {
+const WorkspaceShellContent = () => {
   const theme = useWorkspaceTheme();
   const mode = useWorkspaceMode();
   const leftDrawerOpen = useLeftDrawerOpen();
@@ -209,68 +210,74 @@ const WorkspaceShell = () => {
       className="iq-workspace fixed inset-0 flex flex-col overflow-hidden bg-app text-t1"
       data-theme={theme}
     >
-      <TopToolbar />
+        <TopToolbar />
 
-      {mode === 'review' && <ReviewBanner />}
+        {mode === 'review' && <ReviewBanner />}
 
-      {/* Annotator-facing review feedback and the correction queue. Both render
-          nothing unless there is something to show, so they cost nothing in
-          ordinary annotation work. */}
-      {/* Keyed to the scan on a stack, so stepping through slices neither reloads
-          it nor lets it blink out while the next slice's mask is looked up. */}
-      {stackId != null
-        ? <RejectionBanner stackId={stackId} dataset={dataset} />
-        : maskId && <RejectionBanner maskId={maskId} dataset={dataset} />}
-      <CorrectionBar />
+        {/* Annotator-facing review feedback and the correction queue. Both render
+            nothing unless there is something to show, so they cost nothing in
+            ordinary annotation work. */}
+        {/* Keyed to the scan on a stack, so stepping through slices neither reloads
+            it nor lets it blink out while the next slice's mask is looked up. */}
+        {stackId != null
+          ? <RejectionBanner stackId={stackId} dataset={dataset} />
+          : maskId && <RejectionBanner maskId={maskId} dataset={dataset} />}
+        <CorrectionBar />
 
-      <div className="flex-1 min-h-0 flex">
-        <ToolRail />
-        {/* The drawer is the rail's companion in every mode, and carries whatever
-            that mode's work needs beside the canvas: the options for the selected
-            drawing tool while annotating, the selected calibration's controls
-            while calibrating, and — since reviewing configures nothing — what the
-            image measures, for judging it against the dataset it belongs to. */}
-        {/* The overview and the view settings are rail entries of their own and
-            look the same in every mode. */}
-        {leftDrawerOpen && (
-          leftDrawerContent === 'overview' ? <OverviewDrawer />
-            : leftDrawerContent === 'view' ? <ViewSettingsDrawer />
-              : mode === 'calibrate' ? <CalibrationDrawer />
-                : mode === 'review' ? <ReviewDrawer />
-                  : <ToolOptionsDrawer />
-        )}
+        <div className="flex-1 min-h-0 flex">
+          <ToolRail />
+          {/* The drawer is the rail's companion in every mode, and carries whatever
+              that mode's work needs beside the canvas: the options for the selected
+              drawing tool while annotating, the selected calibration's controls
+              while calibrating, and — since reviewing configures nothing — what the
+              image measures, for judging it against the dataset it belongs to. */}
+          {/* The overview and the view settings are rail entries of their own and
+              look the same in every mode. */}
+          {leftDrawerOpen && (
+            leftDrawerContent === 'overview' ? <OverviewDrawer />
+              : leftDrawerContent === 'view' ? <ViewSettingsDrawer />
+                : mode === 'calibrate' ? <CalibrationDrawer />
+                  : mode === 'review' ? <ReviewDrawer />
+                    : <ToolOptionsDrawer />
+          )}
 
-        <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">
-          <div ref={canvasAreaRef} data-guide="canvas" className="flex-1 relative overflow-hidden">
-            <MainCanvas />
-            <SliceHud />
-            <ActionBar />
-            {/* Over the bottom of the image, above the action bar, for a stack item. */}
-            <TimelineDrawer />
-            {/* Mode ring. The stage fills the screen and the eye lives on it, so
-                the mode has to be answerable without looking back at the toolbar.
-                An inset border in the phase's hue does that at the edge of vision
-                and costs no space; `pointer-events-none` keeps it clear of every
-                canvas interaction underneath. */}
-            <div
-              aria-hidden
-              className={`pointer-events-none absolute inset-0 border-2 ${modePhase.border}`}
-            />
+          <div className="flex-1 min-w-0 flex flex-col bg-canvasbg">
+            <div ref={canvasAreaRef} data-guide="canvas" className="flex-1 relative overflow-hidden">
+              <MainCanvas />
+              <SliceHud />
+              <ActionBar />
+              {/* Over the bottom of the image, above the action bar, for a stack item. */}
+              <TimelineDrawer />
+              {/* Mode ring. The stage fills the screen and the eye lives on it, so
+                  the mode has to be answerable without looking back at the toolbar.
+                  An inset border in the phase's hue does that at the edge of vision
+                  and costs no space; `pointer-events-none` keeps it clear of every
+                  canvas interaction underneath. */}
+              <div
+                aria-hidden
+                className={`pointer-events-none absolute inset-0 border-2 ${modePhase.border}`}
+              />
+            </div>
+
+            <SliceBar />
+            {filmstripOpen && <Filmstrip />}
+            <StatusBar />
           </div>
 
-          <SliceBar />
-          {filmstripOpen && <Filmstrip />}
-          <StatusBar />
+          <RightPanel />
         </div>
 
-        <RightPanel />
+        <ShortcutSheet />
+        {/* Guide cards and offers. Inside the workspace root for its theme tokens. */}
+        <GuideLayer />
       </div>
-
-      <ShortcutSheet />
-      {/* Guide cards and offers. Inside the workspace root for its theme tokens. */}
-      <GuideLayer />
-    </div>
-  );
+    );
 };
+
+const WorkspaceShell = () => (
+  <CellposeInstanceRunnerProvider>
+    <WorkspaceShellContent />
+  </CellposeInstanceRunnerProvider>
+);
 
 export default WorkspaceShell;

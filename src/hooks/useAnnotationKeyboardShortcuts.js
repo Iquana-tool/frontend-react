@@ -12,12 +12,16 @@ import {
   useSetInstanceRunRequested,
   useInstanceWarningModalOpen,
   useWorkspaceMode,
+  useInstanceModel,
+  useAvailableInstanceModels,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
 import useAiTools from './useAiTools';
 import { deleteObject } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
+import { useCellposeInstanceRunnerContext } from '../components/annotationPage/workspace/CellposeInstanceRunnerContext';
+import { acceptsRoiInput } from '../components/annotationPage/workspace/cellposePreviewModel';
 
 /**
  * Action keyboard shortcuts for the annotation page.
@@ -52,6 +56,12 @@ export default function useAnnotationKeyboardShortcuts() {
   const setInstanceRunRequested = useSetInstanceRunRequested();
   const instanceWarningModalOpen = useInstanceWarningModalOpen();
   const mode = useWorkspaceMode();
+  const instanceModel = useInstanceModel();
+  const cellposeRunner = useCellposeInstanceRunnerContext();
+  const availableInstanceModels = useAvailableInstanceModels();
+  const isCellposeSelected = acceptsRoiInput(
+    (availableInstanceModels || []).find((m) => m.id === instanceModel || m.registry_key === instanceModel)
+  );
 
   const { runSegmentation } = useAISegmentation();
   const suggestSimilar = useSuggestSimilar();
@@ -115,9 +125,20 @@ export default function useAnnotationKeyboardShortcuts() {
           break;
         }
         case '3': {
-          if (!isModifier && isToolEnabled('instance_segmentation')) {
+          if (!isModifier && !instanceWarningModalOpen && isToolEnabled('instance_segmentation')) {
             e.preventDefault();
-            runInstanceRequest(true);
+            if (isCellposeSelected) {
+              if (
+                cellposeRunner &&
+                cellposeRunner.canRun &&
+                !cellposeRunner.isRunning &&
+                cellposeRunner.status !== 'saving'
+              ) {
+                cellposeRunner.run();
+              }
+            } else {
+              runInstanceRequest(true);
+            }
           }
           break;
         }
@@ -158,5 +179,8 @@ export default function useAnnotationKeyboardShortcuts() {
     currentTool,
     prompts.length,
     removeLastPrompt,
+    isToolEnabled,
+    isCellposeSelected,
+    cellposeRunner,
   ]);
 }
