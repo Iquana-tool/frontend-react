@@ -3,7 +3,7 @@ import { render, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useAnnotationKeyboardShortcuts from './useAnnotationKeyboardShortcuts';
 import { CellposeInstanceRunnerProvider, useCellposeInstanceRunnerContext } from '../components/annotationPage/workspace/CellposeInstanceRunnerContext';
-import { CELLPOSE_POLYP_REGISTRY_KEY } from '../components/annotationPage/workspace/cellposePreviewModel';
+const CELLPOSE_POLYP_REGISTRY_KEY = 'cpsam_polyp_v3_b_seed17';
 import useAnnotationStore from '../stores/useAnnotationStore';
 import { initialState } from '../stores/initialState';
 import * as inferenceApi from '../api/inference';
@@ -56,6 +56,7 @@ function Harness() {
 const cellposeModel = {
   id: CELLPOSE_POLYP_REGISTRY_KEY,
   registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
+  roi_input: 'parent_regions',
   name: 'Cellpose-SAM · Polyp',
   task: 'instance-segmentation',
   classes: [{ key: 'polyp' }],

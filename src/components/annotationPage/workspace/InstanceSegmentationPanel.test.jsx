@@ -72,6 +72,7 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
       {
         id: 'cpsam_polyp_v3_b_seed17',
         registry_key: 'cpsam_polyp_v3_b_seed17',
+        roi_input: 'parent_regions',
         name: 'Cellpose-SAM · Polyp',
         is_experimental: true,
         checkpoint_sha256: '8d17682741428d0c71b93dc6112de9ff9d6595fc586fe797bf4566423b788eba',

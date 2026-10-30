@@ -38,7 +38,7 @@ import useAiTools from '../../../hooks/useAiTools';
 import { useInstanceSegmentation } from '../../../hooks/useInstanceSegmentation';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useCellposeInstanceRunnerContext } from './CellposeInstanceRunnerContext';
-import { isPolypInstanceModel } from './cellposePreviewModel';
+import { acceptsRoiInput } from './cellposePreviewModel';
 
 // Module-level map tracking explicit user selections per dataset: datasetKey -> modelId
 const manualInstanceOverridesByDataset = new Map();
@@ -162,10 +162,7 @@ export default function useAnnotationServices() {
   const selectedInstanceModel = availableInstanceModels.find((model) =>
     matchesModelKey(model, 'instance-segmentation', instanceModel)
   );
-  const isCellposeSelected =
-    isPolypInstanceModel(instanceModel) ||
-    isPolypInstanceModel(selectedInstanceModel?.id) ||
-    isPolypInstanceModel(selectedInstanceModel?.registry_key);
+  const isCellposeSelected = acceptsRoiInput(selectedInstanceModel);
   const hasUsableSelectedInstanceModel = Boolean(selectedInstanceModel);
   const instanceInputs = getMatchingBindingInputs(
     instanceRouting,

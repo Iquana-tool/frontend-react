@@ -13,6 +13,7 @@ import {
   useInstanceWarningModalOpen,
   useWorkspaceMode,
   useInstanceModel,
+  useAvailableInstanceModels,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
 import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
@@ -20,7 +21,7 @@ import useAiTools from './useAiTools';
 import { deleteObject } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
 import { useCellposeInstanceRunnerContext } from '../components/annotationPage/workspace/CellposeInstanceRunnerContext';
-import { isPolypInstanceModel } from '../components/annotationPage/workspace/cellposePreviewModel';
+import { acceptsRoiInput } from '../components/annotationPage/workspace/cellposePreviewModel';
 
 /**
  * Action keyboard shortcuts for the annotation page.
@@ -57,7 +58,10 @@ export default function useAnnotationKeyboardShortcuts() {
   const mode = useWorkspaceMode();
   const instanceModel = useInstanceModel();
   const cellposeRunner = useCellposeInstanceRunnerContext();
-  const isCellposeSelected = isPolypInstanceModel(instanceModel);
+  const availableInstanceModels = useAvailableInstanceModels();
+  const isCellposeSelected = acceptsRoiInput(
+    (availableInstanceModels || []).find((m) => m.id === instanceModel || m.registry_key === instanceModel)
+  );
 
   const { runSegmentation } = useAISegmentation();
   const suggestSimilar = useSuggestSimilar();

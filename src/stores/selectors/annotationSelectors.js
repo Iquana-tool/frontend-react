@@ -128,7 +128,6 @@ export const useSetInstanceWarningModalOpen = () => useAnnotationStore(state => 
 // AI Annotation selectors
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
-export const useCellposePreview = () => useAnnotationStore(state => state.aiAnnotation.cellposePreview);
 export const useLastInstanceRun = () => useAnnotationStore(state => state.aiAnnotation.lastInstanceRun);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
 export const usePromptMode = () => useAnnotationStore(state => state.aiAnnotation.promptMode);
@@ -150,12 +149,6 @@ export const useClearAllPrompts = () => useAnnotationStore(state => state.clearA
 // For prompts that became an object. Not interchangeable with the above — see the slice.
 export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
-export const useSetCellposePreview = () => useAnnotationStore(state => state.setCellposePreview);
-export const useUpdateCellposePreviewPrediction = () => useAnnotationStore(state => state.updateCellposePreviewPrediction);
-export const useUpdateCellposePreviewVertex = () => useAnnotationStore(state => state.updateCellposePreviewVertex);
-export const useSetCellposePreviewEditingId = () => useAnnotationStore(state => state.setCellposePreviewEditingId);
-export const useRemoveCellposePreviewPrediction = () => useAnnotationStore(state => state.removeCellposePreviewPrediction);
-export const useClearCellposePreview = () => useAnnotationStore(state => state.clearCellposePreview);
 export const useSetLastInstanceRun = () => useAnnotationStore(state => state.setLastInstanceRun);
 export const useClearLastInstanceRun = () => useAnnotationStore(state => state.clearLastInstanceRun);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);

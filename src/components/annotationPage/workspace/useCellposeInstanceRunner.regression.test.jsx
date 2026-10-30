@@ -29,7 +29,7 @@ vi.mock('../../../hooks/useAiTools', () => ({ default: () => ({ isEnabled: () =>
 vi.mock('../../../hooks/useInstanceSegmentation', () => ({ useInstanceSegmentation: () => ({ runInstance: mocks.legacyRun }) }));
 
 const model = {
-  id: 'cpsam_polyp_v3_b_seed17', registry_key: 'cpsam_polyp_v3_b_seed17',
+  id: 'cpsam_polyp_v3_b_seed17', registry_key: 'cpsam_polyp_v3_b_seed17', roi_input: 'parent_regions',
   name: 'Cellpose-SAM · Polyp', classes: [{ key: 'polyp' }], label_ids: [43],
   class_mappings: [{ model_class: { key: 'polyp' }, action: 'map', label_id: 43 }],
 };
@@ -221,7 +221,7 @@ describe('live Cellpose runner regressions', () => {
 
 
 describe('YOLO polyp uses the shared instance workflow', () => {
-  const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp' };
+  const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp', checkpoint_sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' };
   it('saves YOLO results with the selected model identity and mapped dataset label', async () => {
     useAnnotationStore.setState((state) => {
       state.models.availableInstanceModels = [model, yolo];
@@ -263,7 +263,7 @@ describe('YOLO polyp uses the shared instance workflow', () => {
   });
 
   it('keeps the focused coral ROI after selecting a result polyp and switching models both ways', async () => {
-    const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp' };
+    const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp', checkpoint_sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' };
     useAnnotationStore.setState((state) => {
       state.models.availableInstanceModels = [model, yolo];
       state.models.instanceModel = model.id;

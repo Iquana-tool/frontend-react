@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Loader2, Play, Star } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
 import CellposeInstancePanel from './CellposeInstancePanel';
-import { isPolypInstanceModel } from './cellposePreviewModel';
+import { acceptsRoiInput } from './cellposePreviewModel';
 import { getPromptTypeInfo } from '../../../utils/promptTypes';
 import {
   useModelFavorites,
@@ -74,11 +74,7 @@ const ServiceCard = ({ service }) => {
   const canRun =
     service.canRun ?? (hasModels && !service.isLoading && !service.isRunning);
 
-  const isCellpose =
-    service.key === 'instance' &&
-    (isPolypInstanceModel(service.selectedModel) ||
-      isPolypInstanceModel(selectedModelObj?.id) ||
-      isPolypInstanceModel(selectedModelObj?.registry_key));
+  const isCellpose = service.key === 'instance' && acceptsRoiInput(selectedModelObj);
 
   return (
     <div className="rounded-9 border border-ln2 bg-well px-[10px] py-[9px]">

@@ -100,7 +100,6 @@ export const initialState = {
   aiAnnotation: {
     prompts: [],
     activePreview: null,
-    cellposePreview: null,
     /** Last completed instance-segmentation run: { count, objectIds, labelName, imageId, datasetId } */
     lastInstanceRun: null,
     isSubmitting: false,

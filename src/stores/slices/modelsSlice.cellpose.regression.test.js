@@ -8,7 +8,7 @@ import { getSelectedFragmentContourIds, resolvePolypProjectLabel } from '../../c
 vi.mock('../../api/instance_segmentation', () => ({ getInstanceModels: vi.fn() }));
 vi.mock('../../api/inference', () => ({ getInferenceModelCatalog: vi.fn() }));
 const key = 'cpsam_polyp_v3_b_seed17';
-const provider = { registry_key: key, name: 'Cellpose', classes: [{ key: 'polyp' }], tags: { maturity: 'provisional' } };
+const provider = { registry_key: key, name: 'Cellpose', classes: [{ key: 'polyp' }], tags: { maturity: 'provisional', roi_input: 'parent_regions' } };
 const catalog = (labelId, action = 'map') => ({ models: [{ ...provider, task: 'instance-segmentation', label_ids: action === 'map' ? [labelId] : [], class_mappings: [{ model_class: { key: 'polyp' }, action, label_id: labelId }] }] });
 const deferred = () => { let resolve; const promise = new Promise((done) => { resolve = done; }); return { resolve, promise }; };
 
@@ -76,8 +76,12 @@ describe('Cellpose discovery and label regressions', () => {
 
 it('discovers YOLO C seed 1 with the dataset mapping and verified artifact identity', async () => {
   const yoloKey = 'yolo_polyp_v3_c_seed1';
-  getInstanceModels.mockResolvedValue({ success: true, result: [{ ...provider, registry_key: yoloKey }] });
-  getInferenceModelCatalog.mockResolvedValue({ models: [{ ...catalog(43).models[0], registry_key: yoloKey }] });
+  // Name and artifact identity come from the model's own info, not from a frontend table.
+  getInstanceModels.mockResolvedValue({ success: true, result: [{
+    ...provider, registry_key: yoloKey, name: 'YOLO11m-seg · Polyp',
+    tags: { ...provider.tags, default_checkpoint_sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' },
+  }] });
+  getInferenceModelCatalog.mockResolvedValue({ models: [{ ...catalog(43).models[0], registry_key: yoloKey, name: 'YOLO11m-seg · Polyp' }] });
   await useAnnotationStore.getState().fetchAvailableInstanceModels(15);
   const loaded = useAnnotationStore.getState().models.availableInstanceModels.find((m) => m.id === yoloKey);
   expect(loaded.name).toContain('YOLO11m-seg');
