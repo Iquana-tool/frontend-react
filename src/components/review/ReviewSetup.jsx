@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { buildLabelHierarchy } from '../../utils/labelHierarchy';
 import { getLabelColor } from '../../utils/labelColors';
+import QueueHelpNote from '../ui/QueueHelpNote';
 
 /** The three ways to slice the review work. */
 const MODES = [
@@ -102,6 +103,9 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
         <p className="text-t2 mb-2">
           Choose how to work through the annotations awaiting review.
         </p>
+        <div className="mb-4">
+          <QueueHelpNote kind="review" />
+        </div>
         {pending != null && (
           <p className="text-sm font-medium text-ac mb-6">
             {pending === 0

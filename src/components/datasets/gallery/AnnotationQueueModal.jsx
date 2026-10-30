@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ListOrdered, Loader2, Play, RotateCcw, SquarePen, X } from "lucide-react";
 import {
   buildAnnotationQueue,
@@ -12,9 +12,12 @@ import {
 import { isAiToolEnabled } from "../../../utils/aiTools";
 import useDatasetMetadata from "../../../hooks/useDatasetMetadata";
 import MetadataFilterBar from "./MetadataFilterBar";
+import QueueHelpNote from "../../ui/QueueHelpNote";
 
 /** Job states after which polling stops. */
-const JOB_DONE = new Set(["succeeded", "partial", "cancelled"]);
+const JOB_DONE = new Set(["succeeded", "partial", "cancelled", "failed"]);
+/** How many metadata keys the filter search suggests at once. */
+const KEY_SUGGESTIONS = 8;
 const ROUND_ROBIN = "round_robin";
 const ORDER_LABELS = { ascending: "Ascending", descending: "Descending", [ROUND_ROBIN]: "Round robin" };
 const PREFERRED_EMBEDDER = "dinov3";
@@ -39,6 +42,7 @@ const initialSettings = (summary, models) => {
       || (embedders.includes(PREFERRED_EMBEDDER) ? PREFERRED_EMBEDDER : embedders[0]) || null,
     trainedModel: saved.trained_model || models.trained[0]?.registry_key || null,
     metadataFilters: saved.metadata_filters || {},
+    balanceBy: saved.balance_by || null,
     confidencePct: saved.max_confidence != null ? Math.round(saved.max_confidence * 100) : null,
     hideBuilder: saved.show_builder === false,
   };
@@ -72,6 +76,13 @@ const AnnotationQueueModal = ({
   const [notice, setNotice] = useState(null);
   // A running preparation job (filling image vectors / model scores), shown as progress.
   const [prepJob, setPrepJob] = useState(null);
+  // Set when the user leaves the wait (closing the window, or a shared job they cannot stop):
+  // the poll loop ends and nothing is built or opened behind their back.
+  const detachedRef = useRef(false);
+  // Metadata keys the user searched for and picked; only these (and keys with an active
+  // filter) are shown, instead of one control per key the dataset has.
+  const [pickedKeys, setPickedKeys] = useState([]);
+  const [keyQuery, setKeyQuery] = useState("");
   const { facets } = useDatasetMetadata(isOpen ? dataset?.id : null, NO_IMAGES);
 
   const update = useCallback((patch) => setSettings((current) => ({ ...current, ...patch })), []);
@@ -84,6 +95,9 @@ const AnnotationQueueModal = ({
     setError(null);
     setNotice(null);
     setRecomputing(forceChooser);
+    detachedRef.current = false;
+    setPickedKeys([]);
+    setKeyQuery("");
     Promise.all([
       fetchAnnotationQueueSummary(dataset.id),
       fetchQueueModels(dataset.id).catch(() => null),
@@ -147,7 +161,8 @@ const AnnotationQueueModal = ({
   const partner = roundRobin && methods[settings.roundRobinWith];
   // A method's sentence for one of its directions; round robin runs each in its default order.
   const describe = (m, direction = m?.directions[0]) => m?.descriptions[direction];
-  const useConfidence = settings?.confidencePct != null;
+  // The confidence filter needs a model that predicts confidences on this dataset.
+  const useConfidence = settings?.confidencePct != null && !confidenceBlocked;
   const needs = new Set([
     ...(method?.needs || []),
     ...(partner?.needs || []),
@@ -168,6 +183,7 @@ const AnnotationQueueModal = ({
     embedding_model: needs.has("embedding_model") ? settings.embeddingModel : null,
     trained_model: needs.has("trained_model") ? settings.trainedModel : null,
     metadata_filters: settings.metadataFilters,
+    balance_by: settings.balanceBy || null,
     max_confidence: useConfidence ? settings.confidencePct / 100 : null,
     show_builder: !settings.hideBuilder,
   });
@@ -196,11 +212,14 @@ const AnnotationQueueModal = ({
 
   // Polling (rather than a stream) keeps this window self-contained; preparation is short
   // on a typical dataset and the check is cheap.
+  // Returns null when the user stopped waiting (see `detachedRef`).
   const waitForJob = async (job) => {
     let current = job;
     while (!JOB_DONE.has(current.status)) {
+      if (detachedRef.current) return null;
       setPrepJob(current);
       await new Promise((resolve) => setTimeout(resolve, pollMs));
+      if (detachedRef.current) return null;
       current = (await fetchQueuePrepJob(dataset.id, current.id)).job;
     }
     setPrepJob(null);
@@ -218,8 +237,13 @@ const AnnotationQueueModal = ({
       const prepared = await prepareAnnotationQueue(dataset.id, body);
       if (!prepared.ready && prepared.job) {
         const finished = await waitForJob(prepared.job);
+        if (!finished) return;
         if (finished.status === "cancelled") {
           setNotice("Preparation stopped. Your saved queue was not changed.");
+          return;
+        }
+        if (finished.status === "failed") {
+          setError("Preparation stopped because the worker stopped responding. Try again.");
           return;
         }
       }
@@ -235,14 +259,25 @@ const AnnotationQueueModal = ({
     }
   };
 
+  // Stops the job when this user started it. A job is shared with everyone who asked for
+  // the same preparation, so for anyone else the server refuses and we only stop waiting.
   const handleCancelPrep = async () => {
-    if (prepJob) await cancelQueuePrepJob(dataset.id, prepJob.id);
+    if (!prepJob) return;
+    try {
+      await cancelQueuePrepJob(dataset.id, prepJob.id);
+    } catch (err) {
+      detachedRef.current = true;
+      setPrepJob(null);
+      setNotice((err.message || "Stopped waiting for the preparation.").replace(/^API Error: /, ""));
+    }
   };
 
-  // Closing while images are being prepared stops the job too. Otherwise the polling loop
-  // would keep running unseen and open the editor when the job finished.
+  // Closing only stops waiting. The job keeps filling vectors and scores, which are saved
+  // and reused by the next build, and may be shared with other annotators; and the poll
+  // loop must not build a queue or open the editor after the window is gone.
   const handleClose = () => {
-    if (prepJob) handleCancelPrep();
+    detachedRef.current = true;
+    setPrepJob(null);
     onClose();
   };
 
@@ -255,6 +290,20 @@ const AnnotationQueueModal = ({
     if (nextValues.length) next[key] = nextValues;
     else delete next[key];
     update({ metadataFilters: next });
+  };
+
+  const shownFacets = (facets || []).filter(
+    (f) => pickedKeys.includes(f.key) || Object.hasOwn(settings?.metadataFilters || {}, f.key)
+  );
+  const keySuggestions = keyQuery.trim()
+    ? (facets || [])
+      .filter((f) => !shownFacets.includes(f)
+        && f.key.toLowerCase().includes(keyQuery.trim().toLowerCase()))
+      .slice(0, KEY_SUGGESTIONS)
+    : [];
+  const pickKey = (key) => {
+    setPickedKeys((current) => (current.includes(key) ? current : [...current, key]));
+    setKeyQuery("");
   };
 
   const selectOrder = (order) => update({
@@ -357,6 +406,8 @@ const AnnotationQueueModal = ({
 
                 {showChooser && (
                   <div className="space-y-4">
+                    <QueueHelpNote kind="annotation" />
+
                     {/* Sort */}
                     <div>
                       <label htmlFor="queue-method" className={labelClass}>Sort images by</label>
@@ -411,31 +462,83 @@ const AnnotationQueueModal = ({
                       "Scores unfinished images in the background. It does not add any objects."
                     )}
 
-                    {/* Filter */}
+                    {/* Balance: take turns between the values of a metadata key */}
+                    {(facets || []).length > 0 && (
+                      <div>
+                        <label htmlFor="queue-balance" className={labelClass}>Take turns by</label>
+                        <select id="queue-balance" value={settings.balanceBy || ""} disabled={busy}
+                          onChange={(e) => update({ balanceBy: e.target.value || null })}
+                          className={fieldClass}>
+                          <option value="">Nothing (one sorted list)</option>
+                          {facets.map((f) => <option key={f.key} value={f.key}>{f.key}</option>)}
+                        </select>
+                        <p className="text-[11px] text-t3 mt-1">
+                          {settings.balanceBy
+                            ? `One image of each ${settings.balanceBy} in turn, every ${settings.balanceBy} in the order above.`
+                            : "E.g. species: alternate between species instead of finishing one before the next."}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Filter: search a key, then narrow it */}
                     <div className="space-y-2">
-                      <div className={labelClass}>Filter by</div>
-                      <MetadataFilterBar
-                        facets={facets}
-                        filters={settings.metadataFilters}
-                        untaggedCount={0}
-                        onToggleValue={toggleMetadataValue}
-                        onSetCondition={(key, condition) =>
-                          update({ metadataFilters: { ...settings.metadataFilters, [key]: condition } })}
-                        onClear={() => update({ metadataFilters: {} })}
-                      />
-                      <label className={`flex items-center gap-2 text-sm text-t2 ${confidenceBlocked ? "opacity-60" : ""}`}>
-                        <input type="checkbox" className="h-4 w-4" checked={useConfidence}
-                          disabled={busy || Boolean(confidenceBlocked)}
-                          onChange={(e) => update({ confidencePct: e.target.checked ? DEFAULT_CONFIDENCE_PCT : null })} />
-                        Model confidence below
-                        <input type="number" min={1} max={100} aria-label="Confidence percent"
-                          value={settings.confidencePct ?? DEFAULT_CONFIDENCE_PCT}
-                          disabled={busy || !useConfidence}
-                          onChange={(e) => update({ confidencePct: Math.min(100, Math.max(1, Number(e.target.value) || 1)) })}
-                          className="w-16 px-2 py-1 text-sm border border-ln2 rounded bg-p1 text-t1" />%
-                      </label>
-                      {confidenceBlocked && (
-                        <p className="text-[11px] text-t3">The confidence filter {confidenceBlocked}.</p>
+                      <label htmlFor="queue-filter-key" className={labelClass}>Filter by</label>
+                      {(facets || []).length > 0 ? (
+                        <div className="relative">
+                          <input id="queue-filter-key" type="search" value={keyQuery} disabled={busy}
+                            onChange={(e) => setKeyQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && keySuggestions[0]) {
+                                e.preventDefault();
+                                pickKey(keySuggestions[0].key);
+                              }
+                            }}
+                            placeholder="Search metadata, e.g. species"
+                            className={fieldClass} />
+                          {keySuggestions.length > 0 && (
+                            <ul role="listbox" aria-label="Metadata keys"
+                              className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-ln2 bg-p1 shadow-lg">
+                              {keySuggestions.map((f) => (
+                                <li key={f.key}>
+                                  <button type="button" role="option" aria-selected="false"
+                                    onClick={() => pickKey(f.key)}
+                                    className="w-full text-left px-3 py-1.5 text-sm text-t1 hover:bg-hv">
+                                    {f.key}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-t3">This dataset has no image metadata to filter by.</p>
+                      )}
+                      {shownFacets.length > 0 && (
+                        <MetadataFilterBar
+                          facets={shownFacets}
+                          filters={settings.metadataFilters}
+                          untaggedCount={0}
+                          onToggleValue={toggleMetadataValue}
+                          onSetCondition={(key, condition) =>
+                            update({ metadataFilters: { ...settings.metadataFilters, [key]: condition } })}
+                          onClear={() => {
+                            setPickedKeys([]);
+                            update({ metadataFilters: {} });
+                          }}
+                        />
+                      )}
+                      {!confidenceBlocked && (
+                        <label className="flex items-center gap-2 text-sm text-t2">
+                          <input type="checkbox" className="h-4 w-4" checked={useConfidence}
+                            disabled={busy}
+                            onChange={(e) => update({ confidencePct: e.target.checked ? DEFAULT_CONFIDENCE_PCT : null })} />
+                          Model confidence below
+                          <input type="number" min={1} max={100} aria-label="Confidence percent"
+                            value={settings.confidencePct ?? DEFAULT_CONFIDENCE_PCT}
+                            disabled={busy || !useConfidence}
+                            onChange={(e) => update({ confidencePct: Math.min(100, Math.max(1, Number(e.target.value) || 1)) })}
+                            className="w-16 px-2 py-1 text-sm border border-ln2 rounded bg-p1 text-t1" />%
+                        </label>
                       )}
                     </div>
 
@@ -479,7 +582,7 @@ const AnnotationQueueModal = ({
           <div className="flex justify-end gap-3 px-6 py-4 bg-well border-t border-ln">
             {/* While images are being prepared this stops the job; otherwise it closes. */}
             <button
-              onClick={prepJob ? handleCancelPrep : onClose}
+              onClick={prepJob ? handleCancelPrep : handleClose}
               disabled={busy && !prepJob}
               className="px-4 py-2 text-sm font-medium text-t2 bg-p1 border border-ln2 rounded-lg hover:bg-hv transition-colors disabled:opacity-50"
             >

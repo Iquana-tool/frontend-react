@@ -26,3 +26,9 @@ test("choosing an ordering preselects its default direction", () => {
     expect.objectContaining({ sortStrategy: "confidence", direction: "asc" })
   );
 });
+
+test("the help note links to the review queue docs", () => {
+  render(<ReviewSetup summary={summary} labels={[]} building={false} onStart={vi.fn()} />);
+  const link = screen.getByRole("link", { name: /Learn more about it here/ });
+  expect(link.getAttribute("href")).toMatch(/review-and-correct\/#setting-up-a-review-queue$/);
+});

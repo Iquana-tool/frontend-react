@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import AnnotationQueueModal from "./AnnotationQueueModal";
 import * as api from "../../../api";
 
@@ -58,11 +58,25 @@ test("methods a dataset cannot run are disabled with the reason", async () => {
   expect(screen.getByRole("option", { name: "Density" })).toBeEnabled();
 });
 
-test("batch inference switched off blocks model-based sorting and the confidence filter", async () => {
+test("batch inference switched off blocks model-based sorting and hides the confidence filter", async () => {
   renderModal({ dataset: { ...dataset, disabled_ai_tools: "batch_inference" } });
   expect((await screen.findByRole("option", { name: /Uncertainty/ })).textContent)
     .toMatch(/needs Batch inference/);
-  expect(screen.getByLabelText(/Model confidence below/)).toBeDisabled();
+  // Only offered when a model can predict confidences here.
+  expect(screen.queryByLabelText(/Model confidence below/)).not.toBeInTheDocument();
+});
+
+test("the confidence filter is hidden without a model trained on the dataset", async () => {
+  api.fetchQueueModels.mockResolvedValue({ success: true, models: { embedding, trained: [] } });
+  renderModal();
+  await screen.findByLabelText("Sort images by");
+  expect(screen.queryByLabelText(/Model confidence below/)).not.toBeInTheDocument();
+});
+
+test("the help note links to the annotation queue docs", async () => {
+  renderModal();
+  const link = await screen.findByRole("link", { name: /Learn more about it here/ });
+  expect(link.getAttribute("href")).toMatch(/guides\/annotation-queue\/$/);
 });
 
 test("a vector method sends its embedding model and chosen direction", async () => {
@@ -179,14 +193,73 @@ test("the footer button stops preparation and nothing is built", async () => {
   expect(onStart).not.toHaveBeenCalled();
 });
 
-test("closing the window while preparing stops the job", async () => {
+test("closing the window while preparing only stops waiting", async () => {
   const onClose = vi.fn();
   const onStart = await startPreparing({ onClose });
   fireEvent.click(screen.getByTitle("Close"));
   expect(onClose).toHaveBeenCalled();
-  await waitFor(() => expect(api.cancelQueuePrepJob).toHaveBeenCalledWith(7, 9));
+  // The job may be shared and its results are reused, so it is not cancelled -- and
+  // nothing is built or opened once the window is gone, even when the job finishes.
+  api.fetchQueuePrepJob.mockResolvedValue({
+    success: true, job: { id: 9, status: "succeeded", total: 100, done: 100, failed: 0 },
+  });
   await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(api.cancelQueuePrepJob).not.toHaveBeenCalled();
+  expect(api.buildAnnotationQueue).not.toHaveBeenCalled();
   expect(onStart).not.toHaveBeenCalled();
+});
+
+test("stopping a job someone else started only stops waiting", async () => {
+  const onStart = await startPreparing();
+  api.cancelQueuePrepJob.mockRejectedValue(new Error(
+    "API Error: bob started this preparation, so it keeps running for them. "
+    + "Closing this window only stops waiting for it."));
+  fireEvent.click(screen.getByRole("button", { name: "Stop preparing" }));
+  expect(await screen.findByText(/bob started this preparation/)).toBeInTheDocument();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(api.buildAnnotationQueue).not.toHaveBeenCalled();
+  expect(onStart).not.toHaveBeenCalled();
+});
+
+test("a job given up as stale is reported, not built", async () => {
+  api.prepareAnnotationQueue.mockResolvedValue({
+    success: true, ready: false, job: { id: 9, status: "running", total: 2, done: 0, failed: 0 },
+  });
+  api.fetchQueuePrepJob.mockResolvedValue({
+    success: true, job: { id: 9, status: "failed", total: 2, done: 1, failed: 0 },
+  });
+  const onStart = renderModal();
+  await pickMethod("diversity");
+  build();
+  expect(await screen.findByText(/worker stopped responding/)).toBeInTheDocument();
+  expect(api.buildAnnotationQueue).not.toHaveBeenCalled();
+  expect(onStart).not.toHaveBeenCalled();
+});
+
+test("metadata keys are searched, not all listed, and the queue can take turns by one", async () => {
+  api.fetchDatasetMetadata.mockResolvedValue({
+    untagged_count: 0,
+    facets: [
+      { key: "species", value_type: "categorical", values: [{ value: "apal", count: 2 }], image_count: 2 },
+      { key: "site", value_type: "categorical", values: [{ value: "reef_a", count: 1 }], image_count: 1 },
+    ],
+  });
+  const onStart = renderModal();
+  const search = await screen.findByPlaceholderText(/Search metadata/);
+  await waitFor(() => expect(screen.getByLabelText("Take turns by")).toBeInTheDocument());
+  // No per-key control until a key is picked.
+  expect(screen.queryByRole("button", { name: /species/i })).not.toBeInTheDocument();
+  fireEvent.change(search, { target: { value: "spec" } });
+  const suggestions = within(screen.getByRole("listbox", { name: "Metadata keys" }));
+  expect(suggestions.getByRole("option", { name: "species" })).toBeInTheDocument();
+  expect(suggestions.queryByRole("option", { name: "site" })).not.toBeInTheDocument();
+  fireEvent.click(suggestions.getByRole("option", { name: "species" }));
+  expect(screen.getByRole("button", { name: /species/i })).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText("Take turns by"), { target: { value: "species" } });
+  build();
+  await waitFor(() => expect(onStart).toHaveBeenCalled());
+  expect(sent()).toMatchObject({ balance_by: "species" });
 });
 
 test("a server refusal is shown without the API prefix", async () => {
