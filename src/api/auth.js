@@ -2,28 +2,6 @@ import { getAuthHeaders, handleApiError, buildUrl } from "./util";
 import { API_BASE_URL } from "./config";
 
 /**
- * Register a new user
- * @param {string} username
- * @param {string} password
- * @returns {Promise<Object>} Response with success status and message
- */
-export const register = async (username, password) => {
-    try {
-        const url = buildUrl(API_BASE_URL, '/auth/register', {
-            name: username,
-            password: password
-        });
-
-        const response = await fetch(url, {
-            method: "POST",
-        });
-        return handleApiError(response);
-    } catch (error) {
-        throw error;
-    }
-};
-
-/**
  * Login a user
  * @param {string} username 
  * @param {string} password 

@@ -18,7 +18,6 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated, 
     isLoading: storeLoading,
     login: storeLogin, 
-    register: storeRegister, 
     logout: storeLogout,
     updateProfile,
     changePassword,
@@ -59,10 +58,6 @@ export const AuthProvider = ({ children }) => {
     return await storeLogin(username, password);
   };
 
-  const register = async (username, password) => {
-    return await storeRegister(username, password);
-  };
-
   const logout = () => {
     storeLogout();
   };
@@ -73,7 +68,6 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isLoading: storeLoading || isInitializing,
     login,
-    register,
     logout,
     updateProfile,
     changePassword,
