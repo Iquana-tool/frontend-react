@@ -8,7 +8,7 @@ import { API_BASE_URL } from "./config";
  * point is to greet somebody who does not have an account yet.
  *
  * @returns {Promise<{name: ?string, organisation: ?string, contact: ?string,
- *                    notice: ?string, allow_registration: boolean}>}
+ *                    notice: ?string}>}
  */
 export const fetchInstance = async () => {
     const response = await fetch(`${API_BASE_URL}/instance/`);

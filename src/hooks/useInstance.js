@@ -18,16 +18,14 @@ const UNBRANDED = {
     organisation: null,
     contact: null,
     notice: null,
-    allow_registration: false,
 };
 
 /**
- * This deployment's branding and account policy, from the backend.
+ * This deployment's branding, from the backend.
  *
  * Held on the backend rather than in the frontend's environment because Vite
  * substitutes `import.meta.env` at build time: branding baked into the bundle
- * could not be corrected without a rebuild, and the registration policy has to
- * be enforced server-side regardless of what this page chooses to render.
+ * could not be corrected without a rebuild.
  *
  * @returns {{instance: Object, loading: boolean}}
  */
