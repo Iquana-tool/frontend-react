@@ -196,41 +196,6 @@ export const createAIAnnotationSlice = (set) => ({
     state.aiAnnotation.activePreview = preview;
   }),
 
-  setCellposePreview: (preview) => set((state) => {
-    state.aiAnnotation.cellposePreview = preview;
-  }),
-
-  updateCellposePreviewPrediction: (predictionId, updates) => set((state) => {
-    const predictions = state.aiAnnotation.cellposePreview?.predictions;
-    const prediction = predictions?.find((item) => item.id === predictionId);
-    if (prediction) Object.assign(prediction, updates);
-  }),
-
-  updateCellposePreviewVertex: (predictionId, index, x, y) => set((state) => {
-    const prediction = state.aiAnnotation.cellposePreview?.predictions?.find(
-      (item) => item.id === predictionId
-    );
-    if (!prediction || index < 0 || index >= prediction.x.length) return;
-    prediction.x[index] = x;
-    prediction.y[index] = y;
-  }),
-
-  setCellposePreviewEditingId: (predictionId) => set((state) => {
-    if (state.aiAnnotation.cellposePreview) {
-      state.aiAnnotation.cellposePreview.editingPredictionId = predictionId;
-    }
-  }),
-
-  removeCellposePreviewPrediction: (predictionId) => set((state) => {
-    const preview = state.aiAnnotation.cellposePreview;
-    if (!preview) return;
-    preview.predictions = preview.predictions.filter((item) => item.id !== predictionId);
-    if (preview.editingPredictionId === predictionId) preview.editingPredictionId = null;
-  }),
-
-  clearCellposePreview: () => set((state) => {
-    state.aiAnnotation.cellposePreview = null;
-  }),
 
   setLastInstanceRun: (run) => set((state) => {
     state.aiAnnotation.lastInstanceRun = run;

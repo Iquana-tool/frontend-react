@@ -1,4 +1,3 @@
-import { POLYP_MODEL_INFO, isPolypInstanceModel } from '../../components/annotationPage/workspace/cellposePreviewModel';
 import {
   getPromptedModels,
   getSuggestionModels,
@@ -316,23 +315,19 @@ export const createModelsSlice = (set, get) => ({
 
       const transformedModels = rawList.map((model) => {
         const id = getModelId(model);
-        const polypInfo = POLYP_MODEL_INFO[id];
-        const rawName = polypInfo?.name ?? model.name ?? '';
-        const displayName = isPolypInstanceModel(id)
-          ? (polypInfo?.name ?? rawName.replace(/\s*\([^)]*\)/g, '').trim())
-          : rawName;
         const isExperimental = Boolean(model.is_experimental) || model.tags?.maturity === 'provisional';
         return {
           id,
           registry_key: id,
           task: 'instance-segmentation',
-          name: displayName,
+          name: model.name ?? '',
           description: model.description,
           tags: model.tags,
           label_ids: extractLabelIds(model),
           classes: model.classes,
           class_mappings: model.class_mappings,
-          checkpoint_sha256: model.checkpoint_sha256 || polypInfo?.sha256,
+          checkpoint_sha256: model.checkpoint_sha256 || model.tags?.default_checkpoint_sha256,
+          roi_input: model.roi_input ?? model.tags?.roi_input ?? null,
           is_experimental: isExperimental,
           model_status: model.model_status || 'ready',
         };

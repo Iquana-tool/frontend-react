@@ -1,15 +1,29 @@
-export const CELLPOSE_POLYP_REGISTRY_KEY = 'cpsam_polyp_v3_b_seed17';
-export const YOLO_POLYP_REGISTRY_KEY = 'yolo_polyp_v3_c_seed1';
-export const POLYP_MODEL_INFO = {
-  [CELLPOSE_POLYP_REGISTRY_KEY]: { name: 'Cellpose-SAM · Polyp', sha256: '8d17682741428d0c71b93dc6112de9ff9d6595fc586fe797bf4566423b788eba' },
-  [YOLO_POLYP_REGISTRY_KEY]: { name: 'YOLO11m-seg · Polyp', sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' },
-};
-export const isPolypInstanceModel = (key) => Object.hasOwn(POLYP_MODEL_INFO, key);
+/** How a model takes saved outlines as its region of interest (its `roi_input` tag). */
+export const ROI_INPUT = 'parent_regions';
+
+/**
+ * Whether a model accepts saved outlines as a region of interest. Read from what the
+ * model declares (ModelInfo tag `roi_input`, or the catalog's `roi_input`), never from
+ * its registry key, so a retrained or new model gets the ROI workflow without code changes.
+ */
+export const acceptsRoiInput = (model) =>
+  model?.roi_input === ROI_INPUT || model?.tags?.roi_input === ROI_INPUT;
 
 const className = (value) => {
   if (typeof value === 'string') return value.trim().toLowerCase();
   return String(value?.key ?? value?.name ?? value?.class_name ?? value?.label ?? '').trim().toLowerCase();
 };
+
+/** The class an ROI model predicts, lower-cased: its first declared class, else its first mapping's. */
+const targetClassName = (model) => className(
+  (Array.isArray(model?.classes) && model.classes[0])
+    || (Array.isArray(model?.class_mappings) && model.class_mappings[0]?.model_class)
+    || null
+);
+
+/** Whether a label name contains the class name as a whole word ("polyp" in "Coral polyp"). */
+const nameHasClass = (name, cls) =>
+  Boolean(cls) && typeof name === 'string' && name.toLowerCase().split(/[^a-z0-9]+/).includes(cls);
 
 const numberId = (value) => {
   const candidate = value?.label_id ?? value?.dataset_label_id ?? value?.id ?? value;
@@ -27,13 +41,14 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
   if (!model) return null;
 
   const classes = Array.isArray(model?.classes) ? model.classes : [];
-  const classIndex = classes.findIndex((entry) => className(entry) === 'polyp');
+  const targetClass = targetClassName(model);
+  const classIndex = classes.findIndex((entry) => className(entry) === targetClass);
 
   let labelId = null;
 
   // 1. Authoritative class_mappings on model (from dataset catalog)
   const classMappings = Array.isArray(model?.class_mappings) ? model.class_mappings : [];
-  const classMappingEntry = classMappings.find((entry) => className(entry?.model_class) === 'polyp');
+  const classMappingEntry = classMappings.find((entry) => className(entry?.model_class) === targetClass);
   if (classMappingEntry) {
     const action = String(classMappingEntry.action ?? '').toLowerCase();
     if (action === 'discard' || action === 'unmapped') return null;
@@ -44,7 +59,7 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
   } else {
     // 2. Direct model_label_mapping
     const mapping = model?.model_label_mapping ?? model?.label_mapping ?? {};
-    const directMapping = mapping.polyp ?? mapping.Polyp;
+    const directMapping = targetClass ? mapping[targetClass] : null;
     if (directMapping) {
       const action = String(directMapping?.action ?? '').toLowerCase();
       if (action === 'discard' || action === 'unmapped') return null;
@@ -54,7 +69,7 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
       const mappedIds = Array.isArray(model?.label_ids) ? model.label_ids : [];
       if (mappedIds.length > 0) {
         const mappedEntry = mappedIds.find(
-          (entry) => entry && typeof entry === 'object' && className(entry) === 'polyp'
+          (entry) => entry && typeof entry === 'object' && className(entry) === targetClass
         );
         const candidate = mappedEntry ?? (classIndex >= 0 ? mappedIds[classIndex] : null);
         labelId = numberId(candidate);
@@ -73,7 +88,7 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
     if (labelsMap instanceof Map) {
       for (const [id, val] of labelsMap.entries()) {
         const name = typeof val === 'string' ? val : val?.name;
-        if (typeof name === 'string' && /polyp/i.test(name)) {
+        if (nameHasClass(name, targetClass)) {
           labelId = Number(id);
           break;
         }
@@ -81,7 +96,7 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
     } else if (labelsMap && typeof labelsMap === 'object') {
       for (const [id, val] of Object.entries(labelsMap)) {
         const name = typeof val === 'string' ? val : val?.name;
-        if (typeof name === 'string' && /polyp/i.test(name)) {
+        if (nameHasClass(name, targetClass)) {
           labelId = Number(id);
           break;
         }
@@ -89,14 +104,14 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
     }
 
     if (labelId == null && Array.isArray(datasetLabels) && datasetLabels.length > 0) {
-      const found = datasetLabels.find((l) => /polyp/i.test(l.name || l.label || ''));
+      const found = datasetLabels.find((l) => nameHasClass(l.name || l.label || '', targetClass));
       if (found) labelId = Number(found.id);
     }
 
     if (labelId == null && Array.isArray(objectsList) && objectsList.length > 0) {
       const foundObj = objectsList.find((obj) => {
         const name = obj.label || getLabelName(labelsMap, obj.labelId ?? obj.label_id);
-        return typeof name === 'string' && /polyp/i.test(name);
+        return nameHasClass(name, targetClass);
       });
       if (foundObj) labelId = numberId(foundObj.labelId ?? foundObj.label_id);
     }
@@ -107,7 +122,7 @@ export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], o
       getLabelName(labelsMap, labelId) ??
       (Array.isArray(datasetLabels) ? datasetLabels.find((l) => Number(l.id) === labelId)?.name : null) ??
       (Array.isArray(objectsList) ? objectsList.find((o) => Number(o.labelId ?? o.label_id) === labelId)?.label : null) ??
-      'Coral Polyp';
+      (classes[0]?.name ?? classes[0]?.key ?? (targetClass || 'Object'));
     const color =
       (Array.isArray(datasetLabels) ? datasetLabels.find((l) => Number(l.id) === labelId)?.color : null) ??
       (Array.isArray(objectsList) ? objectsList.find((o) => Number(o.labelId ?? o.label_id) === labelId)?.color : null) ??
@@ -148,32 +163,7 @@ export function getSelectedFragmentContourIds(
       : getSelectedFragmentContourIds([focusedContourId], objects, labelsMap, targetLabelId, datasetLabels);
   }
 
-  let resolvedTargetId = targetLabelId != null ? Number(targetLabelId) : null;
-  if (resolvedTargetId == null && Array.isArray(datasetLabels)) {
-    const target = datasetLabels.find(
-      (l) => l.key === 'polyp' || (typeof l.name === 'string' && /polyp/i.test(l.name))
-    );
-    if (target?.id != null) resolvedTargetId = Number(target.id);
-  }
-  if (resolvedTargetId == null && labelsMap) {
-    if (labelsMap instanceof Map) {
-      for (const [id, val] of labelsMap.entries()) {
-        const name = typeof val === 'string' ? val : val?.name;
-        if (typeof name === 'string' && /polyp/i.test(name)) {
-          resolvedTargetId = Number(id);
-          break;
-        }
-      }
-    } else if (typeof labelsMap === 'object') {
-      for (const [id, val] of Object.entries(labelsMap)) {
-        const name = typeof val === 'string' ? val : val?.name;
-        if (typeof name === 'string' && /polyp/i.test(name)) {
-          resolvedTargetId = Number(id);
-          break;
-        }
-      }
-    }
-  }
+  const resolvedTargetId = targetLabelId != null ? Number(targetLabelId) : null;
 
   let allowedAncestorIds = null;
   if (Array.isArray(datasetLabels) && datasetLabels.length > 0 && resolvedTargetId != null) {
@@ -230,12 +220,8 @@ export function getSelectedFragmentContourIds(
         return allowedAncestorIds.has(objLabelId);
       }
 
-      const name = getLabelName(labelsMap, objLabelId) ?? object.label ?? '';
-      if (typeof name === 'string' && /polyp/i.test(name)) {
-        return false;
-      }
-
-      return /fragment|surface|coral/i.test(String(name));
+      // Without the label hierarchy any selected object of another label can bound the run.
+      return resolvedTargetId != null;
     })
     .map((object) => Number(object.contour_id))
     .filter(Number.isFinite);
@@ -249,7 +235,7 @@ export function getSelectedFragmentContourIds(
 export function resolvePolypInputs({
   policy = null,
   labelId = null,
-  modelKey = CELLPOSE_POLYP_REGISTRY_KEY,
+  modelKey = null,
   inputs = null,
   threshold = null,
 } = {}) {
@@ -366,7 +352,7 @@ export function buildCellposePreviewRequest({
   imageId,
   labelId,
   roiContourIds = [],
-  modelKey = CELLPOSE_POLYP_REGISTRY_KEY,
+  modelKey = null,
   inputs = null,
   policy = null,
   threshold = null,
@@ -698,9 +684,7 @@ export function resolveParentContourId(prediction, {
     if (predLabelId != null && objLabelId != null && objLabelId === predLabelId) {
       return false;
     }
-    const name = getLabelName(labelsMap, objLabelId) ?? obj.label ?? '';
-    if (typeof name === 'string' && /polyp/i.test(name)) return false;
-    return /coral|fragment|surface/i.test(String(name));
+    return objLabelId != null;
   };
 
   if (prediction?.parent_id != null) {

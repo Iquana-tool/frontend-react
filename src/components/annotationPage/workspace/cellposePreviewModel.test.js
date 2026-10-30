@@ -8,9 +8,11 @@ import {
   calculatePolygonIoU,
   getExistingPolypsForScope,
   suppressOverlappingPredictions,
-  CELLPOSE_POLYP_REGISTRY_KEY,
   resolvePolypInputs,
+  acceptsRoiInput,
 } from './cellposePreviewModel';
+
+const CELLPOSE_POLYP_REGISTRY_KEY = 'cpsam_polyp_v3_b_seed17';
 
 describe('Cellpose polyp preview contract', () => {
   it('uses the mapped project polyp label instead of a category constant', () => {
@@ -58,7 +60,8 @@ describe('Cellpose polyp preview contract', () => {
       registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
       class_mappings: [{ model_class: 'polyp', action: 'map', label_id: 43 }],
     }, null);
-    expect(withDirectId).toEqual({ labelId: 43, labelName: 'Coral Polyp' });
+    // Without loaded labels the name falls back to the model's class, not a fixed string.
+    expect(withDirectId).toEqual({ labelId: 43, labelName: 'polyp' });
   });
 
   it('sends only selected, saved coral or fragment contours as the ROI', () => {
@@ -70,18 +73,21 @@ describe('Cellpose polyp preview contract', () => {
         { id: 'object-b', contour_id: 99, labelId: 12 },
         { id: 'not-selected', contour_id: null, labelId: 11 },
       ],
-      new Map([[11, 'coral fragment'], [12, 'polyp'], [13, 'Coral Surface']])
+      new Map([[11, 'coral fragment'], [12, 'polyp'], [13, 'Coral Surface']]),
+      12
     );
     expect(selectedContourIds).toEqual([88]);
 
     const surfaceIds = getSelectedFragmentContourIds(
       ['object-surface'],
       [{ id: 'object-surface', contour_id: 19748, labelId: 13 }],
-      new Map([[13, 'Coral Surface']])
+      new Map([[13, 'Coral Surface']]),
+      12
     );
     expect(surfaceIds).toEqual([19748]);
     expect(buildCellposePreviewRequest({
       datasetId: '5', imageId: '100', labelId: 47, roiContourIds: selectedContourIds,
+      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
     })).toEqual({
       dataset_id: 5,
       image_selection: 'custom',
@@ -616,5 +622,14 @@ describe('Cellpose polyp preview contract', () => {
     // p4 kept (adjacent, IoU = 0 < 0.5)
     expect(result.kept.map((p) => p.id)).toEqual(['p2', 'p4']);
     expect(result.suppressedCount).toBe(2);
+  });
+});
+
+describe('ROI capability', () => {
+  it('comes from what the model declares, never from its registry key', () => {
+    expect(acceptsRoiInput({ registry_key: CELLPOSE_POLYP_REGISTRY_KEY })).toBe(false);
+    expect(acceptsRoiInput({ registry_key: 'any-new-model', tags: { roi_input: 'parent_regions' } })).toBe(true);
+    expect(acceptsRoiInput({ registry_key: 'catalog-entry', roi_input: 'parent_regions' })).toBe(true);
+    expect(acceptsRoiInput(null)).toBe(false);
   });
 });

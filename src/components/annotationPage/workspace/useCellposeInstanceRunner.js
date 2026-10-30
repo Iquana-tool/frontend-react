@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  CELLPOSE_POLYP_REGISTRY_KEY,
-  POLYP_MODEL_INFO,
   resolvePolypProjectLabel,
   getSelectedFragmentContourIds,
   buildCellposePreviewRequest,
@@ -45,8 +43,11 @@ import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingP
 export const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'partial']);
 
 export function useCellposeInstanceRunner(selectedModelObj = null) {
-  const modelKey = selectedModelObj?.registry_key ?? selectedModelObj?.id ?? CELLPOSE_POLYP_REGISTRY_KEY;
-  const modelInfo = POLYP_MODEL_INFO[modelKey] ?? POLYP_MODEL_INFO[CELLPOSE_POLYP_REGISTRY_KEY];
+  const modelKey = selectedModelObj?.registry_key ?? selectedModelObj?.id ?? null;
+  const modelInfo = useMemo(() => ({
+    name: selectedModelObj?.name || modelKey || 'The model',
+    sha256: selectedModelObj?.checkpoint_sha256 ?? selectedModelObj?.tags?.default_checkpoint_sha256 ?? null,
+  }), [selectedModelObj, modelKey]);
   let routeParams = {};
   try {
     routeParams = useParams() || {};
@@ -693,10 +694,8 @@ export function useCellposeInstanceRunner(selectedModelObj = null) {
     retry,
     cancel,
     undoRun,
-    checkpointSha:
-      selectedModelObj?.checkpoint_sha256 ||
-      modelInfo.sha256,
-    modelName: selectedModelObj?.name || modelInfo.name,
+    checkpointSha: modelInfo.sha256,
+    modelName: modelInfo.name,
   };
 }
 
