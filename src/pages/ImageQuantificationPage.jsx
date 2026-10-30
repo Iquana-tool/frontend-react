@@ -22,6 +22,7 @@ import {
 } from "../api/quantifications";
 import { listDerivedMetrics } from "../api/derivedMetrics";
 import { derivedCatalogEntries } from "../utils/derivedMetrics";
+import { getImageDataUrl } from "../utils/imageDataUrl";
 import { getAuthHeaders } from "../api/util";
 import DatasetManagementLayout from "../components/datasets/gallery/DatasetManagementLayout";
 import AnnotationViewerCanvas from "../components/viewer/AnnotationViewerCanvas";
@@ -264,7 +265,7 @@ const ImageQuantificationPage = () => {
             ([key]) => key !== "success" && key !== "message"
           )?.[1];
 
-        setImageSrc(base64 ? `data:image/png;base64,${base64}` : null);
+        setImageSrc(getImageDataUrl(base64));
         setContours(contourResponse.contours || []);
         setPixelScale(scaleResult.data);
         setScaleError(scaleResult.error);

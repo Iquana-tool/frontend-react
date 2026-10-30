@@ -17,6 +17,7 @@ import { undoAnnotationAction } from '../../api/annotationHistory';
 import { approveMask, rejectMask } from '../../api/reviews';
 import { useToast } from '../../contexts/ToastContext';
 import { getChildLabels } from '../../utils/labelHierarchy';
+import { getImageDataUrl } from '../../utils/imageDataUrl';
 import { getLabelColor } from '../../utils/labelColors';
 import Kbd from '../annotationPage/workspace/primitives/Kbd';
 import LabelPicker from '../annotationPage/workspace/LabelPicker';
@@ -157,7 +158,7 @@ const ReviewSession = ({ queue, labels = [], labelsById, onExit }) => {
             Object.entries(imageData).find(
               ([key]) => key !== 'success' && key !== 'message'
             )?.[1];
-          src = base64 ? `data:image/png;base64,${base64}` : null;
+          src = getImageDataUrl(base64);
           imageCache.current.set(current.image_id, src);
         }
 

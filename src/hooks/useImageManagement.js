@@ -1,6 +1,7 @@
 import {useState, useCallback} from 'react';
 import { useDataset } from '../contexts/DatasetContext';
 import * as api from '../api';
+import { getImageDataUrl } from '../utils/imageDataUrl';
 
 export const useImageManagement = (fetchFinalMask = null) => {
   const { currentDataset } = useDataset();
@@ -28,7 +29,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
       if (imageData && imageData[image.id]) {
         const imgObj = new Image();
         const base64Data = imageData[image.id];
-        const thumbnailUrl = `data:image/jpeg;base64,${base64Data}`;
+        const thumbnailUrl = getImageDataUrl(base64Data);
 
         const imageLoadPromise = new Promise((resolve, reject) => {
           imgObj.onload = () => resolve(thumbnailUrl);
@@ -132,7 +133,7 @@ export const useImageManagement = (fetchFinalMask = null) => {
       }
 
       const base64Data = imageResponse[image.id];
-      const imageUrl = `data:image/jpeg;base64,${base64Data}`;
+      const imageUrl = getImageDataUrl(base64Data);
       const imgObject = new Image();
 
       await new Promise((resolve, reject) => {
@@ -272,4 +273,4 @@ export const useImageManagement = (fetchFinalMask = null) => {
     setImageLoaded,
     setAvailableImages,
   };
-}; 
+};

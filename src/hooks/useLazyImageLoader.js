@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as api from '../api';
 import useAppStore from '../stores/useAppStore';
+import { getImageDataUrl } from '../utils/imageDataUrl';
 
 const BATCH_SIZE = 10;
 const MAX_RETRIES = 3;
@@ -66,7 +67,7 @@ export const useLazyImageLoader = (imageIds = [], options = {}) => {
 
           newIds.forEach((id) => {
             if (imageData.images[id]) {
-              const thumbnailUrl = `data:image/jpeg;base64,${imageData.images[id]}`;
+              const thumbnailUrl = getImageDataUrl(imageData.images[id]);
               newThumbnails.set(id, thumbnailUrl);
               setLoadingErrors((prev) => {
                 const updated = new Map(prev);

@@ -7,6 +7,7 @@ import ManageAccessModal from "./ManageAccessModal";
 import RoleBadge from "./RoleBadge";
 import Can from "../auth/Can";
 import { Permission } from "../../utils/permissions";
+import { getImageDataUrl } from "../../utils/imageDataUrl";
 
 const DatasetCard = ({
   dataset,
@@ -48,7 +49,7 @@ const DatasetCard = ({
                   className="aspect-square rounded-lg overflow-hidden"
                 >
                   <img
-                    src={`data:image/jpeg;base64,${image.base64}`}
+                    src={getImageDataUrl(image.base64)}
                     alt={`Sample ${index + 1}`}
                     className="w-full h-full object-cover"
                   />
