@@ -46,6 +46,8 @@ const ManagementCardsView = ({
   onModelZooClick,
   onQuantificationsClick,
   onAnnotationClick,
+  // Opens the queue builder even when "Don't show this again" is set.
+  onChangeOrderClick,
   onLabelManagementClick,
   onExportDatasetClick,
   onModelTrainingClick,
@@ -182,6 +184,7 @@ const ManagementCardsView = ({
       title: 'Annotation',
       description: 'Draw instances on the images',
       onClick: onAnnotationClick,
+      action: onChangeOrderClick ? { label: 'Change order', onClick: onChangeOrderClick } : null,
       permitted: canAnnotate,
       color: 'annotate',
     },
@@ -392,6 +395,7 @@ const ManagementCardsView = ({
                     stat={card.stat}
                     statTone={card.statTone}
                     onClick={card.onClick}
+                    action={card.action}
                     color={card.color}
                     progress={phaseBar(card.phase)}
                   />

@@ -27,6 +27,7 @@ import {
   Undo2,
   User,
   Download,
+  ListOrdered,
 } from 'lucide-react';
 import Menu, { MenuDivider, MenuHeader, MenuItem } from './primitives/Menu';
 import ToolbarButton from './primitives/ToolbarButton';
@@ -67,10 +68,14 @@ import {
   useRedoActionLabel,
   useSetShortcutSheetOpen,
   useSetRightTab,
+  useSetImageList,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationHistory from '../../../hooks/useAnnotationHistory';
 import { DOCS, openDocs } from '../../../constants/docs';
 import GuidesButton from '../../guides/GuidesButton';
+import AnnotationQueueModal from '../../datasets/gallery/AnnotationQueueModal';
+import { isAnnotated, orderImagesByQueue } from '../layout/DatasetLoader';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 
 /** Status-pill tokens for the three workflow states. */
 const STATUS_TONE = {
@@ -153,6 +158,18 @@ const TopToolbar = () => {
   const resetView = () => {
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
+  };
+
+  // "Change order" from inside the editor: rebuild the queue, then apply the new order to
+  // the loaded image list in place (the loader only orders images when a dataset loads).
+  const [showQueue, setShowQueue] = useState(false);
+  const setImageList = useSetImageList();
+  const applyQueue = (imageIds) => {
+    setShowQueue(false);
+    const ordered = orderImagesByQueue(useAnnotationStore.getState().images.imageList, imageIds);
+    setImageList(ordered);
+    const first = ordered.find((img) => !isAnnotated(img)) || ordered[0];
+    if (first) navigate(`/dataset/${currentDataset.id}/annotate/${first.id}`);
   };
 
   const backToGallery = () => {
@@ -261,6 +278,9 @@ const TopToolbar = () => {
         <span className="text-btn text-t2 truncate max-w-[180px]">
           {currentDataset?.name || 'Loading…'}
         </span>
+        {currentDataset && (
+          <ToolbarButton icon={ListOrdered} label="Change order" onClick={() => setShowQueue(true)} />
+        )}
         <span className="text-t3 flex-none">/</span>
         <span className="text-btn font-semibold text-t1 truncate max-w-[180px]">
           {nav.currentImage?.name || '—'}
@@ -561,6 +581,13 @@ const TopToolbar = () => {
           // The count in the panel header is derived, so nothing else to reset.
           setRightTab('objects');
         }}
+      />
+      <AnnotationQueueModal
+        isOpen={showQueue}
+        forceChooser
+        onClose={() => setShowQueue(false)}
+        dataset={currentDataset}
+        onStart={applyQueue}
       />
     </div>
   );
