@@ -23,6 +23,7 @@ import ModelTrainingPage from "./pages/ModelTrainingPage";
 import ModelOrchestrationPage from "./pages/ModelOrchestrationPage";
 import BatchInferencePage from "./pages/BatchInferencePage";
 import AcceptInvitePage from "./pages/AcceptInvitePage";
+import JoinPage from "./pages/JoinPage";
 import AnnotationViewerPage from "./pages/AnnotationViewerPage";
 import DatasetAccessPage from "./pages/DatasetAccessPage";
 import AdminPage from "./pages/AdminPage";
@@ -81,6 +82,8 @@ function App() {
             {/* Dataset invite links land here. The page itself bounces to
                 /login?next=... when the invitee is not signed in yet. */}
             <Route path="/invites/:token" element={<AcceptInvitePage />} />
+            {/* Public: a registration link from an admin is the only way to sign up. */}
+            <Route path="/join/:token" element={<JoinPage />} />
             <Route
               path="/account"
               element={

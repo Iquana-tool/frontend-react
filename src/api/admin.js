@@ -136,3 +136,33 @@ export const pushSettings = async () => {
     });
     return handleApiError(response);
 };
+
+/**
+ * Mint a registration link. The raw token comes back once and only its hash is stored,
+ * so the link has to be copied now.
+ * @param {{expires_in_hours?: number|null, max_uses?: number|null, note?: string|null}} body
+ * @returns {Promise<{success: boolean, token: string, invite_path: string, invite: Object}>}
+ */
+export const createAccountInvite = async (body) => {
+    const response = await fetch(`${API_BASE_URL}/admin/account-invites`, {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify(body),
+    });
+    return handleApiError(response);
+};
+
+/** Registration links that can still be used (metadata only, never the tokens). */
+export const fetchAccountInvites = async () => {
+    const response = await fetch(`${API_BASE_URL}/admin/account-invites`, { headers: getAuthHeaders() });
+    return handleApiError(response);
+};
+
+/** Revoke a registration link; accounts already created with it stay. */
+export const revokeAccountInvite = async (inviteId) => {
+    const response = await fetch(`${API_BASE_URL}/admin/account-invites/${inviteId}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+    });
+    return handleApiError(response);
+};

@@ -4,9 +4,9 @@ import { contactHref } from '../../hooks/useInstance';
 /**
  * How to get an account, under every sign-in form.
  *
- * There is no self-registration: the installer creates the first admin, and that
- * admin creates every other account. So the only useful thing to say is whom to
- * ask -- the instance's contact when one is configured.
+ * There is no open self-registration: the installer creates the first admin, who
+ * creates accounts or sends registration links (`/join/<token>`). So the only useful
+ * thing to say is whom to ask -- the instance's contact when one is configured.
  *
  * @param {Object} props
  * @param {{contact: ?string}} props.instance - From `useInstance`.
