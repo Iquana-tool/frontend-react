@@ -34,7 +34,7 @@ import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
 import { getChildLabels, resolveParentLabelId } from '../../../utils/labelHierarchy';
-import useSuggestSimilar from '../workspace/useSuggestSimilar';
+import { useConceptSegmentation } from '../workspace/ConceptSegmentationContext';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
@@ -153,7 +153,22 @@ const ObjectContextMenu = () => {
     [flatLabels, parentLabelId]
   );
   
-  const suggestSimilar = useSuggestSimilar();
+  const conceptSegmentation = useConceptSegmentation();
+  const targetLabelId = primaryTarget?.labelId ?? primaryTarget?.label_id ?? null;
+  const targetLabelState = targetLabelId != null
+    ? conceptSegmentation?.getLabelState(targetLabelId) : null;
+  const mixedLabels = targetObjects.some((object) =>
+    Number(object.labelId ?? object.label_id) !== Number(targetLabelId)
+  );
+  const segmentationReason = !conceptSegmentation
+    ? 'Segmentation is unavailable.'
+    : targetLabelId == null
+      ? 'Assign a label to this object first.'
+      : mixedLabels
+        ? 'Select objects of one label to segment that label.'
+        : conceptSegmentation.busy
+          ? 'Segmentation is already running.'
+          : targetLabelState?.reason;
 
   // Adjust position to keep menu within container bounds and place it intuitively next to the object
   useEffect(() => {
@@ -392,9 +407,10 @@ const ObjectContextMenu = () => {
     }
   };
 
-  const handleSuggestSimilar = async () => {
-    hideContextMenu();
-    await suggestSimilar.run();
+  const handleSegmentLabel = () => {
+    if (!segmentationReason && conceptSegmentation?.requestRun(targetLabelId)) {
+      hideContextMenu();
+    }
   };
 
   /**
@@ -621,17 +637,12 @@ const ObjectContextMenu = () => {
         }
       />
 
-      {/* Suggest Similar Instances Option */}
+      {/* The same per-label segmentation action as the label panel and action bar. */}
       <ContextMenuItem
-        onClick={handleSuggestSimilar}
-        disabled={!suggestSimilar.eligible}
-        title={
-          suggestSimilar.reason ||
-          (isMultiSelect
-            ? `Use ${targetObjects.length} objects as seeds for suggestion segmentation`
-            : 'Find similar instances using suggestion segmentation')
-        }
-        label={suggestSimilar.isRunning ? 'Finding similar...' : 'Suggest Similar Instances'}
+        onClick={handleSegmentLabel}
+        disabled={Boolean(segmentationReason)}
+        title={segmentationReason || 'Segment this label using its configured model and hierarchy settings'}
+        label={conceptSegmentation?.busy ? 'Segmenting…' : 'Segment label'}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
