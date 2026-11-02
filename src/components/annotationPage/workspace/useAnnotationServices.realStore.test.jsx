@@ -1,184 +1,97 @@
-import React from 'react';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import useAnnotationServices, { clearManualInstanceOverrides } from './useAnnotationServices';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import useAnnotationServices from './useAnnotationServices';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { initialState } from '../../../stores/initialState';
-import { getInferenceRoutingPolicy, getInferenceModelCatalog } from '../../../api/inference';
-import { getInstanceModels } from '../../../api/instance_segmentation';
+import { getInferenceRoutingPolicy } from '../../../api/inference';
+import { getPromptedModels } from '../../../api/models';
 
-vi.mock('../../../api/inference', () => ({
-  getInferenceRoutingPolicy: vi.fn(),
-  getInferenceModelCatalog: vi.fn(),
+vi.mock('../../../api/inference', () => ({ getInferenceRoutingPolicy: vi.fn() }));
+vi.mock('../../../api/models', () => ({
+  getPromptedModels: vi.fn(), getSuggestionModels: vi.fn(), getModelFavorites: vi.fn(),
+  setModelFavorite: vi.fn(), clearModelFavorite: vi.fn(),
 }));
+vi.mock('../../../hooks/useModelSwitchPreloader', () => ({ default: vi.fn() }));
 
-vi.mock('../../../api/instance_segmentation', () => ({
-  getInstanceModels: vi.fn(),
-}));
-
-vi.mock('../../../hooks/useModelSwitchPreloader', () => ({
-  default: vi.fn(),
-}));
-
-vi.mock('../../../hooks/useInstanceSegmentation', () => ({
-  useInstanceSegmentation: () => ({ runInstance: vi.fn() }),
-}));
-
-let mockCurrentDataset = { id: 101, name: 'Dataset 101' };
-
+let mockCurrentDataset = { id: 101 };
 vi.mock('../../../contexts/DatasetContext', () => ({
-  useDataset: () => ({
-    currentDataset: mockCurrentDataset,
-    datasets: [{ id: 101 }, { id: 102 }],
-  }),
+  useDataset: () => ({ currentDataset: mockCurrentDataset }),
 }));
-
 const models = [
-  { id: 'm2f-generic', name: 'Mask2Former Generic', task: 'instance-segmentation', label_ids: [] },
-  { id: 'm2f-routed-default', name: 'Mask2Former Routed Default', task: 'instance-segmentation', label_ids: [] },
-  { id: 'm2f-dataset102-default', name: 'Mask2Former Dataset 102 Default', task: 'instance-segmentation', label_ids: [] },
+  { id: 'sam-generic', name: 'Generic', label_ids: [] },
+  { id: 'sam-dataset101', name: 'Dataset 101 model', label_ids: [] },
+  { id: 'sam-dataset102', name: 'Dataset 102 model', label_ids: [] },
 ];
+const deferred = () => {
+  let resolve;
+  const promise = new Promise((done) => { resolve = done; });
+  return { promise, resolve };
+};
+const policy = (datasetId, key) => ({
+  dataset_id: datasetId,
+  bindings: [{ task: 'prompted-segmentation', label_id: null, model_registry_key: key }],
+});
+const selected = () => useAnnotationStore.getState().models.promptedModel;
 
-describe('useAnnotationServices real store integration (Bug 2)', () => {
+describe('prompted service discovery and routing with the real store', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearManualInstanceOverrides();
-    mockCurrentDataset = { id: 101, name: 'Dataset 101' };
+    mockCurrentDataset = { id: 101 };
     useAnnotationStore.setState({
       ...initialState,
       models: { ...initialState.models, favoritesLoaded: true },
       objects: { ...initialState.objects, labelDatasetId: 101 },
     });
-    getInstanceModels.mockResolvedValue({ success: true, result: models });
-    getInferenceModelCatalog.mockResolvedValue({ models });
+    getPromptedModels.mockResolvedValue({ success: true, models });
+    getInferenceRoutingPolicy.mockResolvedValue(policy(101, 'sam-dataset101'));
   });
 
-  it('discovery-before-policy: dataset routing default overrides automatic first-model default selection', async () => {
-    // 1. Discovery finishes first and auto-selects m2f-generic
-    await useAnnotationStore.getState().fetchAvailableInstanceModels(101);
-    expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-generic');
-    expect(useAnnotationStore.getState().models.autoSelectedInstanceModel).toBe('m2f-generic');
-
-    // 2. Policy resolves afterwards with m2f-routed-default
-    getInferenceRoutingPolicy.mockResolvedValueOnce({
-      dataset_id: 101,
-      bindings: [
-        {
-          task: 'instance-segmentation',
-          label_id: null,
-          model_registry_key: 'm2f-routed-default',
-        },
-      ],
-    });
-
-    renderHook(() => useAnnotationServices());
-
-    await waitFor(() => {
-      expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-routed-default');
-    });
+  it('applies dataset policy after model discovery automatically selected the first model', async () => {
+    await useAnnotationStore.getState().fetchAvailablePromptedModels();
+    expect(selected()).toBe('sam-generic');
+    const pending = deferred();
+    getInferenceRoutingPolicy.mockReturnValue(pending.promise);
+    const { result } = renderHook(() => useAnnotationServices());
+    expect(selected()).toBeNull();
+    expect(result.current.policyLoading).toBe(true);
+    await act(async () => pending.resolve(policy(101, 'sam-dataset101')));
+    await waitFor(() => expect(selected()).toBe('sam-dataset101'));
   });
 
-  it('policy-before-discovery: dataset routing default takes precedence when policy is ready before models load', async () => {
-    // 1. Policy is configured before discovery completes
-    getInferenceRoutingPolicy.mockResolvedValueOnce({
-      dataset_id: 101,
-      bindings: [
-        {
-          task: 'instance-segmentation',
-          label_id: null,
-          model_registry_key: 'm2f-routed-default',
-        },
-      ],
-    });
-
-    renderHook(() => useAnnotationServices());
-
-    // 2. Discovery finishes afterwards
-    await act(async () => {
-      await useAnnotationStore.getState().fetchAvailableInstanceModels(101);
-    });
-
-    await waitFor(() => {
-      expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-routed-default');
-    });
+  it('applies a resolved policy when prompted model discovery finishes later', async () => {
+    const pending = deferred();
+    getPromptedModels.mockReturnValue(pending.promise);
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(result.current.policyLoading).toBe(false));
+    expect(selected()).toBeNull();
+    await act(async () => pending.resolve({ success: true, models }));
+    await waitFor(() => expect(selected()).toBe('sam-dataset101'));
+    expect(getPromptedModels).toHaveBeenCalledOnce();
   });
 
-  it('manual override survives drawer closure and reopening without being reset to dataset default', async () => {
-    getInferenceRoutingPolicy.mockResolvedValue({
-      dataset_id: 101,
-      bindings: [
-        {
-          task: 'instance-segmentation',
-          label_id: null,
-          model_registry_key: 'm2f-routed-default',
-        },
-      ],
-    });
-
-    await useAnnotationStore.getState().fetchAvailableInstanceModels(101);
-
-    const { result, unmount } = renderHook(() => useAnnotationServices());
-
-    await waitFor(() => {
-      expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-routed-default');
-    });
-
-    // Explicit user selection in the UI
-    act(() => {
-      const instanceService = result.current.services.find((s) => s.key === 'instance');
-      instanceService.setSelectedModel('m2f-generic');
-    });
-
-    expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-generic');
-
-    // Drawer closes (unmount)
-    unmount();
-
-    // Drawer reopens (remount)
-    const { result: remountResult } = renderHook(() => useAnnotationServices());
-
-    await act(async () => {});
-
-    // Must remain m2f-generic, not reset to m2f-routed-default
-    expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-generic');
-    const instanceService = remountResult.current.services.find((s) => s.key === 'instance');
-    expect(instanceService.selectedModel).toBe('m2f-generic');
+  it('keeps a manual prompted model choice through unrelated store updates', async () => {
+    await useAnnotationStore.getState().fetchAvailablePromptedModels();
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(selected()).toBe('sam-dataset101'));
+    act(() => result.current.services[0].setSelectedModel('sam-generic'));
+    act(() => useAnnotationStore.setState((state) => ({ ui: { ...state.ui, leftSidebarCollapsed: true } })));
+    expect(selected()).toBe('sam-generic');
+    expect(result.current.services[0].selectedModel).toBe('sam-generic');
   });
 
-  it('switching datasets resolves new dataset defaults without carrying old manual override across', async () => {
-    getInferenceRoutingPolicy.mockImplementation((dsId) => {
-      if (Number(dsId) === 101) {
-        return Promise.resolve({
-          dataset_id: 101,
-          bindings: [{ task: 'instance-segmentation', label_id: null, model_registry_key: 'm2f-routed-default' }],
-        });
-      }
-      return Promise.resolve({
-        dataset_id: 102,
-        bindings: [{ task: 'instance-segmentation', label_id: null, model_registry_key: 'm2f-dataset102-default' }],
-      });
-    });
-
-    await useAnnotationStore.getState().fetchAvailableInstanceModels(101);
-
+  it('disarms the previous dataset while the new dataset policy is loading', async () => {
+    await useAnnotationStore.getState().fetchAvailablePromptedModels();
+    const nextPolicy = deferred();
+    getInferenceRoutingPolicy.mockImplementation((id) => Number(id) === 101
+      ? Promise.resolve(policy(101, 'sam-dataset101')) : nextPolicy.promise);
     const { result, rerender } = renderHook(() => useAnnotationServices());
-
-    await waitFor(() => {
-      expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-routed-default');
-    });
-
-    // User manual override on dataset 101
-    act(() => {
-      result.current.services.find((s) => s.key === 'instance').setSelectedModel('m2f-generic');
-    });
-    expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-generic');
-
-    // Switch dataset to 102
-    mockCurrentDataset = { id: 102, name: 'Dataset 102' };
+    await waitFor(() => expect(selected()).toBe('sam-dataset101'));
+    act(() => result.current.services[0].setSelectedModel('sam-generic'));
+    mockCurrentDataset = { id: 102 };
     rerender();
-
-    await waitFor(() => {
-      expect(useAnnotationStore.getState().models.instanceModel).toBe('m2f-dataset102-default');
-    });
+    expect(result.current.policyLoading).toBe(true);
+    expect(selected()).toBeNull();
+    await act(async () => nextPolicy.resolve(policy(102, 'sam-dataset102')));
+    await waitFor(() => expect(selected()).toBe('sam-dataset102'));
   });
 });

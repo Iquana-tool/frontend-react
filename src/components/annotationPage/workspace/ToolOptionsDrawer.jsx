@@ -1,11 +1,10 @@
 import React from 'react';
 import { Ban, ChevronLeft, Pencil, Sparkles } from 'lucide-react';
 import ServiceCard from './ServiceCard';
-import CrossImageSuggestionCard from './CrossImageSuggestionCard';
+import ConceptSegmentationPanel from './ConceptSegmentationPanel';
 import useAnnotationServices from './useAnnotationServices';
 import useRailTools from './useRailTools';
 import { PROMPT_ACTIONS, getPromptAction, getRailTool } from './toolModel';
-import InstanceWarningModal from '../modals/InstanceWarningModal';
 import useAiTools from '../../../hooks/useAiTools';
 import { useToggleLeftDrawer } from '../../../stores/selectors/annotationSelectors';
 
@@ -26,9 +25,6 @@ const ToolOptionsDrawer = () => {
     services,
     policyLoading,
     policyError,
-    showInstanceWarning,
-    closeInstanceWarning,
-    confirmInstanceRun,
   } = useAnnotationServices();
   const { isEnabled: isToolEnabled } = useAiTools();
 
@@ -117,19 +113,14 @@ const ToolOptionsDrawer = () => {
             </p>
           )}
           <div className="flex flex-col gap-[9px]">
-            {services.map((service) => (
+            {services.filter((service) => service.key === 'prompted').map((service) => (
               <ServiceCard key={service.key} service={service} />
             ))}
-            {isToolEnabled('cross_image') && <CrossImageSuggestionCard />}
+            <ConceptSegmentationPanel />
           </div>
         </div>
       </div>
 
-      <InstanceWarningModal
-        isOpen={showInstanceWarning}
-        onClose={closeInstanceWarning}
-        onConfirm={confirmInstanceRun}
-      />
     </div>
   );
 };

@@ -5,10 +5,7 @@ import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { initialState } from '../../../stores/initialState';
 import * as api from '../../../api/inference';
 import annotationSession from '../../../services/annotationSession';
-import { useCellposeInstanceRunner } from './useCellposeInstanceRunner';
-import { CellposeInstanceRunnerProvider, useCellposeInstanceRunnerContext } from './CellposeInstanceRunnerContext';
-import ServiceCard from './ServiceCard';
-import useAnnotationServices from './useAnnotationServices';
+import { useConceptSegmentationRunner } from './useConceptSegmentationRunner';
 
 const mocks = vi.hoisted(() => ({ toast: vi.fn(), legacyRun: vi.fn(), policy: { bindings: [] } }));
 vi.mock('../../../api/inference', () => ({
@@ -74,67 +71,10 @@ beforeEach(() => {
 });
 
 describe('live Cellpose runner regressions', () => {
-  it('owns mapped model metadata before the collapsible panel mounts', () => {
-    let flow;
-    function Probe() { flow = useCellposeInstanceRunnerContext(); return null; }
-    render(<CellposeInstanceRunnerProvider><Probe /></CellposeInstanceRunnerProvider>);
-    expect(flow.mappedLabel?.labelId).toBe(43);
-    expect(flow.canRun).toBe(true);
-  });
-
-  it('keeps the run across card closure but rejects a late result after navigation', async () => {
-    const start = deferred();
-    api.startInferenceJob.mockReturnValue(start.promise);
-    let flow;
-    function Probe() { flow = useCellposeInstanceRunnerContext(); return null; }
-    render(<CellposeInstanceRunnerProvider><Probe /><ServiceCard service={service} /></CellposeInstanceRunnerProvider>);
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Run model' }));
-    await waitFor(() => expect(api.startInferenceJob).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    expect(flow.isRunning).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    act(() => {
-      annotationSession.currentImageId = 999;
-      useAnnotationStore.setState((state) => { state.images.currentImageId = 999; state.objects.list = []; });
-    });
-    await act(async () => { start.resolve({ id: 991, status: 'succeeded' }); await start.promise; });
-    await waitFor(() => expect(api.cancelInferenceJob).toHaveBeenCalledWith(991));
-    expect(annotationSession.addObject).not.toHaveBeenCalled();
-  });
-
-  it('keeps a session model override when the tools drawer closes and reopens', async () => {
-    const originalFetch = useAnnotationStore.getState().fetchAvailableInstanceModels;
-    const fetchModels = vi.fn().mockResolvedValue();
-    const other = { id: 'mask2former', registry_key: 'mask2former', name: 'Mask2Former' };
-    useAnnotationStore.setState((state) => {
-      state.fetchAvailableInstanceModels = fetchModels;
-      state.models.availableInstanceModels = [other, model];
-      state.models.availablePromptedModels = [{ id: 'prompted' }];
-      state.models.availableSuggestionModels = [{ id: 'suggestion' }];
-      state.models.modelsDatasetId = 15;
-    });
-    function Drawer() { useAnnotationServices(); return null; }
-    const view = render(<CellposeInstanceRunnerProvider><Drawer /></CellposeInstanceRunnerProvider>);
-    try {
-      act(() => useAnnotationStore.getState().setInstanceModel(model.id));
-      expect(useAnnotationStore.getState().models.instanceModel).toBe(model.id);
-      view.rerender(<CellposeInstanceRunnerProvider />);
-      view.rerender(<CellposeInstanceRunnerProvider><Drawer /></CellposeInstanceRunnerProvider>);
-      await act(async () => {});
-      expect(useAnnotationStore.getState().models.instanceModel).toBe(model.id);
-    } finally {
-      view.unmount();
-      useAnnotationStore.setState({ fetchAvailableInstanceModels: originalFetch });
-    }
-  });
-
   it('shows a failed item from a partial terminal job and permits a fresh retry', async () => {
     api.startInferenceJob.mockResolvedValueOnce({ id: 991, status: 'partial' });
     api.getInferenceJobItems.mockResolvedValueOnce([{ status: 'failed', error: 'CUDA out of memory' }]);
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.isRunning).toBe(false);
     expect(result.current.error).toContain('CUDA out of memory');
@@ -148,7 +88,7 @@ describe('live Cellpose runner regressions', () => {
     api.streamInferenceJob.mockImplementation((id, next, error) => {
       connections.push({ id, next, error }); return { abort: vi.fn() };
     });
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     await act(async () => { connections[0].error(new Error('stream lost')); });
     await act(async () => { await result.current.retry(); });
@@ -165,7 +105,7 @@ describe('live Cellpose runner regressions', () => {
     api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     api.getInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     api.getInferenceJobItems.mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValue(results());
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.error).toBeTruthy();
     await act(async () => { await result.current.retry(); });
@@ -177,7 +117,7 @@ describe('live Cellpose runner regressions', () => {
   it('retains the existing job when reconnecting cannot read its status', async () => {
     let onError;
     api.streamInferenceJob.mockImplementation((_id, _next, error) => { onError = error; return { abort: vi.fn() }; });
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     await act(async () => { onError(new Error('stream lost')); });
     api.getInferenceJob.mockRejectedValueOnce(new Error('status unavailable'));
@@ -194,7 +134,7 @@ describe('live Cellpose runner regressions', () => {
   it('finishes suppressed duplicates with feedback instead of a permanent save failure', async () => {
     api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     annotationSession.addObject.mockResolvedValue({ type: 'success', success: true, data: { skipped: true } });
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.status).toBe('done');
     expect(result.current.error).toBeNull();
@@ -208,7 +148,7 @@ describe('live Cellpose runner regressions', () => {
       .mockResolvedValueOnce({ success: true, data: { skipped: true } })
       .mockRejectedValueOnce(new Error('save failed'))
       .mockResolvedValueOnce({ success: true, data: { id: 21062 } });
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.error).toBeTruthy();
     await act(async () => { await result.current.retry(); });
@@ -219,111 +159,6 @@ describe('live Cellpose runner regressions', () => {
   });
 });
 
-
-describe('YOLO polyp uses the shared instance workflow', () => {
-  const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp', checkpoint_sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' };
-  it('saves YOLO results with the selected model identity and mapped dataset label', async () => {
-    useAnnotationStore.setState((state) => {
-      state.models.availableInstanceModels = [model, yolo];
-      state.models.instanceModel = yolo.id;
-    });
-    api.startInferenceJob.mockResolvedValue({ id: 992, status: 'succeeded' });
-    let flow;
-    function Probe() { flow = useCellposeInstanceRunnerContext(); return null; }
-    render(<CellposeInstanceRunnerProvider><Probe /></CellposeInstanceRunnerProvider>);
-    await act(async () => { await flow.run(); });
-    expect(api.startInferenceJob).toHaveBeenCalledWith(expect.objectContaining({
-      steps: [expect.objectContaining({ model_registry_key: yolo.id, label_id: 43, roi_contour_ids: [21060] })],
-    }));
-    expect(annotationSession.addObject).toHaveBeenCalledWith(
-      expect.any(Array), expect.any(Array), 'Coral Polyp', 21060, .9, 43,
-      { addedBy: yolo.id, source: 'instance_segmentation', modelKey: yolo.id }
-    );
-    expect(flow.status).toBe('done');
-    expect(flow.modelName).toContain('YOLO');
-    expect(flow.checkpointSha).toBe('7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf');
-  });
-  it('retains the YOLO job across model switches and prevents a competing polyp run', async () => {
-    useAnnotationStore.setState((state) => {
-      state.models.availableInstanceModels = [model, yolo];
-      state.models.instanceModel = yolo.id;
-    });
-    let flow;
-    function Probe() { flow = useCellposeInstanceRunnerContext(); return null; }
-    render(<CellposeInstanceRunnerProvider><Probe /></CellposeInstanceRunnerProvider>);
-    await act(async () => { await flow.run(); });
-    act(() => { useAnnotationStore.getState().setInstanceModel(model.id); });
-    expect(flow.canRun).toBe(false);
-    await act(async () => { await flow.run(); });
-    expect(api.startInferenceJob).toHaveBeenCalledTimes(1);
-    act(() => { useAnnotationStore.getState().setInstanceModel(yolo.id); });
-    expect(flow.isRunning).toBe(true);
-    await act(async () => { await flow.cancel(); });
-    expect(api.cancelInferenceJob).toHaveBeenCalledWith(991);
-  });
-
-  it('keeps the focused coral ROI after selecting a result polyp and switching models both ways', async () => {
-    const yolo = { ...model, id: 'yolo_polyp_v3_c_seed1', registry_key: 'yolo_polyp_v3_c_seed1', name: 'YOLO11m-seg · Polyp', checkpoint_sha256: '7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf' };
-    useAnnotationStore.setState((state) => {
-      state.models.availableInstanceModels = [model, yolo];
-      state.models.instanceModel = model.id;
-      state.focusMode = { ...state.focusMode, active: true, objectId: 21060 };
-    });
-    api.startInferenceJob
-      .mockResolvedValueOnce({ id: 993, status: 'succeeded' })
-      .mockResolvedValueOnce({ id: 994, status: 'succeeded' })
-      .mockResolvedValueOnce({ id: 995, status: 'succeeded' });
-    let flow;
-    function Probe() { flow = useCellposeInstanceRunnerContext(); return null; }
-    render(<CellposeInstanceRunnerProvider><Probe /></CellposeInstanceRunnerProvider>);
-
-    await act(async () => { await flow.run(); });
-    act(() => {
-      useAnnotationStore.setState((state) => {
-        state.objects.list.push({ id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060 });
-        state.objects.selected = [30001];
-        state.models.instanceModel = yolo.id;
-      });
-    });
-    expect(flow.roiCount).toBe(1);
-    await act(async () => { await flow.run(); });
-
-    act(() => { useAnnotationStore.getState().setInstanceModel(model.id); });
-    expect(flow.roiCount).toBe(1);
-    await act(async () => { await flow.run(); });
-    expect(api.startInferenceJob.mock.calls.map(([request]) => request.steps[0].model_registry_key))
-      .toEqual([model.id, yolo.id, model.id]);
-    expect(api.startInferenceJob.mock.calls.map(([request]) => request.steps[0].roi_contour_ids))
-      .toEqual([[21060], [21060], [21060]]);
-  });
-
-  it('skips the write-mode warning when the current scope has no existing target polyps', async () => {
-    render(<CellposeInstanceRunnerProvider><ServiceCard service={service} /></CellposeInstanceRunnerProvider>);
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Run model' }));
-    await waitFor(() => expect(api.startInferenceJob).toHaveBeenCalledTimes(1));
-    expect(screen.queryByRole('button', { name: /Patch and run/i })).not.toBeInTheDocument();
-  });
-
-  it('shows the write-mode warning for a nested in-scope polyp and honors cancellation', async () => {
-    useAnnotationStore.setState((state) => {
-      state.objects.list.push(
-        { id: 21061, contour_id: 21061, labelId: 42, parent_id: 21060 },
-        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21061 },
-        { id: 22060, contour_id: 22060, labelId: 41 },
-        { id: 30002, contour_id: 30002, labelId: 43, parent_id: 22060 },
-        { id: 30003, contour_id: 30003, labelId: 44, parent_id: 21060 }
-      );
-    });
-    render(<CellposeInstanceRunnerProvider><ServiceCard service={service} /></CellposeInstanceRunnerProvider>);
-    fireEvent.click(screen.getByRole('button', { name: 'Instance Segmentation' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Run model' }));
-    expect(screen.getByRole('button', { name: /Patch and run/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('button', { name: /Patch and run/i })).not.toBeInTheDocument();
-    expect(api.startInferenceJob).not.toHaveBeenCalled();
-  });
-});
 
 describe('writeMode: replace vs add with overlap suppression', () => {
   it.each(['cpsam_polyp_v3_b_seed17', 'yolo_polyp_v3_c_seed1'])(
@@ -341,7 +176,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       const fresh = { ...prediction, x: [.6, .7, .7, .6], y: [.6, .6, .7, .7] };
       api.startInferenceJob.mockResolvedValue({ id: 997, status: 'succeeded' });
       api.getInferenceJobItems.mockResolvedValue(results([shifted, fresh]));
-      const { result } = renderHook(() => useCellposeInstanceRunner(selectedModel));
+      const { result } = renderHook(() => useConceptSegmentationRunner(selectedModel));
       await act(async () => { await result.current.run('patch'); });
       expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
       expect(annotationSession.addObject.mock.calls[0][0]).toEqual(fresh.x);
@@ -357,7 +192,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       complete = next;
       return { abort: vi.fn() };
     });
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     await act(async () => { await result.current.run('patch'); });
     // Another annotation is saved while inference is in flight, nested under a surface.
     act(() => {
@@ -391,7 +226,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30002 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     expect(result.current.writeMode).toBe('patch');
 
     await act(async () => {
@@ -404,6 +239,288 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
     expect(result.current.status).toBe('done');
     expect(mocks.toast.mock.calls.some(([t]) => /replaced/i.test(t.message))).toBe(true);
+  });
+
+  it('removes existing in-scope polyps and preserves out-of-scope annotations when Override returns zero predictions', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 21061, contour_id: 21061, labelId: 41, x: [.55, .9, .9, .55], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+        { id: 30002, contour_id: 30002, labelId: 43, parent_id: 21061, x: [.6, .7, .7, .6], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+      state.aiAnnotation.lastInstanceRun = {
+        count: 1,
+        objectIds: [30001],
+        labelName: 'Coral Polyp',
+        imageId: 385,
+        datasetId: 15,
+      };
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1005, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([]));
+    let resolveDelete;
+    annotationSession.deleteObject.mockImplementation(
+      () => new Promise((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    let runPromise;
+    act(() => {
+      runPromise = result.current.run('override');
+    });
+
+    await waitFor(() => {
+      expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    });
+    // Must remain busy in 'saving' state while backend deletion is still in flight
+    expect(result.current.isRunning).toBe(true);
+    expect(result.current.status).toBe('saving');
+
+    await act(async () => {
+      resolveDelete({ success: true });
+      await runPromise;
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(1);
+    expect(annotationSession.deleteObject).not.toHaveBeenCalledWith(30002);
+    expect(annotationSession.deleteObject).not.toHaveBeenCalledWith(21060);
+    expect(annotationSession.addObject).not.toHaveBeenCalled();
+    expect(result.current.isRunning).toBe(false);
+    expect(result.current.status).toBe('done');
+    expect(result.current.lastRun).toBeNull();
+    expect(mocks.toast).toHaveBeenCalledWith({
+      type: 'info',
+      message: '1 existing objects removed.',
+    });
+  });
+
+  it('reports failure when deleting an existing object throws during Override and recovers on retry', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1007, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([]));
+    annotationSession.deleteObject.mockRejectedValueOnce(new Error('Network error deleting object'));
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('override');
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    expect(result.current.status).toBe('failed');
+    expect(result.current.error).toMatch(/could not remove 1 existing object/i);
+    expect(result.current.isRunning).toBe(false);
+
+    // Now retry after failure:
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: true });
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('done');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('reports failure when deleting an existing object returns success: false and recovers on retry', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1008, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([]));
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: false, message: 'Object locked' });
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('override');
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    expect(result.current.status).toBe('failed');
+    expect(result.current.error).toMatch(/could not remove 1 existing object/i);
+    expect(result.current.isRunning).toBe(false);
+
+    // Now retry after failure:
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: true });
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('done');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('reports failure and preserves safe retry when deletion fails with incoming predictions', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1009, status: 'succeeded' });
+    const p1 = { x: [.4, .5, .5, .4], y: [.4, .4, .5, .5], label_id: 43, parent_id: 21060, confidence: .9 };
+    api.getInferenceJobItems.mockResolvedValue(results([p1]));
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: false });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { id: 30002 } });
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('override');
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('failed');
+    expect(result.current.error).toMatch(/could not remove 1 existing object/i);
+
+    // On retry, deletion succeeds, prediction already added is not re-added
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: true });
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(2);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('done');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('retries suppressed replacement predictions when override deletion failed on first attempt and succeeds on retry', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1010, status: 'succeeded' });
+    const p1 = { x: [.2, .3, .3, .2], y: [.2, .2, .3, .3], label_id: 43, parent_id: 21060, confidence: .9 };
+    api.getInferenceJobItems.mockResolvedValue(results([p1]));
+
+    // Pass 1: Deletion fails, replacement is suppressed by backend duplicate check because old outline still exists
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: false });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('override');
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('failed');
+    expect(result.current.error).toMatch(/could not remove 1 existing object and could not save 1 object/i);
+
+    // Pass 2: Retry deletes old outline successfully; suppressed replacement is retried and saved
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: true });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { id: 30002 } });
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(2);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('done');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('retries suppressed replacement predictions while properly treating remaining duplicates as suppressed once deletions succeed on retry', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1011, status: 'succeeded' });
+    // p1 replaces 30001; p2 is a within-batch duplicate or out-of-scope duplicate
+    const p1 = { x: [.2, .3, .3, .2], y: [.2, .2, .3, .3], label_id: 43, parent_id: 21060, confidence: .9 };
+    const p2 = { x: [.6, .7, .7, .6], y: [.6, .6, .7, .7], label_id: 43, parent_id: 21060, confidence: .85 };
+    api.getInferenceJobItems.mockResolvedValue(results([p1, p2]));
+
+    // Pass 1: Deletion fails, both p1 and p2 get skipped
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: false });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('override');
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('failed');
+
+    // Pass 2: Deletion succeeds. p1 succeeds. p2 is still duplicate and skipped.
+    annotationSession.deleteObject.mockResolvedValueOnce({ success: true });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { id: 30002 } });
+    annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
+
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledTimes(2);
+    expect(annotationSession.addObject).toHaveBeenCalledTimes(4);
+    // Since deletion succeeded, p2's skip is treated as suppressed, not unresolved!
+    expect(result.current.status).toBe('done');
+    expect(result.current.error).toBeNull();
+  });
+
+  it('keeps existing polyps untouched when Patch returns zero predictions', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [
+        { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .45, .45, .1], y: [.1, .1, .9, .9] },
+        { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21060, x: [.2, .3, .3, .2], y: [.2, .2, .3, .3] },
+      ];
+      state.objects.selected = [21060];
+    });
+
+    api.startInferenceJob.mockResolvedValue({ id: 1006, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([]));
+
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+
+    await act(async () => {
+      await result.current.run('patch');
+    });
+
+    expect(annotationSession.deleteObject).not.toHaveBeenCalled();
+    expect(annotationSession.addObject).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(mocks.toast).toHaveBeenCalledWith({
+      type: 'info',
+      message: 'No objects found in the selected area.',
+    });
   });
 
   it('keeps existing polyps and suppresses overlapping predictions when writeMode is patch (add)', async () => {
@@ -426,7 +543,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30003 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
     act(() => {
       result.current.setWriteMode('patch');
     });
@@ -468,7 +585,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       // Retry pass: p2 succeeds (id 30003)
       .mockResolvedValueOnce({ success: true, data: { id: 30003 } });
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -479,7 +596,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     expect(annotationSession.deleteObject).toHaveBeenCalledWith(30001);
     // P1 was saved, P2 failed
     expect(result.current.status).toBe('failed');
-    expect(result.current.error).toContain('1 of 2 polyps');
+    expect(result.current.error).toContain('1 of 2 objects');
 
     // Simulate store updating to include newly created polyp 30002
     act(() => {
@@ -529,7 +646,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30004 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -564,7 +681,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.startInferenceJob.mockResolvedValue({ id: 999, status: 'succeeded' });
     api.getInferenceJobItems.mockResolvedValue(results());
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
 
     await act(async () => {
       await result.current.run();
@@ -599,7 +716,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.startInferenceJob.mockResolvedValue({ id: 1000, status: 'succeeded' });
     api.getInferenceJobItems.mockResolvedValue(results());
 
-    const { result } = renderHook(() => useCellposeInstanceRunner(model));
+    const { result } = renderHook(() => useConceptSegmentationRunner(model));
 
     await act(async () => {
       await result.current.run();

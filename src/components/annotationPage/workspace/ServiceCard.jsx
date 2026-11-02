@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Loader2, Play, Star } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
-import CellposeInstancePanel from './CellposeInstancePanel';
-import { acceptsRoiInput } from './cellposePreviewModel';
 import { getPromptTypeInfo } from '../../../utils/promptTypes';
 import {
   useModelFavorites,
@@ -54,10 +52,7 @@ const PromptTypeChips = ({ types }) => {
 /**
  * One annotation service in the tool-options drawer.
  *
- * Carries everything the old sidebar card did: status dot, model select,
- * favourite star, supported prompt types, usage hint, the
- * explicit Run button (instance segmentation only) and the collapsible model
- * description + tags.
+ * Model selection, favourite, supported prompts and model information.
  */
 const ServiceCard = ({ service }) => {
   const [open, setOpen] = useState(service.key === 'prompted');
@@ -73,8 +68,6 @@ const ServiceCard = ({ service }) => {
   const isFavorite = favorites?.[service.task] === service.selectedModel;
   const canRun =
     service.canRun ?? (hasModels && !service.isLoading && !service.isRunning);
-
-  const isCellpose = service.key === 'instance' && acceptsRoiInput(selectedModelObj);
 
   return (
     <div className="rounded-9 border border-ln2 bg-well px-[10px] py-[9px]">
@@ -94,9 +87,6 @@ const ServiceCard = ({ service }) => {
       </button>
 
       {open && (
-        isCellpose ? (
-          <CellposeInstancePanel service={service} selectedModelObj={selectedModelObj} />
-        ) : (
         <div className="mt-[8px]">
           {service.isLoading ? (
             <div className="h-[27px] rounded-6 bg-hv animate-pulse" />
@@ -215,7 +205,6 @@ const ServiceCard = ({ service }) => {
             </div>
           )}
         </div>
-        )
       )}
     </div>
   );

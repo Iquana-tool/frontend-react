@@ -33,7 +33,7 @@ import { useDataset } from '../../../contexts/DatasetContext';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { PHASE_MAP, getPhase } from '../../../utils/imageStatus';
 import '../../../styles/workspace.css';
-import { CellposeInstanceRunnerProvider } from './CellposeInstanceRunnerContext';
+import { ConceptSegmentationProvider } from './ConceptSegmentationContext';
 import {
   useWorkspaceTheme,
   useWorkspaceMode,
@@ -275,9 +275,9 @@ const WorkspaceShellContent = () => {
 };
 
 const WorkspaceShell = () => (
-  <CellposeInstanceRunnerProvider>
+  <ConceptSegmentationProvider>
     <WorkspaceShellContent />
-  </CellposeInstanceRunnerProvider>
+  </ConceptSegmentationProvider>
 );
 
 export default WorkspaceShell;

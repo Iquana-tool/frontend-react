@@ -71,4 +71,17 @@ describe('annotation guide registry', () => {
     const ids = ANNOTATION_GUIDES.map((guide) => guide.id);
     expect(ids.indexOf('focus-mode')).toBeLessThan(ids.indexOf('fix-outline'));
   });
+
+  test('the label segmentation guide follows the unified action and explains hierarchy scope', () => {
+    const guide = ANNOTATION_GUIDES.find((entry) => entry.id === 'find-more');
+    const scope = guide.steps.find((step) => step.anchor === 'concept-segmentation');
+    const run = guide.steps.find((step) => step.title === 'Segment this label');
+    expect(guide.steps[0].anchor).toBe('labels-list');
+    expect(scope.body).toContain('Use hierarchy');
+    expect(scope.body).toContain('whole image');
+    expect(run.keys).toEqual(['2', '3']);
+    // A run finding no additional objects must still allow the user to finish the guide.
+    expect(run.showNext).toBe(true);
+    expect(run.body).toContain('Objects');
+  });
 });
