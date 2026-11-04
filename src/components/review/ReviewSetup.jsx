@@ -257,6 +257,7 @@ const ReviewSetup = ({
             update={updateSort}
             facets={facets || []}
             authors={summary?.authors || []}
+            models={summary?.models || []}
             busy={building}
             sortable={isInstanceMode && methods.length > 0}
             confidence={{ label: 'Confidence below' }}

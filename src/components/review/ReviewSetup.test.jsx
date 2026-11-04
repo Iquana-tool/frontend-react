@@ -80,6 +80,17 @@ test("the By filter offers shortcuts and the people who drew here", () => {
   expect(sortOf(onStart)).toMatchObject({ by: "mine", by_person: null });
 });
 
+test("the By filter offers the models that made objects here", () => {
+  const onStart = vi.fn();
+  render(<ReviewSetup summary={{ ...summary, authors: ["ann"], models: ["sam3"] }} labels={[]}
+    building={false} onStart={onStart} />);
+
+  fireEvent.change(screen.getByLabelText("By"), { target: { value: "model:sam3" } });
+  expect(screen.getByText(/Only objects made by sam3/)).toBeTruthy();
+  start();
+  expect(sortOf(onStart)).toMatchObject({ by: "model", by_model: "sam3", by_person: null });
+});
+
 test("independent review starts on everyone but me, also for entire images", () => {
   const onStart = vi.fn();
   render(<ReviewSetup summary={{ ...summary, require_independent_review: true }} labels={[]}
@@ -88,7 +99,7 @@ test("independent review starts on everyone but me, also for entire images", () 
   expect(screen.getByLabelText("By").value).toBe("others");
   fireEvent.click(screen.getByRole("button", { name: /Entire images/ }));
   start();
-  expect(sortOf(onStart)).toEqual({ metadata_filters: {}, by: "others", by_person: null });
+  expect(sortOf(onStart)).toEqual({ metadata_filters: {}, by: "others", by_person: null, by_model: null });
 });
 
 test("use recommended queue sets the item type and the sorting", () => {

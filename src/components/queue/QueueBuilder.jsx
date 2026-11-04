@@ -34,6 +34,7 @@ export const sortStateFrom = (saved, methods) => ({
   confidencePct: saved?.max_confidence != null ? Math.round(saved.max_confidence * 100) : null,
   by: saved?.by || "everyone",
   byPerson: saved?.by_person || null,
+  byModel: saved?.by_model || null,
 });
 
 /** The API's sort settings from builder state. */
@@ -54,11 +55,17 @@ export const sortPayload = (state, method, useConfidence = state.confidencePct !
 export const authorPayload = (state) => ({
   by: state.by || "everyone",
   by_person: state.by === "person" ? state.byPerson : null,
+  by_model: state.by === "model" ? state.byModel : null,
 });
 
-/** The "By" select's value: the choice, or the person picked. */
+/** The "By" select's value: the choice, or the person or model picked. */
 const PERSON = "person:";
-const byValue = (state) => (state.by === "person" ? `${PERSON}${state.byPerson}` : state.by || "everyone");
+const MODEL = "model:";
+const byValue = (state) => {
+  if (state.by === "person") return `${PERSON}${state.byPerson}`;
+  if (state.by === "model") return `${MODEL}${state.byModel}`;
+  return state.by || "everyone";
+};
 
 /**
  * @param {{singular: string, plural: string}} unit - What is sorted, for labels and hints.
@@ -67,6 +74,7 @@ const byValue = (state) => (state.by === "person" ? `${PERSON}${state.byPerson}`
  * @param {(patch: object) => void} update - Merges a patch into `settings`.
  * @param {object[]} facets - The dataset's metadata facets.
  * @param {string[]} [authors] - Other people who drew in the dataset, for the "By" filter.
+ * @param {string[]} [models] - Models that made objects in the dataset, for the "By" filter.
  * @param {(method: object) => string|null} [blockedMethod] - Why a method cannot run here.
  * @param {{label: string, blocked?: string|null}} confidence - The confidence filter's label;
  *   `blocked` hides it when no confidence is available.
@@ -76,7 +84,7 @@ const byValue = (state) => (state.by === "person" ? `${PERSON}${state.byPerson}`
  *   the models a method needs.
  */
 const QueueBuilder = ({
-  unit, methods, settings, update, facets = [], authors = [], busy = false,
+  unit, methods, settings, update, facets = [], authors = [], models = [], busy = false,
   blockedMethod = () => null,
   confidence, sortable = true, children,
 }) => {
@@ -129,14 +137,18 @@ const QueueBuilder = ({
         && f.key.toLowerCase().includes(keyQuery.trim().toLowerCase()))
       .slice(0, KEY_SUGGESTIONS)
     : [];
-  const selectBy = (value) => update(value.startsWith(PERSON)
-    ? { by: "person", byPerson: value.slice(PERSON.length) }
-    : { by: value, byPerson: null });
+  const selectBy = (value) => {
+    if (value.startsWith(PERSON)) update({ by: "person", byPerson: value.slice(PERSON.length), byModel: null });
+    else if (value.startsWith(MODEL)) update({ by: "model", byModel: value.slice(MODEL.length), byPerson: null });
+    else update({ by: value, byPerson: null, byModel: null });
+  };
   const byHint = {
     everyone: `${unit.plural[0].toUpperCase()}${unit.plural.slice(1)} by anyone.`,
     mine: `Only ${unit.plural} by you.`,
     others: `Only ${unit.plural} not by you.`,
     person: `Only ${unit.plural} by ${settings.byPerson}.`,
+    // A model's object stays the model's after someone accepts or edits it.
+    model: `Only ${unit.plural} made by ${settings.byModel}, including ones people accepted or edited.`,
   }[settings.by || "everyone"];
 
   const pickKey = (key) => {
@@ -273,6 +285,11 @@ const QueueBuilder = ({
               {authors.length > 0 && (
                 <optgroup label="People who drew here">
                   {authors.map((a) => <option key={a} value={`${PERSON}${a}`}>{a}</option>)}
+                </optgroup>
+              )}
+              {models.length > 0 && (
+                <optgroup label="Models">
+                  {models.map((m) => <option key={m} value={`${MODEL}${m}`}>{m}</option>)}
                 </optgroup>
               )}
             </select>

@@ -377,6 +377,7 @@ const AnnotationQueueModal = ({
                       update={update}
                       facets={facets || []}
                       authors={summary.authors || []}
+                      models={summary.models || []}
                       busy={busy}
                       blockedMethod={blockedMethod}
                       confidence={{ label: "Model confidence below", blocked: confidenceBlocked }}
