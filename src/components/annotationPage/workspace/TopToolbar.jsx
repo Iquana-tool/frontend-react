@@ -181,7 +181,7 @@ const TopToolbar = () => {
   const initial = (user?.username || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="h-[44px] flex-none flex items-center gap-[10px] px-[10px] bg-p1 border-b border-ln">
+    <div className="h-[44px] flex-none flex items-center gap-[6px] xl:gap-[10px] px-[10px] bg-p1 border-b border-ln">
       {/* App menu + wordmark */}
       <div className="relative flex items-center gap-[8px] flex-none">
         <button
@@ -264,23 +264,26 @@ const TopToolbar = () => {
 
       <Divider />
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-[7px] min-w-0 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={backToGallery}
-          className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-6 text-btn text-t2 hover:bg-hv hover:text-t1 transition-colors flex-none"
-        >
-          <ArrowLeft size={13} strokeWidth={1.9} />
-          <span>Gallery</span>
-        </button>
+      {/* Kept out of the breadcrumb so the way back never gets clipped; below xl the
+          label goes, which is what lets the toolbar fit at the editor's 1024px minimum. */}
+      <button
+        type="button"
+        onClick={backToGallery}
+        title="Gallery"
+        aria-label="Gallery"
+        className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-6 text-btn text-t2 hover:bg-hv hover:text-t1 transition-colors flex-none"
+      >
+        <ArrowLeft size={13} strokeWidth={1.9} />
+        <span className="hidden xl:inline">Gallery</span>
+      </button>
+
+      {/* Breadcrumb. It is the part that gives way on narrow screens, so it clips its
+          own overflow instead of spilling under the image navigation beside it. */}
+      <div className="flex items-center gap-[7px] min-w-0 overflow-hidden whitespace-nowrap">
         <span className="text-t3 flex-none">/</span>
         <span className="text-btn text-t2 truncate max-w-[180px]">
           {currentDataset?.name || 'Loading…'}
         </span>
-        {currentDataset && (
-          <ToolbarButton icon={ListOrdered} label="Change order" onClick={() => setShowQueue(true)} />
-        )}
         <span className="text-t3 flex-none">/</span>
         <span className="text-btn font-semibold text-t1 truncate max-w-[180px]">
           {nav.currentImage?.name || '—'}
@@ -355,6 +358,11 @@ const TopToolbar = () => {
           disabled={!nav.canGoNext}
           onClick={nav.goNext}
         />
+        {/* Sits with the navigation rather than the breadcrumb: it decides which image
+            comes next, and this group never shrinks, so it stays reachable at any width. */}
+        {currentDataset && (
+          <ToolbarButton icon={ListOrdered} label="Change order" onClick={() => setShowQueue(true)} />
+        )}
       </div>
 
       <div className="flex-1 min-w-[8px]" />
