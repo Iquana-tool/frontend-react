@@ -97,26 +97,6 @@ export const useAuthStore = create((set, get) => ({
         }
       },
 
-      register: async (username, password) => {
-        set({ isLoading: true, error: null });
-        try {
-          const response = await authApi.register(username, password);
-          if (response.success) {
-            // After successful registration, automatically log in
-            return await get().login(username, password);
-          } else {
-            throw new Error(response.message || 'Registration failed');
-          }
-        } catch (error) {
-          const errorMessage = error.message || 'Registration failed. Username may already exist.';
-          set({
-            isLoading: false,
-            error: errorMessage,
-          });
-          throw error;
-        }
-      },
-
       logout: () => {
         // Emitted before the token is cleared, so the event is still attributed
         // to the participant who is leaving rather than to nobody. `endSession`
