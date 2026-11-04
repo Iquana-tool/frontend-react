@@ -24,10 +24,13 @@ const WorkflowCard = ({
   // Any node; in practice a <PhaseProgressBar compact />. Pinned to the bottom
   // so the bars line up across cards of different content height.
   progress = null,
+  // Optional secondary action, e.g. { label: 'Change order', onClick }. Rendered beside the
+  // card's own button rather than inside it: a button cannot contain another button.
+  action = null,
 }) => {
   const c = paletteFor(color);
 
-  return (
+  const card = (
     <button
       type="button"
       onClick={onClick}
@@ -55,6 +58,21 @@ const WorkflowCard = ({
 
       {progress && <div className="mt-auto pt-3">{progress}</div>}
     </button>
+  );
+
+  if (!action) return card;
+  return (
+    <div className="relative h-full">
+      {card}
+      <button
+        type="button"
+        onClick={action.onClick}
+        className={`absolute top-3 right-3 text-xs font-medium ${c.stat} hover:underline
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-ac rounded`}
+      >
+        {action.label}
+      </button>
+    </div>
   );
 };
 

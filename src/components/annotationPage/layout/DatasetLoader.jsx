@@ -15,7 +15,7 @@ import { getPhaseStatus } from '../../../utils/imageStatus';
  * built) keep their original order at the end. Next/previous walk this list, so
  * this is what makes the queue define the annotation order.
  */
-const orderImagesByQueue = (images, queueIds) => {
+export const orderImagesByQueue = (images, queueIds) => {
   if (!queueIds || queueIds.length === 0) return images;
   const rank = new Map(queueIds.map((id, index) => [id, index]));
   const inQueue = [];
@@ -32,7 +32,7 @@ const orderImagesByQueue = (images, queueIds) => {
  * the annotation tools, and an image whose objects are all drawn should not be
  * reopened for annotation just because nobody has calibrated or reviewed it.
  */
-const isAnnotated = (img) => getPhaseStatus(img, 'annotate').key === 'finished';
+export const isAnnotated = (img) => getPhaseStatus(img, 'annotate').key === 'finished';
 
 const DatasetLoader = ({ children }) => {
   const navigate = useNavigate();

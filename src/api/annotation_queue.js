@@ -13,7 +13,7 @@ import { API_BASE_URL } from "./config";
 const jsonHeaders = () => getAuthHeaders({ "Content-Type": "application/json" });
 
 /**
- * The dataset's annotation workload plus the caller's saved-queue state.
+ * The dataset's annotation workload, the sorting methods, and the caller's saved queue.
  *
  * Backs the Annotation card's "x in progress, y not started" subcaption and the
  * queue builder's ordering options / resume prompt.
@@ -21,8 +21,10 @@ const jsonHeaders = () => getAuthHeaders({ "Content-Type": "application/json" })
  * @param {number|string} datasetId
  * @returns {Promise<{success: boolean, summary: {
  *   not_started: number, in_progress: number, finished: number, total: number,
- *   has_saved_queue: boolean, saved_strategy: string|null,
- *   strategies: Array<{key: string, label: string, description: string, available: boolean}>,
+ *   has_saved_queue: boolean, saved_settings: QueueSettings|null,
+ *   methods: Array<{key: string, label: string,
+ *     needs: Array<"embedding_model"|"trained_model">, directions: string[],
+ *     descriptions: Object<string, string>}>,
  * }}>}
  */
 export const fetchAnnotationQueueSummary = async (datasetId) => {
@@ -38,7 +40,7 @@ export const fetchAnnotationQueueSummary = async (datasetId) => {
  *
  * @param {number|string} datasetId
  * @returns {Promise<{success: boolean, queue: {
- *   strategy: string, image_ids: number[], total: number, updated_at: string|null,
+ *   settings: QueueSettings, image_ids: number[], total: number, updated_at: string|null,
  * }|null}>}
  */
 export const fetchAnnotationQueue = async (datasetId) => {
@@ -50,24 +52,81 @@ export const fetchAnnotationQueue = async (datasetId) => {
 };
 
 /**
- * Build the image order for a strategy and persist it, overwriting any earlier
- * queue for this dataset + user.
+ * Queue settings, as sent to prepare and build and saved with the queue.
+ * @typedef {Object} QueueSettings
+ * @property {string} method - A key from the summary's `methods`.
+ * @property {"ascending"|"descending"} [direction] - Defaults to the method's first direction.
+ * @property {string} [round_robin_with] - A second method to alternate with.
+ * @property {string} [embedding_model] - For methods that need one.
+ * @property {string} [trained_model] - For methods, or the confidence filter, that need one.
+ * @property {Object} [metadata_filters] - Same shape as the gallery's metadata filter.
+ * @property {number} [max_confidence] - 0..1; keeps images whose most confident detection is lower.
+ * @property {boolean} [show_builder] - False opens this queue directly next time.
+ */
+
+const postSettings = async (url, settings) => {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify(settings),
+    });
+    return handleApiError(response);
+};
+
+/**
+ * Build the queue for the settings and persist it, overwriting any earlier queue for this
+ * dataset + user.
  *
  * @param {number|string} datasetId
- * @param {Object} options
- * @param {string} options.strategy - A key from the summary's `strategies` (must be `available`).
- * @returns {Promise<{success: boolean, queue: {
- *   strategy: string, image_ids: number[], total: number, updated_at: string|null,
+ * @param {QueueSettings} settings
+ * @returns {Promise<{success: boolean, queue: {settings: QueueSettings, image_ids: number[],
+ *   total: number, details: Object, updated_at: string|null}}>}
+ */
+export const buildAnnotationQueue = (datasetId, settings) =>
+    postSettings(`${API_BASE_URL}/annotation-queue/datasets/${datasetId}`, settings);
+
+/**
+ * Fill in what the settings need (image vectors, model scores). `ready: true` means build
+ * now; otherwise poll `fetchQueuePrepJob` until the job ends.
+ *
+ * @param {number|string} datasetId
+ * @param {QueueSettings} settings
+ * @returns {Promise<{success: boolean, ready: boolean, job: null|{
+ *   id: number, status: string, total: number, done: number, failed: number,
  * }}>}
  */
-export const buildAnnotationQueue = async (datasetId, { strategy }) => {
+export const prepareAnnotationQueue = (datasetId, settings) =>
+    postSettings(`${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prepare`, settings);
+
+/** Progress of a preparation job. */
+export const fetchQueuePrepJob = async (datasetId, jobId) => {
     const response = await fetch(
-        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}`,
-        {
-            method: "POST",
-            headers: jsonHeaders(),
-            body: JSON.stringify({ strategy }),
-        }
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prep-jobs/${jobId}`,
+        { headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
+/** Stop a preparation job after its current image. */
+export const cancelQueuePrepJob = async (datasetId, jobId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/prep-jobs/${jobId}/cancel`,
+        { method: "POST", headers: getAuthHeaders() }
+    );
+    return handleApiError(response);
+};
+
+/**
+ * Models the builder can offer: embedding models, and models trained on this dataset.
+ * @returns {Promise<{success: boolean, models: {
+ *   embedding: Array<{registry_key: string, name: string}>,
+ *   trained: Array<{registry_key: string, name: string}>,
+ * }}>}
+ */
+export const fetchQueueModels = async (datasetId) => {
+    const response = await fetch(
+        `${API_BASE_URL}/annotation-queue/datasets/${datasetId}/models`,
+        { headers: getAuthHeaders() }
     );
     return handleApiError(response);
 };

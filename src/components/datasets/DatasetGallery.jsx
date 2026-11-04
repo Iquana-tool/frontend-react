@@ -30,6 +30,9 @@ const DatasetGallery = () => {
 
   const [showDatasetExportModal, setShowDatasetExportModal] = useState(false);
   const [showQueueModal, setShowQueueModal] = useState(false);
+  // True when opened through "Change order": always show the settings, even if the
+  // annotator chose not to see them on the Annotation card.
+  const [forceQueueChooser, setForceQueueChooser] = useState(false);
 
   const { can } = usePermissions(currentDataset);
 
@@ -50,8 +53,13 @@ const DatasetGallery = () => {
   }, [galleryActions]);
 
   // The Annotation card opens the queue builder rather than jumping straight into
-  // the editor: the queue defines the order images are worked in.
-  const handleAnnotationClick = () => setShowQueueModal(true);
+  // the editor: the queue defines the order images are worked in. With "Don't show this
+  // again" saved, the builder resumes the saved queue by itself.
+  const openQueue = (forceChooser) => {
+    setForceQueueChooser(forceChooser);
+    setShowQueueModal(true);
+  };
+  const handleAnnotationClick = () => openQueue(false);
 
   // Called by the queue modal once a queue is built or resumed. Land on the first
   // not-yet-finished image in queue order (fall back to the first image, then to
@@ -183,6 +191,7 @@ const DatasetGallery = () => {
             onModelZooClick={handleModelZooClick}
             onQuantificationsClick={handleQuantificationsClick}
             onAnnotationClick={handleAnnotationClick}
+            onChangeOrderClick={() => openQueue(true)}
             onLabelManagementClick={handleLabelManagementClick}
             onExportDatasetClick={() => setShowDatasetExportModal(true)}
             onModelTrainingClick={handleModelTrainingClick}
@@ -226,6 +235,7 @@ const DatasetGallery = () => {
         onClose={() => setShowQueueModal(false)}
         dataset={dataset}
         onStart={handleQueueStart}
+        forceChooser={forceQueueChooser}
       />
     </DatasetManagementLayout>
   );
