@@ -11,6 +11,13 @@ vi.mock("../../../api", () => ({
   cancelQueuePrepJob: vi.fn(),
   fetchQueueModels: vi.fn(),
   fetchDatasetMetadata: vi.fn(() => Promise.resolve({ facets: [], untagged_count: 0 })),
+  saveRecommendedQueue: vi.fn(),
+  clearRecommendedQueue: vi.fn(),
+}));
+// Whether the viewer may change dataset settings (and so recommend a queue).
+const permissions = { curator: false };
+vi.mock("../../../hooks/usePermissions", () => ({
+  usePermissions: () => ({ can: () => permissions.curator }),
 }));
 
 const methods = [
@@ -43,6 +50,7 @@ const sent = () => api.buildAnnotationQueue.mock.calls.at(-1)[1];
 
 beforeEach(() => {
   vi.clearAllMocks();
+  permissions.curator = false;
   api.fetchAnnotationQueueSummary.mockResolvedValue({ success: true, summary });
   api.fetchQueueModels.mockResolvedValue({ success: true, models: { embedding, trained } });
   api.prepareAnnotationQueue.mockResolvedValue({ success: true, ready: true, job: null });
@@ -268,4 +276,43 @@ test("a server refusal is shown without the API prefix", async () => {
   await pickMethod("density");
   build();
   expect(await screen.findByText("Choose an embedding model first.")).toBeInTheDocument();
+});
+
+
+test("use recommended queue fills the builder with the dataset's recommendation", async () => {
+  api.fetchAnnotationQueueSummary.mockResolvedValue({ success: true, summary: {
+    ...summary,
+    recommended: { reason: "Cover every look first.",
+      settings: { method: "diversity", direction: "descending", embedding_model: "dinov3" } },
+  } });
+  renderModal();
+  expect(await screen.findByText(/Cover every look first/)).toBeInTheDocument();
+  // Only curators may change the recommendation.
+  expect(screen.queryByRole("button", { name: /Recommend these settings/ })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Use recommended queue" }));
+  expect(screen.getByLabelText("Sort images by").value).toBe("diversity");
+  expect(screen.getByLabelText("Embedding model").value).toBe("dinov3");
+  build();
+  await waitFor(() => expect(api.buildAnnotationQueue).toHaveBeenCalled());
+  expect(sent()).toMatchObject({ method: "diversity", direction: "descending", embedding_model: "dinov3" });
+});
+
+test("a curator saves the current settings as the recommendation", async () => {
+  permissions.curator = true;
+  api.saveRecommendedQueue.mockResolvedValue({ success: true,
+    recommended: { reason: "Typical first.", settings: { method: "density" } } });
+  renderModal();
+  await pickMethod("density");
+  fireEvent.click(screen.getByRole("button", { name: /Recommend these settings/ }));
+  fireEvent.change(screen.getByLabelText(/Why these settings/), { target: { value: " Typical first. " } });
+  fireEvent.click(screen.getByRole("button", { name: "Save recommendation" }));
+
+  await waitFor(() => expect(api.saveRecommendedQueue).toHaveBeenCalled());
+  const [kind, datasetId, body] = api.saveRecommendedQueue.mock.calls[0];
+  expect([kind, datasetId, body.reason]).toEqual(["annotation", 7, "Typical first."]);
+  expect(body.settings).toMatchObject({ method: "density", embedding_model: "dinov3" });
+  expect(body.settings).not.toHaveProperty("show_builder");
+  // The saved recommendation is offered straight away.
+  expect(await screen.findByRole("button", { name: "Use recommended queue" })).toBeInTheDocument();
 });

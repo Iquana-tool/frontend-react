@@ -132,8 +132,9 @@ export const fetchReviewSummary = async (datasetId) => {
  * @param {number|string} datasetId
  * @param {Object} options
  * @param {"images"|"hierarchy"|"custom"} options.granularity
- * @param {string} [options.sortStrategy="hierarchy"] - A key from the summary's `strategies`.
- * @param {"asc"|"desc"} [options.direction="asc"]
+ * @param {Object} [options.sort] - Sort settings shared with the annotation queue:
+ *   `method` (a key from the summary's `methods`), `direction`, `round_robin_with`,
+ *   `metadata_filters`, `balance_by` and `max_confidence`. The server defaults to hierarchy.
  * @param {number[]} [options.labelIds] - Required for "custom" granularity.
  * @param {boolean} [options.onlySubmitted=true] - Only masks submitted for review.
  * @param {boolean} [options.includeReviewed=false] - Also queue instances other
@@ -143,8 +144,7 @@ export const buildReviewQueue = async (
     datasetId,
     {
         granularity,
-        sortStrategy = "hierarchy",
-        direction = "asc",
+        sort = {},
         labelIds = null,
         onlySubmitted = true,
         includeReviewed = false,
@@ -154,9 +154,8 @@ export const buildReviewQueue = async (
         method: "POST",
         headers: jsonHeaders(),
         body: JSON.stringify({
+            ...sort,
             granularity,
-            sort_strategy: sortStrategy,
-            direction,
             label_ids: labelIds,
             only_submitted: onlySubmitted,
             include_reviewed: includeReviewed,
