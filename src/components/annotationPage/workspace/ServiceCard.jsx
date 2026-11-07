@@ -52,10 +52,7 @@ const PromptTypeChips = ({ types }) => {
 /**
  * One annotation service in the tool-options drawer.
  *
- * Carries everything the old sidebar card did: status dot, model select,
- * favourite star, supported prompt types, usage hint, the
- * explicit Run button (instance segmentation only) and the collapsible model
- * description + tags.
+ * Model selection, favourite, supported prompts and model information.
  */
 const ServiceCard = ({ service }) => {
   const [open, setOpen] = useState(service.key === 'prompted');

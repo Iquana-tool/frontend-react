@@ -28,7 +28,7 @@ import useObjectActions from './useObjectActions';
 import useLabelAssignment from './useLabelAssignment';
 import useAddShapesAsObjects from './useAddShapesAsObjects';
 import useSupportedPromptTypes from './useSupportedPromptTypes';
-import useSuggestSimilar from './useSuggestSimilar';
+import { useConceptSegmentation } from './ConceptSegmentationContext';
 import useRailTools from './useRailTools';
 import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
@@ -108,7 +108,7 @@ const ActionBar = () => {
   const bar = useActionBarState();
   const actions = useObjectActions();
   const labelling = useLabelAssignment();
-  const suggest = useSuggestSimilar();
+  const concept = useConceptSegmentation();
   const { isAdding, addShapes } = useAddShapesAsObjects();
   const supportedPromptTypes = useSupportedPromptTypes();
   const { promptAction, cyclePromptAction } = useRailTools();
@@ -129,6 +129,8 @@ const ActionBar = () => {
   const setLeftDrawerOpen = useSetLeftDrawerOpen();
   const scale = useImageScale();
   const labels = useDatasetLabels();
+  const conceptLabel = labels.find((label) => Number(label.id) === Number(concept?.targetLabelId));
+  const conceptState = conceptLabel ? concept?.getLabelState(conceptLabel.id) : null;
   const colorOverrides = useLabelColorOverrides();
   const currentMaskId = useCurrentMaskId();
   const objects = useObjectsList();
@@ -354,14 +356,15 @@ const ActionBar = () => {
   let buttons = null;
   let hint = null;
 
-  if (bar.state === 'running') {
+  if (bar.state === 'running' || concept?.runner.isRunning) {
     context = (
       <>
         <Loader2 size={13} className="text-ac animate-spin flex-none" />
-        <span className="text-btn font-bold text-t1 animate-dcScan">{RUN_COPY[bar.runKind]}</span>
+        <span className="text-btn font-bold text-t1 animate-dcScan">{concept?.runner.isRunning ? 'Segmenting label…' : RUN_COPY[bar.runKind]}</span>
       </>
     );
-    sub = `${modelName}${prompts.length ? ` · ${prompts.length} prompts` : ''}`;
+    sub = concept?.runner.isRunning ? concept.runner.modelName : `${modelName}${prompts.length ? ` · ${prompts.length} prompts` : ''}`;
+    if (concept?.runner.isRunning) buttons = <BarButton icon={X} label="Cancel" onClick={concept.runner.cancel} />;
   } else if (bar.state === 'prompt') {
     context = (
       <>
@@ -437,15 +440,15 @@ const ActionBar = () => {
             guide="action-refine"
           />
         )}
-        {suggest.available && (
+        {conceptLabel && (
           <BarButton
             icon={Sparkles}
-            label="Suggest similar"
+            label={`Segment ${conceptLabel.name}`}
             shortcut="2"
-            disabled={!suggest.eligible}
-            title={suggest.reason || undefined}
-            onClick={suggest.run}
-            guide="action-suggest-similar"
+            disabled={concept.busy || Boolean(conceptState?.reason)}
+            title={conceptState?.reason || undefined}
+            onClick={() => concept.requestRun(conceptLabel.id)}
+            guide="action-segment-label"
           />
         )}
         <BarButton
@@ -487,15 +490,15 @@ const ActionBar = () => {
     buttons = (
       <>
         <BarButton icon={Layers} label="Group under…" onClick={() => setPicker('parent')} />
-        {suggest.available && (
+        {conceptLabel && (
           <BarButton
             icon={Sparkles}
-            label="Suggest similar"
+            label={`Segment ${conceptLabel.name}`}
             shortcut="2"
-            disabled={!suggest.eligible}
-            title={suggest.reason || undefined}
-            onClick={suggest.run}
-            guide="action-suggest-similar"
+            disabled={concept.busy || Boolean(conceptState?.reason)}
+            title={conceptState?.reason || undefined}
+            onClick={() => concept.requestRun(conceptLabel.id)}
+            guide="action-segment-label"
           />
         )}
         <BarButton

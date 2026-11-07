@@ -9,12 +9,11 @@ import {
   useRemoveObject,
   useRemoveLastPrompt,
   useClearSelection,
-  useSetInstanceRunRequested,
   useInstanceWarningModalOpen,
   useWorkspaceMode,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
-import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
+import { useConceptSegmentation } from '../components/annotationPage/workspace/ConceptSegmentationContext';
 import useAiTools from './useAiTools';
 import { deleteObject } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
@@ -29,8 +28,7 @@ import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } f
  *   Not in review mode — there the primary action is approving the instance
  *   under review, which the action bar owns along with the review cursor.
  * - 1: Run Prompted Segmentation
- * - 2: Run Instance Suggestion (suggestion) with selected objects as seeds
- * - 3: Open Instance Segmentation (warning modal)
+ * - 2 / 3: Segment the active label using the shared concept workflow
  * - Delete/Backspace: Remove the last prompt while any are on the AI canvas, otherwise
  *   reject the selected objects. See deleteRouting.js for why prompts come first.
  */
@@ -49,13 +47,10 @@ export default function useAnnotationKeyboardShortcuts() {
   const removeObject = useRemoveObject();
   const removeLastPrompt = useRemoveLastPrompt();
   const clearSelection = useClearSelection();
-  const setInstanceRunRequested = useSetInstanceRunRequested();
   const instanceWarningModalOpen = useInstanceWarningModalOpen();
   const mode = useWorkspaceMode();
-
+  const concept = useConceptSegmentation();
   const { runSegmentation } = useAISegmentation();
-  const suggestSimilar = useSuggestSimilar();
-  const runInstanceRequest = setInstanceRunRequested;
 
   const canRunPrompted =
     currentTool === 'ai_annotation' &&
@@ -107,17 +102,11 @@ export default function useAnnotationKeyboardShortcuts() {
           }
           break;
         }
-        case '2': {
-          if (isModifier) break;
-          if (!suggestSimilar.eligible) break;
-          e.preventDefault();
-          suggestSimilar.run();
-          break;
-        }
+        case '2':
         case '3': {
-          if (!isModifier && isToolEnabled('instance_segmentation')) {
+          if (!isModifier && !instanceWarningModalOpen && mode !== 'review' && mode !== 'calibrate' && concept && !concept.busy) {
             e.preventDefault();
-            runInstanceRequest(true);
+            concept.requestRun();
           }
           break;
         }
@@ -152,11 +141,11 @@ export default function useAnnotationKeyboardShortcuts() {
     mode,
     runSegmentation,
     selectedObjects,
-    suggestSimilar,
-    runInstanceRequest,
+    concept,
     handleRejectSelected,
     currentTool,
     prompts.length,
     removeLastPrompt,
+    isToolEnabled,
   ]);
 }
