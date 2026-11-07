@@ -1,7 +1,7 @@
 import React from 'react';
 import { Ban, ChevronLeft, Pencil, Sparkles } from 'lucide-react';
 import ServiceCard from './ServiceCard';
-import ConceptSegmentationPanel from './ConceptSegmentationPanel';
+import LabelSegmentationPanel from './LabelSegmentationPanel';
 import useAnnotationServices from './useAnnotationServices';
 import useRailTools from './useRailTools';
 import { PROMPT_ACTIONS, getPromptAction, getRailTool } from './toolModel';
@@ -116,7 +116,7 @@ const ToolOptionsDrawer = () => {
             {services.filter((service) => service.key === 'prompted').map((service) => (
               <ServiceCard key={service.key} service={service} />
             ))}
-            <ConceptSegmentationPanel />
+            <LabelSegmentationPanel />
           </div>
         </div>
       </div>

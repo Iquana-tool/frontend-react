@@ -1,9 +1,10 @@
 // The task is an input-conditioning detail, rather than a separate annotation action.
-export const CONCEPT_TASKS = [
+export const LABEL_SEGMENTATION_TASKS = [
   'instance-segmentation',
   'cross-image-suggestion',
   'instance-suggestion',
 ];
+export const CONCEPT_TASKS = LABEL_SEGMENTATION_TASKS;
 
 const numericId = (value) => {
   if (value == null || value === '') return null;
@@ -17,12 +18,25 @@ export const modelIdentity = (model) => model?.task && modelKey(model) != null
   ? `${model.task}:${modelKey(model)}`
   : '';
 
+/** Distinguish task choices while keeping catalog names and routing identities intact. */
+export function getLabelModelDisplayName(model, candidates = []) {
+  if (!model) return '';
+  const ambiguous = candidates.some((candidate) => candidate.name === model.name && candidate.task !== model.task);
+  const taskLabel = {
+    'instance-segmentation': 'Automatic',
+    'instance-suggestion': 'This image',
+    'cross-image-suggestion': 'Other images',
+  }[model.task];
+  return ambiguous && taskLabel ? `${model.name} · ${taskLabel}` : model.name;
+}
+export const getConceptModelDisplayName = getLabelModelDisplayName;
+
 const classKey = (entry) => typeof entry === 'string'
   ? entry
   : entry?.key ?? entry?.name ?? entry?.model_class ?? entry?.class_name;
 
 /** Declared class mappings are authoritative, including discard/unmapped entries. */
-export function isConceptModelCompatible(model, labelId) {
+export function isLabelModelCompatible(model, labelId) {
   const targetId = numericId(labelId);
   if (!model || targetId == null) return false;
   const classes = Array.isArray(model.classes) ? model.classes : [];
@@ -41,10 +55,12 @@ export function isConceptModelCompatible(model, labelId) {
   // A class-aware model with no mapped outputs must first have its classes mapped.
   return classes.length === 0;
 }
+export const isConceptModelCompatible = isLabelModelCompatible;
 
-export const isConceptModelAvailable = (model) => CONCEPT_TASKS.includes(model?.task) && ![
+export const isLabelModelAvailable = (model) => LABEL_SEGMENTATION_TASKS.includes(model?.task) && ![
   'not_ready', 'error', 'unavailable', 'disabled',
 ].includes(String(model?.model_status ?? model?.status ?? '').toLowerCase());
+export const isConceptModelAvailable = isLabelModelAvailable;
 
 const inputsFrom = (binding) => {
   const inputs = binding?.inputs;
@@ -58,20 +74,21 @@ const bindingKey = (binding) => binding.model_registry_key ?? null;
 const matchesKey = (model, key) => key != null
   && [model.registry_key, model.id].some((candidate) => candidate != null && String(candidate) === String(key));
 
-/** Resolve one concept action without borrowing another label, model or task's inputs. */
-export function resolveConceptSelection({ models = [], policy = null, labelId, override = null } = {}) {
+/** Resolve one label segmentation action without borrowing another label, model or task's inputs. */
+export function resolveLabelSelection({ models = [], policy = null, labelId, override = null } = {}) {
   const targetId = numericId(labelId);
-  const catalog = models.filter(isConceptModelAvailable);
+  const catalog = models.filter(isLabelModelAvailable);
   const bindings = Array.isArray(policy?.bindings) ? policy.bindings : [];
   const failed = (reason) => ({ model: null, inputs: {}, reason });
   const success = (model, binding = null) => ({ model, inputs: inputsFrom(binding), reason: null });
   const labelMatches = (binding) => binding.label_id != null && numericId(binding.label_id) === targetId;
+
   if (targetId == null) return failed('Select a label before running segmentation.');
 
   if (override) {
     const model = catalog.find((candidate) => modelIdentity(candidate) === override);
     if (!model) return failed('The selected model is unavailable. Choose another model.');
-    if (!isConceptModelCompatible(model, targetId)) {
+    if (!isLabelModelCompatible(model, targetId)) {
       return failed('The selected model has no class mapped to this label.');
     }
     const scoped = bindings.filter((binding) => binding.task === model.task);
@@ -88,29 +105,30 @@ export function resolveConceptSelection({ models = [], policy = null, labelId, o
   const fromBinding = (binding) => {
     const key = bindingKey(binding);
     const model = catalog.find((candidate) => candidate.task === binding.task
-      && (key == null ? isConceptModelCompatible(candidate, targetId) : matchesKey(candidate, key)));
+      && (key == null ? isLabelModelCompatible(candidate, targetId) : matchesKey(candidate, key)));
     if (!model) return failed('The configured model is unavailable. Update this label’s model settings.');
-    if (!isConceptModelCompatible(model, targetId)) {
+    if (!isLabelModelCompatible(model, targetId)) {
       return failed('The configured model has no class mapped to this label. Update its class mapping.');
     }
     return success(model, binding);
   };
 
   // Label-specific choices across every task outrank every task-level default.
-  for (const task of CONCEPT_TASKS) {
+  for (const task of LABEL_SEGMENTATION_TASKS) {
     const binding = bindings.find((entry) => entry.task === task && labelMatches(entry));
     if (binding) return fromBinding(binding);
   }
-  for (const task of CONCEPT_TASKS) {
+  for (const task of LABEL_SEGMENTATION_TASKS) {
     const binding = bindings.find((entry) => entry.task === task && entry.label_id == null);
     if (binding) return fromBinding(binding);
   }
-  for (const task of CONCEPT_TASKS) {
-    const model = catalog.find((candidate) => candidate.task === task && isConceptModelCompatible(candidate, targetId));
+  for (const task of LABEL_SEGMENTATION_TASKS) {
+    const model = catalog.find((candidate) => candidate.task === task && isLabelModelCompatible(candidate, targetId));
     if (model) return success(model);
   }
   return failed('No available model is mapped to this label.');
 }
+export const resolveConceptSelection = resolveLabelSelection;
 
 const objectLabelId = (object) => numericId(object?.labelId ?? object?.label_id);
 const parentId = (object) => numericId(object?.parent_id ?? object?.parentId);
@@ -121,8 +139,21 @@ const contourId = (object) => {
   return id != null && Number.isInteger(id) && id > 0 ? id : null;
 };
 
+/** Within-image suggestions need saved target-label examples, independently of parent ROIs. */
+export function getLabelConditioningReason({ model, label, objects = [] } = {}) {
+  const conditioning = model?.input_contract?.conditioning;
+  const minimum = conditioning?.min_units ?? 0;
+  if (model?.task !== 'instance-suggestion' || conditioning?.kind !== 'instances' || minimum <= 0) return null;
+  const examples = new Set(objects
+    .filter((object) => !object.temporary && objectLabelId(object) === numericId(label?.id))
+    .map((object) => numericId(object.contour_id)).filter((id) => Number.isInteger(id) && id > 0));
+  if (examples.size >= minimum) return null;
+  return `Annotate and save at least ${minimum} ${label.name} ${minimum === 1 ? 'example' : 'examples'} on this image before using ${model.name}.`;
+}
+export const getConceptConditioningReason = getLabelConditioningReason;
+
 /** Saved immediate-parent instances, optionally narrowed by selected/focused ancestors. */
-export function getConceptParentIds({
+export function getLabelParentIds({
   labelId, labels = [], objects = [], selectedIds = [], focusedContourId = null,
 } = {}) {
   const labelList = labels instanceof Map ? [...labels.values()] : Array.isArray(labels) ? labels : Object.values(labels);
@@ -163,8 +194,9 @@ export function getConceptParentIds({
   };
   return [...new Set(saved.filter((object) => objectLabelId(object) === immediateParentId && isInScope(object)).map(contourId))];
 }
+export const getConceptParentIds = getLabelParentIds;
 
-export function buildConceptPreviewRequest({
+export function buildLabelPreviewRequest({
   datasetId, imageId, labelId, model, inputs = {}, useHierarchy = false, roiContourIds = [],
 }) {
   return {
@@ -182,3 +214,4 @@ export function buildConceptPreviewRequest({
     }],
   };
 }
+export const buildConceptPreviewRequest = buildLabelPreviewRequest;

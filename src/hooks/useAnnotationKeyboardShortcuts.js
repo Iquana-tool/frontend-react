@@ -13,7 +13,7 @@ import {
   useWorkspaceMode,
 } from '../stores/selectors/annotationSelectors';
 import useAISegmentation from './useAISegmentation';
-import { useConceptSegmentation } from '../components/annotationPage/workspace/ConceptSegmentationContext';
+import { useLabelSegmentation } from '../components/annotationPage/workspace/LabelSegmentationContext';
 import useAiTools from './useAiTools';
 import { deleteObject } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
@@ -28,7 +28,7 @@ import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } f
  *   Not in review mode — there the primary action is approving the instance
  *   under review, which the action bar owns along with the review cursor.
  * - 1: Run Prompted Segmentation
- * - 2 / 3: Segment the active label using the shared concept workflow
+ * - 2 / 3: Segment the active label using the shared label segmentation workflow
  * - Delete/Backspace: Remove the last prompt while any are on the AI canvas, otherwise
  *   reject the selected objects. See deleteRouting.js for why prompts come first.
  */
@@ -49,7 +49,7 @@ export default function useAnnotationKeyboardShortcuts() {
   const clearSelection = useClearSelection();
   const instanceWarningModalOpen = useInstanceWarningModalOpen();
   const mode = useWorkspaceMode();
-  const concept = useConceptSegmentation();
+  const labelSegmentation = useLabelSegmentation();
   const { runSegmentation } = useAISegmentation();
 
   const canRunPrompted =
@@ -104,9 +104,9 @@ export default function useAnnotationKeyboardShortcuts() {
         }
         case '2':
         case '3': {
-          if (!isModifier && !instanceWarningModalOpen && mode !== 'review' && mode !== 'calibrate' && concept && !concept.busy) {
+          if (!isModifier && !instanceWarningModalOpen && mode !== 'review' && mode !== 'calibrate' && labelSegmentation && !labelSegmentation.busy) {
             e.preventDefault();
-            concept.requestRun();
+            labelSegmentation.requestRun();
           }
           break;
         }
@@ -141,7 +141,7 @@ export default function useAnnotationKeyboardShortcuts() {
     mode,
     runSegmentation,
     selectedObjects,
-    concept,
+    labelSegmentation,
     handleRejectSelected,
     currentTool,
     prompts.length,

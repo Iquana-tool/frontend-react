@@ -1,377 +1,9 @@
-/** How a model takes saved outlines as its region of interest (its `roi_input` tag). */
-export const ROI_INPUT = 'parent_regions';
-
-/**
- * Whether a model accepts saved outlines as a region of interest. Read from what the
- * model declares (ModelInfo tag `roi_input`, or the catalog's `roi_input`), never from
- * its registry key, so a retrained or new model gets the ROI workflow without code changes.
- */
-export const acceptsRoiInput = (model) =>
-  model?.roi_input === ROI_INPUT || model?.tags?.roi_input === ROI_INPUT;
-
-const className = (value) => {
-  if (typeof value === 'string') return value.trim().toLowerCase();
-  return String(value?.key ?? value?.name ?? value?.class_name ?? value?.label ?? '').trim().toLowerCase();
-};
-
-/** The class an ROI model predicts, lower-cased: its first declared class, else its first mapping's. */
-const targetClassName = (model) => className(
-  (Array.isArray(model?.classes) && model.classes[0])
-    || (Array.isArray(model?.class_mappings) && model.class_mappings[0]?.model_class)
-    || null
-);
-
-/** Whether a label name contains the class name as a whole word ("polyp" in "Coral polyp"). */
-const nameHasClass = (name, cls) =>
-  Boolean(cls) && typeof name === 'string' && name.toLowerCase().split(/[^a-z0-9]+/).includes(cls);
-
+// Geometry and persistence helpers shared by label-segmentation models.
 const numberId = (value) => {
   const candidate = value?.label_id ?? value?.dataset_label_id ?? value?.id ?? value;
   const id = Number(candidate);
   return Number.isFinite(id) ? id : null;
 };
-
-const getLabelName = (labelsMap, id) => {
-  if (!labelsMap || id == null) return null;
-  if (labelsMap instanceof Map) return labelsMap.get(id) ?? labelsMap.get(String(id)) ?? null;
-  return labelsMap[id] ?? labelsMap[String(id)] ?? null;
-};
-
-export function resolvePolypProjectLabel(model, labelsMap, datasetLabels = [], objectsList = []) {
-  if (!model) return null;
-
-  const classes = Array.isArray(model?.classes) ? model.classes : [];
-  const targetClass = targetClassName(model);
-  const classIndex = classes.findIndex((entry) => className(entry) === targetClass);
-
-  let labelId = null;
-
-  // 1. Authoritative class_mappings on model (from dataset catalog)
-  const classMappings = Array.isArray(model?.class_mappings) ? model.class_mappings : [];
-  const classMappingEntry = classMappings.find((entry) => className(entry?.model_class) === targetClass);
-  if (classMappingEntry) {
-    const action = String(classMappingEntry.action ?? '').toLowerCase();
-    if (action === 'discard' || action === 'unmapped') return null;
-    if (action === 'map' && classMappingEntry.label_id != null) {
-      labelId = numberId(classMappingEntry.label_id);
-    }
-    if (labelId == null) return null;
-  } else {
-    // 2. Direct model_label_mapping
-    const mapping = model?.model_label_mapping ?? model?.label_mapping ?? {};
-    const directMapping = targetClass ? mapping[targetClass] : null;
-    if (directMapping) {
-      const action = String(directMapping?.action ?? '').toLowerCase();
-      if (action === 'discard' || action === 'unmapped') return null;
-      labelId = numberId(directMapping);
-    } else {
-      // 3. Mapped label_ids
-      const mappedIds = Array.isArray(model?.label_ids) ? model.label_ids : [];
-      if (mappedIds.length > 0) {
-        const mappedEntry = mappedIds.find(
-          (entry) => entry && typeof entry === 'object' && className(entry) === targetClass
-        );
-        const candidate = mappedEntry ?? (classIndex >= 0 ? mappedIds[classIndex] : null);
-        labelId = numberId(candidate);
-      }
-    }
-  }
-
-  // Fallbacks ONLY if model has no configured mappings at all
-  if (
-    labelId == null &&
-    classMappings.length === 0 &&
-    !model?.model_label_mapping &&
-    !model?.label_mapping &&
-    (!Array.isArray(model?.label_ids) || model.label_ids.length === 0)
-  ) {
-    if (labelsMap instanceof Map) {
-      for (const [id, val] of labelsMap.entries()) {
-        const name = typeof val === 'string' ? val : val?.name;
-        if (nameHasClass(name, targetClass)) {
-          labelId = Number(id);
-          break;
-        }
-      }
-    } else if (labelsMap && typeof labelsMap === 'object') {
-      for (const [id, val] of Object.entries(labelsMap)) {
-        const name = typeof val === 'string' ? val : val?.name;
-        if (nameHasClass(name, targetClass)) {
-          labelId = Number(id);
-          break;
-        }
-      }
-    }
-
-    if (labelId == null && Array.isArray(datasetLabels) && datasetLabels.length > 0) {
-      const found = datasetLabels.find((l) => nameHasClass(l.name || l.label || '', targetClass));
-      if (found) labelId = Number(found.id);
-    }
-
-    if (labelId == null && Array.isArray(objectsList) && objectsList.length > 0) {
-      const foundObj = objectsList.find((obj) => {
-        const name = obj.label || getLabelName(labelsMap, obj.labelId ?? obj.label_id);
-        return nameHasClass(name, targetClass);
-      });
-      if (foundObj) labelId = numberId(foundObj.labelId ?? foundObj.label_id);
-    }
-  }
-
-  if (labelId != null) {
-    const labelName =
-      getLabelName(labelsMap, labelId) ??
-      (Array.isArray(datasetLabels) ? datasetLabels.find((l) => Number(l.id) === labelId)?.name : null) ??
-      (Array.isArray(objectsList) ? objectsList.find((o) => Number(o.labelId ?? o.label_id) === labelId)?.label : null) ??
-      (classes[0]?.name ?? classes[0]?.key ?? (targetClass || 'Object'));
-    const color =
-      (Array.isArray(datasetLabels) ? datasetLabels.find((l) => Number(l.id) === labelId)?.color : null) ??
-      (Array.isArray(objectsList) ? objectsList.find((o) => Number(o.labelId ?? o.label_id) === labelId)?.color : null) ??
-      null;
-    return {
-      labelId,
-      labelName: String(labelName),
-      ...(color ? { color } : {}),
-    };
-  }
-
-  return null;
-}
-
-export function getSelectedFragmentContourIds(
-  selectedIds,
-  objects,
-  labelsMap,
-  targetLabelId = null,
-  datasetLabels = null,
-  focusedContourId = null
-) {
-  if (!Array.isArray(objects) || objects.length === 0) {
-    return [];
-  }
-
-  const selected = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(String));
-  const selectedObjects = objects.filter(
-    (object) =>
-      (selected.has(String(object.id)) || selected.has(String(object.contour_id))) &&
-      object.contour_id != null &&
-      object.contour_id !== ''
-  );
-
-  if (selectedObjects.length === 0) {
-    return focusedContourId == null
-      ? []
-      : getSelectedFragmentContourIds([focusedContourId], objects, labelsMap, targetLabelId, datasetLabels);
-  }
-
-  const resolvedTargetId = targetLabelId != null ? Number(targetLabelId) : null;
-
-  let allowedAncestorIds = null;
-  if (Array.isArray(datasetLabels) && datasetLabels.length > 0 && resolvedTargetId != null) {
-    const targetLabelObj = datasetLabels.find((l) => Number(l.id) === resolvedTargetId);
-    if (targetLabelObj) {
-      const parentMap = new Map();
-      datasetLabels.forEach((l) => {
-        if (l?.id != null) {
-          const pid = l.parent_id != null ? Number(l.parent_id) : null;
-          parentMap.set(Number(l.id), pid);
-        }
-      });
-
-      const pid = targetLabelObj.parent_id != null ? Number(targetLabelObj.parent_id) : null;
-      if (pid != null) {
-        const allowed = new Set();
-        const visited = new Set();
-        let currId = resolvedTargetId;
-        let cycle = false;
-        while (currId != null && Number.isFinite(currId)) {
-          if (visited.has(currId)) {
-            cycle = true;
-            break;
-          }
-          visited.add(currId);
-          const parentId = parentMap.get(currId);
-          if (parentId == null || !parentMap.has(parentId)) {
-            break;
-          }
-          if (visited.has(parentId)) {
-            cycle = true;
-            break;
-          }
-          allowed.add(parentId);
-          currId = parentId;
-        }
-        allowedAncestorIds = cycle ? new Set() : allowed;
-      } else {
-        // Mapped target has no parent in datasetLabels -> root target with no allowed ancestors
-        allowedAncestorIds = new Set();
-      }
-    }
-  }
-
-  const ids = selectedObjects
-    .filter((object) => {
-      const objLabelId = Number(object.labelId ?? object.label_id);
-
-      if (resolvedTargetId != null && objLabelId === resolvedTargetId) {
-        return false;
-      }
-
-      if (allowedAncestorIds != null) {
-        return allowedAncestorIds.has(objLabelId);
-      }
-
-      // Without the label hierarchy any selected object of another label can bound the run.
-      return resolvedTargetId != null;
-    })
-    .map((object) => Number(object.contour_id))
-    .filter(Number.isFinite);
-
-  const uniqueIds = [...new Set(ids)];
-  return uniqueIds.length > 0 || focusedContourId == null
-    ? uniqueIds
-    : getSelectedFragmentContourIds([focusedContourId], objects, labelsMap, targetLabelId, datasetLabels);
-}
-
-export function resolvePolypInputs({
-  policy = null,
-  labelId = null,
-  modelKey = null,
-  inputs = null,
-  threshold = null,
-} = {}) {
-  // 1. Explicit inputs envelope provided (e.g. { parameters: { threshold: 0.9 } })
-  if (inputs && typeof inputs === 'object') {
-    if (inputs.parameters != null || inputs.conditioning != null) {
-      const result = {
-        ...(inputs.conditioning != null ? { conditioning: { ...inputs.conditioning } } : {}),
-        ...(inputs.parameters != null ? { parameters: { ...inputs.parameters } } : {}),
-      };
-      if (threshold != null && Number.isFinite(Number(threshold))) {
-        result.parameters = { ...(result.parameters || {}), threshold: Number(threshold) };
-      }
-      return result;
-    }
-    if (inputs.threshold != null && Number.isFinite(Number(inputs.threshold))) {
-      return { parameters: { threshold: Number(inputs.threshold) } };
-    }
-  }
-
-  // 2. Explicit direct threshold provided
-  if (threshold != null && Number.isFinite(Number(threshold))) {
-    return { parameters: { threshold: Number(threshold) } };
-  }
-
-  // 3. Resolve from dataset routing policy matching settings
-  if (policy && Array.isArray(policy.bindings)) {
-    const numLabelId = labelId != null ? Number(labelId) : null;
-    const task = 'instance-segmentation';
-
-    const getBindingModelKey = (b) =>
-      b.model_registry_key ??
-      b.registry_key ??
-      b.model?.registry_key ??
-      b.model?.id ??
-      b.model ??
-      b.id ??
-      null;
-
-    const matchesExactModel = (b) => {
-      const bKey = getBindingModelKey(b);
-      return bKey != null && (bKey === modelKey || String(bKey) === String(modelKey));
-    };
-
-    const isModelAgnostic = (b) => getBindingModelKey(b) == null;
-
-    let matchedBinding = null;
-
-    // 1. Label override explicitly matching modelKey
-    if (numLabelId != null) {
-      matchedBinding = policy.bindings.find(
-        (b) => b.task === task && Number(b.label_id) === numLabelId && matchesExactModel(b)
-      );
-    }
-
-    // 2. Task default explicitly matching modelKey
-    if (!matchedBinding) {
-      matchedBinding = policy.bindings.find(
-        (b) => b.task === task && (b.label_id == null || b.label_id === undefined) && matchesExactModel(b)
-      );
-    }
-
-    // 3. Model-agnostic label override
-    if (!matchedBinding && numLabelId != null) {
-      matchedBinding = policy.bindings.find(
-        (b) => b.task === task && Number(b.label_id) === numLabelId && isModelAgnostic(b)
-      );
-    }
-
-    // 4. Model-agnostic task default
-    if (!matchedBinding) {
-      matchedBinding = policy.bindings.find(
-        (b) => b.task === task && (b.label_id == null || b.label_id === undefined) && isModelAgnostic(b)
-      );
-    }
-
-    if (matchedBinding) {
-      const bInputs = matchedBinding.inputs;
-      const configuredThreshold =
-        bInputs?.parameters?.threshold ??
-        bInputs?.threshold ??
-        matchedBinding.threshold;
-
-      if (bInputs && typeof bInputs === 'object') {
-        const result = {
-          ...(bInputs.conditioning ? { conditioning: { ...bInputs.conditioning } } : {}),
-          parameters: {
-            ...(bInputs.parameters ? { ...bInputs.parameters } : {}),
-            ...(configuredThreshold != null ? { threshold: Number(configuredThreshold) } : {}),
-          },
-        };
-        if (Object.keys(result.parameters).length === 0) {
-          delete result.parameters;
-        }
-        if (Object.keys(result).length > 0) {
-          return result;
-        }
-      } else if (configuredThreshold != null && Number.isFinite(Number(configuredThreshold))) {
-        return { parameters: { threshold: Number(configuredThreshold) } };
-      }
-    }
-  }
-
-  // 4. Fallback if inputs was a generic non-empty object
-  if (inputs && typeof inputs === 'object' && Object.keys(inputs).length > 0) {
-    return { ...inputs };
-  }
-
-  return {};
-}
-
-export function buildCellposePreviewRequest({
-  datasetId,
-  imageId,
-  labelId,
-  roiContourIds = [],
-  modelKey = null,
-  inputs = null,
-  policy = null,
-  threshold = null,
-}) {
-  const resolvedInputs = resolvePolypInputs({ policy, labelId, modelKey, inputs, threshold });
-  return {
-    dataset_id: Number(datasetId),
-    image_selection: 'custom',
-    image_ids: [Number(imageId)],
-    result_mode: 'preview',
-    steps: [{
-      model_registry_key: modelKey,
-      task: 'instance-segmentation',
-      label_id: Number(labelId),
-      inputs: resolvedInputs,
-      roi_contour_ids: roiContourIds.map(Number),
-    }],
-  };
-}
 
 const flattenContours = (contours) => {
   if (Array.isArray(contours)) {
@@ -398,6 +30,7 @@ export function extractPreviewPredictions(items, fallbackLabelId) {
       const labelId = numberId(contour.label_id) ?? numberId(fallbackLabelId);
       if (labelId == null) return;
       const score = Number(contour.score ?? contour.confidence ?? instance?.score);
+      const modelClass = contour.model_class ?? instance?.model_class ?? contour.modelClass ?? instance?.modelClass ?? null;
       result.push({
         id: `${item.image_id ?? itemIndex}:${sourceInstanceId ?? contour.id ?? contourIndex}:${contourIndex}`,
         sourceInstanceId,
@@ -406,6 +39,7 @@ export function extractPreviewPredictions(items, fallbackLabelId) {
         label_id: labelId,
         parent_id: contour.parent_id ?? null,
         score: Number.isFinite(score) ? score : null,
+        ...(modelClass ? { model_class: modelClass } : {}),
         included: true,
       });
     });
@@ -509,12 +143,12 @@ export function calculatePolygonIoU(polyA, polyB, gridSize = 20) {
 }
 
 /**
- * Retrieve existing polyp objects matching the target parent coral or image scope.
+ * Retrieve target-label objects within the selected parent hierarchy or image.
  */
-export function getExistingPolypsForScope(objects = [], {
+export function getExistingObjectsForScope(objects = [], {
   targetParentIds = null,
   labelId = null,
-  scope = 'fragment',
+  scope = 'hierarchy',
 } = {}) {
   if (!Array.isArray(objects) || labelId == null) return [];
   const targetLabelId = Number(labelId);
@@ -531,11 +165,11 @@ export function getExistingPolypsForScope(objects = [], {
     if (!obj) return false;
     const objLabelId = Number(obj.labelId ?? obj.label_id);
     if (objLabelId !== targetLabelId) return false;
-    if (scope === 'fragment') {
+    if (scope === 'hierarchy') {
       if (!parentIdSet || parentIdSet.size === 0) return false;
       let parentId = obj.parentId ?? obj.parent_id;
       const visited = new Set();
-      // A selected fragment can contain surfaces which in turn contain the polyps.
+      // A selected ancestor can contain intermediate objects before the target objects.
       while (parentId != null) {
         parentId = Number(parentId);
         if (visited.has(parentId)) return false;
@@ -589,7 +223,7 @@ export function suppressOverlappingPredictions(
       const existingArea = polygonArea(existing.x, existing.y);
       const intersection = iou * (candidateArea + existingArea) / (1 + iou);
       const smallerArea = Math.min(candidateArea, existingArea);
-      // Different models can outline the same polyp at different sizes or offsets.
+      // Different models can outline the same object at different sizes or offsets.
       const overlapSmaller = smallerArea > 0 ? intersection / smallerArea : 0;
       if (iou >= iouThreshold || overlapSmaller >= 0.3) {
         isSuppressed = true;
@@ -710,7 +344,7 @@ export function resolveParentContourId(prediction, {
     const cx = prediction.x.reduce((a, b) => a + b, 0) / prediction.x.length;
     const cy = prediction.y.reduce((a, b) => a + b, 0) / prediction.y.length;
 
-    // If explicit ROIs are specified (in fragment scope), check compatibility and containment in them first
+    // If explicit ROIs are specified (in hierarchy scope), check compatibility and containment in them first
     if (effectiveRoiIds.length > 0) {
       for (const roiId of effectiveRoiIds) {
         const roiObj = (objects || []).find((obj) => Number(obj.contour_id ?? obj.id) === roiId);
@@ -724,11 +358,11 @@ export function resolveParentContourId(prediction, {
           }
         }
       }
-      // Predictions outside the explicit ROI in fragment scope must not attach to unrelated objects
+      // Predictions outside the explicit ROI in hierarchy scope must not attach to unrelated objects
       return null;
     }
 
-    // If a focused contour is specified (in fragment scope without explicit ROI), check compatibility and containment
+    // If a focused contour is specified (in hierarchy scope without explicit ROI), check compatibility and containment
     if (effectiveFocusedId != null) {
       const focusedObj = (objects || []).find((obj) => Number(obj.contour_id ?? obj.id) === effectiveFocusedId);
       if (focusedObj && isCompatibleParent(focusedObj)) {
@@ -793,6 +427,7 @@ export function toAcceptedContour(prediction, imageWidth = null, imageHeight = n
   const rawParentId = prediction.parent_id != null
     ? Number(prediction.parent_id)
     : (parentIdFallback != null ? Number(parentIdFallback) : null);
+  const modelClass = prediction.model_class ?? prediction.modelClass ?? null;
   return {
     x,
     y,
@@ -800,5 +435,6 @@ export function toAcceptedContour(prediction, imageWidth = null, imageHeight = n
     parentId: Number.isFinite(rawParentId) ? rawParentId : null,
     confidence: prediction.score != null && Number.isFinite(Number(prediction.score)) ? Number(prediction.score) : 1,
     sourceInstanceId: prediction.sourceInstanceId ?? null,
+    ...(modelClass ? { modelClass, model_class: modelClass } : {}),
   };
 }

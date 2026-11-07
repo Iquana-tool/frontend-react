@@ -393,14 +393,14 @@ export const ANNOTATION_GUIDES = [
         doneWhen: (state) => state.workspace.activeLabelId != null,
       },
       {
-        anchor: 'concept-segmentation',
+        anchor: 'label-segmentation',
         placement: 'right',
         title: 'Choose the scope for this label',
-        body: 'Each label has one Segment action. For child labels, Use hierarchy runs separately inside eligible saved parents. Annotate a parent first, or turn the switch off to run over the whole image. Settings changes the model for this label.',
+        body: 'Each label has one Segment action and a Use hierarchy switch. On uses eligible parent regions for child labels and allows automatic child linking. Root labels run on the whole image. Off runs on the whole image and saves independent objects. The choice affects new results only. Settings changes the model for this label.',
         onEnter: openLeftDrawer,
       },
       {
-        anchor: 'concept-segmentation',
+        anchor: 'label-segmentation',
         placement: 'right',
         title: 'Segment this label',
         body: 'Press Segment beside your label. The configured model saves the outlines in Objects for editing. When objects already exist, Patch preserves them and Override replaces them in the inference area.',

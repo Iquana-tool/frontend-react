@@ -5,7 +5,8 @@ import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { initialState } from '../../../stores/initialState';
 import * as api from '../../../api/inference';
 import annotationSession from '../../../services/annotationSession';
-import { useConceptSegmentationRunner } from './useConceptSegmentationRunner';
+import { useLabelSegmentationRunner } from './useLabelSegmentationRunner';
+import { getLabelParentIds, modelIdentity, resolveLabelSelection } from './labelSegmentationModel';
 
 const mocks = vi.hoisted(() => ({ toast: vi.fn(), legacyRun: vi.fn(), policy: { bindings: [] } }));
 vi.mock('../../../api/inference', () => ({
@@ -27,9 +28,24 @@ vi.mock('../../../hooks/useInstanceSegmentation', () => ({ useInstanceSegmentati
 
 const model = {
   id: 'cpsam_polyp_v3_b_seed17', registry_key: 'cpsam_polyp_v3_b_seed17', roi_input: 'parent_regions',
-  name: 'Cellpose-SAM · Polyp', classes: [{ key: 'polyp' }], label_ids: [43],
+  task: 'instance-segmentation', name: 'Cellpose-SAM · Polyp', classes: [{ key: 'polyp' }], label_ids: [43],
   class_mappings: [{ model_class: { key: 'polyp' }, action: 'map', label_id: 43 }],
 };
+// Exercise the same resolved-configuration contract as the live context. The
+// persistence scenarios below must not rely on the removed label-guessing path.
+function useConfiguredRunner(selectedModel = model, overrides = {}) {
+  const objects = useAnnotationStore((state) => state.objects);
+  const useHierarchy = overrides.useHierarchy ?? true;
+  const labelId = overrides.labelId ?? 43;
+  const selection = resolveLabelSelection({ models: [selectedModel], policy: mocks.policy,
+    labelId, override: modelIdentity(selectedModel) });
+  return useLabelSegmentationRunner({
+    ...selection, labelId, useHierarchy,
+    parentContourIds: getLabelParentIds({ labelId, labels: objects.datasetLabels,
+      objects: objects.list, selectedIds: objects.selected, focusedContourId: objects.focused }),
+    ...overrides,
+  });
+}
 const prediction = { x: [.2, .3, .3, .2], y: [.2, .2, .3, .3], label_id: 43, parent_id: 21060, confidence: .9 };
 const results = (contours = [prediction]) => [{ status: 'done', image_id: 385, predictions: { contours } }];
 const service = {
@@ -45,6 +61,7 @@ const deferred = () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.policy = { bindings: [] };
   annotationSession.currentImageId = 385;
   useAnnotationStore.setState({
     ...initialState,
@@ -54,7 +71,7 @@ beforeEach(() => {
       datasetLabels: [
         { id: 41, name: 'Coral Fragment', parent_id: null },
         { id: 42, name: 'Coral Surface', parent_id: 41 },
-        { id: 43, name: 'Coral Polyp', parent_id: 42 },
+        { id: 43, name: 'Coral Polyp', parent_id: 41 },
       ],
       datasetLabelsMap: new Map([[41, 'Coral Fragment'], [42, 'Coral Surface'], [43, 'Coral Polyp']]),
       list: [{ id: 21060, contour_id: 21060, labelId: 41, x: [.1, .9, .9, .1], y: [.1, .1, .9, .9] }],
@@ -70,11 +87,70 @@ beforeEach(() => {
   annotationSession.addObject.mockResolvedValue({ type: 'object_added', success: true, data: { id: 21061 } });
 });
 
-describe('live Cellpose runner regressions', () => {
+describe('configured label runner regressions', () => {
+  it('clears result selection so the next hierarchy run includes every eligible parent', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.selected = [];
+      state.objects.list.push({ id: 22000, contour_id: 22000, labelId: 41,
+        x: [.01, .08, .08, .01], y: [.01, .01, .08, .08] });
+    });
+    api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
+    annotationSession.addObject.mockImplementation(async () => {
+      // The existing WebSocket handler auto-selects every OBJECT_ADDED event.
+      useAnnotationStore.getState().addObject({ id: 21061, contour_id: 21061,
+        labelId: 43, parent_id: 21060, x: prediction.x, y: prediction.y });
+      useAnnotationStore.getState().clearSelection();
+      useAnnotationStore.getState().selectObject(21061);
+      return { type: 'object_added', success: true, data: { id: 21061 } };
+    });
+    const { result } = renderHook(() => useConfiguredRunner());
+    await act(async () => { await result.current.run(); });
+    expect(result.current.status).toBe('done');
+    expect(useAnnotationStore.getState().objects.selected).toEqual([]);
+    api.startInferenceJob.mockResolvedValue({ id: 992, status: 'running' });
+    await act(async () => { await result.current.run(); });
+    expect(api.startInferenceJob.mock.calls[1][0].steps[0].roi_contour_ids).toEqual([21060, 22000]);
+  });
+
+  it('clears selection after an empty run without exiting deliberate focus mode', async () => {
+    useAnnotationStore.setState((state) => {
+      state.focusMode = { active: true, contourId: 21060 };
+    });
+    api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([]));
+    const { result } = renderHook(() => useConfiguredRunner());
+    await act(async () => { await result.current.run(); });
+    expect(useAnnotationStore.getState().objects.selected).toEqual([]);
+    expect(useAnnotationStore.getState().focusMode).toMatchObject({ active: true, contourId: 21060 });
+  });
+
+  it('requires resolved label settings instead of guessing from the model or dataset names', async () => {
+    const { result } = renderHook(() => useLabelSegmentationRunner());
+    expect(result.current.canRun).toBe(false);
+    expect(result.current.disableReason).toMatch(/label.*settings/i);
+    await act(async () => { expect(await result.current.run()).toBe(false); });
+    expect(api.startInferenceJob).not.toHaveBeenCalled();
+  });
+
+  it('ignores stale parent IDs for a root label and cannot inherit unrelated focus', async () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.datasetLabels.find((label) => label.id === 43).parent_id = null;
+      state.focusMode = { active: true, objectId: 21060 };
+    });
+    api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results([{ ...prediction, parent_id: null }]));
+    const { result } = renderHook(() => useConfiguredRunner(model,
+      { useHierarchy: false, parentContourIds: [21060] }));
+    await act(async () => { await result.current.run(); });
+    expect(api.startInferenceJob.mock.calls[0][0].steps[0]).toMatchObject({ use_hierarchy: false });
+    expect(api.startInferenceJob.mock.calls[0][0].steps[0]).not.toHaveProperty('roi_contour_ids');
+    expect(annotationSession.addObject.mock.calls[0][3]).toBeNull();
+  });
+
   it('shows a failed item from a partial terminal job and permits a fresh retry', async () => {
     api.startInferenceJob.mockResolvedValueOnce({ id: 991, status: 'partial' });
     api.getInferenceJobItems.mockResolvedValueOnce([{ status: 'failed', error: 'CUDA out of memory' }]);
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.isRunning).toBe(false);
     expect(result.current.error).toContain('CUDA out of memory');
@@ -88,7 +164,7 @@ describe('live Cellpose runner regressions', () => {
     api.streamInferenceJob.mockImplementation((id, next, error) => {
       connections.push({ id, next, error }); return { abort: vi.fn() };
     });
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     await act(async () => { connections[0].error(new Error('stream lost')); });
     await act(async () => { await result.current.retry(); });
@@ -105,7 +181,7 @@ describe('live Cellpose runner regressions', () => {
     api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     api.getInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     api.getInferenceJobItems.mockRejectedValueOnce(new Error('fetch failed')).mockResolvedValue(results());
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.error).toBeTruthy();
     await act(async () => { await result.current.retry(); });
@@ -117,7 +193,7 @@ describe('live Cellpose runner regressions', () => {
   it('retains the existing job when reconnecting cannot read its status', async () => {
     let onError;
     api.streamInferenceJob.mockImplementation((_id, _next, error) => { onError = error; return { abort: vi.fn() }; });
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     await act(async () => { onError(new Error('stream lost')); });
     api.getInferenceJob.mockRejectedValueOnce(new Error('status unavailable'));
@@ -134,7 +210,7 @@ describe('live Cellpose runner regressions', () => {
   it('finishes suppressed duplicates with feedback instead of a permanent save failure', async () => {
     api.startInferenceJob.mockResolvedValue({ id: 991, status: 'succeeded' });
     annotationSession.addObject.mockResolvedValue({ type: 'success', success: true, data: { skipped: true } });
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.status).toBe('done');
     expect(result.current.error).toBeNull();
@@ -148,7 +224,7 @@ describe('live Cellpose runner regressions', () => {
       .mockResolvedValueOnce({ success: true, data: { skipped: true } })
       .mockRejectedValueOnce(new Error('save failed'))
       .mockResolvedValueOnce({ success: true, data: { id: 21062 } });
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run(); });
     expect(result.current.error).toBeTruthy();
     await act(async () => { await result.current.retry(); });
@@ -176,7 +252,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       const fresh = { ...prediction, x: [.6, .7, .7, .6], y: [.6, .6, .7, .7] };
       api.startInferenceJob.mockResolvedValue({ id: 997, status: 'succeeded' });
       api.getInferenceJobItems.mockResolvedValue(results([shifted, fresh]));
-      const { result } = renderHook(() => useConceptSegmentationRunner(selectedModel));
+      const { result } = renderHook(() => useConfiguredRunner(selectedModel));
       await act(async () => { await result.current.run('patch'); });
       expect(annotationSession.addObject).toHaveBeenCalledTimes(1);
       expect(annotationSession.addObject.mock.calls[0][0]).toEqual(fresh.x);
@@ -192,7 +268,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       complete = next;
       return { abort: vi.fn() };
     });
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     await act(async () => { await result.current.run('patch'); });
     // Another annotation is saved while inference is in flight, nested under a surface.
     act(() => {
@@ -226,7 +302,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30002 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     expect(result.current.writeMode).toBe('patch');
 
     await act(async () => {
@@ -268,7 +344,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       })
     );
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     let runPromise;
     act(() => {
@@ -313,7 +389,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.getInferenceJobItems.mockResolvedValue(results([]));
     annotationSession.deleteObject.mockRejectedValueOnce(new Error('Network error deleting object'));
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -348,7 +424,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.getInferenceJobItems.mockResolvedValue(results([]));
     annotationSession.deleteObject.mockResolvedValueOnce({ success: false, message: 'Object locked' });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -385,7 +461,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.deleteObject.mockResolvedValueOnce({ success: false });
     annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { id: 30002 } });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -425,7 +501,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.deleteObject.mockResolvedValueOnce({ success: false });
     annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -470,7 +546,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
     annotationSession.addObject.mockResolvedValueOnce({ success: true, data: { skipped: true, duplicate: true } });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -508,7 +584,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.startInferenceJob.mockResolvedValue({ id: 1006, status: 'succeeded' });
     api.getInferenceJobItems.mockResolvedValue(results([]));
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('patch');
@@ -543,7 +619,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30003 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
     act(() => {
       result.current.setWriteMode('patch');
     });
@@ -585,7 +661,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
       // Retry pass: p2 succeeds (id 30003)
       .mockResolvedValueOnce({ success: true, data: { id: 30003 } });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -627,6 +703,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     // Polyp 30002 is on Surface 21063.
     // Polyp 30003 is directly on Fragment 21060.
     useAnnotationStore.setState((state) => {
+      state.objects.datasetLabels.find((label) => label.id === 43).parent_id = 42;
       state.objects.list = [
         { id: 21060, contour_id: 21060, labelId: 41, x: [.1, .9, .9, .1], y: [.1, .1, .9, .9] },
         { id: 21062, contour_id: 21062, labelId: 42, parentId: 21060, x: [.2, .5, .5, .2], y: [.2, .2, .5, .5] },
@@ -646,7 +723,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     annotationSession.addObject.mockResolvedValue({ success: true, data: { id: 30004 } });
     annotationSession.deleteObject.mockResolvedValue({ success: true });
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run('override');
@@ -681,7 +758,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.startInferenceJob.mockResolvedValue({ id: 999, status: 'succeeded' });
     api.getInferenceJobItems.mockResolvedValue(results());
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run();
@@ -716,7 +793,7 @@ describe('writeMode: replace vs add with overlap suppression', () => {
     api.startInferenceJob.mockResolvedValue({ id: 1000, status: 'succeeded' });
     api.getInferenceJobItems.mockResolvedValue(results());
 
-    const { result } = renderHook(() => useConceptSegmentationRunner(model));
+    const { result } = renderHook(() => useConfiguredRunner(model));
 
     await act(async () => {
       await result.current.run();
@@ -733,5 +810,41 @@ describe('writeMode: replace vs add with overlap suppression', () => {
         ],
       })
     );
+  });
+
+  it('clears previous job ID so retry after failed start initiates a new run rather than reconnecting to completed job', async () => {
+    mocks.policy = { bindings: [] };
+    api.getInferenceJob.mockClear();
+    api.startInferenceJob.mockReset();
+    api.startInferenceJob.mockResolvedValueOnce({ id: 1000, status: 'succeeded' });
+    api.getInferenceJobItems.mockResolvedValue(results());
+    annotationSession.addObject.mockResolvedValue({ type: 'object_added', success: true, data: { id: 501 } });
+
+    const { result } = renderHook(() => useConfiguredRunner(model));
+
+    // Run 1: succeeds
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(result.current.status).toBe('done');
+    expect(api.startInferenceJob).toHaveBeenCalledTimes(1);
+
+    // Run 2: start fails (e.g. network offline)
+    api.startInferenceJob.mockRejectedValueOnce(new Error('Network offline'));
+    await act(async () => {
+      await result.current.run();
+    });
+    expect(result.current.status).toBe('failed');
+    expect(result.current.error).toBe('Network offline');
+
+    // Retry: should NOT call getInferenceJob(1000) or reconnect to job 1000; should attempt run()
+    api.startInferenceJob.mockResolvedValueOnce({ id: 1001, status: 'succeeded' });
+    await act(async () => {
+      await result.current.retry();
+    });
+
+    expect(api.getInferenceJob).not.toHaveBeenCalledWith(1000);
+    expect(api.startInferenceJob).toHaveBeenCalledTimes(3);
+    expect(result.current.status).toBe('done');
   });
 });

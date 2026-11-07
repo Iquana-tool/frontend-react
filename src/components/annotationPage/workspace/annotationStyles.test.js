@@ -75,6 +75,11 @@ describe('getPolygonStyle outline settings', () => {
     };
     expect(getPolygonStyle(smallPending, { color: COLOR }).strokeDasharray).toBe('none');
     expect(getPolygonStyle(largePending, { color: COLOR }).strokeDasharray).toBe('30 8');
+    const continuous = getPolygonStyle(largePending, { color: COLOR, continuousLabelledOutline: true });
+    expect(continuous.strokeDasharray).toBe('none');
+    expect(continuous.stroke).toBe(COLOR);
+    expect(getPolygonStyle(largePending, { color: COLOR, reviewMode: true }).strokeDasharray).toBe('30 8');
+    expect(getPolygonStyle(unlabelled, { color: COLOR, continuousLabelledOutline: true }).strokeDasharray).toBe('18 10');
   });
 
   describe('the outline preset', () => {

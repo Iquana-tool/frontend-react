@@ -5,7 +5,8 @@ import useAnnotationStore from '../stores/useAnnotationStore';
 import { initialState } from '../stores/initialState';
 
 const mocks = vi.hoisted(() => ({ requestRun: vi.fn(), busy: false }));
-vi.mock('../components/annotationPage/workspace/ConceptSegmentationContext', () => ({
+vi.mock('../components/annotationPage/workspace/LabelSegmentationContext', () => ({
+  useLabelSegmentation: () => mocks,
   useConceptSegmentation: () => mocks,
 }));
 vi.mock('./useAISegmentation', () => ({ default: () => ({ runSegmentation: vi.fn() }) }));
@@ -17,7 +18,7 @@ beforeEach(() => {
   useAnnotationStore.setState({ ...initialState, workspace: { ...initialState.workspace, mode: 'annotate' } });
 });
 
-describe('concept segmentation keyboard shortcuts', () => {
+describe('label segmentation keyboard shortcuts', () => {
   it.each(['2', '3'])('routes key %s through the same label action as the panel', (key) => {
     renderHook(() => useAnnotationKeyboardShortcuts());
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key })));

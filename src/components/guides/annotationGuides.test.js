@@ -74,7 +74,7 @@ describe('annotation guide registry', () => {
 
   test('the label segmentation guide follows the unified action and explains hierarchy scope', () => {
     const guide = ANNOTATION_GUIDES.find((entry) => entry.id === 'find-more');
-    const scope = guide.steps.find((step) => step.anchor === 'concept-segmentation');
+    const scope = guide.steps.find((step) => step.anchor === 'label-segmentation');
     const run = guide.steps.find((step) => step.title === 'Segment this label');
     expect(guide.steps[0].anchor).toBe('labels-list');
     expect(scope.body).toContain('Use hierarchy');

@@ -234,7 +234,9 @@ export const MessageBuilders = {
       confidence,
       ...(options.added_by || options.addedBy ? { added_by: options.added_by || options.addedBy } : {}),
       ...(options.source ? { source: options.source } : {}),
+      ...(typeof options.useHierarchy === 'boolean' ? { use_hierarchy: options.useHierarchy } : {}),
       ...(options.model_key || options.modelKey ? { model_key: options.model_key || options.modelKey } : {}),
+      ...(options.model_class || options.modelClass ? { model_class: options.model_class || options.modelClass } : {}),
     }
   ),
 

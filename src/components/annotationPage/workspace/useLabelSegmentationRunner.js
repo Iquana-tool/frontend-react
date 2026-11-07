@@ -1,12 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  resolvePolypProjectLabel,
-  getSelectedFragmentContourIds,
-  buildCellposePreviewRequest,
   extractPreviewPredictions,
   resolveParentContourId,
   toAcceptedContour,
-  getExistingPolypsForScope,
+  getExistingObjectsForScope,
   suppressOverlappingPredictions,
 } from './cellposePreviewModel';
 import {
@@ -22,28 +19,27 @@ import {
   useCurrentImageId,
   useImageObject,
   useObjectsList,
-  useSelectedObjectIds,
   useDatasetLabels,
   useDatasetLabelsMap,
   useSetDatasetLabels,
-  useFocusedContourId,
   useExpandObject,
   useLastInstanceRun,
   useSetLastInstanceRun,
   useClearLastInstanceRun,
   useSetCurrentTool,
+  useClearSelection,
 } from '../../../stores/selectors/annotationSelectors';
 import { useParams } from 'react-router-dom';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { fetchLabels } from '../../../api/labels';
 import { extractLabelsFromResponse } from '../../../utils/labelHierarchy';
-import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
-import { buildConceptPreviewRequest } from './conceptSegmentationModel';
+import { buildLabelPreviewRequest } from './labelSegmentationModel';
 
 export const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'cancelled', 'partial']);
 
-export function useConceptSegmentationRunner(selectedModelObj = null, configuration = null) {
+export function useLabelSegmentationRunner(configuration = null) {
+  const selectedModelObj = configuration?.model;
   const modelKey = selectedModelObj?.registry_key ?? selectedModelObj?.id ?? null;
   const modelInfo = useMemo(() => ({
     name: selectedModelObj?.name || modelKey || 'The model',
@@ -76,15 +72,13 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
 
   const imageObject = useImageObject();
   const objectsList = useObjectsList();
-  const selectedObjectIds = useSelectedObjectIds();
   const datasetLabels = useDatasetLabels();
   const datasetLabelsMap = useDatasetLabelsMap();
   const setDatasetLabels = useSetDatasetLabels();
-  const focusedContourId = useFocusedContourId();
   const expandObject = useExpandObject();
   const setCurrentTool = useSetCurrentTool();
+  const clearSelection = useClearSelection();
   const { addToast } = useToast();
-  const { policy } = useAnnotationRoutingPolicy(datasetId);
 
   // If dataset is active but labels are not yet loaded in store, fetch them automatically
   useEffect(() => {
@@ -111,8 +105,8 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
   const setLastInstanceRun = useSetLastInstanceRun();
   const clearLastInstanceRun = useClearLastInstanceRun();
 
-  const [legacyScope, setScope] = useState('fragment');
-  const scope = configuration ? (configuration.useHierarchy ? 'fragment' : 'whole') : legacyScope;
+  const useHierarchy = Boolean(configuration?.useHierarchy);
+  const scope = useHierarchy && configuration?.parentContourIds?.length > 0 ? 'hierarchy' : 'image';
   const [writeMode, setWriteMode] = useState('patch');
   const [status, setStatus] = useState('ready'); // 'ready' | 'starting' | 'running' | 'saving' | 'done' | 'failed' | 'cancelled'
   const [isRunning, setIsRunning] = useState(false);
@@ -144,42 +138,26 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
     currentScopeRef.current = { datasetId, imageId };
   }, [datasetId, imageId]);
 
-  const mappedLabel = useMemo(
-    () => configuration
-      ? (() => {
-          const label = datasetLabels.find((entry) => Number(entry.id) === Number(configuration.labelId));
-          return label ? { labelId: Number(label.id), labelName: label.name, color: label.color } : null;
-        })()
-      : resolvePolypProjectLabel(selectedModelObj, datasetLabelsMap, datasetLabels, objectsList),
-    [selectedModelObj, datasetLabelsMap, datasetLabels, objectsList, configuration?.labelId]
-  );
+  const mappedLabel = useMemo(() => {
+    if (configuration?.labelId == null) return null;
+    const label = datasetLabels.find((entry) => Number(entry.id) === Number(configuration.labelId));
+    return label ? { labelId: Number(label.id), labelName: label.name, color: label.color, parentLabelId: label.parent_id } : null;
+  }, [datasetLabels, configuration?.labelId]);
 
+  // Hierarchy scope is resolved by the context from the dataset taxonomy. Never
+  // guess an ROI from a selected object or from a model/label display name here.
   const roiContourIds = useMemo(
-    () =>
-      configuration ? configuration.parentContourIds || [] : getSelectedFragmentContourIds(
-        selectedObjectIds,
-        objectsList,
-        datasetLabelsMap,
-        mappedLabel?.labelId,
-        datasetLabels,
-        focusedContourId
-      ),
-    [selectedObjectIds, objectsList, datasetLabelsMap, mappedLabel, datasetLabels, focusedContourId, configuration?.parentContourIds]
+    () => useHierarchy ? configuration?.parentContourIds || [] : [],
+    [useHierarchy, configuration?.parentContourIds]
   );
   const roiCount = roiContourIds.length;
 
   const targetParentIds = useMemo(
-    () => {
-      if (scope !== 'fragment') return null;
-      if (roiContourIds.length > 0) {
-        return new Set(roiContourIds.map(Number));
-      }
-      return focusedContourId != null ? new Set([Number(focusedContourId)]) : null;
-    },
-    [scope, focusedContourId, roiContourIds]
+    () => useHierarchy && roiContourIds.length > 0 ? new Set(roiContourIds.map(Number)) : null,
+    [useHierarchy, roiContourIds]
   );
-  const hasExistingPolypsInScope = useMemo(
-    () => getExistingPolypsForScope(objectsList, {
+  const hasExistingTargetObjectsInScope = useMemo(
+    () => getExistingObjectsForScope(objectsList, {
       targetParentIds,
       labelId: mappedLabel?.labelId,
       scope,
@@ -189,15 +167,17 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
 
   const disableReason = useMemo(() => {
     if (isRunning) return 'Inference is running…';
+    if (!configuration) return 'Choose a dataset label and its segmentation settings.';
+    if (configuration.reason) return configuration.reason;
     if (!modelKey) return 'Choose a compatible model for this label.';
     if (!datasetId) return 'No active dataset selected.';
     if (!imageId) return 'No active image loaded.';
     if (!mappedLabel) return 'Choose a dataset label.';
-    if (scope === 'fragment' && roiCount === 0) {
-      return configuration ? 'Annotate an eligible parent first, or turn off Use hierarchy.' : 'Select a coral outline to run on, or choose "Whole image".';
+    if (useHierarchy && mappedLabel?.parentLabelId != null && roiCount === 0) {
+      return 'Annotate an eligible parent first, or turn off Use hierarchy.';
     }
     return null;
-  }, [isRunning, datasetId, imageId, mappedLabel, scope, roiCount, modelKey, Boolean(configuration)]);
+  }, [isRunning, datasetId, imageId, mappedLabel, useHierarchy, roiCount, modelKey, configuration]);
 
   const canRun = !disableReason;
 
@@ -264,7 +244,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
           ? pendingUnresolvedDeletionsRef.current.filter(
               (cid) => !successfullyDeletedIdsRef.current.has(Number(cid))
             )
-          : getExistingPolypsForScope(currentObjects, {
+          : getExistingObjectsForScope(currentObjects, {
               targetParentIds,
               labelId: mappedLabel.labelId,
               scope,
@@ -303,13 +283,13 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
         }
       } else {
         // 'patch' mode: suppress overlapping predictions against existing objects
-        const existingPolyps = getExistingPolypsForScope(currentObjects, {
+        const existingTargetObjects = getExistingObjectsForScope(currentObjects, {
           targetParentIds,
           labelId: mappedLabel.labelId,
           scope,
         });
 
-        const suppressionResult = suppressOverlappingPredictions(predictions, existingPolyps, {
+        const suppressionResult = suppressOverlappingPredictions(predictions, existingTargetObjects, {
           iouThreshold: 0.5,
         });
         predictionsToSave = suppressionResult.kept;
@@ -328,17 +308,17 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
           break;
         }
 
-        const parentId = resolveParentContourId(prediction, {
-          focusedContourId: scope === 'fragment' && roiContourIds.length === 0 ? focusedContourId : null,
-          roiContourIds: scope === 'fragment' ? roiContourIds : [],
+        const parentId = useHierarchy ? resolveParentContourId(prediction, {
+          focusedContourId: null,
+          roiContourIds,
           objects: objectsForResolution,
           labelsMap: datasetLabelsMap,
           datasetLabels,
           scope,
-        });
+        }) : null;
 
         const contour = toAcceptedContour(
-          prediction,
+          { ...prediction, parent_id: parentId },
           imageObject?.width,
           imageObject?.height,
           parentId
@@ -358,9 +338,11 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
             contour.confidence,
             contour.labelId,
             {
+              useHierarchy,
               addedBy: modelKey,
               source: ({ 'instance-suggestion': 'instance_suggestion', 'cross-image-suggestion': 'cross_image' })[selectedModelObj?.task] || 'instance_segmentation',
               modelKey,
+              modelClass: contour.modelClass ?? contour.model_class ?? prediction.model_class ?? prediction.modelClass,
             }
           );
 
@@ -382,6 +364,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
               if (contour.parentId != null) {
                 expandObject(contour.parentId);
               }
+              expandObject(canonicalId);
             }
           } else {
             unresolved.push(prediction);
@@ -393,6 +376,9 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
 
       if (!isCurrentRun()) return;
 
+      // OBJECT_ADDED selects each saved contour. Do not leave the final result
+      // selected and accidentally restrict the next hierarchy run to that object.
+      clearSelection();
       const totalSuppressed = skippedCount + overlapSuppressedCount;
       setSuppressedCount(totalSuppressed);
       const allCreatedIds = [...new Set([...previousCreatedIdsRef.current, ...createdIds])];
@@ -414,6 +400,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       }
 
       if (unresolved.length === 0 && unresolvedDeletions.length === 0) {
+        activeJobIdRef.current = null;
         setStatus('done');
         setProgress(100);
         setIsRunning(false);
@@ -477,7 +464,6 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       imageId,
       imageObject,
       mappedLabel,
-      focusedContourId,
       scope,
       roiContourIds,
       targetParentIds,
@@ -485,6 +471,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       datasetLabelsMap,
       datasetLabels,
       selectedModelObj,
+      useHierarchy,
       modelKey,
       modelInfo,
       expandObject,
@@ -492,6 +479,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       clearLastInstanceRun,
       addToast,
       setCurrentTool,
+      clearSelection,
     ]
   );
 
@@ -516,6 +504,8 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
           const effectiveMode = activeWriteModeRef.current || 'patch';
           const isOverride = effectiveMode === 'override' || effectiveMode === 'replace';
           if (predictions.length === 0 && !isOverride) {
+            activeJobIdRef.current = null;
+            clearSelection();
             setStatus('done');
             setProgress(100);
             setIsRunning(false);
@@ -566,7 +556,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
         setIsRunning(false);
       }
     },
-    [mappedLabel, persistPredictions, addToast, modelInfo]
+    [mappedLabel, persistPredictions, addToast, modelInfo, clearSelection]
   );
 
   const run = useCallback(
@@ -581,6 +571,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       const token = ++runTokenRef.current;
       streamRef.current?.abort();
       streamRef.current = null;
+      activeJobIdRef.current = null;
       setError(null);
       setIsRunning(true);
       setStatus('starting');
@@ -594,22 +585,14 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
       setSuppressedCount(0);
 
       try {
-        const request = configuration ? buildConceptPreviewRequest({
+        const request = buildLabelPreviewRequest({
           datasetId,
           imageId,
           labelId: mappedLabel.labelId,
           model: selectedModelObj,
           inputs: explicitInputs || configuration.inputs || {},
-          useHierarchy: configuration.useHierarchy,
-          roiContourIds: configuration.useHierarchy ? roiContourIds : [],
-        }) : buildCellposePreviewRequest({
-          datasetId,
-          imageId,
-          labelId: mappedLabel.labelId,
-          modelKey,
-          roiContourIds: scope === 'fragment' ? roiContourIds : [],
-          inputs: explicitInputs,
-          policy,
+          useHierarchy,
+          roiContourIds,
         });
 
       const snapshot = await startInferenceJob(request);
@@ -652,7 +635,7 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
     } finally {
       startingRef.current = false;
     }
-  }, [canRun, datasetId, imageId, mappedLabel, scope, roiContourIds, handleSnapshot, persistPredictions, modelKey, modelInfo, policy, configuration, selectedModelObj]);
+  }, [canRun, datasetId, imageId, mappedLabel, scope, roiContourIds, handleSnapshot, persistPredictions, modelKey, modelInfo, configuration, selectedModelObj, useHierarchy]);
 
   const retry = useCallback(async () => {
     if (isRunning || startingRef.current) return;
@@ -759,11 +742,10 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
 
   return {
     scope,
-    setScope,
     writeMode,
     setWriteMode: handleSetWriteMode,
     roiCount,
-    hasExistingPolypsInScope,
+    hasExistingTargetObjectsInScope,
     mappedLabel,
     canRun,
     disableReason,
@@ -783,4 +765,5 @@ export function useConceptSegmentationRunner(selectedModelObj = null, configurat
   };
 }
 
-export default useConceptSegmentationRunner;
+export const useConceptSegmentationRunner = useLabelSegmentationRunner;
+export default useLabelSegmentationRunner;

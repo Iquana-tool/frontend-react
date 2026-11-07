@@ -34,7 +34,7 @@ import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import { useLabelSelection } from '../../../hooks/useLabelSelection';
 import { useLabelsHierarchy } from '../../../hooks/useLabelsHierarchy';
 import { getChildLabels, resolveParentLabelId } from '../../../utils/labelHierarchy';
-import { useConceptSegmentation } from '../workspace/ConceptSegmentationContext';
+import { useLabelSegmentation } from '../workspace/LabelSegmentationContext';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
 import { deleteObject } from '../../../utils/objectOperations';
@@ -153,20 +153,20 @@ const ObjectContextMenu = () => {
     [flatLabels, parentLabelId]
   );
   
-  const conceptSegmentation = useConceptSegmentation();
+  const labelSegmentation = useLabelSegmentation();
   const targetLabelId = primaryTarget?.labelId ?? primaryTarget?.label_id ?? null;
   const targetLabelState = targetLabelId != null
-    ? conceptSegmentation?.getLabelState(targetLabelId) : null;
+    ? labelSegmentation?.getLabelState(targetLabelId) : null;
   const mixedLabels = targetObjects.some((object) =>
     Number(object.labelId ?? object.label_id) !== Number(targetLabelId)
   );
-  const segmentationReason = !conceptSegmentation
+  const segmentationReason = !labelSegmentation
     ? 'Segmentation is unavailable.'
     : targetLabelId == null
       ? 'Assign a label to this object first.'
       : mixedLabels
         ? 'Select objects of one label to segment that label.'
-        : conceptSegmentation.busy
+        : labelSegmentation.busy
           ? 'Segmentation is already running.'
           : targetLabelState?.reason;
 
@@ -408,7 +408,7 @@ const ObjectContextMenu = () => {
   };
 
   const handleSegmentLabel = () => {
-    if (!segmentationReason && conceptSegmentation?.requestRun(targetLabelId)) {
+    if (!segmentationReason && labelSegmentation?.requestRun(targetLabelId)) {
       hideContextMenu();
     }
   };
@@ -642,7 +642,7 @@ const ObjectContextMenu = () => {
         onClick={handleSegmentLabel}
         disabled={Boolean(segmentationReason)}
         title={segmentationReason || 'Segment this label using its configured model and hierarchy settings'}
-        label={conceptSegmentation?.busy ? 'Segmenting…' : 'Segment label'}
+        label={labelSegmentation?.busy ? 'Segmenting…' : 'Segment label'}
         icon={
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />

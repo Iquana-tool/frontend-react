@@ -56,7 +56,7 @@ export const getBoundingBox = (object) => {
  * opacity setting would flatten approved, pending and unlabelled into one
  * uniform tint. See utils/outlineSettings.
  */
-export const getPolygonStyle = (object, { hovered, selected, reviewMode, color, outline } = {}) => {
+export const getPolygonStyle = (object, { hovered, selected, reviewMode, color, outline, continuousLabelledOutline = false } = {}) => {
   const {
     fillScale,
     strokeWidth: settingWidth,
@@ -100,9 +100,11 @@ export const getPolygonStyle = (object, { hovered, selected, reviewMode, color, 
   let strokeWidth = (state === 'pending' ? 3 : 2.5) * widthScale;
   let fillOpacity =
     (state === 'approved' ? 0.16 : state === 'pending' ? 0.1 : 0.18) * fillScale;
+  // Annotation needs a continuous boundary for geometry inspection; review
+  // can still distinguish pending work with dashes.
   let strokeDasharray =
     state === 'pending'
-      ? (isSmallObject ? 'none' : '30 8')
+      ? (continuousLabelledOutline || isSmallObject ? 'none' : '30 8')
       : state === 'unlabelled'
         ? '18 10'
         : 'none';

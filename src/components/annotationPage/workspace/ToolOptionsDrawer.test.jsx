@@ -16,7 +16,7 @@ vi.mock('./useRailTools', () => ({
 }));
 vi.mock('../../../stores/selectors/annotationSelectors', () => ({ useToggleLeftDrawer: () => vi.fn() }));
 vi.mock('../../../hooks/useAiTools', () => ({ default: () => ({ isEnabled: () => true }) }));
-vi.mock('./ConceptSegmentationPanel', () => ({ default: () => <div>Segment by label</div> }));
+vi.mock('./LabelSegmentationPanel', () => ({ default: () => <div>Segment by label</div> }));
 vi.mock('./ServiceCard', () => ({ default: ({ service }) => <div>{service.name}</div> }));
 
 describe('ToolOptionsDrawer concept and prompted controls', () => {

@@ -1,225 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildCellposePreviewRequest,
   extractPreviewPredictions,
-  getSelectedFragmentContourIds,
-  resolvePolypProjectLabel,
   toAcceptedContour,
   calculatePolygonIoU,
-  getExistingPolypsForScope,
+  getExistingObjectsForScope,
   suppressOverlappingPredictions,
-  resolvePolypInputs,
-  acceptsRoiInput,
 } from './cellposePreviewModel';
 
-const CELLPOSE_POLYP_REGISTRY_KEY = 'cpsam_polyp_v3_b_seed17';
-
-describe('Cellpose polyp preview contract', () => {
-  it('uses the mapped project polyp label instead of a category constant', () => {
-    const projectLabel = resolvePolypProjectLabel({
-      registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-      classes: ['polyp'],
-      label_ids: [2],
-      class_mappings: [{ model_class: 'polyp', action: 'map', label_id: 47, source: 'dataset' }],
-    }, new Map([[2, 'wrong label'], [47, 'Project Polyp']]));
-
-    expect(projectLabel).toEqual({ labelId: 47, labelName: 'Project Polyp' });
-    expect(resolvePolypProjectLabel({
-      classes: ['polyp'],
-      class_mappings: [{ model_class: 'polyp', action: 'discard', label_id: 47 }],
-      label_ids: [47],
-    }, new Map([[47, 'Project Polyp']]))).toBeNull();
-  });
-
-  it('falls back to finding polyp labels via labelsMap, datasetLabels, or canvas objectsList', () => {
-    const rawModel = {
-      registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-      classes: [{ key: 'polyp', name: 'Polyp' }],
-    };
-
-    // 1. Fallback via labelsMap
-    const fromMap = resolvePolypProjectLabel(rawModel, new Map([[43, 'Coral Polyp']]));
-    expect(fromMap).toEqual({ labelId: 43, labelName: 'Coral Polyp' });
-
-    // 2. Fallback via datasetLabels array when labelsMap is null
-    const fromDataset = resolvePolypProjectLabel(rawModel, null, [
-      { id: 41, name: 'Coral Fragment' },
-      { id: 43, name: 'Coral Polyp', color: '#f59e0b' },
-    ]);
-    expect(fromDataset).toEqual({ labelId: 43, labelName: 'Coral Polyp', color: '#f59e0b' });
-
-    // 3. Fallback via objectsList when labels are not loaded yet
-    const fromObjects = resolvePolypProjectLabel(rawModel, null, [], [
-      { id: 'surf-1', contour_id: 19748, label: 'Coral Surface', labelId: 42 },
-      { id: 'poly-1', contour_id: 19749, label: 'Coral Polyp', labelId: 43, color: '#38bdf8' },
-    ]);
-    expect(fromObjects).toEqual({ labelId: 43, labelName: 'Coral Polyp', color: '#38bdf8' });
-
-    // 4. Safe resolution when model has labelId but labelsMap is not loaded
-    const withDirectId = resolvePolypProjectLabel({
-      registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-      class_mappings: [{ model_class: 'polyp', action: 'map', label_id: 43 }],
-    }, null);
-    // Without loaded labels the name falls back to the model's class, not a fixed string.
-    expect(withDirectId).toEqual({ labelId: 43, labelName: 'polyp' });
-  });
-
-  it('sends only selected, saved coral or fragment contours as the ROI', () => {
-    const selectedContourIds = getSelectedFragmentContourIds(
-      ['object-a', 'not-selected'],
-      [
-        { id: 'object-a', contour_id: 88, labelId: 11 },
-        { id: 'object-surface', contour_id: 19748, labelId: 13 },
-        { id: 'object-b', contour_id: 99, labelId: 12 },
-        { id: 'not-selected', contour_id: null, labelId: 11 },
-      ],
-      new Map([[11, 'coral fragment'], [12, 'polyp'], [13, 'Coral Surface']]),
-      12
-    );
-    expect(selectedContourIds).toEqual([88]);
-
-    const surfaceIds = getSelectedFragmentContourIds(
-      ['object-surface'],
-      [{ id: 'object-surface', contour_id: 19748, labelId: 13 }],
-      new Map([[13, 'Coral Surface']]),
-      12
-    );
-    expect(surfaceIds).toEqual([19748]);
-    expect(buildCellposePreviewRequest({
-      datasetId: '5', imageId: '100', labelId: 47, roiContourIds: selectedContourIds,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-    })).toEqual({
-      dataset_id: 5,
-      image_selection: 'custom',
-      image_ids: [100],
-      result_mode: 'preview',
-      steps: [{
-        model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-        task: 'instance-segmentation',
-        label_id: 47,
-        inputs: {},
-        roi_contour_ids: [88],
-      }],
-    });
-  });
-
-  it('forwards configured confidence thresholds from matching dataset settings', () => {
-    const policy = {
-      dataset_id: 15,
-      bindings: [
-        {
-          task: 'instance-segmentation',
-          label_id: 43,
-          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-          inputs: { parameters: { threshold: 0.9 } },
-        },
-        {
-          task: 'instance-segmentation',
-          label_id: null,
-          model_registry_key: 'yolo_polyp_v3_c_seed1',
-          inputs: { parameters: { threshold: 0.85 } },
-        },
-        {
-          task: 'instance-segmentation',
-          label_id: null,
-          model_registry_key: 'mask2former',
-          inputs: { parameters: { threshold: 0.5 } },
-        },
-      ],
-    };
-
-    // 1. Matches exact label override for Cellpose
-    expect(resolvePolypInputs({ policy, labelId: 43, modelKey: CELLPOSE_POLYP_REGISTRY_KEY })).toEqual({
-      parameters: { threshold: 0.9 },
-    });
-
-    // 2. Matches model-default binding for YOLO
-    expect(resolvePolypInputs({ policy, labelId: 43, modelKey: 'yolo_polyp_v3_c_seed1' })).toEqual({
-      parameters: { threshold: 0.85 },
-    });
-
-    // 3. Does not adopt unrelated model's threshold (mask2former)
-    expect(resolvePolypInputs({
-      policy: {
-        bindings: [
-          {
-            task: 'instance-segmentation',
-            label_id: null,
-            model_registry_key: 'mask2former',
-            inputs: { parameters: { threshold: 0.5 } },
-          },
-        ],
-      },
-      labelId: 43,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-    })).toEqual({});
-
-    // 4. Direct inputs override takes precedence
-    expect(resolvePolypInputs({
-      policy,
-      labelId: 43,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-      inputs: { parameters: { threshold: 0.95 } },
-    })).toEqual({ parameters: { threshold: 0.95 } });
-
-    // 5. Direct threshold parameter takes precedence
-    expect(resolvePolypInputs({
-      policy,
-      labelId: 43,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-      threshold: 0.7,
-    })).toEqual({ parameters: { threshold: 0.7 } });
-
-    // 6. buildCellposePreviewRequest forwards threshold in request envelope
-    const req = buildCellposePreviewRequest({
-      datasetId: 15,
-      imageId: 385,
-      labelId: 43,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-      policy,
-    });
-    expect(req.steps[0].inputs).toEqual({ parameters: { threshold: 0.9 } });
-  });
-
-  it('does not apply unrelated label or task bindings for the same model', () => {
-    const policyWithUnrelatedBindings = {
-      dataset_id: 15,
-      bindings: [
-        {
-          task: 'instance-segmentation',
-          label_id: 44, // old remapped label
-          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-          inputs: { parameters: { threshold: 0.99 } },
-        },
-        {
-          task: 'semantic-segmentation', // unrelated task
-          label_id: 43,
-          model_registry_key: CELLPOSE_POLYP_REGISTRY_KEY,
-          inputs: { parameters: { threshold: 0.88 } },
-        },
-      ],
-    };
-
-    // Label 43 run should not inherit threshold from label 44 binding of the same model
-    expect(
-      resolvePolypInputs({
-        policy: policyWithUnrelatedBindings,
-        labelId: 43,
-        modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-      })
-    ).toEqual({});
-
-    // buildCellposePreviewRequest sends empty inputs when only unrelated label bindings exist
-    const req = buildCellposePreviewRequest({
-      datasetId: 15,
-      imageId: 385,
-      labelId: 43,
-      modelKey: CELLPOSE_POLYP_REGISTRY_KEY,
-      policy: policyWithUnrelatedBindings,
-    });
-    expect(req.steps[0].inputs).toEqual({});
-  });
-
+describe('Concept prediction geometry and persistence', () => {
   it('prioritizes explicit surface ROI over containing focused fragment in resolveParentContourId', () => {
     const { resolveParentContourId } = require('./cellposePreviewModel');
     const objects = [
@@ -242,29 +30,11 @@ describe('Cellpose polyp preview contract', () => {
     const parentId = resolveParentContourId(pred, {
       focusedContourId: 21060,
       roiContourIds: [21062],
-      scope: 'fragment',
+      scope: 'hierarchy',
       objects,
       datasetLabels,
     });
     expect(parentId).toBe(21062);
-  });
-
-  it('falls back to the focused saved coral when a result polyp is selected', () => {
-    const objects = [
-      { id: 21060, contour_id: 21060, labelId: 41 },
-      { id: 21061, contour_id: 21061, labelId: 42, parent_id: 21060 },
-      { id: 30001, contour_id: 30001, labelId: 43, parent_id: 21061 },
-    ];
-    const labels = [
-      { id: 41, name: 'Coral Fragment', parent_id: null },
-      { id: 42, name: 'Coral Surface', parent_id: 41 },
-      { id: 43, name: 'Coral Polyp', parent_id: 42 },
-    ];
-    const labelsMap = new Map(labels.map(({ id, name }) => [id, name]));
-
-    expect(getSelectedFragmentContourIds([30001], objects, labelsMap, 43, labels, 21060)).toEqual([21060]);
-    expect(getSelectedFragmentContourIds([21060], objects, labelsMap, 43, labels, 21060)).toEqual([21060]);
-    expect(getSelectedFragmentContourIds([], objects, labelsMap, 43, labels, 30001)).toEqual([]);
   });
 
   it('keeps response contours in normalized editor coordinates and associates mask scores', () => {
@@ -301,6 +71,27 @@ describe('Cellpose polyp preview contract', () => {
       confidence: 0.91,
       sourceInstanceId: 'mask-1',
     });
+  });
+
+  it('preserves model_class and maps it through extractPreviewPredictions and toAcceptedContour', () => {
+    const predictions = extractPreviewPredictions([{
+      image_id: 385,
+      predictions: {
+        contours: [{
+          x: [0.1, 0.8, 0.6],
+          y: [0.2, 0.3, 0.9],
+          label_id: 47,
+          model_class: 'acropora',
+          source_instance_id: 'mask-species-1',
+        }],
+      },
+    }], 9);
+
+    expect(predictions).toHaveLength(1);
+    expect(predictions[0].model_class).toBe('acropora');
+    const accepted = toAcceptedContour(predictions[0], 100, 50);
+    expect(accepted.modelClass).toBe('acropora');
+    expect(accepted.model_class).toBe('acropora');
   });
 
   it('resolves parent contour id via explicit parent_id, focus mode, single ROI, or containment', () => {
@@ -534,17 +325,17 @@ describe('Cellpose polyp preview contract', () => {
     ];
 
     // Fragment scope: only returns polyps belonging to target coral 21060
-    const fragmentPolyps = getExistingPolypsForScope(objects, {
+    const fragmentPolyps = getExistingObjectsForScope(objects, {
       targetParentIds: [21060],
       labelId: 43,
-      scope: 'fragment',
+      scope: 'hierarchy',
     });
     expect(fragmentPolyps.map((o) => o.id)).toEqual([101]);
 
     // Whole image scope: returns all polyps with labelId 43 regardless of parent
-    const wholePolyps = getExistingPolypsForScope(objects, {
+    const wholePolyps = getExistingObjectsForScope(objects, {
       labelId: 43,
-      scope: 'whole',
+      scope: 'image',
     });
     expect(wholePolyps.map((o) => o.id)).toEqual([101, 102, 104]);
   });
@@ -557,8 +348,8 @@ describe('Cellpose polyp preview contract', () => {
       { id: 40, labelId: 41, parent_id: null },
       { id: 50, labelId: 43, parent_id: 40 },
     ];
-    expect(getExistingPolypsForScope(objects, {
-      targetParentIds: new Set([10]), labelId: 43, scope: 'fragment',
+    expect(getExistingObjectsForScope(objects, {
+      targetParentIds: new Set([10]), labelId: 43, scope: 'hierarchy',
     }).map((object) => object.id)).toEqual([30]);
   });
 
@@ -567,8 +358,8 @@ describe('Cellpose polyp preview contract', () => {
       { id: 20, labelId: 42, parent_id: 30 },
       { id: 30, labelId: 43, parent_id: 20 },
     ];
-    expect(getExistingPolypsForScope(objects, {
-      targetParentIds: new Set([10]), labelId: 43, scope: 'fragment',
+    expect(getExistingObjectsForScope(objects, {
+      targetParentIds: new Set([10]), labelId: 43, scope: 'hierarchy',
     })).toEqual([]);
   });
 
@@ -625,11 +416,3 @@ describe('Cellpose polyp preview contract', () => {
   });
 });
 
-describe('ROI capability', () => {
-  it('comes from what the model declares, never from its registry key', () => {
-    expect(acceptsRoiInput({ registry_key: CELLPOSE_POLYP_REGISTRY_KEY })).toBe(false);
-    expect(acceptsRoiInput({ registry_key: 'any-new-model', tags: { roi_input: 'parent_regions' } })).toBe(true);
-    expect(acceptsRoiInput({ registry_key: 'catalog-entry', roi_input: 'parent_regions' })).toBe(true);
-    expect(acceptsRoiInput(null)).toBe(false);
-  });
-});

@@ -35,7 +35,10 @@ vi.mock('../../../stores/selectors/annotationSelectors', () => ({
   useArmedRelationshipName: () => null,
   useOpenSceneGraphPopover: () => vi.fn(),
 }));
-vi.mock('../workspace/ConceptSegmentationContext', () => ({
+vi.mock('../workspace/LabelSegmentationContext', () => ({
+  useLabelSegmentation: () => state.contextEnabled ? {
+    busy: state.busy, requestRun: actions.requestRun, getLabelState: actions.getLabelState,
+  } : null,
   useConceptSegmentation: () => state.contextEnabled ? {
     busy: state.busy, requestRun: actions.requestRun, getLabelState: actions.getLabelState,
   } : null,

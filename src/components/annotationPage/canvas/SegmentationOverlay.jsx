@@ -744,13 +744,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             strokeColor = object.color;
           }
         } else {
-          // Normal mode: the design's state treatment (approved solid, pending
-          // dashed, unlabelled amber + marching ants), with hover and selection
-          // as modifiers on top.
+          // Keep labelled boundaries continuous while annotating. Review retains
+          // pending dashes; unlabelled work keeps its amber marching ants.
           const style = getPolygonStyle(object, {
             hovered: isHovered,
             selected: isSelected,
             reviewMode: workspaceMode === 'review' && !showApproved,
+            continuousLabelledOutline: workspaceMode !== 'review',
             color: object.color,
             outline,
           });

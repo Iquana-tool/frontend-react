@@ -9,12 +9,14 @@ import {
   useSelectedObjectIds, useFocusedContourId, useSetInstanceWarningModalOpen,
   useCurrentImageId,
   useSetIsRunningInstance,
+  useExitFocusMode,
+  useClearSelection,
 } from '../../../stores/selectors/annotationSelectors';
-import { useConceptSegmentationRunner } from './useConceptSegmentationRunner';
-import { getConceptParentIds, isConceptModelAvailable, resolveConceptSelection } from './conceptSegmentationModel';
+import { useLabelSegmentationRunner } from './useLabelSegmentationRunner';
+import { getLabelConditioningReason, getLabelParentIds, isLabelModelAvailable, resolveLabelSelection } from './labelSegmentationModel';
 import InstanceWarningModal from '../modals/InstanceWarningModal';
 
-const ConceptSegmentationContext = createContext(null);
+const LabelSegmentationContext = createContext(null);
 const TOOL = {
   'instance-segmentation': 'instance_segmentation',
   'instance-suggestion': 'instance_suggestion',
@@ -22,7 +24,7 @@ const TOOL = {
 };
 
 /** Workspace lifetime keeps jobs, retries and per-label settings alive when the drawer closes. */
-export function ConceptSegmentationProvider({ children }) {
+export function LabelSegmentationProvider({ children }) {
   const { currentDataset } = useDataset();
   const datasetId = currentDataset?.id;
   const imageId = useCurrentImageId();
@@ -37,6 +39,8 @@ export function ConceptSegmentationProvider({ children }) {
   const { isEnabled } = useAiTools();
   const { can } = usePermissions();
   const { policy, policyResolved, policyError } = useAnnotationRoutingPolicy(datasetId);
+  const exitFocusMode = useExitFocusMode();
+  const clearSelection = useClearSelection();
   const [catalog, setCatalog] = useState({ datasetId: null, models: [], loading: true, error: null });
   const [settings, setSettings] = useState({ datasetId, labels: {} });
   const [runConfiguration, setRunConfiguration] = useState(null);
@@ -75,33 +79,60 @@ export function ConceptSegmentationProvider({ children }) {
   }, [warning, setWarningOpen]);
 
   const models = useMemo(() => catalog.datasetId === datasetId
-    ? catalog.models.filter((model) => isConceptModelAvailable(model) && isEnabled(TOOL[model.task])) : [], [catalog, datasetId, isEnabled]);
+    ? catalog.models.filter((model) => isLabelModelAvailable(model) && isEnabled(TOOL[model.task])) : [], [catalog, datasetId, isEnabled]);
   const loading = catalog.datasetId !== datasetId || catalog.loading || !policyResolved;
   const settingsByLabel = settings.datasetId === datasetId ? settings.labels : {};
 
-  const getLabelState = (labelId) => {
+  const getLabelState = (labelId, overrides = {}) => {
     const label = labels.find((entry) => Number(entry.id) === Number(labelId));
-    const setting = settingsByLabel[labelId] || {};
-    const selection = resolveConceptSelection({ models, policy, labelId, override: setting.model });
-    const useHierarchy = label?.parent_id != null && (setting.useHierarchy ?? true);
-    const parentContourIds = useHierarchy
-      ? getConceptParentIds({ labelId, labels, objects, selectedIds, focusedContourId }) : [];
+    const parentLabel = label?.parent_id != null ? labels.find((entry) => Number(entry.id) === Number(label.parent_id)) : null;
+    const setting = { ...(settingsByLabel[labelId] || {}), ...overrides };
+    const selection = resolveLabelSelection({ models, policy, labelId, override: setting.model });
+    const followsDatasetDefault = Boolean(!setting.model && selection.model && Array.isArray(policy?.bindings) && policy.bindings.some((binding) =>
+      binding.task === selection.model.task
+      && (binding.label_id == null || Number(binding.label_id) === Number(labelId))));
+    const availableParentIds = label?.parent_id != null
+      ? getLabelParentIds({ labelId, labels, objects, selectedIds, focusedContourId }) : [];
+    const imageParentIds = label?.parent_id != null
+      ? getLabelParentIds({ labelId, labels, objects, selectedIds: [], focusedContourId: null }) : [];
+    const defaultUseHierarchy = label?.parent_id == null || availableParentIds.length > 0;
+    const useHierarchy = setting.useHierarchy ?? defaultUseHierarchy;
+    const parentContourIds = useHierarchy ? availableParentIds : [];
     let reason = loading ? 'Loading segmentation settings…' : catalog.error || policyError || selection.reason;
     if (imageId == null) reason = 'Load an image before segmenting.';
     if (!can(Permission.AI_INTERACTIVE) || !can(Permission.ANNOTATION_CREATE)) reason = 'You do not have permission to segment this image.';
-    if (!reason && useHierarchy && parentContourIds.length === 0) reason = 'Annotate an eligible parent first, or turn off Use hierarchy.';
+    if (!label) reason = 'This label is no longer available in this dataset.';
+    const isMissingParents = Boolean(useHierarchy && label?.parent_id != null && parentContourIds.length === 0);
+    const missingParentsReason = Boolean(!reason && isMissingParents);
+    if (missingParentsReason) {
+      reason = `No eligible ${parentLabel?.name || 'parent'} objects in the current scope.`;
+    }
+    if (!reason) reason = getLabelConditioningReason({ model: selection.model, label, objects });
     const inputs = setting.threshold == null ? selection.inputs : {
       ...selection.inputs,
       parameters: { ...selection.inputs?.parameters, threshold: setting.threshold },
     };
-    return { ...selection, labelId: Number(labelId), useHierarchy, parentContourIds, inputs, reason, setting };
+    return {
+      ...selection,
+      followsDatasetDefault,
+      labelId: Number(labelId),
+      useHierarchy,
+      parentContourIds,
+      inputs,
+      reason,
+      setting,
+      parentLabelName: parentLabel?.name || 'parent',
+      missingParentsReason,
+      hasParentsElsewhere: imageParentIds.length > 0 && availableParentIds.length === 0,
+      imageParentCount: imageParentIds.length,
+    };
   };
 
   const targetLabelId = labels.some((label) => Number(label.id) === Number(activeLabelId))
     ? Number(activeLabelId) : labels[0]?.id;
   const selected = getLabelState(targetLabelId);
   const effectiveConfiguration = runConfiguration?.datasetId === datasetId ? runConfiguration : selected;
-  const runner = useConceptSegmentationRunner(effectiveConfiguration.model, effectiveConfiguration);
+  const runner = useLabelSegmentationRunner(effectiveConfiguration);
   const busy = runner.isRunning || runner.status === 'saving';
 
   useEffect(() => {
@@ -128,6 +159,18 @@ export function ConceptSegmentationProvider({ children }) {
     return true;
   };
 
+  const runOnWholeImage = (labelId = targetLabelId) => {
+    if (requestedRef.current || busy || warning) return false;
+    updateSettings(labelId, { useHierarchy: false });
+    const wholeConfig = getLabelState(labelId, { useHierarchy: false });
+    if (wholeConfig.reason || !wholeConfig.model) return false;
+    requestedRef.current = true;
+    setActiveLabelId(Number(labelId));
+    setRunConfiguration({ ...wholeConfig, datasetId });
+    setPending({ mode: null });
+    return true;
+  };
+
   useEffect(() => {
     if (!pending || !runConfiguration || runConfiguration.datasetId !== datasetId) return;
     if (!runner.canRun) {
@@ -135,7 +178,7 @@ export function ConceptSegmentationProvider({ children }) {
       requestedRef.current = false;
       return;
     }
-    if (pending.mode == null && runner.hasExistingPolypsInScope) {
+    if (pending.mode == null && runner.hasExistingTargetObjectsInScope) {
       setWarning(true);
       setPending(null);
       return;
@@ -149,10 +192,15 @@ export function ConceptSegmentationProvider({ children }) {
     requestedRef.current = false;
   }, []);
 
+  const clearScope = useCallback(() => {
+    exitFocusMode();
+    clearSelection();
+  }, [exitFocusMode, clearSelection]);
+
   return (
-    <ConceptSegmentationContext.Provider value={{
+    <LabelSegmentationContext.Provider value={{
       models, labels, loading, error: catalog.error || policyError, targetLabelId,
-      getLabelState, updateSettings, requestRun, busy: busy || warning || Boolean(pending),
+      getLabelState, updateSettings, requestRun, runOnWholeImage, clearScope, busy: busy || warning || Boolean(pending),
       runner, runLabelId: effectiveConfiguration.labelId,
     }}>
       {children}
@@ -162,8 +210,11 @@ export function ConceptSegmentationProvider({ children }) {
         onConfirm={(mode) => { setWarning(false); setPending({ mode }); }}
         labelName={runner.mappedLabel?.labelName}
       />
-    </ConceptSegmentationContext.Provider>
+    </LabelSegmentationContext.Provider>
   );
 }
 
-export const useConceptSegmentation = () => useContext(ConceptSegmentationContext);
+export const useLabelSegmentation = () => useContext(LabelSegmentationContext);
+export const useConceptSegmentation = useLabelSegmentation;
+export const ConceptSegmentationContext = LabelSegmentationContext;
+export const ConceptSegmentationProvider = LabelSegmentationProvider;

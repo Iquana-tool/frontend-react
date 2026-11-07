@@ -6,11 +6,11 @@ import { initialState } from '../../../stores/initialState';
 import useWebSocketObjectHandler from '../../../hooks/useWebSocketObjectHandler';
 import websocketService from '../../../services/websocket';
 import annotationSession from '../../../services/annotationSession';
-import ConceptSegmentationPanel from './ConceptSegmentationPanel';
+import LabelSegmentationPanel from './LabelSegmentationPanel';
 import ObjectsTab from './ObjectsTab';
 import EditableContourOverlay from '../canvas/EditableContourOverlay';
 import CanvasContainer from '../canvas/CanvasContainer';
-import { ConceptSegmentationProvider } from './ConceptSegmentationContext';
+import { LabelSegmentationProvider } from './LabelSegmentationContext';
 import * as DatasetContext from '../../../contexts/DatasetContext';
 import * as ToastContext from '../../../contexts/ToastContext';
 import * as PermissionsHook from '../../../hooks/usePermissions';
@@ -40,10 +40,10 @@ function IntegrationHarness({ service }) {
   useWebSocketObjectHandler();
 
   return (
-    <ConceptSegmentationProvider>
+    <LabelSegmentationProvider>
       <div>
         <div data-testid="left-service-container">
-          <ConceptSegmentationPanel />
+          <LabelSegmentationPanel />
         </div>
         <div data-testid="canvas-container">
           <CanvasContainer
@@ -57,7 +57,7 @@ function IntegrationHarness({ service }) {
           <ObjectsTab />
         </div>
       </div>
-    </ConceptSegmentationProvider>
+    </LabelSegmentationProvider>
   );
 }
 

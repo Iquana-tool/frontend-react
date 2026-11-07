@@ -3,7 +3,7 @@ import useAnnotationStore from '../useAnnotationStore';
 import { initialState } from '../initialState';
 import { getInstanceModels } from '../../api/instance_segmentation';
 import { getInferenceModelCatalog } from '../../api/inference';
-import { getSelectedFragmentContourIds, resolvePolypProjectLabel } from '../../components/annotationPage/workspace/cellposePreviewModel';
+import { getLabelParentIds, isLabelModelCompatible } from '../../components/annotationPage/workspace/labelSegmentationModel';
 
 vi.mock('../../api/instance_segmentation', () => ({ getInstanceModels: vi.fn() }));
 vi.mock('../../api/inference', () => ({ getInferenceModelCatalog: vi.fn() }));
@@ -25,14 +25,14 @@ describe('Cellpose discovery and label regressions', () => {
     const loaded = useAnnotationStore.getState().models.availableInstanceModels.find((model) => model.id === key);
     expect(loaded.class_mappings[0].label_id).toBe(43);
     expect(loaded.tags.maturity).toBe('provisional');
-    expect(resolvePolypProjectLabel(loaded, new Map([[43, 'Budding unit']]))).toMatchObject({ labelId: 43, labelName: 'Budding unit' });
+    expect(isLabelModelCompatible(loaded, 43)).toBe(true);
   });
 
   it.each(['discard', 'unmapped'])('honors an explicit %s mapping instead of guessing from label names', async (action) => {
     getInferenceModelCatalog.mockResolvedValue(catalog(null, action));
     await useAnnotationStore.getState().fetchAvailableInstanceModels(15);
     const loaded = useAnnotationStore.getState().models.availableInstanceModels.find((model) => model.id === key);
-    expect(resolvePolypProjectLabel(loaded, new Map([[43, 'Coral Polyp']]))).toBeNull();
+    expect(isLabelModelCompatible(loaded, 43)).toBe(false);
   });
 
   it('never invents a ready provider when neither endpoint advertises one', async () => {
@@ -55,21 +55,20 @@ describe('Cellpose discovery and label regressions', () => {
     expect(loaded.class_mappings[0].label_id).toBe(63);
   });
 
-  it('selects ancestors by label IDs, including renamed ancestors, and excludes the polyp itself', () => {
+  it('selects saved immediate parents by label IDs even when ancestor labels are renamed', () => {
     const labels = [{ id: 41, name: 'Colonia', parent_id: null }, { id: 42, name: 'Polyp colony surface', parent_id: 41 }, { id: 43, name: 'Coral Polyp', parent_id: 42 }, { id: 44, name: 'Coral unrelated', parent_id: null }];
     const objects = labels.map((label) => ({ id: label.id + 100, contour_id: label.id + 100, labelId: label.id }));
-    const map = new Map(labels.map((label) => [label.id, label.name]));
-    expect(getSelectedFragmentContourIds(objects.map((object) => object.id), objects, map, 43, labels)).toEqual([141, 142]);
+    expect(getLabelParentIds({ labelId: 43, labels, objects, selectedIds: objects.map((object) => object.id) })).toEqual([142]);
   });
 
   it('fails closed for a cycle in the target label ancestry', () => {
     const labels = [{ id: 41, name: 'Fragment', parent_id: 42 }, { id: 42, name: 'Surface', parent_id: 41 }, { id: 43, name: 'Polyp', parent_id: 42 }];
-    expect(getSelectedFragmentContourIds([141, 142], [{ id: 141, contour_id: 141, labelId: 41 }, { id: 142, contour_id: 142, labelId: 42 }], new Map(), 43, labels)).toEqual([]);
+    expect(getLabelParentIds({ labelId: 43, labels, selectedIds: [141, 142], objects: [{ id: 141, contour_id: 141, labelId: 41 }, { id: 142, contour_id: 142, labelId: 42 }] })).toEqual([]);
   });
 
   it('does not fall back to coral names when the mapped target has no ancestors', () => {
     const labels = [{ id: 41, name: 'Coral Fragment', parent_id: null }, { id: 43, name: 'Coral Polyp', parent_id: null }];
-    expect(getSelectedFragmentContourIds([141], [{ id: 141, contour_id: 141, labelId: 41 }], new Map([[41, 'Coral Fragment']]), 43, labels)).toEqual([]);
+    expect(getLabelParentIds({ labelId: 43, labels, selectedIds: [141], objects: [{ id: 141, contour_id: 141, labelId: 41 }] })).toEqual([]);
   });
 });
 
@@ -86,5 +85,5 @@ it('discovers YOLO C seed 1 with the dataset mapping and verified artifact ident
   const loaded = useAnnotationStore.getState().models.availableInstanceModels.find((m) => m.id === yoloKey);
   expect(loaded.name).toContain('YOLO11m-seg');
   expect(loaded.checkpoint_sha256).toBe('7e9ac2eec159b4d227d1b8c6553de224a982f420f96b738362ef04bbfad08edf');
-  expect(resolvePolypProjectLabel(loaded, new Map([[43, 'Coral Polyp']]))?.labelId).toBe(43);
+  expect(isLabelModelCompatible(loaded, 43)).toBe(true);
 });

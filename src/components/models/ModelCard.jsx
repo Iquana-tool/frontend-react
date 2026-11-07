@@ -119,14 +119,6 @@ const ModelCard = ({ model, isFavorite = false, onToggleFavorite, onAction }) =>
               </button>
             </div>
           </div>
-          {model.identifier && (
-            <p
-              className="text-[11px] text-t3 font-mono truncate mt-0.5"
-              title={model.identifier}
-            >
-              {model.identifier}
-            </p>
-          )}
         </div>
       </div>
 
