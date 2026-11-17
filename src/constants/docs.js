@@ -34,6 +34,8 @@ export const DOCS = {
   calibrate: 'guides/calibrate/',
   batchInference: 'guides/batch-inference/',
   reviewAndCorrect: 'guides/review-and-correct/',
+  annotationQueue: 'guides/annotation-queue/',
+  reviewQueue: 'guides/review-and-correct/#setting-up-a-review-queue',
   quantifyAndExport: 'guides/quantify-and-export/',
   trainAModel: 'guides/train-a-model/',
   manageAccess: 'guides/manage-access/',

@@ -27,6 +27,7 @@ import {
   Undo2,
   User,
   Download,
+  ListOrdered,
 } from 'lucide-react';
 import Menu, { MenuDivider, MenuHeader, MenuItem } from './primitives/Menu';
 import ToolbarButton from './primitives/ToolbarButton';
@@ -67,10 +68,14 @@ import {
   useRedoActionLabel,
   useSetShortcutSheetOpen,
   useSetRightTab,
+  useSetImageList,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationHistory from '../../../hooks/useAnnotationHistory';
 import { DOCS, openDocs } from '../../../constants/docs';
 import GuidesButton from '../../guides/GuidesButton';
+import AnnotationQueueModal from '../../datasets/gallery/AnnotationQueueModal';
+import { isAnnotated, orderImagesByQueue } from '../layout/DatasetLoader';
+import useAnnotationStore from '../../../stores/useAnnotationStore';
 
 /** Status-pill tokens for the three workflow states. */
 const STATUS_TONE = {
@@ -155,6 +160,18 @@ const TopToolbar = () => {
     setPanOffset({ x: 0, y: 0 });
   };
 
+  // "Change order" from inside the editor: rebuild the queue, then apply the new order to
+  // the loaded image list in place (the loader only orders images when a dataset loads).
+  const [showQueue, setShowQueue] = useState(false);
+  const setImageList = useSetImageList();
+  const applyQueue = (imageIds) => {
+    setShowQueue(false);
+    const ordered = orderImagesByQueue(useAnnotationStore.getState().images.imageList, imageIds);
+    setImageList(ordered);
+    const first = ordered.find((img) => !isAnnotated(img)) || ordered[0];
+    if (first) navigate(`/dataset/${currentDataset.id}/annotate/${first.id}`);
+  };
+
   const backToGallery = () => {
     navigate(
       currentDataset ? `/dataset/${currentDataset.id}/datamanagement` : '/datasets'
@@ -164,7 +181,7 @@ const TopToolbar = () => {
   const initial = (user?.username || '?').charAt(0).toUpperCase();
 
   return (
-    <div className="h-[44px] flex-none flex items-center gap-[10px] px-[10px] bg-p1 border-b border-ln">
+    <div className="h-[44px] flex-none flex items-center gap-[6px] xl:gap-[10px] px-[10px] bg-p1 border-b border-ln">
       {/* App menu + wordmark */}
       <div className="relative flex items-center gap-[8px] flex-none">
         <button
@@ -247,16 +264,22 @@ const TopToolbar = () => {
 
       <Divider />
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-[7px] min-w-0 whitespace-nowrap">
-        <button
-          type="button"
-          onClick={backToGallery}
-          className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-6 text-btn text-t2 hover:bg-hv hover:text-t1 transition-colors flex-none"
-        >
-          <ArrowLeft size={13} strokeWidth={1.9} />
-          <span>Gallery</span>
-        </button>
+      {/* Kept out of the breadcrumb so the way back never gets clipped; below xl the
+          label goes, which is what lets the toolbar fit at the editor's 1024px minimum. */}
+      <button
+        type="button"
+        onClick={backToGallery}
+        title="Gallery"
+        aria-label="Gallery"
+        className="flex items-center gap-[5px] h-[26px] px-[8px] rounded-6 text-btn text-t2 hover:bg-hv hover:text-t1 transition-colors flex-none"
+      >
+        <ArrowLeft size={13} strokeWidth={1.9} />
+        <span className="hidden xl:inline">Gallery</span>
+      </button>
+
+      {/* Breadcrumb. It is the part that gives way on narrow screens, so it clips its
+          own overflow instead of spilling under the image navigation beside it. */}
+      <div className="flex items-center gap-[7px] min-w-0 overflow-hidden whitespace-nowrap">
         <span className="text-t3 flex-none">/</span>
         <span className="text-btn text-t2 truncate max-w-[180px]">
           {currentDataset?.name || 'Loading…'}
@@ -335,6 +358,11 @@ const TopToolbar = () => {
           disabled={!nav.canGoNext}
           onClick={nav.goNext}
         />
+        {/* Sits with the navigation rather than the breadcrumb: it decides which image
+            comes next, and this group never shrinks, so it stays reachable at any width. */}
+        {currentDataset && (
+          <ToolbarButton icon={ListOrdered} label="Change order" onClick={() => setShowQueue(true)} />
+        )}
       </div>
 
       <div className="flex-1 min-w-[8px]" />
@@ -561,6 +589,13 @@ const TopToolbar = () => {
           // The count in the panel header is derived, so nothing else to reset.
           setRightTab('objects');
         }}
+      />
+      <AnnotationQueueModal
+        isOpen={showQueue}
+        forceChooser
+        onClose={() => setShowQueue(false)}
+        dataset={currentDataset}
+        onStart={applyQueue}
       />
     </div>
   );

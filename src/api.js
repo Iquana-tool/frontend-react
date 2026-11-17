@@ -16,6 +16,7 @@ export * from "./api/inference";
 export * from "./api/members";
 export * from "./api/reviews";
 export * from "./api/annotation_queue";
+export * from "./api/recommended_queue";
 export * from "./api/annotationHistory";
 export * from "./api/admin";
 export * from "./api/account";

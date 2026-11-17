@@ -44,6 +44,8 @@ const ReviewPage = () => {
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState(null);
+  // Neutral feedback that is not an error, e.g. when the settings match nothing.
+  const [notice, setNotice] = useState(null);
 
   const loadSummary = useCallback(async () => {
     const response = await fetchReviewSummary(datasetId);
@@ -86,9 +88,15 @@ const ReviewPage = () => {
   const handleStart = async (options) => {
     setBuilding(true);
     setError(null);
+    setNotice(null);
     try {
       const response = await buildReviewQueue(datasetId, options);
-      if (response?.success) setQueue(response.queue);
+      // An empty queue would open a session that is finished before it starts; stay on the
+      // setup so the reviewer can loosen the settings.
+      if (response?.success && response.queue.total === 0) {
+        const unit = response.queue.granularity === 'images' ? 'images' : 'objects';
+        setNotice(`No ${unit} match these settings. Try fewer filters or a different "By" choice.`);
+      } else if (response?.success) setQueue(response.queue);
     } catch (err) {
       setError(readableError(err, 'Could not build the review queue.'));
     } finally {
@@ -161,9 +169,12 @@ const ReviewPage = () => {
           />
         ) : (
           <ReviewSetup
+            datasetId={datasetId}
             summary={summary}
             labels={labels}
             building={building}
+            notice={notice}
+            canRecommend={can(Permission.DATASET_UPDATE)}
             onStart={handleStart}
             defaultOnlySubmitted={location.state?.onlySubmitted !== false}
           />

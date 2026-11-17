@@ -1,7 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ArrowDownWideNarrow,
-  ArrowUpNarrowWide,
   Images,
   ListTree,
   Loader2,
@@ -10,6 +8,16 @@ import {
 } from 'lucide-react';
 import { buildLabelHierarchy } from '../../utils/labelHierarchy';
 import { getLabelColor } from '../../utils/labelColors';
+import QueueHelpNote from '../ui/QueueHelpNote';
+import useDatasetMetadata from '../../hooks/useDatasetMetadata';
+import QueueBuilder, { authorPayload, sortPayload, sortStateFrom } from '../queue/QueueBuilder';
+import RecommendControls from '../queue/RecommendControls';
+import { clearRecommendedQueue, saveRecommendedQueue } from '../../api/recommended_queue';
+
+// The metadata hook can derive facets from loaded images; this page has none, so it passes
+// a stable empty list and uses the fetched facets.
+const NO_IMAGES = [];
+const OBJECTS = { singular: 'object', plural: 'objects' };
 
 /** The three ways to slice the review work. */
 const MODES = [
@@ -52,18 +60,35 @@ const flattenWithDepth = (labels) => {
 /**
  * The review session's launch pad: granularity, ordering, and (for the custom
  * mode) which labels to sweep. Calls `onStart` with the options the API expects.
+ *
+ * Sorting and filters are the shared `QueueBuilder`, the same as the annotation
+ * window's, over the summary's object methods; this page adds what only review has.
+ * `notice` is feedback on the last start, shown by the button so it is seen where the
+ * reviewer clicked. With `canRecommend` (curators), the current settings can be saved as
+ * the dataset's recommended review queue, which everyone can start from.
  */
-const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted = true }) => {
+const ReviewSetup = ({
+  datasetId, summary, labels, building, onStart, notice = null, defaultOnlySubmitted = true,
+  canRecommend = false,
+}) => {
   const [mode, setMode] = useState('hierarchy');
-  const [direction, setDirection] = useState('asc');
-  const [strategy, setStrategy] = useState('hierarchy');
+  // Null until the reviewer changes something: the defaults follow the summary's methods.
+  const [sortState, setSortState] = useState(null);
   const [selectedLabelIds, setSelectedLabelIds] = useState([]);
   const [includeReviewed, setIncludeReviewed] = useState(false);
   // Defaults to submitted work only. Batch inference deep-links with this off: it writes
   // predictions onto masks nobody has submitted yet, so its output is invisible otherwise.
   const [onlySubmitted, setOnlySubmitted] = useState(defaultOnlySubmitted);
 
-  const strategies = summary?.strategies || [];
+  const methods = summary?.methods || [];
+  const { facets } = useDatasetMetadata(datasetId, NO_IMAGES);
+  // With independent review on, your own work cannot be approved by you, so it starts hidden.
+  const sort = sortState
+    || sortStateFrom(summary?.require_independent_review ? { by: 'others' } : null, methods);
+  const updateSort = (patch) => setSortState({ ...sort, ...patch });
+  // Undefined until saved or removed here; until then the summary's recommendation counts.
+  const [recommendedHere, setRecommendedHere] = useState(undefined);
+  const recommended = recommendedHere !== undefined ? recommendedHere : summary?.recommended || null;
   const indentedLabels = useMemo(() => flattenWithDepth(labels), [labels]);
   const isInstanceMode = mode === 'hierarchy' || mode === 'custom';
   const pending = summary?.pending_instances ?? null;
@@ -84,11 +109,34 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
     (mode !== 'custom' || selectedLabelIds.length > 0) &&
     (available == null || available > 0 || !onlySubmitted);
 
+  // Entire images have a fixed order, so they take only the filters on whose work and
+  // which images.
+  const sortSettings = () => (isInstanceMode && sort.method
+    ? sortPayload(sort, methods.find((m) => m.key === sort.method))
+    : { metadata_filters: sort.metadataFilters, ...authorPayload(sort) });
+
+  const useRecommended = () => {
+    const { settings } = recommended;
+    setMode(settings.granularity || 'hierarchy');
+    setSortState(sortStateFrom(settings, methods));
+  };
+
+  const saveRecommended = async (reason) => {
+    const response = await saveRecommendedQueue('review', datasetId, {
+      settings: { ...sortSettings(), granularity: mode }, reason,
+    });
+    setRecommendedHere(response.recommended);
+  };
+
+  const clearRecommended = async () => {
+    await clearRecommendedQueue('review', datasetId);
+    setRecommendedHere(null);
+  };
+
   const handleStart = () => {
     onStart({
       granularity: mode,
-      sortStrategy: strategy,
-      direction,
+      sort: sortSettings(),
       labelIds: mode === 'custom' ? selectedLabelIds : null,
       onlySubmitted,
       includeReviewed,
@@ -102,6 +150,9 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
         <p className="text-t2 mb-2">
           Choose how to work through the annotations awaiting review.
         </p>
+        <div className="mb-4">
+          <QueueHelpNote kind="review" recommended={recommended} onUseRecommended={useRecommended} />
+        </div>
         {pending != null && (
           <p className="text-sm font-medium text-ac mb-6">
             {pending === 0
@@ -193,55 +244,36 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
           </label>
         </div>
 
-        {/* Ordering — only meaningful when the queue is instance-by-instance. */}
-        {isInstanceMode && (
-          <div className="bg-p1 rounded-xl border border-ln p-4 mb-6">
-            <div className="text-sm font-semibold text-t2 mb-3">Queue order</div>
-            <div className="flex flex-wrap items-center gap-3">
-              {strategies.length > 1 && (
-                <select
-                  value={strategy}
-                  onChange={(e) => setStrategy(e.target.value)}
-                  className="border border-ln2 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-ac focus:border-ac"
-                >
-                  {strategies.map((option) => (
-                    <option key={option.key} value={option.key}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div className="flex rounded-lg border border-ln2 overflow-hidden">
-                <button
-                  onClick={() => setDirection('asc')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
-                    direction === 'asc'
-                      ? 'bg-accent text-onAccent'
-                      : 'bg-p1 text-t2 hover:bg-hv'
-                  }`}
-                >
-                  <ArrowUpNarrowWide className="w-4 h-4" />
-                  Ascending
-                </button>
-                <button
-                  onClick={() => setDirection('desc')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm transition-colors ${
-                    direction === 'desc'
-                      ? 'bg-accent text-onAccent'
-                      : 'bg-p1 text-t2 hover:bg-hv'
-                  }`}
-                >
-                  <ArrowDownWideNarrow className="w-4 h-4" />
-                  Descending
-                </button>
-              </div>
-              <span className="text-xs text-t3">
-                {strategies.find((option) => option.key === strategy)?.description ||
-                  'Root instances first, then their children.'}
-              </span>
-            </div>
+        {/* Ordering and filters. Entire images are served most pending work first, so only
+            the metadata filter applies to them. */}
+        <div className="bg-p1 rounded-xl border border-ln p-4 mb-6 space-y-4">
+          <div className="text-sm font-semibold text-t2">
+            {isInstanceMode ? 'Queue order' : 'Which images'}
           </div>
-        )}
+          <QueueBuilder
+            unit={OBJECTS}
+            methods={methods}
+            settings={sort}
+            update={updateSort}
+            facets={facets || []}
+            authors={summary?.authors || []}
+            models={summary?.models || []}
+            busy={building}
+            sortable={isInstanceMode && methods.length > 0}
+            confidence={{ label: 'Confidence below' }}
+          />
+          {canRecommend && (
+            <RecommendControls
+              recommended={recommended}
+              onSave={saveRecommended}
+              onClear={clearRecommended}
+              unavailable={mode === 'custom'
+                ? "Custom selection can't be recommended: which labels to sweep is each reviewer's choice."
+                : null}
+              busy={building}
+            />
+          )}
+        </div>
 
         {/* Label filter for the custom mode. */}
         {mode === 'custom' && (
@@ -274,6 +306,12 @@ const ReviewSetup = ({ summary, labels, building, onStart, defaultOnlySubmitted 
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {notice && (
+          <div className="mb-4 p-3 bg-well border border-ln rounded-lg text-sm text-t2" role="status">
+            {notice}
           </div>
         )}
 
