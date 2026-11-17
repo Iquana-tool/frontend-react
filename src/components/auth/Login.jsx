@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Database, LogIn, ArrowRight } from 'lucide-react';
 import Wordmark from '../Wordmark';
+import AccountRequestNote from './AccountRequestNote';
+import { useInstance } from '../../hooks/useInstance';
 
 /**
  * Where to send the user after signing in.
@@ -19,6 +21,7 @@ const resolveNextPath = (search) => {
 };
 
 const Login = () => {
+  const { instance, loading: instanceLoading } = useInstance();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -144,18 +147,11 @@ const Login = () => {
               </button>
             </div>
 
-            <div className="text-center pt-4 border-t border-ln">
-              <p className="text-sm text-t2">
-                Don't have an account?{' '}
-                <Link
-                  to="/register"
-                  className="font-medium text-ac hover:brightness-110 transition-all duration-150 inline-flex items-center gap-[4px] group"
-                >
-                  <span>Create one</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-150" />
-                </Link>
-              </p>
-            </div>
+            {!instanceLoading && (
+              <div className="text-center pt-4 border-t border-ln">
+                <AccountRequestNote instance={instance} />
+              </div>
+            )}
           </form>
         </div>
 

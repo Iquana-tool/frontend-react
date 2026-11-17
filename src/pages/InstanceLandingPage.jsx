@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Database, LogIn, ArrowRight, ExternalLink } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useInstance, contactHref, PROJECT_URL } from '../hooks/useInstance';
+import { useInstance, PROJECT_URL } from '../hooks/useInstance';
+import AccountRequestNote from '../components/auth/AccountRequestNote';
 import Wordmark from '../components/Wordmark';
 
 /**
@@ -180,44 +181,11 @@ const InstanceLandingPage = () => {
                                 )}
                             </button>
 
-                            {/* How to get an account. Instances hand out credentials
-                                deliberately, so the default is "ask someone" rather than
-                                "sign yourself up" — and the backend refuses registration
-                                unless this instance opted in, so this is not the only
-                                thing keeping the door shut. */}
+                            {/* How to get an account: there is no self-registration, so
+                                this says whom to ask. */}
                             {!instanceLoading && (
                                 <div className="text-center pt-4 border-t border-ln">
-                                    {instance.allow_registration ? (
-                                        <p className="text-sm text-t2">
-                                            Don&apos;t have an account?{' '}
-                                            <Link
-                                                to="/register"
-                                                className="font-medium text-ac hover:brightness-110 transition-all duration-150 inline-flex items-center gap-[4px] group"
-                                            >
-                                                <span>Create one</span>
-                                                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-150" />
-                                            </Link>
-                                        </p>
-                                    ) : instance.contact ? (
-                                        <p className="text-sm text-t2">
-                                            Need an account? Request access from{' '}
-                                            {contactHref(instance.contact) ? (
-                                                <a
-                                                    href={contactHref(instance.contact)}
-                                                    className="font-medium text-ac hover:brightness-110 transition-all duration-150"
-                                                >
-                                                    {instance.contact}
-                                                </a>
-                                            ) : (
-                                                <span className="font-medium text-t1">{instance.contact}</span>
-                                            )}
-                                            .
-                                        </p>
-                                    ) : (
-                                        <p className="text-sm text-t3">
-                                            Accounts on this instance are issued by its administrator.
-                                        </p>
-                                    )}
+                                    <AccountRequestNote instance={instance} />
                                 </div>
                             )}
                         </form>

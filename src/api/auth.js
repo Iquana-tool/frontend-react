@@ -2,28 +2,6 @@ import { getAuthHeaders, handleApiError, buildUrl } from "./util";
 import { API_BASE_URL } from "./config";
 
 /**
- * Register a new user
- * @param {string} username
- * @param {string} password
- * @returns {Promise<Object>} Response with success status and message
- */
-export const register = async (username, password) => {
-    try {
-        const url = buildUrl(API_BASE_URL, '/auth/register', {
-            name: username,
-            password: password
-        });
-
-        const response = await fetch(url, {
-            method: "POST",
-        });
-        return handleApiError(response);
-    } catch (error) {
-        throw error;
-    }
-};
-
-/**
  * Login a user
  * @param {string} username 
  * @param {string} password 
@@ -74,3 +52,29 @@ export const getCurrentUser = async (token) => {
     }
 };
 
+/**
+ * Check a registration link before showing the form. Public: the invitee has no
+ * account yet, and the token is the whole authorisation.
+ * @param {string} token
+ * @returns {Promise<{success: boolean, invite: {is_valid: boolean, invited_by: string, expires_at: string|null}}>}
+ */
+export const previewRegistrationLink = async (token) => {
+    const response = await fetch(`${API_BASE_URL}/auth/invites/${encodeURIComponent(token)}`);
+    return handleApiError(response);
+};
+
+/**
+ * Create your own account with a registration link an admin sent. There is no other
+ * way to register; the account is a plain member and chose its own password.
+ * @param {string} token
+ * @param {string} username
+ * @param {string} password
+ */
+export const registerWithLink = async (token, username, password) => {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, username, password }),
+    });
+    return handleApiError(response);
+};

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Building2, ShieldCheck, SlidersHorizontal, UserCog, Users } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import AccountsPanel from '../components/admin/AccountsPanel';
+import RegistrationLinksPanel from '../components/admin/RegistrationLinksPanel';
 import SettingsPanel from '../components/admin/SettingsPanel';
 import OrganizationsPanel from '../components/admin/OrganizationsPanel';
 
@@ -83,7 +84,12 @@ const AdminPage = () => {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {tab === 'accounts' && <AccountsPanel />}
+        {tab === 'accounts' && (
+          <>
+            <AccountsPanel />
+            <RegistrationLinksPanel />
+          </>
+        )}
         {tab === 'organizations' && <OrganizationsPanel />}
         {tab === 'settings' && <SettingsPanel />}
       </div>
