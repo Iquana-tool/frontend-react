@@ -66,6 +66,7 @@ export const useSetCurrentMask = () => useAnnotationStore(state => state.setCurr
 // Object actions
 export const useAddObject = () => useAnnotationStore(state => state.addObject);
 export const useRemoveObject = () => useAnnotationStore(state => state.removeObject);
+export const useRemoveObjects = () => useAnnotationStore(state => state.removeObjects);
 export const useUpdateObject = () => useAnnotationStore(state => state.updateObject);
 export const useSelectObject = () => useAnnotationStore(state => state.selectObject);
 export const useDeselectObject = () => useAnnotationStore(state => state.deselectObject);

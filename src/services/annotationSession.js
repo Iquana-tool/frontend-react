@@ -460,6 +460,18 @@ class AnnotationSession {
   }
 
   /**
+   * Delete several objects in one request (see MessageBuilders.deleteObjects)
+   * @param {Array<number>} contourIds - Contour IDs to delete
+   * @returns {Promise<void>}
+   */
+  async deleteObjects(contourIds) {
+    this._ensureReady();
+    const message = MessageBuilders.deleteObjects(contourIds);
+    // Fire-and-forget, like deleteObject: one OBJECT_REMOVED lists them all.
+    return websocketService.send(message, false);
+  }
+
+  /**
    * Delete an object
    * @param {number} contourId - Contour ID to delete
    * @returns {Promise<void>}

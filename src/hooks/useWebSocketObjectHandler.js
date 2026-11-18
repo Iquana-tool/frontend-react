@@ -5,6 +5,7 @@ import {
   useAddObject,
   useUpdateObject,
   useRemoveObject,
+  useRemoveObjects,
   useObjectsList,
   useClearSelection,
   useSelectObject,
@@ -16,6 +17,7 @@ const useWebSocketObjectHandler = () => {
   const addObject = useAddObject();
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
+  const removeObjects = useRemoveObjects();
   const objectsList = useObjectsList();
   const clearSelection = useClearSelection();
   const selectObject = useSelectObject();
@@ -166,17 +168,16 @@ const useWebSocketObjectHandler = () => {
           return;
         }
 
-        deletedContours.forEach(contourId => {
-          const normalizedId = typeof contourId === 'string' && !isNaN(contourId)
-            ? Number(contourId)
-            : contourId;
-
-          const objectToRemove = objectsListRef.current.find(obj => obj.contour_id === normalizedId);
-
-          if (objectToRemove) {
-            removeObject(objectToRemove.id);
-          }
-        });
+        // One store update for all of them: a bulk delete lists hundreds at once,
+        // and removing them one by one re-rendered the canvas for each.
+        const doomed = new Set(deletedContours.map((contourId) =>
+          typeof contourId === 'string' && !isNaN(contourId) ? Number(contourId) : contourId
+        ));
+        const ids = objectsListRef.current
+          .filter((obj) => doomed.has(obj.contour_id))
+          .map((obj) => obj.id);
+        if (ids.length === 1) removeObject(ids[0]);
+        else if (ids.length > 1) removeObjects(ids);
       }
     );
 
@@ -187,7 +188,7 @@ const useWebSocketObjectHandler = () => {
     };
   // Stable deps only — objectsList is accessed via ref, not as a dep
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addObject, updateObject, removeObject, clearSelection, selectObject, setObjectsFromHierarchy]);
+  }, [addObject, updateObject, removeObject, removeObjects, clearSelection, selectObject, setObjectsFromHierarchy]);
 };
 
 export default useWebSocketObjectHandler;
