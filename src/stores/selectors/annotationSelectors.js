@@ -384,3 +384,10 @@ export const useSetHoveredRelationshipId = () => useAnnotationStore(state => sta
 export const useOpenSceneGraphPopover = () => useAnnotationStore(state => state.openSceneGraphPopover);
 export const useCloseSceneGraphPopover = () => useAnnotationStore(state => state.closeSceneGraphPopover);
 export const useBumpSceneGraph = () => useAnnotationStore(state => state.bumpSceneGraph);
+
+// Inference run selectors (the model run in flight; see inferenceSlice)
+export const useInferenceRun = () => useAnnotationStore(state => state.inference.run);
+export const useBeginInferenceRun = () => useAnnotationStore(state => state.beginInferenceRun);
+export const useAckInferenceRun = () => useAnnotationStore(state => state.ackInferenceRun);
+export const useEndInferenceRun = () => useAnnotationStore(state => state.endInferenceRun);
+export const useClearInferenceRun = () => useAnnotationStore(state => state.clearInferenceRun);

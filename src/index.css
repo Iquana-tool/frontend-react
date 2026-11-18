@@ -265,3 +265,41 @@ select option:disabled {
 .image-grid-item img {
   @apply transition-transform duration-300 ease-out;
 }
+
+/* A model's new outline arriving: it pops in with a small overshoot as the
+   inference animation's fade front reaches it (SegmentationOverlay sets the
+   delay). Reduced motion keeps only the fade. */
+@keyframes inference-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Its label chip follows once the outline has landed. */
+@keyframes inference-chip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes inference-pop {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

@@ -14,6 +14,8 @@ vi.mock('../stores/selectors/annotationSelectors', () => ({
   useSuggestionModel: () => 'personal-default',
   useIsRunningSuggestion: () => false,
   useSetIsRunningSuggestion: () => setIsRunning,
+  useBeginInferenceRun: () => () => 1,
+  useAckInferenceRun: () => () => {},
 }));
 
 vi.mock('../contexts/ToastContext', () => ({
