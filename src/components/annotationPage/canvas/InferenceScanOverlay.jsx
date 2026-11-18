@@ -383,14 +383,16 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
             R += (248 - R) * fk; G += (113 - G) * fk; B += (113 - B) * fk;
             a = a * (1 - fk) + flash * fk; rad = rad * (1 - fk) + r0 * 1.25 * fk;
           }
-          if (!reduced && fk === 0) {
-            // Shimmer: every dot twinkles at its own pace, and now and then one
-            // catches the light — a brief white sparkle. Stronger on the rings.
+          // Shimmer, on the waves only — the calm cloud between them stays still.
+          const onWave = w3 * att;
+          if (!reduced && fk === 0 && onWave > 0.02) {
+            // Each dot on a wave twinkles at its own pace, and now and then one
+            // catches the light — a brief white sparkle.
             const seed = cloud.R[i];
-            a *= 0.78 + 0.22 * Math.sin(t * (2.2 + 3.1 * seed) + seed * 40);
+            a *= 1 - onWave * (0.22 - 0.22 * Math.sin(t * (2.2 + 3.1 * seed) + seed * 40));
             const sp = Math.sin(t * (0.45 + 0.7 * seed) + seed * 97);
             if (sp > 0.985) {
-              const s = ((sp - 0.985) / 0.015) ** 2 * (0.25 + 0.75 * att);
+              const s = ((sp - 0.985) / 0.015) ** 2 * onWave;
               a += 0.55 * s;
               rad *= 1 + 0.5 * s;
               R += (255 - R) * 0.6 * s; G += (255 - G) * 0.6 * s; B += (255 - B) * 0.6 * s;
