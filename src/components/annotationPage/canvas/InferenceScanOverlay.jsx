@@ -35,11 +35,69 @@ const hexToRgb = (hex) => {
 /** Most dots the cloud draws, so a large stage stays cheap per frame. */
 const MAX_DOTS = 9000;
 
+/** Resolution of the brightness map; a little blur makes it follow regions, not texture. */
+const LUM_W = 48;
+
+/**
+ * How bright the image is, overall and region by region (0 = black, 1 = white).
+ *
+ * Glowing dots on a dark scrim read well over a dark micrograph but wash out on
+ * a bright photo, so the overlay changes its look where the image is bright.
+ * Read once per image from a small downscaled copy; the image is a data URL, so
+ * the canvas is never tainted, but a read that throws simply keeps the dark look.
+ */
+export const measureBrightness = (image) => {
+  const iw = image?.naturalWidth || image?.width || 0;
+  const ih = image?.naturalHeight || image?.height || 0;
+  if (!iw || !ih || typeof document === 'undefined') return null;
+  try {
+    const w = LUM_W;
+    const h = Math.max(1, Math.round((LUM_W * ih) / iw));
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const g = canvas.getContext('2d', { willReadFrequently: true });
+    if (!g) return null;
+    g.drawImage(image, 0, 0, w, h);
+    const px = g.getImageData(0, 0, w, h).data;
+    const raw = new Float32Array(w * h);
+    let sum = 0;
+    for (let i = 0; i < w * h; i++) {
+      const l = (0.2126 * px[i * 4] + 0.7152 * px[i * 4 + 1] + 0.0722 * px[i * 4 + 2]) / 255;
+      raw[i] = l;
+      sum += l;
+    }
+    const grid = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let s = 0;
+        let n = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            s += raw[yy * w + xx];
+            n++;
+          }
+        }
+        grid[y * w + x] = s / n;
+      }
+    }
+    return { w, h, grid, mean: sum / (w * h) };
+  } catch {
+    return null;
+  }
+};
+
+/** 0 where the image is dark enough for glowing dots, 1 where it is bright. */
+const brightness = (lum) => smooth(clamp((lum - 0.45) / 0.3));
+
 /**
  * The point cloud, in display pixels: a jittered grid over what the model looks
  * at, each dot with its distance to the nearest pulse origin.
  */
-const buildCloud = (geometry, k, width, height) => {
+const buildCloud = (geometry, k, width, height, lum) => {
   const sp = Math.max(11, Math.sqrt((width * height) / MAX_DOTS));
   const origins = geometry.origins.map((o) => ({ x: o.x * k, y: o.y * k }));
   const negatives = geometry.negatives.map((o) => ({ x: o.x * k, y: o.y * k }));
@@ -56,6 +114,7 @@ const buildCloud = (geometry, k, width, height) => {
   const D = [];
   const Q = [];
   const R = [];
+  const L = [];
   for (let gy = 0; gy * sp < height; gy++) {
     for (let gx = 0; gx * sp < width; gx++) {
       const x = (gx + 0.5 + (rnd() - 0.5) * 0.7) * sp;
@@ -68,6 +127,7 @@ const buildCloud = (geometry, k, width, height) => {
         if (d < quiet) q = Math.min(q, 0.08 + 0.92 * smooth(d / quiet));
       }
       X.push(x); Y.push(y); D.push(nearestDistance(x, y, origins)); Q.push(q); R.push(rnd());
+      L.push(lum ? brightness(lum.grid[Math.min(lum.h - 1, Math.floor((y / height) * lum.h)) * lum.w + Math.min(lum.w - 1, Math.floor((x / width) * lum.w))]) : 0);
     }
   }
   return {
@@ -77,6 +137,7 @@ const buildCloud = (geometry, k, width, height) => {
     D: Float32Array.from(D),
     Q: Float32Array.from(Q),
     R: Float32Array.from(R),
+    L: Float32Array.from(L),
     origins,
     polygon,
     maxD: geometry.maxD * k,
@@ -119,6 +180,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
   const imgW = imageObject?.width || imageObject?.naturalWidth || 0;
   const imgH = imageObject?.height || imageObject?.naturalHeight || 0;
   const runId = run?.id ?? null;
+  const lum = useMemo(() => measureBrightness(imageObject), [imageObject]);
 
   // Where the run looks is fixed when it starts; outlines arriving later do not move it.
   const geometry = useMemo(
@@ -137,7 +199,31 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
     canvas.height = Math.round(H * dpr);
     const ctx = canvas.getContext('2d');
     if (!ctx) return undefined;
-    const cloud = buildCloud(geometry, W / imgW, W, H);
+    const cloud = buildCloud(geometry, W / imgW, W, H, lum);
+    // The scrim follows the image region by region: darkening a white area by a
+    // third makes it look dimmed rather than busy, so bright areas get far less.
+    // It is a small alpha map, scaled up smoothly when drawn.
+    const scrimK = 1 - 0.75 * (lum ? brightness(lum.mean) : 0);
+    let scrimMap = null;
+    if (lum) {
+      scrimMap = document.createElement('canvas');
+      scrimMap.width = lum.w;
+      scrimMap.height = lum.h;
+      const sg = scrimMap.getContext('2d');
+      if (sg) {
+        const img = sg.createImageData(lum.w, lum.h);
+        for (let i = 0; i < lum.w * lum.h; i++) {
+          img.data[i * 4] = 6;
+          img.data[i * 4 + 1] = 14;
+          img.data[i * 4 + 2] = 16;
+          img.data[i * 4 + 3] = Math.round(255 * 0.34 * (1 - 0.8 * brightness(lum.grid[i])));
+        }
+        sg.putImageData(img, 0, 0);
+      } else {
+        scrimMap = null;
+      }
+    }
+    const ringDark = lum ? brightness(lum.mean) > 0.5 : false;
     const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lam = waveLength(cloud.maxD);
     const fw = 40;
@@ -177,14 +263,21 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
       // Scrim: the image is momentarily not yours to edit, and the dots need
       // something to read against. Darker outside a focused object.
       if (envScrim > 0) {
-        ctx.fillStyle = `rgba(6, 14, 16, ${(0.34 * envScrim).toFixed(3)})`;
-        ctx.fillRect(0, 0, W, H);
+        if (scrimMap) {
+          ctx.globalAlpha = envScrim;
+          ctx.imageSmoothingEnabled = true;
+          ctx.drawImage(scrimMap, 0, 0, W, H);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.fillStyle = `rgba(6, 14, 16, ${(0.34 * envScrim).toFixed(3)})`;
+          ctx.fillRect(0, 0, W, H);
+        }
         if (cloud.polygon) {
           ctx.beginPath();
           ctx.rect(0, 0, W, H);
           cloud.polygon.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
           ctx.closePath();
-          ctx.fillStyle = `rgba(4, 8, 10, ${(0.36 * envScrim).toFixed(3)})`;
+          ctx.fillStyle = `rgba(4, 8, 10, ${(0.36 * Math.max(0.5, scrimK) * envScrim).toFixed(3)})`;
           ctx.fill('evenodd');
         }
       }
@@ -207,7 +300,10 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
       const frontLive = fr >= 0 && fr < fMax - 1;
 
       if (env > 0.002) {
-        ctx.globalCompositeOperation = 'lighter';
+        // Light adds up over dark areas; over bright ones it would only whiten
+        // what is already white, so there the dots are painted, darker and denser.
+        let mode = 'lighter';
+        ctx.globalCompositeOperation = mode;
         const Pw = wavePeriodS(r.etaS);
         const waveT = reduced ? 0 : t / Pw;
         const amp = reduced ? 0 : 1;
@@ -224,6 +320,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
           }
           const x = cloud.X[i];
           const y = cloud.Y[i];
+          const b = cloud.L[i];
           const ph = d / lam - waveT + 0.06 * Math.sin(x * 0.021 + y * 0.017);
           const wv = 0.5 + 0.5 * Math.cos(ph * TAU);
           const w3 = wv * wv * wv;
@@ -249,7 +346,11 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
               const w = 1 - dd / fl;
               a += 0.5 * w;
               rad *= 1 + 0.45 * w;
-              R += (235 - R) * 0.6 * w; G += (240 - G) * 0.6 * w; B += (245 - B) * 0.6 * w;
+              // The rim is light on dark areas and dark on bright ones.
+              const tr = 235 - 207 * b;
+              const tg = 240 - 204 * b;
+              const tb = 245 - 201 * b;
+              R += (tr - R) * 0.6 * w; G += (tg - G) * 0.6 * w; B += (tb - B) * 0.6 * w;
             }
           }
           if (fr >= 0) a *= 1 - gone;
@@ -263,15 +364,30 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
             if (dd < 12 && sweepR < cloud.maxD) {
               const w = 1 - dd / 12;
               a += 0.35 * w;
-              R += (225 - R) * w * 0.6; G += (232 - G) * w * 0.6; B += (240 - B) * w * 0.6;
+              const tr = 225 - 165 * b;
+              const tg = 232 - 162 * b;
+              const tb = 240 - 160 * b;
+              R += (tr - R) * w * 0.6; G += (tg - G) * w * 0.6; B += (tb - B) * w * 0.6;
             }
           }
           if (fk > 0) {
             R += (248 - R) * fk; G += (113 - G) * fk; B += (113 - B) * fk;
             a = a * (1 - fk) + flash * fk; rad = rad * (1 - fk) + r0 * 1.25 * fk;
           }
+          if (b > 0) {
+            // Over bright areas: deeper colour, more opaque, a touch larger.
+            const dk = 1 - 0.3 * b * (1 - fk * 0.5);
+            R *= dk; G *= dk; B *= dk;
+            a *= 1 + 0.9 * b;
+            rad *= 1 + 0.15 * b;
+          }
           a *= env;
           if (a < 0.01) continue;
+          const want = b > 0.5 ? 'source-over' : 'lighter';
+          if (want !== mode) {
+            mode = want;
+            ctx.globalCompositeOperation = mode;
+          }
           let px = x + gx;
           let py = y + gy;
           if (jit > 0) {
@@ -300,7 +416,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
         if (!reduced && !ending && r.positives.length) {
           ctx.globalCompositeOperation = 'source-over';
           const k = (t / Pw) % 1;
-          ctx.strokeStyle = 'rgb(232,237,243)';
+          ctx.strokeStyle = ringDark ? 'rgb(28,36,44)' : 'rgb(232,237,243)';
           ctx.lineWidth = 1.25;
           for (const o of cloud.origins) {
             ctx.globalAlpha = (1 - k) * 0.6 * env;
@@ -355,7 +471,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [geometry, rect.width, rect.height, imgW]);
+  }, [geometry, rect.width, rect.height, imgW, lum]);
 
   if (!run || rect.width === 0) return null;
 
