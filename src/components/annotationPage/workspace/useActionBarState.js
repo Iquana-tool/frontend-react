@@ -12,6 +12,7 @@ import {
   useLineEditActive,
   useCalibrationEntries,
   useActiveCalibrationKind,
+  useInferenceRun,
 } from '../../../stores/selectors/annotationSelectors';
 import { isReviewed } from './objectViewModel';
 import { ADDABLE_PROMPT_TYPES } from './toolModel';
@@ -41,6 +42,10 @@ export default function useActionBarState() {
   const lineEditActive = useLineEditActive();
   const calibrationEntries = useCalibrationEntries();
   const activeCalibrationKind = useActiveCalibrationKind();
+  const inferenceRun = useInferenceRun();
+  // A run stays open past its request: a suggestion run is acknowledged before
+  // its objects stream in, so the bar keeps reporting it until they are all here.
+  const openRunKind = inferenceRun && inferenceRun.phase !== 'ending' ? inferenceRun.kind : null;
 
   return useMemo(() => {
     const selection = objects.filter((object) => selectedIds.includes(object.id));
@@ -51,7 +56,7 @@ export default function useActionBarState() {
       return { state: 'editing', selection, reviewQueue };
     }
 
-    if (isSubmitting || isRunningSuggestion || isRunningInstance) {
+    if (isSubmitting || isRunningSuggestion || isRunningInstance || openRunKind) {
       return {
         state: 'running',
         selection,
@@ -62,7 +67,9 @@ export default function useActionBarState() {
             : 'segment'
           : isRunningSuggestion
             ? 'suggest'
-            : 'instance',
+            : isRunningInstance
+              ? 'instance'
+              : openRunKind,
       };
     }
 
@@ -111,6 +118,7 @@ export default function useActionBarState() {
     isSubmitting,
     isRunningSuggestion,
     isRunningInstance,
+    openRunKind,
     selectedIds,
     objects,
     mode,

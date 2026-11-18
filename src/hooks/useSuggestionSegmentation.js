@@ -5,6 +5,8 @@ import {
   useSuggestionModel,
   useIsRunningSuggestion,
   useSetIsRunningSuggestion,
+  useBeginInferenceRun,
+  useAckInferenceRun,
 } from "../stores/selectors/annotationSelectors";
 import { useToast } from '../contexts/ToastContext';
 
@@ -23,6 +25,8 @@ export function useSuggestionSegmentation(onSuccess, onError) {
   const suggestionModelId = useSuggestionModel(); // This is a string ID, not an object
   const availableModels = useAvailableSuggestionModels();
   const { addToast } = useToast();
+  const beginInferenceRun = useBeginInferenceRun();
+  const ackInferenceRun = useAckInferenceRun();
 
   const runSuggestion = useCallback(async (contourIdOrIds, labelId, modelIdOverride = null, inputs = null) => {
     // Note: Model status is handled by the backend, no need to update here
@@ -62,6 +66,13 @@ export function useSuggestionSegmentation(onSuccess, onError) {
     }
 
     setIsRunning(true);
+    // Pulses start at the exemplars, in the colour of the label being searched for.
+    const runId = beginInferenceRun({
+      kind: 'suggest',
+      modelKey: effectiveModelId,
+      labelIds: [labelId],
+      seedContourIds: contourIds,
+    });
 
     try {
       // Call WebSocket method - objects will be added automatically via OBJECT_ADDED messages
@@ -77,6 +88,10 @@ export function useSuggestionSegmentation(onSuccess, onError) {
       if (!response.success) {
         throw new Error(response.message || 'Suggestion failed');
       }
+      // The ack arrives before the objects: the server streams them one by one
+      // afterwards, so the run stays open until `added_count` of them are in.
+      const addedCount = response?.data?.added_count;
+      ackInferenceRun(runId, { expected: Number.isFinite(addedCount) ? addedCount : null });
 
       // Let the user know when the model returned no new instances. The found
       // objects (if any) arrive separately as OBJECT_ADDED messages, but the
@@ -94,6 +109,7 @@ export function useSuggestionSegmentation(onSuccess, onError) {
       }
     } catch (error) {
       console.error('Suggestion segmentation error:', error);
+      ackInferenceRun(runId, { failed: true });
       
       // Call error callback if provided
       if (onError) {
@@ -104,7 +120,7 @@ export function useSuggestionSegmentation(onSuccess, onError) {
     } finally {
       setIsRunning(false);
     }
-  }, [suggestionModelId, availableModels, addToast, onSuccess, onError]);
+  }, [suggestionModelId, availableModels, addToast, onSuccess, onError, beginInferenceRun, ackInferenceRun, setIsRunning]);
 
   return { runSuggestion, isRunning };
 }

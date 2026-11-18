@@ -30,6 +30,8 @@ import useAddShapesAsObjects from './useAddShapesAsObjects';
 import useSupportedPromptTypes from './useSupportedPromptTypes';
 import useSuggestSimilar from './useSuggestSimilar';
 import useRailTools from './useRailTools';
+import useInferenceProgress from './useInferenceProgress';
+import useInferenceColors from '../canvas/useInferenceColors';
 import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
 import { resolveLabelColor } from './labelColorUtils';
@@ -58,6 +60,7 @@ import {
   useObjectsList,
   useUpdateObject,
   useRefinementModeActive,
+  useInferenceRun,
 } from '../../../stores/selectors/annotationSelectors';
 import { useCurrentImage, useTimelineOpen } from '../../../stores/selectors/annotationSelectors';
 import { TIMELINE_HEIGHT } from './stack/TimelineDrawer';
@@ -134,6 +137,9 @@ const ActionBar = () => {
   const objects = useObjectsList();
   const updateObject = useUpdateObject();
   const refinementActive = useRefinementModeActive();
+  const inferenceRun = useInferenceRun();
+  const progress = useInferenceProgress(inferenceRun);
+  const runColors = useInferenceColors(inferenceRun);
 
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
@@ -353,14 +359,42 @@ const ActionBar = () => {
   let sub = null;
   let buttons = null;
   let hint = null;
+  let progressLine = null;
 
   if (bar.state === 'running') {
     context = (
       <>
         <Loader2 size={13} className="text-ac animate-spin flex-none" />
-        <span className="text-btn font-bold text-t1 animate-dcScan">{RUN_COPY[bar.runKind]}</span>
+        <span className="text-btn font-bold text-t1">{RUN_COPY[bar.runKind]}</span>
+        {progress && (
+          <span
+            className="font-mono text-btn font-semibold text-t1 tabular-nums min-w-[4.2ch] text-right"
+            role="progressbar"
+            aria-label="Estimated progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={progress.percent}
+          >
+            {progress.percent} %
+          </span>
+        )}
       </>
     );
+    // An estimate from this model's earlier runs; it holds at 99 % until the
+    // result is in. The fill carries the labels in flight, like the canvas.
+    if (progress) {
+      progressLine = (
+        <div className="absolute left-[12px] right-[12px] bottom-[3px] h-[2px] rounded-full bg-well overflow-hidden" aria-hidden="true">
+          <div
+            className="h-full rounded-full transition-[width] duration-100 ease-linear"
+            style={{
+              width: `${(progress.fraction * 100).toFixed(1)}%`,
+              background: runColors.length > 1 ? `linear-gradient(90deg, ${runColors.join(', ')})` : runColors[0],
+            }}
+          />
+        </div>
+      );
+    }
     sub = `${modelName}${prompts.length ? ` · ${prompts.length} prompts` : ''}`;
   } else if (bar.state === 'prompt') {
     context = (
@@ -699,8 +733,9 @@ const ActionBar = () => {
 
       <div
         data-guide="action-bar"
-        className="pointer-events-auto flex flex-wrap items-center justify-center gap-[7px] p-[6px] rounded-12 bg-glass border border-ln2 shadow-bar backdrop-blur-sm"
+        className="pointer-events-auto relative flex flex-wrap items-center justify-center gap-[7px] p-[6px] rounded-12 bg-glass border border-ln2 shadow-bar backdrop-blur-sm"
       >
+        {progressLine}
         <div className="flex items-center gap-[6px] pl-[5px]">{context}</div>
         {sub && <span className="font-mono text-meta text-t3">{sub}</span>}
         {buttons && <div className="w-px h-5 bg-ln2" />}

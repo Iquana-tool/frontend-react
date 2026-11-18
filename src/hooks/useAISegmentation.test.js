@@ -52,6 +52,8 @@ vi.mock('../stores/selectors/annotationSelectors', () => ({
   useSyncEditModeDraftFromRefinement: () => actions.syncEditModeDraftFromRefinement,
   useAvailablePromptedModels: () => hookState.availablePromptedModels,
   useActiveLabelId: () => hookState.activeLabelId,
+  useBeginInferenceRun: () => () => 1,
+  useAckInferenceRun: () => () => {},
 }));
 
 vi.mock('../services/annotationSession', () => ({

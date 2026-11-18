@@ -22,6 +22,8 @@ import {
   useSyncEditModeDraftFromRefinement,
   useAvailablePromptedModels,
   useActiveLabelId,
+  useBeginInferenceRun,
+  useAckInferenceRun,
 } from '../stores/selectors/annotationSelectors';
 import { useAnnotationRoutingPolicy } from '../contexts/AnnotationRoutingPolicyContext';
 import { matchesModelKey, resolveRoutingBinding } from '../utils/inferenceRouting';
@@ -83,6 +85,8 @@ const useAISegmentation = () => {
   const exitRefinementMode = useExitRefinementMode();
   const setCurrentTool = useSetCurrentTool();
   const syncEditModeDraftFromRefinement = useSyncEditModeDraftFromRefinement();
+  const beginInferenceRun = useBeginInferenceRun();
+  const ackInferenceRun = useAckInferenceRun();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -174,6 +178,18 @@ const useAISegmentation = () => {
 
     setIsSubmitting(true);
     setError(null);
+    // The canvas animation and the action bar's percentage follow this run.
+    // The labels in flight: the refined object's own, else the active label;
+    // none means class-agnostic.
+    const refinedObject = refinementModeActive
+      ? objectsList.find((obj) => obj.id === refinementModeObjectId)
+      : null;
+    const runId = beginInferenceRun({
+      kind: refinementModeActive ? 'refine' : 'segment',
+      modelKey: promptedModelId,
+      labelIds: [refinedObject ? refinedObject.labelId : activeLabelId],
+      fromPrompts: true,
+    });
 
     try {
       // Verify session is ready
@@ -272,6 +288,18 @@ const useAISegmentation = () => {
       // Send segmentation request via WebSocket
       const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts, resolvedInputs);
 
+      // One outline comes back for an add or a refinement. A SUCCESS without one
+      // means the model found nothing new (every candidate duplicated the
+      // focused object, or the outline added no pixels).
+      ackInferenceRun(runId, {
+        expected:
+          response?.type === 'object_added' || response?.type === 'object_modified'
+            ? 1
+            : response?.type === 'success' && (response?.data?.skipped || response?.data?.candidate_count != null)
+              ? 0
+              : null,
+      });
+
       // Transform response to mask format
       const mask = transformResponseToMask(response);
 
@@ -349,6 +377,7 @@ const useAISegmentation = () => {
     } catch (err) {
       const errorMessage = err.message || 'Segmentation failed';
       setError(errorMessage);
+      ackInferenceRun(runId, { failed: true });
       // Note: Model status is handled by the backend, no need to update here
       return { success: false, error: errorMessage };
     } finally {
@@ -375,6 +404,8 @@ const useAISegmentation = () => {
     activeLabelId,
     availablePromptedModels,
     datasetId,
+    beginInferenceRun,
+    ackInferenceRun,
   ]);
 
   return {
