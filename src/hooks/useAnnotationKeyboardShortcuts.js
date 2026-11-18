@@ -6,7 +6,6 @@ import {
   useIsSubmitting,
   useSelectedObjects,
   useObjectsList,
-  useRemoveObject,
   useRemoveLastPrompt,
   useClearSelection,
   useSetInstanceRunRequested,
@@ -16,7 +15,7 @@ import {
 import useAISegmentation from './useAISegmentation';
 import useSuggestSimilar from '../components/annotationPage/workspace/useSuggestSimilar';
 import useAiTools from './useAiTools';
-import { deleteObject } from '../utils/objectOperations';
+import { deleteObjects } from '../utils/objectOperations';
 import { PROMPT as DELETE_PROMPT, SELECTION as DELETE_SELECTION, routeDelete } from './deleteRouting';
 
 /**
@@ -46,7 +45,6 @@ export default function useAnnotationKeyboardShortcuts() {
     () => objectsList.filter((obj) => selectedIds.includes(obj.id)),
     [objectsList, selectedIds]
   );
-  const removeObject = useRemoveObject();
   const removeLastPrompt = useRemoveLastPrompt();
   const clearSelection = useClearSelection();
   const setInstanceRunRequested = useSetInstanceRunRequested();
@@ -66,17 +64,14 @@ export default function useAnnotationKeyboardShortcuts() {
 
   const handleRejectSelected = useCallback(async () => {
     if (selectedObjects.length === 0) return;
-    for (const obj of selectedObjects) {
-      try {
-        await deleteObject(obj, removeObject);
-      } catch (err) {
-        console.error('Reject object failed:', err);
-        alert(`Failed to reject object: ${err.message || 'Unknown error'}`);
-        break;
-      }
+    try {
+      await deleteObjects(selectedObjects);
+    } catch (err) {
+      console.error('Reject object failed:', err);
+      alert(`Failed to reject object: ${err.message || 'Unknown error'}`);
     }
     clearSelection();
-  }, [selectedObjects, removeObject, clearSelection]);
+  }, [selectedObjects, clearSelection]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
