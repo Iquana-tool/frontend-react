@@ -41,8 +41,8 @@ const LUM_W = 48;
 /**
  * How bright the image is, overall and region by region (0 = black, 1 = white).
  *
- * Glowing dots on a dark scrim read well over a dark micrograph but wash out on
- * a bright photo, so the overlay changes its look where the image is bright.
+ * A full-strength scrim turns a bright photo a dull grey, so bright areas get a
+ * lighter one — still dark enough for the glowing dots to read against.
  * Read once per image from a small downscaled copy; the image is a data URL, so
  * the canvas is never tainted, but a read that throws simply keeps the dark look.
  */
@@ -90,14 +90,14 @@ export const measureBrightness = (image) => {
   }
 };
 
-/** 0 where the image is dark enough for glowing dots, 1 where it is bright. */
+/** 0 where the image is dark, 1 where it is bright. */
 const brightness = (lum) => smooth(clamp((lum - 0.45) / 0.3));
 
 /**
  * The point cloud, in display pixels: a jittered grid over what the model looks
  * at, each dot with its distance to the nearest pulse origin.
  */
-const buildCloud = (geometry, k, width, height, lum) => {
+const buildCloud = (geometry, k, width, height) => {
   const sp = Math.max(11, Math.sqrt((width * height) / MAX_DOTS));
   const origins = geometry.origins.map((o) => ({ x: o.x * k, y: o.y * k }));
   const negatives = geometry.negatives.map((o) => ({ x: o.x * k, y: o.y * k }));
@@ -114,7 +114,6 @@ const buildCloud = (geometry, k, width, height, lum) => {
   const D = [];
   const Q = [];
   const R = [];
-  const L = [];
   for (let gy = 0; gy * sp < height; gy++) {
     for (let gx = 0; gx * sp < width; gx++) {
       const x = (gx + 0.5 + (rnd() - 0.5) * 0.7) * sp;
@@ -127,7 +126,6 @@ const buildCloud = (geometry, k, width, height, lum) => {
         if (d < quiet) q = Math.min(q, 0.08 + 0.92 * smooth(d / quiet));
       }
       X.push(x); Y.push(y); D.push(nearestDistance(x, y, origins)); Q.push(q); R.push(rnd());
-      L.push(lum ? brightness(lum.grid[Math.min(lum.h - 1, Math.floor((y / height) * lum.h)) * lum.w + Math.min(lum.w - 1, Math.floor((x / width) * lum.w))]) : 0);
     }
   }
   return {
@@ -137,7 +135,6 @@ const buildCloud = (geometry, k, width, height, lum) => {
     D: Float32Array.from(D),
     Q: Float32Array.from(Q),
     R: Float32Array.from(R),
-    L: Float32Array.from(L),
     origins,
     polygon,
     maxD: geometry.maxD * k,
@@ -199,11 +196,10 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
     canvas.height = Math.round(H * dpr);
     const ctx = canvas.getContext('2d');
     if (!ctx) return undefined;
-    const cloud = buildCloud(geometry, W / imgW, W, H, lum);
-    // The scrim follows the image region by region: darkening a white area by a
-    // third makes it look dimmed rather than busy, so bright areas get far less.
-    // It is a small alpha map, scaled up smoothly when drawn.
-    const scrimK = 1 - 0.75 * (lum ? brightness(lum.mean) : 0);
+    const cloud = buildCloud(geometry, W / imgW, W, H);
+    // The scrim follows the image region by region: bright areas get a lighter
+    // one, so a bright photo is dimmed rather than greyed out, while the glow
+    // still has something to shine against. A small alpha map, scaled up smoothly.
     let scrimMap = null;
     if (lum) {
       scrimMap = document.createElement('canvas');
@@ -216,19 +212,43 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
           img.data[i * 4] = 6;
           img.data[i * 4 + 1] = 14;
           img.data[i * 4 + 2] = 16;
-          img.data[i * 4 + 3] = Math.round(255 * 0.34 * (1 - 0.8 * brightness(lum.grid[i])));
+          img.data[i * 4 + 3] = Math.round(255 * 0.34 * (1 - 0.2 * brightness(lum.grid[i])));
         }
         sg.putImageData(img, 0, 0);
       } else {
         scrimMap = null;
       }
     }
-    const ringDark = lum ? brightness(lum.mean) > 0.5 : false;
     const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const lam = waveLength(cloud.maxD);
     const fw = 40;
     const fl = 16;
     const fMax = frontMax(cloud.maxD);
+    // Soft glow sprites, one per colour: a radial falloff drawn once and stamped
+    // under each bright dot, so the halo has no hard edge.
+    const spriteCache = new Map();
+    const glowSprite = (rgb) => {
+      const key = rgb.join(',');
+      let sprite = spriteCache.get(key);
+      if (!sprite) {
+        sprite = document.createElement('canvas');
+        sprite.width = 32;
+        sprite.height = 32;
+        const sg = sprite.getContext('2d');
+        if (sg) {
+          const gr = sg.createRadialGradient(16, 16, 0, 16, 16, 16);
+          gr.addColorStop(0, `rgba(${key},1)`);
+          gr.addColorStop(0.35, `rgba(${key},0.45)`);
+          gr.addColorStop(1, `rgba(${key},0)`);
+          sg.fillStyle = gr;
+          sg.fillRect(0, 0, 32, 32);
+        }
+        spriteCache.set(key, sprite);
+      }
+      return sprite;
+    };
+    const RED = [248, 113, 113];
+    const GREY = [139, 152, 166];
     let raf = 0;
 
     const frame = () => {
@@ -277,7 +297,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
           ctx.rect(0, 0, W, H);
           cloud.polygon.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
           ctx.closePath();
-          ctx.fillStyle = `rgba(4, 8, 10, ${(0.36 * Math.max(0.5, scrimK) * envScrim).toFixed(3)})`;
+          ctx.fillStyle = `rgba(4, 8, 10, ${(0.36 * envScrim).toFixed(3)})`;
           ctx.fill('evenodd');
         }
       }
@@ -300,10 +320,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
       const frontLive = fr >= 0 && fr < fMax - 1;
 
       if (env > 0.002) {
-        // Light adds up over dark areas; over bright ones it would only whiten
-        // what is already white, so there the dots are painted, darker and denser.
-        let mode = 'lighter';
-        ctx.globalCompositeOperation = mode;
+        ctx.globalCompositeOperation = 'lighter';
         const Pw = wavePeriodS(r.etaS);
         const waveT = reduced ? 0 : t / Pw;
         const amp = reduced ? 0 : 1;
@@ -320,7 +337,6 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
           }
           const x = cloud.X[i];
           const y = cloud.Y[i];
-          const b = cloud.L[i];
           const ph = d / lam - waveT + 0.06 * Math.sin(x * 0.021 + y * 0.017);
           const wv = 0.5 + 0.5 * Math.cos(ph * TAU);
           const w3 = wv * wv * wv;
@@ -346,11 +362,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
               const w = 1 - dd / fl;
               a += 0.5 * w;
               rad *= 1 + 0.45 * w;
-              // The rim is light on dark areas and dark on bright ones.
-              const tr = 235 - 207 * b;
-              const tg = 240 - 204 * b;
-              const tb = 245 - 201 * b;
-              R += (tr - R) * 0.6 * w; G += (tg - G) * 0.6 * w; B += (tb - B) * 0.6 * w;
+              R += (235 - R) * 0.6 * w; G += (240 - G) * 0.6 * w; B += (245 - B) * 0.6 * w;
             }
           }
           if (fr >= 0) a *= 1 - gone;
@@ -364,30 +376,28 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
             if (dd < 12 && sweepR < cloud.maxD) {
               const w = 1 - dd / 12;
               a += 0.35 * w;
-              const tr = 225 - 165 * b;
-              const tg = 232 - 162 * b;
-              const tb = 240 - 160 * b;
-              R += (tr - R) * w * 0.6; G += (tg - G) * w * 0.6; B += (tb - B) * w * 0.6;
+              R += (225 - R) * w * 0.6; G += (232 - G) * w * 0.6; B += (240 - B) * w * 0.6;
             }
           }
           if (fk > 0) {
             R += (248 - R) * fk; G += (113 - G) * fk; B += (113 - B) * fk;
             a = a * (1 - fk) + flash * fk; rad = rad * (1 - fk) + r0 * 1.25 * fk;
           }
-          if (b > 0) {
-            // Over bright areas: deeper colour, more opaque, a touch larger.
-            const dk = 1 - 0.3 * b * (1 - fk * 0.5);
-            R *= dk; G *= dk; B *= dk;
-            a *= 1 + 0.9 * b;
-            rad *= 1 + 0.15 * b;
+          if (!reduced && fk === 0) {
+            // Shimmer: every dot twinkles at its own pace, and now and then one
+            // catches the light — a brief white sparkle. Stronger on the rings.
+            const seed = cloud.R[i];
+            a *= 0.78 + 0.22 * Math.sin(t * (2.2 + 3.1 * seed) + seed * 40);
+            const sp = Math.sin(t * (0.45 + 0.7 * seed) + seed * 97);
+            if (sp > 0.985) {
+              const s = ((sp - 0.985) / 0.015) ** 2 * (0.25 + 0.75 * att);
+              a += 0.55 * s;
+              rad *= 1 + 0.5 * s;
+              R += (255 - R) * 0.6 * s; G += (255 - G) * 0.6 * s; B += (255 - B) * 0.6 * s;
+            }
           }
           a *= env;
           if (a < 0.01) continue;
-          const want = b > 0.5 ? 'source-over' : 'lighter';
-          if (want !== mode) {
-            mode = want;
-            ctx.globalCompositeOperation = mode;
-          }
           let px = x + gx;
           let py = y + gy;
           if (jit > 0) {
@@ -395,8 +405,16 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
             px += jit * Math.sin(te * 70 + q);
             py += jit * Math.cos(te * 63 + q * 1.3);
           }
+          const fill = `rgb(${R | 0},${G | 0},${B | 0})`;
+          ctx.fillStyle = fill;
+          // The glow: a soft halo in the ring's colour under the brighter dots
+          // (skipped for the dim ones, where it would not show and only costs time).
+          if (a > 0.2) {
+            const hr = rad * 4.6;
+            ctx.globalAlpha = (a > 1 ? 1 : a) * 0.42;
+            ctx.drawImage(glowSprite(fk > 0 ? RED : sweepR >= 0 && d < sweepR ? GREY : ca), px - hr, py - hr, hr * 2, hr * 2);
+          }
           ctx.globalAlpha = a > 1 ? 1 : a;
-          ctx.fillStyle = `rgb(${R | 0},${G | 0},${B | 0})`;
           ctx.beginPath();
           ctx.arc(px, py, rad, 0, TAU);
           ctx.fill();
@@ -416,7 +434,7 @@ const InferenceScanOverlay = ({ containerRef, zoomLevel = 1, panOffset = { x: 0,
         if (!reduced && !ending && r.positives.length) {
           ctx.globalCompositeOperation = 'source-over';
           const k = (t / Pw) % 1;
-          ctx.strokeStyle = ringDark ? 'rgb(28,36,44)' : 'rgb(232,237,243)';
+          ctx.strokeStyle = 'rgb(232,237,243)';
           ctx.lineWidth = 1.25;
           for (const o of cloud.origins) {
             ctx.globalAlpha = (1 - k) * 0.6 * env;
