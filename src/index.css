@@ -50,12 +50,14 @@ select {
   color-scheme: light;
 }
 
-select option {
+select option,
+select optgroup {
   background-color: var(--p1, #151b23);
   color: var(--t1, #e6edf3);
 }
 
-[data-theme='light'] select option {
+[data-theme='light'] select option,
+[data-theme='light'] select optgroup {
   background-color: #ffffff;
   color: #0f172a;
 }

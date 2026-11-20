@@ -19,8 +19,8 @@ import useAIAnnotationShortcuts from '../../../hooks/useAIAnnotationShortcuts';
 import useFocusModeEscape from '../../../hooks/useFocusModeEscape';
 import useMultiSelectShortcuts from '../../../hooks/useMultiSelectShortcuts';
 import useInstantSegmentationRunner from '../workspace/useInstantSegmentationRunner';
-import { useSetCursorPosition } from '../../../stores/selectors/annotationSelectors';
 import {
+  useSetCursorPosition,
   useCurrentTool,
   useRefinementModeActive,
   useFocusModeActive,

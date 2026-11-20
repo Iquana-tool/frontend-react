@@ -195,6 +195,15 @@ export const createAIAnnotationSlice = (set) => ({
   setActivePreview: (preview) => set((state) => {
     state.aiAnnotation.activePreview = preview;
   }),
+
+
+  setLastInstanceRun: (run) => set((state) => {
+    state.aiAnnotation.lastInstanceRun = run;
+  }),
+
+  clearLastInstanceRun: () => set((state) => {
+    state.aiAnnotation.lastInstanceRun = null;
+  }),
   
   setIsSubmitting: (isSubmitting) => set((state) => {
     state.aiAnnotation.isSubmitting = isSubmitting;
@@ -259,4 +268,3 @@ export const createAIAnnotationSlice = (set) => ({
     state.aiAnnotation.redoStack = [];
   }),
 });
-

@@ -28,7 +28,7 @@ import useObjectActions from './useObjectActions';
 import useLabelAssignment from './useLabelAssignment';
 import useAddShapesAsObjects from './useAddShapesAsObjects';
 import useSupportedPromptTypes from './useSupportedPromptTypes';
-import useSuggestSimilar from './useSuggestSimilar';
+import { useLabelSegmentation } from './LabelSegmentationContext';
 import useRailTools from './useRailTools';
 import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
@@ -108,7 +108,7 @@ const ActionBar = () => {
   const bar = useActionBarState();
   const actions = useObjectActions();
   const labelling = useLabelAssignment();
-  const suggest = useSuggestSimilar();
+  const labelSegmentation = useLabelSegmentation();
   const { isAdding, addShapes } = useAddShapesAsObjects();
   const supportedPromptTypes = useSupportedPromptTypes();
   const { promptAction, cyclePromptAction } = useRailTools();
@@ -129,6 +129,8 @@ const ActionBar = () => {
   const setLeftDrawerOpen = useSetLeftDrawerOpen();
   const scale = useImageScale();
   const labels = useDatasetLabels();
+  const targetLabel = labels.find((label) => Number(label.id) === Number(labelSegmentation?.targetLabelId));
+  const targetLabelState = targetLabel ? labelSegmentation?.getLabelState(targetLabel.id) : null;
   const colorOverrides = useLabelColorOverrides();
   const currentMaskId = useCurrentMaskId();
   const objects = useObjectsList();
@@ -354,14 +356,15 @@ const ActionBar = () => {
   let buttons = null;
   let hint = null;
 
-  if (bar.state === 'running') {
+  if (bar.state === 'running' || labelSegmentation?.runner.isRunning) {
     context = (
       <>
         <Loader2 size={13} className="text-ac animate-spin flex-none" />
-        <span className="text-btn font-bold text-t1 animate-dcScan">{RUN_COPY[bar.runKind]}</span>
+        <span className="text-btn font-bold text-t1 animate-dcScan">{labelSegmentation?.runner.isRunning ? 'Segmenting label…' : RUN_COPY[bar.runKind]}</span>
       </>
     );
-    sub = `${modelName}${prompts.length ? ` · ${prompts.length} prompts` : ''}`;
+    sub = labelSegmentation?.runner.isRunning ? labelSegmentation.runner.modelName : `${modelName}${prompts.length ? ` · ${prompts.length} prompts` : ''}`;
+    if (labelSegmentation?.runner.isRunning) buttons = <BarButton icon={X} label="Cancel" onClick={labelSegmentation.runner.cancel} />;
   } else if (bar.state === 'prompt') {
     context = (
       <>
@@ -437,15 +440,15 @@ const ActionBar = () => {
             guide="action-refine"
           />
         )}
-        {suggest.available && (
+        {targetLabel && (
           <BarButton
             icon={Sparkles}
-            label="Suggest similar"
+            label={`Segment ${targetLabel.name}`}
             shortcut="2"
-            disabled={!suggest.eligible}
-            title={suggest.reason || undefined}
-            onClick={suggest.run}
-            guide="action-suggest-similar"
+            disabled={labelSegmentation.busy || Boolean(targetLabelState?.reason)}
+            title={targetLabelState?.reason || undefined}
+            onClick={() => labelSegmentation.requestRun(targetLabel.id)}
+            guide="action-segment-label"
           />
         )}
         <BarButton
@@ -487,15 +490,15 @@ const ActionBar = () => {
     buttons = (
       <>
         <BarButton icon={Layers} label="Group under…" onClick={() => setPicker('parent')} />
-        {suggest.available && (
+        {targetLabel && (
           <BarButton
             icon={Sparkles}
-            label="Suggest similar"
+            label={`Segment ${targetLabel.name}`}
             shortcut="2"
-            disabled={!suggest.eligible}
-            title={suggest.reason || undefined}
-            onClick={suggest.run}
-            guide="action-suggest-similar"
+            disabled={labelSegmentation.busy || Boolean(targetLabelState?.reason)}
+            title={targetLabelState?.reason || undefined}
+            onClick={() => labelSegmentation.requestRun(targetLabel.id)}
+            guide="action-segment-label"
           />
         )}
         <BarButton
