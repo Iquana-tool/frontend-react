@@ -13,7 +13,7 @@ import {
   useClearSelection,
 } from '../../../stores/selectors/annotationSelectors';
 import { useLabelSegmentationRunner } from './useLabelSegmentationRunner';
-import { getLabelConditioningReason, getLabelParentIds, isLabelModelAvailable, resolveLabelSelection } from './labelSegmentationModel';
+import { getLabelConditioningReason, getLabelParentIds, isLabelModelAvailable, isLabelModelCompatible, resolveLabelSelection } from './labelSegmentationModel';
 import InstanceWarningModal from '../modals/InstanceWarningModal';
 
 const LabelSegmentationContext = createContext(null);
@@ -43,6 +43,8 @@ export function LabelSegmentationProvider({ children }) {
   const clearSelection = useClearSelection();
   const [catalog, setCatalog] = useState({ datasetId: null, models: [], loading: true, error: null });
   const [settings, setSettings] = useState({ datasetId, labels: {} });
+  const [selectedLabelId, setSelectedLabelId] = useState(null);
+  const [blockedWholeImage, setBlockedWholeImage] = useState({});
   const [runConfiguration, setRunConfiguration] = useState(null);
   const [pending, setPending] = useState(null);
   const [warning, setWarning] = useState(false);
@@ -52,6 +54,8 @@ export function LabelSegmentationProvider({ children }) {
     let cancelled = false;
     setCatalog({ datasetId, models: [], loading: datasetId != null, error: null });
     setSettings({ datasetId, labels: {} });
+    setSelectedLabelId(null);
+    setBlockedWholeImage({});
     setRunConfiguration(null);
     setPending(null);
     setWarning(false);
@@ -67,6 +71,7 @@ export function LabelSegmentationProvider({ children }) {
   }, [datasetId]);
 
   useEffect(() => {
+    setBlockedWholeImage({});
     setRunConfiguration(null);
     setPending(null);
     setWarning(false);
@@ -95,19 +100,33 @@ export function LabelSegmentationProvider({ children }) {
       ? getLabelParentIds({ labelId, labels, objects, selectedIds, focusedContourId }) : [];
     const imageParentIds = label?.parent_id != null
       ? getLabelParentIds({ labelId, labels, objects, selectedIds: [], focusedContourId: null }) : [];
-    const defaultUseHierarchy = label?.parent_id == null || availableParentIds.length > 0;
-    const useHierarchy = setting.useHierarchy ?? defaultUseHierarchy;
+    const resolvedHierarchy = overrides.useHierarchy !== undefined
+      ? overrides.useHierarchy
+      : (setting.useHierarchy !== undefined
+        ? setting.useHierarchy
+        : (selection.useHierarchy ?? true));
+    const useHierarchy = Boolean(resolvedHierarchy);
     const parentContourIds = useHierarchy ? availableParentIds : [];
-    let reason = loading ? 'Loading segmentation settings…' : catalog.error || policyError || selection.reason;
-    if (imageId == null) reason = 'Load an image before segmenting.';
-    if (!can(Permission.AI_INTERACTIVE) || !can(Permission.ANNOTATION_CREATE)) reason = 'You do not have permission to segment this image.';
-    if (!label) reason = 'This label is no longer available in this dataset.';
+    let baseReason = loading ? 'Loading segmentation settings…' : catalog.error || policyError || selection.reason;
+    if (imageId == null) baseReason = 'Load an image before segmenting.';
+    if (!can(Permission.AI_INTERACTIVE) || !can(Permission.ANNOTATION_CREATE)) baseReason = 'You do not have permission to segment this image.';
+    if (!label) baseReason = 'This label is no longer available in this dataset.';
+
+    const conditioningReason = getLabelConditioningReason({ model: selection.model, label, objects });
+    const wholeImageBlocker = Boolean(overrides.useHierarchy === undefined && blockedWholeImage[labelId])
+      ? (baseReason || conditioningReason)
+      : null;
+
     const isMissingParents = Boolean(useHierarchy && label?.parent_id != null && parentContourIds.length === 0);
-    const missingParentsReason = Boolean(!reason && isMissingParents);
-    if (missingParentsReason) {
+    const missingParentsReason = Boolean(!baseReason && !wholeImageBlocker && isMissingParents);
+    let reason = baseReason;
+    if (wholeImageBlocker) {
+      reason = wholeImageBlocker;
+    } else if (missingParentsReason) {
       reason = `No eligible ${parentLabel?.name || 'parent'} objects in the current scope.`;
+    } else if (!reason) {
+      reason = conditioningReason;
     }
-    if (!reason) reason = getLabelConditioningReason({ model: selection.model, label, objects });
     const inputs = setting.threshold == null ? selection.inputs : {
       ...selection.inputs,
       parameters: { ...selection.inputs?.parameters, threshold: setting.threshold },
@@ -128,8 +147,24 @@ export function LabelSegmentationProvider({ children }) {
     };
   };
 
-  const targetLabelId = labels.some((label) => Number(label.id) === Number(activeLabelId))
-    ? Number(activeLabelId) : labels[0]?.id;
+  const targetLabelId = useMemo(() => {
+    if (selectedLabelId != null && labels.some((label) => Number(label.id) === Number(selectedLabelId))) {
+      return Number(selectedLabelId);
+    }
+    if (activeLabelId != null && labels.some((label) => Number(label.id) === Number(activeLabelId))) {
+      return Number(activeLabelId);
+    }
+    const compatibleLabel = labels.find((label) => models.some((model) => isLabelModelCompatible(model, label.id)));
+    if (compatibleLabel) {
+      return Number(compatibleLabel.id);
+    }
+    return labels[0]?.id != null ? Number(labels[0].id) : null;
+  }, [selectedLabelId, labels, activeLabelId, models]);
+
+  const setTargetLabelId = useCallback((labelId) => {
+    setSelectedLabelId(labelId != null ? Number(labelId) : null);
+  }, []);
+
   const selected = getLabelState(targetLabelId);
   const effectiveConfiguration = runConfiguration?.datasetId === datasetId ? runConfiguration : selected;
   const runner = useLabelSegmentationRunner(effectiveConfiguration);
@@ -142,6 +177,15 @@ export function LabelSegmentationProvider({ children }) {
 
   const updateSettings = (labelId, changes) => {
     if (busy || warning || requestedRef.current) return;
+    if (labelId != null) {
+      setSelectedLabelId(Number(labelId));
+      setBlockedWholeImage((prev) => {
+        if (!prev[labelId]) return prev;
+        const next = { ...prev };
+        delete next[labelId];
+        return next;
+      });
+    }
     setSettings((current) => ({
       datasetId,
       labels: { ...(current.datasetId === datasetId ? current.labels : {}), [labelId]: { ...(current.datasetId === datasetId ? current.labels[labelId] : {}), ...changes } },
@@ -149,23 +193,47 @@ export function LabelSegmentationProvider({ children }) {
   };
 
   const requestRun = (labelId = targetLabelId) => {
-    if (requestedRef.current || busy || warning) return false;
+    if (requestedRef.current || busy || warning || !policyResolved) return false;
+    if (labelId != null) {
+      setBlockedWholeImage((prev) => {
+        if (!prev[labelId]) return prev;
+        const next = { ...prev };
+        delete next[labelId];
+        return next;
+      });
+    }
     const configuration = getLabelState(labelId);
     if (configuration.reason || !configuration.model) return false;
     requestedRef.current = true;
-    setActiveLabelId(Number(labelId));
+    if (labelId != null) setSelectedLabelId(Number(labelId));
+    if (activeLabelId !== Number(labelId)) {
+      setActiveLabelId(Number(labelId));
+    }
     setRunConfiguration({ ...configuration, datasetId });
     setPending({ mode: null });
     return true;
   };
 
   const runOnWholeImage = (labelId = targetLabelId) => {
-    if (requestedRef.current || busy || warning) return false;
-    updateSettings(labelId, { useHierarchy: false });
+    if (requestedRef.current || busy || warning || !policyResolved) return false;
     const wholeConfig = getLabelState(labelId, { useHierarchy: false });
-    if (wholeConfig.reason || !wholeConfig.model) return false;
+    if (wholeConfig.reason || !wholeConfig.model) {
+      if (wholeConfig.reason && labelId != null) {
+        setBlockedWholeImage((prev) => ({ ...prev, [labelId]: true }));
+      }
+      return false;
+    }
+    setBlockedWholeImage((prev) => {
+      if (!prev[labelId]) return prev;
+      const next = { ...prev };
+      delete next[labelId];
+      return next;
+    });
     requestedRef.current = true;
-    setActiveLabelId(Number(labelId));
+    if (labelId != null) setSelectedLabelId(Number(labelId));
+    if (activeLabelId !== Number(labelId)) {
+      setActiveLabelId(Number(labelId));
+    }
     setRunConfiguration({ ...wholeConfig, datasetId });
     setPending({ mode: null });
     return true;
@@ -193,6 +261,7 @@ export function LabelSegmentationProvider({ children }) {
   }, []);
 
   const clearScope = useCallback(() => {
+    setBlockedWholeImage({});
     exitFocusMode();
     clearSelection();
   }, [exitFocusMode, clearSelection]);
@@ -200,6 +269,7 @@ export function LabelSegmentationProvider({ children }) {
   return (
     <LabelSegmentationContext.Provider value={{
       models, labels, loading, error: catalog.error || policyError, targetLabelId,
+      selectedLabelId: targetLabelId, setSelectedLabelId, setTargetLabelId,
       getLabelState, updateSettings, requestRun, runOnWholeImage, clearScope, busy: busy || warning || Boolean(pending),
       runner, runLabelId: effectiveConfiguration.labelId,
     }}>

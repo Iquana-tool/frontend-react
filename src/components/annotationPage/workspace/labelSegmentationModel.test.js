@@ -83,6 +83,40 @@ describe('label segmentation model selection', () => {
     const policy = { bindings: [{ task: 'instance-suggestion', label_id: 43, inputs: threshold(0.9) }] };
     expect(resolveLabelSelection({ models, policy, labelId: 43 }).inputs).toEqual(threshold(0.9));
   });
+
+  it('resolves useHierarchy correctly: legacy defaults to ON, explicit false stays OFF', () => {
+    const models = [instance, suggestion];
+    // 1. Legacy binding without use_hierarchy -> true
+    const legacyPolicy = { bindings: [{ ...binding(instance, 43) }] };
+    expect(resolveLabelSelection({ models, policy: legacyPolicy, labelId: 43 }).useHierarchy).toBe(true);
+
+    // 2. Explicit use_hierarchy: false -> false
+    const offPolicy = { bindings: [{ ...binding(instance, 43), use_hierarchy: false }] };
+    expect(resolveLabelSelection({ models, policy: offPolicy, labelId: 43 }).useHierarchy).toBe(false);
+
+    // 3. Explicit use_hierarchy: true -> true
+    const onPolicy = { bindings: [{ ...binding(instance, 43), use_hierarchy: true }] };
+    expect(resolveLabelSelection({ models, policy: onPolicy, labelId: 43 }).useHierarchy).toBe(true);
+
+    // 4. Catalog fallback without any bindings -> true
+    expect(resolveLabelSelection({ models, policy: { bindings: [] }, labelId: 43 }).useHierarchy).toBe(true);
+
+    // 5. Panel model override resolves hierarchy from matching override binding
+    const overridePolicy = {
+      bindings: [
+        { ...binding(instance, 43), use_hierarchy: true },
+        { ...binding(suggestion, 43), use_hierarchy: false },
+      ],
+    };
+    const overridden = resolveLabelSelection({
+      models,
+      policy: overridePolicy,
+      labelId: 43,
+      override: 'instance-suggestion:suggestions',
+    });
+    expect(overridden.model).toEqual(suggestion);
+    expect(overridden.useHierarchy).toBe(false);
+  });
 });
 
 const labels = [

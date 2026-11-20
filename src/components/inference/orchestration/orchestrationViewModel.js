@@ -87,6 +87,7 @@ export function parseSelectorKey(key) {
 export function normalizeBinding(binding) {
   if (!binding || !binding.task) return null;
   const labelId = binding.label_id == null || binding.label_id === "" ? null : Number(binding.label_id);
+  const useHierarchy = binding.use_hierarchy !== undefined ? Boolean(binding.use_hierarchy) : undefined;
   return {
     task: binding.task,
     label_id: labelId,
@@ -95,6 +96,7 @@ export function normalizeBinding(binding) {
       conditioning: binding.inputs?.conditioning ? { ...binding.inputs.conditioning } : {},
       parameters: binding.inputs?.parameters ? { ...binding.inputs.parameters } : {},
     },
+    ...(useHierarchy !== undefined ? { use_hierarchy: useHierarchy } : {}),
   };
 }
 
@@ -453,7 +455,10 @@ export function calculatePolicyDiff(savedBindings = [], draftBindings = []) {
         draftBinding,
         savedBinding,
       });
-    } else if (!areInputsEqual(savedBinding.inputs, draftBinding.inputs)) {
+    } else if (
+      !areInputsEqual(savedBinding.inputs, draftBinding.inputs) ||
+      (savedBinding.use_hierarchy !== false) !== (draftBinding.use_hierarchy !== false)
+    ) {
       changes.push({
         type: "inputs_changed",
         selectorKey: key,

@@ -67,6 +67,7 @@ export const resolveRoutingBinding = (policy, task, labelId = null, catalogModel
                 isTaskDefault: false,
                 isCompatible,
                 isStale,
+                useHierarchy: override.use_hierarchy !== false,
             };
         }
     }
@@ -92,6 +93,7 @@ export const resolveRoutingBinding = (policy, task, labelId = null, catalogModel
             isTaskDefault: true,
             isCompatible,
             isStale,
+            useHierarchy: defaultBinding.use_hierarchy !== false,
         };
     }
 

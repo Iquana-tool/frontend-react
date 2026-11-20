@@ -80,7 +80,13 @@ export function resolveLabelSelection({ models = [], policy = null, labelId, ove
   const catalog = models.filter(isLabelModelAvailable);
   const bindings = Array.isArray(policy?.bindings) ? policy.bindings : [];
   const failed = (reason) => ({ model: null, inputs: {}, reason });
-  const success = (model, binding = null) => ({ model, inputs: inputsFrom(binding), reason: null });
+  const success = (model, binding = null) => ({
+    model,
+    inputs: inputsFrom(binding),
+    useHierarchy: binding ? binding.use_hierarchy !== false : true,
+    binding,
+    reason: null,
+  });
   const labelMatches = (binding) => binding.label_id != null && numericId(binding.label_id) === targetId;
 
   if (targetId == null) return failed('Select a label before running segmentation.');
