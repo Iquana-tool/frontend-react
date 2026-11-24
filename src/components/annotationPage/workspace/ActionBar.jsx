@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import {
   Ban,
   Check,
@@ -9,6 +10,7 @@ import {
   Loader2,
   Palette,
   Pencil,
+  PenLine,
   RotateCcw,
   Ruler,
   SlidersHorizontal,
@@ -34,7 +36,9 @@ import { CALIBRATION_KIND_ICONS, getPromptAction } from './toolModel';
 import { formatArea, getObjectDisplayName, getObjectState } from './objectViewModel';
 import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
-import { trackSuggestionVerdict } from '../../../services/activityLog';
+import { trackAnnotation, trackSuggestionVerdict } from '../../../services/activityLog';
+import { rejectMask } from '../../../api/reviews';
+import { useReviewSession } from '../../../contexts/ReviewSessionContext';
 import useAiTools from '../../../hooks/useAiTools';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import annotationSession from '../../../services/annotationSession';
@@ -80,6 +84,23 @@ const CALIBRATION_BAR_ICONS = Object.fromEntries(
     { Ruler, Palette, SlidersHorizontal }[icon] || SlidersHorizontal,
   ])
 );
+
+/**
+ * The send-back reasons offered on number keys, in shortcut order — `1` sends
+ * the first. Values are the backend's `RejectionReason` vocabulary; the list is
+ * fixed here rather than read from `/reviews/reasons` because a shortcut number
+ * has to stay put however that catalogue grows. Every other reason, and any
+ * note, goes through the dialog on the last key.
+ */
+const QUICK_SEND_BACK_REASONS = [
+  { reason: 'bad_outline', title: 'Bad outline' },
+  { reason: 'wrong_label', title: 'Wrong label' },
+  { reason: 'merged_objects', title: 'Merged objects' },
+  { reason: 'missing_parts', title: 'Parts are missing' },
+];
+
+/** The key that opens the full send-back dialog, one past the quick reasons. */
+const OTHER_REASON_KEY = String(QUICK_SEND_BACK_REASONS.length + 1);
 
 const Dot = ({ color, className = '' }) => (
   <span
@@ -138,6 +159,31 @@ const ActionBar = () => {
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
   const [sendBackFor, setSendBackFor] = useState(null);
+  const [sendBackTrayOpen, setSendBackTrayOpen] = useState(false);
+  const [sendingBack, setSendingBack] = useState(false);
+
+  // A review session (built on the review setup page) decides which object the
+  // bar asks about; without one the bar walks this image's pending objects.
+  const { datasetId } = useParams();
+  const session = useReviewSession();
+  const inSession =
+    session.active &&
+    !session.pendingCompleteness &&
+    String(session.datasetId) === String(datasetId);
+  const instanceSession = inSession && !session.isImageMode;
+  const sessionItem = instanceSession ? session.currentItem : null;
+  const sessionMaskReady = Boolean(sessionItem) && currentMaskId === sessionItem.mask_id;
+  const sessionSubject = useMemo(
+    () =>
+      sessionMaskReady
+        ? objects.find(
+            (object) => Number(getContourId(object)) === Number(sessionItem.contour_id)
+          ) || null
+        : null,
+    [sessionMaskReady, sessionItem, objects]
+  );
+  // The queue item the canvas was last pointed at, so that happens once per item.
+  const focusedSessionItemRef = useRef(null);
 
   const modelName =
     availableModels.find((model) => model.id === promptedModel)?.name || promptedModel || 'no model';
@@ -166,16 +212,48 @@ const ActionBar = () => {
   const addLabel = bar.addableCount > 1 ? `Add ${bar.addableCount} objects` : 'Add this object';
 
   const single = bar.selection.length === 1 ? bar.selection[0] : null;
-  const reviewTarget = bar.reviewQueue[reviewIndex] || null;
+  // In an instance session the target is whatever is picked on the canvas, which
+  // starts out as the queued object. Clicking a neighbour retargets the verdicts
+  // at it — that is how a duplicate spotted in the surroundings is dealt with
+  // without leaving the item.
+  const reviewTarget = instanceSession
+    ? single || sessionSubject
+    : bar.reviewQueue[reviewIndex] || null;
+  /** Whether a verdict on the target settles the current queue item. */
+  const targetIsSubject =
+    instanceSession && Boolean(sessionSubject) && reviewTarget?.id === sessionSubject.id;
 
   // Keep the queue index in range as objects are approved or removed.
   useEffect(() => {
     setReviewIndex((current) => Math.min(current, Math.max(bar.reviewQueue.length - 1, 0)));
   }, [bar.reviewQueue.length]);
 
+  // Point the canvas at each new session item once its object has loaded, and
+  // keep the queued object selected afterwards: a refresh of the objects (or a
+  // click on empty canvas) would otherwise leave the reviewer with nothing
+  // marked as the object under review. Picking another object still retargets
+  // the verdicts, because that selection is not empty.
+  useEffect(() => {
+    if (!instanceSession || !sessionItem) {
+      focusedSessionItemRef.current = null;
+      return;
+    }
+    if (!sessionSubject) return;
+    if (focusedSessionItemRef.current !== sessionItem) {
+      focusedSessionItemRef.current = sessionItem;
+      clearSelection();
+      selectObject(sessionSubject.id);
+      actions.frameObject(sessionSubject);
+    } else if (bar.selection.length === 0) {
+      selectObject(sessionSubject.id);
+    }
+    // `actions` is recreated each render; this follows the queue item only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instanceSession, sessionItem, sessionSubject?.id, bar.selection.length]);
+
   // The review queue drives the canvas selection so the current instance is framed.
   useEffect(() => {
-    if (bar.state !== 'review' || !reviewTarget) return;
+    if (bar.state !== 'review' || !reviewTarget || instanceSession) return;
     selectObject(reviewTarget.id);
     actions.frameObject(reviewTarget);
     // `actions` is recreated each render; framing should follow the target only.
@@ -212,6 +290,17 @@ const ActionBar = () => {
           ? [reviewTarget]
           : bar.selection;
     closePicker();
+    if (bar.state === 'review' && inSession && reviewTarget) {
+      // A relabel by a reviewer is recorded as an approval by the backend, so in
+      // a session it is a verdict of its own rather than a step before Accept.
+      try {
+        await labelling.assignLabel(reviewTarget, label);
+      } catch {
+        return; // Already toasted; the item stays open.
+      }
+      settleReview('relabelled');
+      return;
+    }
     await labelling.assignLabelToMany(targets, label);
   };
 
@@ -243,6 +332,65 @@ const ActionBar = () => {
   const advanceReview = () =>
     setReviewIndex((current) => Math.min(current + 1, Math.max(bar.reviewQueue.length - 1, 0)));
 
+  /**
+   * Move on after a verdict.
+   *
+   * Outside a session that is this image's own cursor. In a session the verdict
+   * settles the queue item when it was about the queued object; a verdict on
+   * anything else (a neighbour, or one object of a whole-image item) is counted
+   * and leaves the item open. Sending back is the exception: it returns the
+   * whole mask to its annotator, so the item is settled whatever was picked.
+   */
+  function settleReview(outcome, { dropContourIds = null } = {}) {
+    if (!inSession) {
+      advanceReview();
+      return;
+    }
+    if (outcome === 'sentBack') {
+      session.settle('sentBack', { dropMaskId: currentMaskId });
+      return;
+    }
+    if (targetIsSubject) {
+      session.settle(outcome, { dropContourIds });
+      return;
+    }
+    if (outcome !== 'accepted') session.countExtra(outcome, { dropContourIds });
+    if (!instanceSession) advanceReview();
+  }
+
+  /** Contour ids of an object and everything nested under it. */
+  const contourIdsWithDescendants = (root) => {
+    const ids = [];
+    const visit = (object) => {
+      ids.push(Number(getContourId(object)));
+      objects.filter((child) => child.parent_id === object.id).forEach(visit);
+    };
+    visit(root);
+    return ids;
+  };
+
+  /** Send the target back with one of the quick reasons, without the dialog. */
+  const quickSendBack = async (reason) => {
+    if (!currentMaskId || !reviewTarget || sendingBack) return;
+    setSendingBack(true);
+    try {
+      await rejectMask(currentMaskId, {
+        reason: reason.reason,
+        contourId: Number(getContourId(reviewTarget)),
+      });
+      addToast({ message: `Sent back: ${reason.title}.` });
+      setSendBackTrayOpen(false);
+      settleReview('sentBack');
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: `Could not send this back: ${(error.message || 'Unknown error').replace(/^API Error:\s*/i, '')}`,
+      });
+    } finally {
+      setSendingBack(false);
+    }
+  };
+
   const acceptCurrent = async () => {
     if (!reviewTarget) return;
     if (getObjectState(reviewTarget) === 'unlabelled') {
@@ -257,11 +405,12 @@ const ActionBar = () => {
       return;
     }
     trackSuggestionVerdict('suggestion.accept', [reviewTarget]);
-    advanceReview();
+    settleReview('accepted');
   };
 
   const rejectCurrent = async () => {
     if (!reviewTarget) return;
+    const deletedIds = contourIdsWithDescendants(reviewTarget);
     try {
       await actions.remove(reviewTarget);
     } catch {
@@ -269,11 +418,17 @@ const ActionBar = () => {
       return;
     }
     trackSuggestionVerdict('suggestion.reject', [reviewTarget]);
-    advanceReview();
+    // The review verdict under its own name, next to the AI-suggestion statistic above.
+    trackAnnotation('review.discard', {
+      datasetId: Number(datasetId),
+      payload: { contour_id: deletedIds[0], removed: deletedIds.length, in_session: inSession },
+    });
+    settleReview('rejected', { dropContourIds: deletedIds });
   };
 
   /**
-   * The review verdict keys: `R` rejects the instance, `⏎` accepts it.
+   * The review verdict keys: `R` rejects the instance, `⏎` accepts it, and the
+   * number keys send it back with the matching quick reason.
    *
    * They are bound here rather than in one of the shortcut hooks because the
    * review cursor is local state on this bar — a hook would have to duplicate it
@@ -287,7 +442,9 @@ const ActionBar = () => {
     const handleKeyDown = (event) => {
       const isReject = event.key.toUpperCase() === 'R';
       const isAccept = event.key === 'Enter';
-      if (!isReject && !isAccept) return;
+      const quickReason = QUICK_SEND_BACK_REASONS[Number(event.key) - 1] || null;
+      const isOtherReason = event.key === OTHER_REASON_KEY;
+      if (!isReject && !isAccept && !quickReason && !isOtherReason) return;
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       // Open overlays own the keyboard — the picker's own Enter would otherwise
       // both choose a label and approve.
@@ -303,7 +460,9 @@ const ActionBar = () => {
       }
       if (!reviewTarget) return;
       event.preventDefault();
-      if (isReject) rejectCurrent();
+      if (quickReason) quickSendBack(quickReason);
+      else if (isOtherReason) setSendBackFor(reviewTarget);
+      else if (isReject) rejectCurrent();
       else acceptCurrent();
     };
 
@@ -312,7 +471,7 @@ const ActionBar = () => {
     // The handlers are recreated each render; the target they act on is the dep
     // that matters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bar.state, picker, sendBackFor, reviewTarget?.id, bar.reviewQueue.length]);
+  }, [bar.state, picker, sendBackFor, sendingBack, reviewTarget?.id, bar.reviewQueue.length, inSession, targetIsSubject]);
 
   /**
    * `⇧⏎` commits the outlines on the canvas.
@@ -555,22 +714,44 @@ const ActionBar = () => {
     );
   } else if (bar.state === 'review') {
     const total = bar.reviewQueue.length;
+    // In an instance session the queue position is the session bar's to show;
+    // this bar names the object the verdicts will land on.
+    const waitingForSubject = instanceSession && !reviewTarget;
     context = (
       <>
         <Dot className="bg-rev" />
         <span className="text-btn font-bold text-t1">
-          {total === 0 ? 'Nothing to review' : `Instance ${reviewIndex + 1} of ${total}`}
+          {instanceSession
+            ? reviewTarget
+              ? getObjectDisplayName(reviewTarget)
+              : sessionMaskReady
+                ? 'This object no longer exists'
+                : 'Loading…'
+            : total === 0
+              ? 'Nothing to review'
+              : `Instance ${reviewIndex + 1} of ${total}`}
         </span>
       </>
     );
-    sub = reviewTarget ? getObjectDisplayName(reviewTarget) : null;
-    buttons = total === 0 ? null : (
+    sub = instanceSession
+      ? reviewTarget && !targetIsSubject
+        ? 'from the surroundings'
+        : waitingForSubject && sessionMaskReady
+          ? 'skip it, or undo to restore it'
+          : null
+      : reviewTarget
+        ? getObjectDisplayName(reviewTarget)
+        : null;
+    const hasWork = instanceSession ? Boolean(reviewTarget) : total > 0;
+    buttons = !hasWork ? null : (
       <>
         <BarButton
-          icon={RotateCcw}
-          label="Send back"
-          disabled={!currentMaskId || !reviewTarget}
-          onClick={() => setSendBackFor(reviewTarget)}
+          icon={PenLine}
+          label="Fix outline"
+          shortcut="E"
+          title="Correct the outline yourself instead of sending it back"
+          disabled={!reviewTarget}
+          onClick={() => actions.refine(reviewTarget)}
         />
         <BarButton
           icon={Tag}
@@ -579,24 +760,37 @@ const ActionBar = () => {
           disabled={!reviewTarget}
           onClick={() => setPicker('label')}
         />
-        <BarButton icon={SkipForward} label="Skip" onClick={advanceReview} />
         <BarButton
-          icon={ChevronLeft}
-          disabled={reviewIndex === 0}
-          title="Previous instance"
-          onClick={() => setReviewIndex((current) => Math.max(current - 1, 0))}
+          icon={RotateCcw}
+          label="Send back"
+          shortcut={`1–${OTHER_REASON_KEY}`}
+          title="Return this to its annotator with a reason"
+          disabled={!currentMaskId || !reviewTarget || sendingBack}
+          onClick={() => setSendBackTrayOpen((open) => !open)}
         />
-        <BarButton
-          icon={ChevronRight}
-          disabled={reviewIndex >= total - 1}
-          title="Next instance"
-          onClick={advanceReview}
-        />
+        {!instanceSession && (
+          <>
+            <BarButton icon={SkipForward} label="Skip" onClick={advanceReview} />
+            <BarButton
+              icon={ChevronLeft}
+              disabled={reviewIndex === 0}
+              title="Previous instance"
+              onClick={() => setReviewIndex((current) => Math.max(current - 1, 0))}
+            />
+            <BarButton
+              icon={ChevronRight}
+              disabled={reviewIndex >= total - 1}
+              title="Next instance"
+              onClick={advanceReview}
+            />
+          </>
+        )}
         <BarButton
           icon={Trash2}
           label="Reject"
           shortcut="R"
           variant="danger"
+          title="Delete it: this is not a real object"
           disabled={!reviewTarget}
           onClick={rejectCurrent}
         />
@@ -697,6 +891,29 @@ const ActionBar = () => {
         </div>
       )}
 
+      {bar.state === 'review' && sendBackTrayOpen && reviewTarget && !picker && (
+        <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-[5px] p-[5px] pl-[10px] rounded-11 bg-glass border border-warnLn shadow-bar backdrop-blur-sm">
+          <span className="text-ctl font-bold text-warn mr-[3px]">Send back because…</span>
+          {QUICK_SEND_BACK_REASONS.map((reason, position) => (
+            <BarButton
+              key={reason.reason}
+              label={reason.title}
+              shortcut={String(position + 1)}
+              variant="chip"
+              disabled={sendingBack}
+              onClick={() => quickSendBack(reason)}
+            />
+          ))}
+          <BarButton
+            label="Other reason…"
+            shortcut={OTHER_REASON_KEY}
+            variant="chip"
+            title="Every other reason, with a note"
+            onClick={() => setSendBackFor(reviewTarget)}
+          />
+        </div>
+      )}
+
       <div
         data-guide="action-bar"
         className="pointer-events-auto flex flex-wrap items-center justify-center gap-[7px] p-[6px] rounded-12 bg-glass border border-ln2 shadow-bar backdrop-blur-sm"
@@ -720,7 +937,10 @@ const ActionBar = () => {
           contourId={getContourId(sendBackFor)}
           contourLabel={sendBackFor.label_name || sendBackFor.label}
           onClose={() => setSendBackFor(null)}
-          onRejected={advanceReview}
+          onRejected={() => {
+            setSendBackTrayOpen(false);
+            settleReview('sentBack');
+          }}
         />
       )}
     </div>

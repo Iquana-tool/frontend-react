@@ -1,33 +1,38 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Loader2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ClipboardCheck, Loader2 } from 'lucide-react';
 import * as api from '../api';
 import { fetchReviewSummary, buildReviewQueue } from '../api/reviews';
 import { useAuth } from '../contexts/AuthContext';
 import { useDataset } from '../contexts/DatasetContext';
+import { useReviewSession } from '../contexts/ReviewSessionContext';
+import { trackAnnotation } from '../services/activityLog';
 import { usePermissions } from '../hooks/usePermissions';
 import { Permission } from '../utils/permissions';
 import { extractLabelsFromResponse } from '../utils/labelHierarchy';
 import RoleBadge from '../components/datasets/RoleBadge';
 import DatasetGalleryHeader from '../components/datasets/gallery/DatasetGalleryHeader';
 import ReviewSetup from '../components/review/ReviewSetup';
-import ReviewSession from '../components/review/ReviewSession';
 
 const readableError = (err, fallback) =>
   (err?.message || '').replace(/^API Error:\s*/i, '') || fallback;
 
 /**
- * The review workflow: pick a granularity, get a queue, work through it.
+ * The launch pad of the review workflow.
  *
- * Two phases on one page. "Setup" chooses what to review (whole images,
- * instances ordered by hierarchy, or a custom label selection) and how to order
- * it; "session" plays the resulting queue one item at a time. The queue lives in
- * memory only — a refresh returns to setup, which is the honest thing to do
- * since the backend queue is a snapshot, not a reservation.
+ * Chooses what to review (whole images, instances ordered by hierarchy, or a
+ * custom label selection) and how to order it, builds the queue, hands it to
+ * `ReviewSessionContext` and opens the annotation editor on the first item —
+ * where `ReviewSessionBar` drives the rest. The queue lives in memory only, so
+ * a session always begins here; a refresh mid-session lands back on this page,
+ * which is the honest thing to do since the backend queue is a snapshot, not a
+ * reservation.
  */
 const ReviewPage = () => {
   const { datasetId } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const reviewSession = useReviewSession();
   const { isAuthenticated } = useAuth();
   const { datasets } = useDataset();
 
@@ -40,17 +45,11 @@ const ReviewPage = () => {
 
   const [summary, setSummary] = useState(null);
   const [labels, setLabels] = useState([]);
-  const [queue, setQueue] = useState(null);
   const [loading, setLoading] = useState(true);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState(null);
   // Neutral feedback that is not an error, e.g. when the settings match nothing.
   const [notice, setNotice] = useState(null);
-
-  const loadSummary = useCallback(async () => {
-    const response = await fetchReviewSummary(datasetId);
-    if (response?.success) setSummary(response.summary);
-  }, [datasetId]);
 
   useEffect(() => {
     if (!datasetId || !isAuthenticated) return undefined;
@@ -80,11 +79,6 @@ const ReviewPage = () => {
     };
   }, [datasetId, isAuthenticated]);
 
-  const labelsById = useMemo(
-    () => Object.fromEntries(labels.map((label) => [label.id, label])),
-    [labels]
-  );
-
   const handleStart = async (options) => {
     setBuilding(true);
     setError(null);
@@ -96,20 +90,26 @@ const ReviewPage = () => {
       if (response?.success && response.queue.total === 0) {
         const unit = response.queue.granularity === 'images' ? 'images' : 'objects';
         setNotice(`No ${unit} match these settings. Try fewer filters or a different "By" choice.`);
-      } else if (response?.success) setQueue(response.queue);
+      } else if (response?.success) {
+        const { queue } = response;
+        const first = (queue.granularity === 'images' ? queue.images : queue.instances)[0];
+        trackAnnotation('review.session_start', {
+          datasetId: Number(datasetId),
+          payload: {
+            granularity: queue.granularity,
+            total: queue.total,
+            include_reviewed: Boolean(queue.include_reviewed),
+          },
+        });
+        reviewSession.start(datasetId, queue);
+        navigate(`/dataset/${datasetId}/annotate/${first.image_id}?mode=review`);
+      }
     } catch (err) {
       setError(readableError(err, 'Could not build the review queue.'));
     } finally {
       setBuilding(false);
     }
   };
-
-  // Leaving a session refreshes the counts: they just changed by however many
-  // items were approved or sent back.
-  const handleExitSession = useCallback(() => {
-    setQueue(null);
-    loadSummary().catch(() => {});
-  }, [loadSummary]);
 
   return (
     <div className="h-screen flex flex-col bg-well">
@@ -118,21 +118,6 @@ const ReviewPage = () => {
       <div className="bg-p1 border-b border-ln flex-shrink-0">
         <div className="px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            {/* The "Back" this replaced is the top bar's job now. Ending a
-                session is not navigation — it drops the queue and stays — so
-                that half of the button stays here, and only while it applies. */}
-            {queue && (
-              <>
-                <button
-                  onClick={handleExitSession}
-                  className="flex items-center gap-2 text-t2 hover:text-ac transition-colors duration-150 flex-shrink-0"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                  <span className="hidden sm:inline">End session</span>
-                </button>
-                <div className="h-6 w-px bg-ln flex-shrink-0" />
-              </>
-            )}
             <ClipboardCheck className="w-5 h-5 flex-shrink-0 text-ac" />
             {/* The dataset is named in the top bar; repeating it here read as
                 a breadcrumb to a page you were already on. */}
@@ -160,13 +145,6 @@ const ReviewPage = () => {
             <Loader2 className="w-5 h-5 animate-spin mr-2" />
             Loading…
           </div>
-        ) : queue ? (
-          <ReviewSession
-            queue={queue}
-            labels={labels}
-            labelsById={labelsById}
-            onExit={handleExitSession}
-          />
         ) : (
           <ReviewSetup
             datasetId={datasetId}

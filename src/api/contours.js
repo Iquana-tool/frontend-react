@@ -1,6 +1,7 @@
 import { handleApiError, getAuthHeaders } from "../api/util";
 
 import { API_BASE_URL } from "./config";
+import { trackAnnotation } from "../services/activityLog";
 
 // Get all contours for a mask
 export const getContoursForMask = async (maskId) => {
@@ -77,7 +78,9 @@ export const markContourAsReviewed = async (contourId) => {
                 headers: getAuthHeaders(),
             }
         );
-        return handleApiError(response);
+        const result = await handleApiError(response);
+        trackAnnotation("review.approve", { payload: { contour_id: contourId, count: 1 } });
+        return result;
     } catch (error) {
         throw error;
     }

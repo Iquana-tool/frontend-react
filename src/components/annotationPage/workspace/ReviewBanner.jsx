@@ -1,16 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import RejectMaskModal from '../modals/RejectMaskModal';
-import useImageLevelActions from './useImageLevelActions';
+import useApproveImage from '../../review/useApproveImage';
 import { isReviewed } from './objectViewModel';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { Permission } from '../../../utils/permissions';
 import { useDataset } from '../../../contexts/DatasetContext';
-import {
-  useObjectsList,
-  useCurrentMaskId,
-  useSetWorkspaceMode,
-} from '../../../stores/selectors/annotationSelectors';
+import { useToast } from '../../../contexts/ToastContext';
+import { useObjectsList, useCurrentMaskId } from '../../../stores/selectors/annotationSelectors';
 
 /**
  * Review-mode banner under the toolbar.
@@ -22,12 +19,34 @@ import {
 const ReviewBanner = () => {
   const objects = useObjectsList();
   const maskId = useCurrentMaskId();
-  const setMode = useSetWorkspaceMode();
   const { currentDataset } = useDataset();
   const { can } = usePermissions(currentDataset);
-  const imageActions = useImageLevelActions();
+  const approveImage = useApproveImage();
+  const { addToast } = useToast();
 
   const [sendBackOpen, setSendBackOpen] = useState(false);
+  const [approving, setApproving] = useState(false);
+
+  // Approves the pending objects. This used to mark the image as fully
+  // annotated instead, which finished the Annotate phase and approved nothing.
+  const handleApproveImage = async () => {
+    setApproving(true);
+    try {
+      const response = await approveImage();
+      const count = response?.approved?.length ?? 0;
+      addToast({
+        type: 'success',
+        message: count === 1 ? '1 object approved.' : `${count} objects approved.`,
+      });
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: `Failed to approve the image: ${error.message || 'Unknown error'}`,
+      });
+    } finally {
+      setApproving(false);
+    }
+  };
 
   const { pending, approved, progress } = useMemo(() => {
     const approvedCount = objects.filter(isReviewed).length;
@@ -40,6 +59,9 @@ const ReviewBanner = () => {
   }, [objects]);
 
   const canReject = can(Permission.REVIEW_REJECT);
+  // Approving the image is a reviewer's call; an annotator using Review mode to
+  // accept model suggestions would only get a refusal from the server.
+  const canApprove = can(Permission.REVIEW_APPROVE);
 
   return (
     <div
@@ -76,17 +98,16 @@ const ReviewBanner = () => {
         </button>
       )}
 
-      <button
-        type="button"
-        disabled={!imageActions.hasMask || imageActions.isProcessing}
-        onClick={async () => {
-          await imageActions.markAsFullyAnnotated();
-          setMode('annotate');
-        }}
-        className="h-[26px] px-[10px] rounded-6 bg-accent text-onAccent text-btn font-bold hover:brightness-110 transition-[filter] disabled:opacity-40"
-      >
-        Approve image
-      </button>
+      {canApprove && (
+        <button
+          type="button"
+          disabled={!maskId || approving || pending === 0}
+          onClick={handleApproveImage}
+          className="h-[26px] px-[10px] rounded-6 bg-accent text-onAccent text-btn font-bold hover:brightness-110 transition-[filter] disabled:opacity-40"
+        >
+          Approve image
+        </button>
+      )}
 
       {maskId && (
         <RejectMaskModal

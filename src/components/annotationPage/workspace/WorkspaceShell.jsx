@@ -26,6 +26,9 @@ import { useCalibrationSync } from './useCalibrationState';
 import MainCanvas from '../canvas/MainCanvas';
 import GuideLayer from '../../guides/GuideLayer';
 import CorrectionBar from '../../correction/CorrectionBar';
+import ReviewSessionBar from '../../review/ReviewSessionBar';
+import CompletenessCard from '../../review/CompletenessCard';
+import { useReviewSession } from '../../../contexts/ReviewSessionContext';
 import RejectionBanner from '../RejectionBanner';
 import useAnnotationKeyboardShortcuts from '../../../hooks/useAnnotationKeyboardShortcuts';
 import useSceneGraph from '../../../hooks/useSceneGraph';
@@ -133,6 +136,12 @@ const WorkspaceShell = () => {
   const { datasets } = useDataset();
   const { datasetId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const reviewSession = useReviewSession();
+  // A session for this dataset replaces the per-image review banner with its own bar.
+  const reviewSessionHere =
+    (reviewSession.active || reviewSession.finished) &&
+    String(reviewSession.datasetId) === String(datasetId);
+  const askingCompleteness = reviewSessionHere && Boolean(reviewSession.pendingCompleteness);
 
   useAnnotationKeyboardShortcuts();
   useWorkspaceShortcuts();
@@ -211,7 +220,7 @@ const WorkspaceShell = () => {
     >
       <TopToolbar />
 
-      {mode === 'review' && <ReviewBanner />}
+      {reviewSessionHere ? <ReviewSessionBar /> : mode === 'review' && <ReviewBanner />}
 
       {/* Annotator-facing review feedback and the correction queue. Both render
           nothing unless there is something to show, so they cost nothing in
@@ -244,7 +253,9 @@ const WorkspaceShell = () => {
           <div ref={canvasAreaRef} data-guide="canvas" className="flex-1 relative overflow-hidden">
             <MainCanvas />
             <SliceHud />
-            <ActionBar />
+            {/* The completeness question is about the whole image, so it takes the
+                place of the per-object bar rather than sitting beside it. */}
+            {askingCompleteness ? <CompletenessCard /> : <ActionBar />}
             {/* Over the bottom of the image, above the action bar, for a stack item. */}
             <TimelineDrawer />
             {/* Mode ring. The stage fills the screen and the eye lives on it, so

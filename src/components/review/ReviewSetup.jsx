@@ -91,7 +91,13 @@ const ReviewSetup = ({
   const recommended = recommendedHere !== undefined ? recommendedHere : summary?.recommended || null;
   const indentedLabels = useMemo(() => flattenWithDepth(labels), [labels]);
   const isInstanceMode = mode === 'hierarchy' || mode === 'custom';
-  const pending = summary?.pending_instances ?? null;
+  // Work on images nobody submitted yet counts only once the reviewer includes them.
+  const pending =
+    summary?.pending_instances == null
+      ? null
+      : summary.pending_instances + (onlySubmitted ? 0 : summary.in_progress_pending_instances ?? 0);
+  const pendingImages =
+    (summary?.pending_images ?? 0) + (onlySubmitted ? 0 : summary?.in_progress_pending_images ?? 0);
   const reviewedCount = summary?.reviewed_instances ?? 0;
   // What the queue will actually contain under the current toggle state.
   const available = pending == null ? null : includeReviewed ? pending + reviewedCount : pending;
@@ -162,12 +168,16 @@ const ReviewSetup = ({
                   } can be re-reviewed.`
                 : 'Nothing is waiting for review right now.'
               : `${pending} instance${pending === 1 ? '' : 's'} across ${
-                  summary.pending_images
-                } image${summary.pending_images === 1 ? '' : 's'} waiting for review.`}
+                  pendingImages
+                } image${pendingImages === 1 ? '' : 's'} waiting for review.`}
             {summary?.open_rejections > 0 &&
               ` ${summary.open_rejections} sent-back item${
                 summary.open_rejections === 1 ? ' is' : 's are'
               } still with the annotators.`}
+            {summary?.unsure_images > 0 &&
+              ` ${summary.unsure_images} image${
+                summary.unsure_images === 1 ? ' needs' : 's need'
+              } a second completeness check — choose “Entire images” to give it.`}
           </p>
         )}
 
