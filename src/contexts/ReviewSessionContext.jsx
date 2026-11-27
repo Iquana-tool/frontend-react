@@ -32,12 +32,19 @@ const emptyTally = () => Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 
  * @param {Object} session
  * @param {string} outcome - One of OUTCOMES.
  * @param {Object} [options]
- * @param {number} [options.dropMaskId] - The mask went back to its annotator; its
- *   later items are stale.
+ * @param {number} [options.dropMaskId] - The whole mask went back to its
+ *   annotator; its later items are stale.
+ * @param {number} [options.sentBackMaskId] - One object of this mask went back.
+ *   The mask's other items stay, so the reviewer can finish the image, but its
+ *   completeness question is not asked: the image is going back anyway.
  * @param {number[]} [options.dropContourIds] - Deleted objects; their later items
  *   would point at nothing.
  */
-export const settleItem = (session, outcome, { dropMaskId = null, dropContourIds = null } = {}) => {
+export const settleItem = (
+  session,
+  outcome,
+  { dropMaskId = null, sentBackMaskId = null, dropContourIds = null } = {}
+) => {
   const current = session.items[session.index];
   if (!current) return session;
 
@@ -48,6 +55,11 @@ export const settleItem = (session, outcome, { dropMaskId = null, dropContourIds
     return !gone.has(item.contour_id);
   });
 
+  const sentBackMasks =
+    sentBackMaskId == null
+      ? session.sentBackMasks
+      : { ...session.sentBackMasks, [sentBackMaskId]: true };
+
   // The image is finished once no later item points at its mask. A mask that was
   // sent back is not asked about: it is already on its way to the annotator.
   const maskHasMore = items.some(
@@ -56,12 +68,14 @@ export const settleItem = (session, outcome, { dropMaskId = null, dropContourIds
   const askCompleteness =
     outcome !== 'skipped' &&
     dropMaskId == null &&
+    !sentBackMasks?.[current.mask_id] &&
     !maskHasMore &&
     !(current.mask_id in session.completeness);
 
   return {
     ...session,
     items,
+    sentBackMasks,
     index: session.index + 1,
     outcomes: { ...session.outcomes, [reviewItemKey(current)]: outcome },
     pendingCompleteness: askCompleteness
@@ -85,7 +99,11 @@ export const stepItem = (session, delta) => {
   const index = Math.min(Math.max(session.index + delta, 0), session.items.length);
   const leaving = delta > 0 ? session.items[session.index] : null;
   let pendingCompleteness = null;
-  if (leaving && !(leaving.mask_id in session.completeness)) {
+  if (
+    leaving &&
+    !(leaving.mask_id in session.completeness) &&
+    !session.sentBackMasks?.[leaving.mask_id]
+  ) {
     const imageItems = session.items.filter((item) => item.mask_id === leaving.mask_id);
     const leavesImage = !session.items
       .slice(index)
@@ -178,8 +196,10 @@ export const ReviewSessionProvider = ({ children }) => {
       outcomes: {},
       // Verdicts on objects that are not queue items themselves: a neighbour
       // rejected out of the surroundings, or an object inside an image item.
-      extras: { relabelled: 0, rejected: 0 },
+      extras: { relabelled: 0, rejected: 0, sentBack: 0 },
       completeness: {},
+      // Masks with an object sent back in this session: never asked about.
+      sentBackMasks: {},
       pendingCompleteness: null,
     });
   }, []);
@@ -190,9 +210,10 @@ export const ReviewSessionProvider = ({ children }) => {
 
   /**
    * Count a verdict on an object that is not the current queue item. Deleting
-   * such an object still invalidates the later items that point at it.
+   * such an object still invalidates the later items that point at it, and
+   * sending it back means its image is not asked about at the end.
    */
-  const countExtra = useCallback((outcome, { dropContourIds = null } = {}) => {
+  const countExtra = useCallback((outcome, { dropContourIds = null, sentBackMaskId = null } = {}) => {
     setSession((current) => {
       if (!current) return current;
       const gone = new Set(dropContourIds || []);
@@ -202,6 +223,10 @@ export const ReviewSessionProvider = ({ children }) => {
           (item, itemIndex) => itemIndex <= current.index || !gone.has(item.contour_id)
         ),
         extras: { ...current.extras, [outcome]: (current.extras[outcome] || 0) + 1 },
+        sentBackMasks:
+          sentBackMaskId == null
+            ? current.sentBackMasks
+            : { ...current.sentBackMasks, [sentBackMaskId]: true },
       };
     });
   }, []);
@@ -243,6 +268,7 @@ export const ReviewSessionProvider = ({ children }) => {
     });
     tally.relabelled += session?.extras.relabelled ?? 0;
     tally.rejected += session?.extras.rejected ?? 0;
+    tally.sentBack += session?.extras.sentBack ?? 0;
 
     const completenessTally = { complete: 0, incomplete: 0, unsure: 0 };
     Object.values(session?.completeness ?? {}).forEach((answer) => {

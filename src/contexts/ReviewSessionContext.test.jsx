@@ -60,3 +60,36 @@ test("stepping past an image with items left unjudged does not ask", () => {
   const unjudged = session([item(1, 11), item(2, 21)]);
   expect(stepItem(unjudged, 1).pendingCompleteness).toBeNull();
 });
+
+test("sending one object back keeps the image's other items", () => {
+  const next = settleItem(session([item(1, 11), item(1, 12), item(2, 21)]), "sentBack", {
+    sentBackMaskId: 1,
+  });
+  expect(next.items.map((queued) => queued.contour_id)).toEqual([11, 12, 21]);
+  expect(next.index).toBe(1);
+  expect(next.outcomes["1:11"]).toBe("sentBack");
+  expect(next.pendingCompleteness).toBeNull();
+});
+
+test("an image with an object sent back is not asked about when it is finished", () => {
+  const sent = settleItem(session([item(1, 11), item(1, 12), item(2, 21)]), "sentBack", {
+    sentBackMaskId: 1,
+  });
+  expect(settleItem(sent, "accepted").pendingCompleteness).toBeNull();
+});
+
+test("sending back the last object of an image does not ask about it", () => {
+  const next = settleItem(session([item(1, 11), item(2, 21)]), "sentBack", { sentBackMaskId: 1 });
+  expect(next.pendingCompleteness).toBeNull();
+});
+
+test("stepping past an image with an object sent back does not ask", () => {
+  const judged = session([item(1, 11), item(1, 12), item(2, 21)], {
+    index: 1,
+    outcomes: { "1:11": "sentBack", "1:12": "accepted" },
+    sentBackMasks: { 1: true },
+  });
+  expect(stepItem(judged, 1).pendingCompleteness).toBeNull();
+  // Without the send-back the same step asks.
+  expect(stepItem({ ...judged, sentBackMasks: {} }, 1).pendingCompleteness).toEqual({ image_id: 10, mask_id: 1 });
+});

@@ -388,8 +388,13 @@ const ActionBar = () => {
    * Outside a session that is this image's own cursor. In a session the verdict
    * settles the queue item when it was about the queued object; a verdict on
    * anything else (a neighbour, or one object of a whole-image item) is counted
-   * and leaves the item open. Sending back is the exception: it returns the
-   * whole mask to its annotator, so the item is settled whatever was picked.
+   * and leaves the item open.
+   *
+   * Sending one object back keeps the image's other items, so the reviewer can
+   * still accept or reject them; only the completeness question is skipped,
+   * because the image goes back to its annotator anyway. In an image session
+   * the item is the whole image and is settled: its "Accept image" would also
+   * approve the object that was just sent back.
    */
   function settleReview(outcome, { dropContourIds = null } = {}) {
     if (!inSession) {
@@ -397,7 +402,9 @@ const ActionBar = () => {
       return;
     }
     if (outcome === 'sentBack') {
-      session.settle('sentBack', { dropMaskId: currentMaskId });
+      if (!instanceSession) session.settle('sentBack', { dropMaskId: currentMaskId });
+      else if (targetIsSubject) session.settle('sentBack', { sentBackMaskId: currentMaskId });
+      else session.countExtra('sentBack', { sentBackMaskId: currentMaskId });
       return;
     }
     if (targetIsSubject) {
@@ -407,6 +414,18 @@ const ActionBar = () => {
     if (outcome !== 'accepted') session.countExtra(outcome, { dropContourIds });
     if (!instanceSession) advanceReview();
   }
+
+  /**
+   * Whether a send-back moves the session to another image: always for an image
+   * item, and for the last queued object of an image.
+   */
+  const sendBackLeavesImage = () =>
+    inSession &&
+    (!instanceSession ||
+      (targetIsSubject &&
+        !session.items.some(
+          (item, itemIndex) => itemIndex > session.index && item.mask_id === currentMaskId
+        )));
 
   /** Contour ids of an object and everything nested under it. */
   const contourIdsWithDescendants = (root) => {
@@ -430,8 +449,8 @@ const ActionBar = () => {
       });
       addToast({ message: `Sent back: ${reason.title}.` });
       markTarget(reviewTarget, 'sentBack', { reason: reason.title });
-      // In a session, sending back leaves the image; wait so the change is seen.
-      if (inSession) await wait(SEND_BACK_HOLD_MS);
+      // When the session moves to another image next, wait so the change is seen.
+      if (sendBackLeavesImage()) await wait(SEND_BACK_HOLD_MS);
       settleReview('sentBack');
     } catch (error) {
       addToast({
@@ -1034,12 +1053,12 @@ const ActionBar = () => {
           onClose={() => setSendBackFor(null)}
           onRejected={(rejection) => {
             markTarget(sendBackFor, 'sentBack', { reason: sendBackReasonTitle(rejection?.reason) });
-            if (!inSession) {
+            if (!sendBackLeavesImage()) {
               settleReview('sentBack');
               return;
             }
-            // Sending back leaves the image; wait so the change is seen, and
-            // keep the verdict keys off meanwhile.
+            // The session moves to another image next; wait so the change is
+            // seen, and keep the verdict keys off meanwhile.
             setSendingBack(true);
             setTimeout(() => {
               setSendingBack(false);

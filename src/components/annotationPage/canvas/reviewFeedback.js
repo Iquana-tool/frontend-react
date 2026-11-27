@@ -14,8 +14,8 @@ export const SENT_BACK_COLOR = '#a855f7';
 export const TRANSIENT_MS = 1600;
 
 /**
- * How long a send-back waits before the session moves on. Sending back always
- * leaves the image, which would unmount the animation before anyone saw it.
+ * How long a send-back waits when the session moves to another image next,
+ * which would otherwise unmount the animation before anyone saw it.
  */
 export const SEND_BACK_HOLD_MS = 550;
 
