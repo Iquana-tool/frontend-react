@@ -11,6 +11,9 @@ import {
   useSetIsRunningInstance,
   useExitFocusMode,
   useClearSelection,
+  useBeginInferenceRun,
+  useAckInferenceRun,
+  useClearInferenceRun,
 } from '../../../stores/selectors/annotationSelectors';
 import { useLabelSegmentationRunner } from './useLabelSegmentationRunner';
 import { getLabelConditioningReason, getLabelParentIds, isLabelModelAvailable, isLabelModelCompatible, resolveLabelSelection } from './labelSegmentationModel';
@@ -174,6 +177,41 @@ export function LabelSegmentationProvider({ children }) {
     setIsRunningInstance(busy);
     return () => setIsRunningInstance(false);
   }, [busy, setIsRunningInstance]);
+
+  // The canvas animation (pulse cloud, the action bar's percentage, outline pop-in)
+  // follows this runner like the other AI tools: a run opens when the runner starts.
+  // When it is done, all outlines are saved; they arrived while the run was open, so
+  // its ending pops them in. A failure ends the run as failed. A cancel, an image
+  // change or an unmount drops it.
+  const beginInferenceRun = useBeginInferenceRun();
+  const ackInferenceRun = useAckInferenceRun();
+  const clearInferenceRun = useClearInferenceRun();
+  const animationRunRef = useRef(null);
+  const runModelKey = effectiveConfiguration?.model?.registry_key ?? effectiveConfiguration?.model?.id ?? null;
+  const runLabelId = effectiveConfiguration?.labelId ?? null;
+
+  useEffect(() => {
+    if (busy) {
+      if (animationRunRef.current == null) {
+        animationRunRef.current = beginInferenceRun({
+          kind: 'instance',
+          modelKey: runModelKey,
+          labelIds: runLabelId != null ? [Number(runLabelId)] : [],
+        });
+      }
+      return;
+    }
+    const runId = animationRunRef.current;
+    if (runId == null) return;
+    animationRunRef.current = null;
+    if (runner.status === 'done') ackInferenceRun(runId, { expected: null });
+    else if (runner.status === 'failed') ackInferenceRun(runId, { failed: true });
+    else clearInferenceRun(runId);
+  }, [busy, runner.status, runModelKey, runLabelId, beginInferenceRun, ackInferenceRun, clearInferenceRun]);
+
+  useEffect(() => () => {
+    if (animationRunRef.current != null) clearInferenceRun(animationRunRef.current);
+  }, [clearInferenceRun]);
 
   const updateSettings = (labelId, changes) => {
     if (busy || warning || requestedRef.current) return;
