@@ -1,6 +1,18 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  TRANSIENT_MS,
+  addVerdictMark,
+  isLastingVerdict,
+  keepMarksOfMask,
+} from '../components/annotationPage/canvas/reviewFeedback';
 
 const ReviewSessionContext = createContext(null);
+
+/**
+ * The verdict marks on the canvas, kept apart from the session so a mark that
+ * appears or fades does not re-render everything that reads the session.
+ */
+const ReviewFeedbackContext = createContext(null);
 
 /** Stable identity of a queue item, so a verdict survives the queue being filtered. */
 export const reviewItemKey = (item) => `${item.mask_id}:${item.contour_id ?? 'image'}`;
@@ -104,14 +116,54 @@ export const stepItem = (session, delta) => {
  */
 export const ReviewSessionProvider = ({ children }) => {
   const [session, setSession] = useState(null);
-  // The object the canvas should briefly glow around. A new nonce replays the
-  // glow when review returns to the same object.
+  // The object the canvas circles with the comet. A new nonce restarts the comet
+  // when review returns to the same object.
   const [spotlight, setSpotlight] = useState(null);
 
   const spotlightObject = useCallback((objectId) => {
     if (objectId == null) return;
     setSpotlight((current) => ({ objectId, nonce: (current?.nonce ?? 0) + 1 }));
   }, []);
+
+  // What the canvas shows after each verdict: a badge and a short outline
+  // animation, plus ghosts of rejected objects and the purple of sent-back ones,
+  // which stay until the reviewer leaves the image. See reviewFeedback.js.
+  const [verdictMarks, setVerdictMarks] = useState([]);
+  const markNonce = useRef(0);
+  const markTimers = useRef(new Set());
+
+  useEffect(() => {
+    const timers = markTimers.current;
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, []);
+
+  /**
+   * Show a verdict on the canvas.
+   * @param {Object} mark - `{ kind, maskId, contourId, ... }`; `kind` is one of
+   *   accepted, edited, relabelled, rejected, sentBack.
+   */
+  const markVerdict = useCallback((mark) => {
+    if (!mark?.kind || mark.maskId == null) return;
+    markNonce.current += 1;
+    const id = markNonce.current;
+    setVerdictMarks((current) => addVerdictMark(current, { ...mark, id, at: Date.now() }));
+    if (isLastingVerdict(mark.kind)) return;
+    const timer = setTimeout(() => {
+      markTimers.current.delete(timer);
+      setVerdictMarks((current) => current.filter((existing) => existing.id !== id));
+    }, TRANSIENT_MS);
+    markTimers.current.add(timer);
+  }, []);
+
+  /** Drop the marks of every other image, so returning to one starts clean. */
+  const keepVerdictMarksOf = useCallback((maskId) => {
+    setVerdictMarks((current) => keepMarksOfMask(current, maskId));
+  }, []);
+
+  const feedback = useMemo(
+    () => ({ marks: verdictMarks, markVerdict, keepVerdictMarksOf }),
+    [verdictMarks, markVerdict, keepVerdictMarksOf]
+  );
 
   const start = useCallback((datasetId, queue) => {
     const isImageMode = queue.granularity === 'images';
@@ -222,11 +274,23 @@ export const ReviewSessionProvider = ({ children }) => {
     };
   }, [session, start, settle, countExtra, step, answerCompleteness, endSession, spotlight, spotlightObject]);
 
-  return <ReviewSessionContext.Provider value={value}>{children}</ReviewSessionContext.Provider>;
+  return (
+    <ReviewSessionContext.Provider value={value}>
+      <ReviewFeedbackContext.Provider value={feedback}>{children}</ReviewFeedbackContext.Provider>
+    </ReviewSessionContext.Provider>
+  );
 };
 
+const NO_FEEDBACK = { marks: [], markVerdict: () => {}, keepVerdictMarksOf: () => {} };
+
 /**
- * The object the review is pointing at, for the canvas glow. Returns null outside
+ * The verdict marks and the function that adds one. Outside the provider it
+ * returns an inert stand-in, so the canvas and the action bar still render.
+ */
+export const useReviewFeedback = () => useContext(ReviewFeedbackContext) ?? NO_FEEDBACK;
+
+/**
+ * The object the review is pointing at, for the canvas comet. Returns null outside
  * the provider, so the canvas also renders where no review can run (tests,
  * embedded viewers).
  */

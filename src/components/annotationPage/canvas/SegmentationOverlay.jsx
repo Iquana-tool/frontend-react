@@ -28,6 +28,7 @@ import {
   useHiddenObjectIds,
   useOutlineSettings,
   useInferenceRun,
+  useCurrentMaskId,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
@@ -51,35 +52,16 @@ import {
 } from '../workspace/annotationStyles';
 import { getObjectState } from '../workspace/objectViewModel';
 import RelationshipOverlay from './RelationshipOverlay';
-import { useReviewSpotlight } from '../../../contexts/ReviewSessionContext';
+import { useReviewFeedback, useReviewSpotlight } from '../../../contexts/ReviewSessionContext';
 import useActiveRelationships from '../sceneGraph/useActiveRelationships';
+import { generatePathFromCoordinates } from './outlinePath';
+import ReviewComet from './ReviewComet';
+import ReviewFeedbackLayer from './ReviewFeedbackLayer';
+import { SENT_BACK_COLOR, outlineLength } from './reviewFeedback';
 
-/**
- * Helper function to generate SVG path from x, y coordinate arrays
- * Coordinates should be normalized (0-1) and will be scaled to image dimensions
- */
-const generatePathFromCoordinates = (xArray, yArray, imageWidth, imageHeight) => {
-  if (!xArray || !yArray || xArray.length === 0 || yArray.length === 0 || !imageWidth || !imageHeight) {
-    return null;
-  }
-  
-  // Scale first point to pixel coordinates
-  const x0 = xArray[0] * imageWidth;
-  const y0 = yArray[0] * imageHeight;
-  let path = `M ${x0} ${y0}`;
-  
-  // Add line segments for remaining points (scaled to pixel coordinates)
-  for (let i = 1; i < Math.min(xArray.length, yArray.length); i++) {
-    const x = xArray[i] * imageWidth;
-    const y = yArray[i] * imageHeight;
-    path += ` L ${x} ${y}`;
-  }
-  
-  // Close path
-  path += ' Z';
-  
-  return path;
-};
+/** Opacity of the other objects while one is under review. */
+const REVIEW_DIM_OPACITY = 0.35;
+
 
 const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 0 } }) => {
   const currentMask = useCurrentMask();
@@ -231,6 +213,29 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   // Named relationships are only drawn while an object or a Relationships-tab row is
   // hovered; everything outside the hovered edges' ends is dimmed meanwhile.
   const relations = useActiveRelationships(refinementModeActive ? [] : visibleObjects);
+
+  // Review feedback. The object under review gets the comet and the others step
+  // back; a verdict leaves its mark (see ReviewFeedbackLayer). Marks belong to
+  // one image: leaving it drops them, so a ghost never shows on another image.
+  const currentMaskId = useCurrentMaskId();
+  const { marks: allVerdictMarks, keepVerdictMarksOf } = useReviewFeedback();
+  useEffect(() => {
+    keepVerdictMarksOf(currentMaskId);
+  }, [currentMaskId, keepVerdictMarksOf]);
+  const verdictMarks = useMemo(
+    () => allVerdictMarks.filter((mark) => mark.maskId === currentMaskId),
+    [allVerdictMarks, currentMaskId]
+  );
+  const sentBackContourIds = useMemo(
+    () => new Set(verdictMarks.filter((mark) => mark.kind === 'sentBack').map((mark) => String(mark.contourId))),
+    [verdictMarks]
+  );
+  const reviewTargetId =
+    workspaceMode === 'review' &&
+    reviewSpotlight &&
+    visibleObjects.some((object) => object.id === reviewSpotlight.objectId)
+      ? reviewSpotlight.objectId
+      : null;
 
   /**
    * Which objects get a chip, and where.
@@ -566,6 +571,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const imgNatW = imageObject ? (imageObject.width || imageObject.naturalWidth || 800) : 800;
   const imgNatH = imageObject ? (imageObject.height || imageObject.naturalHeight || 600) : 600;
   const viewBox = `0 0 ${imgNatW} ${imgNatH}`;
+  // Image pixels per screen pixel, for marks that keep a fixed size on screen.
+  const screenPxPerImagePx = imageDimensions.width > 0 ? (imageDimensions.width / imgNatW) * zoomLevel : 1;
+  const unitsPerScreenPx = 1 / screenPxPerImagePx;
 
   // use high z-index to ensure object interactions work
   // Object paths will only capture events on painted areas, allowing empty areas to pass through
@@ -781,6 +789,19 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
           strokeWidth = style.strokeWidth;
           glowIntensity = isSelected ? 6 : 0;
           strokeColor = style.stroke;
+          // Sent back in this visit: purple and dashed until the reviewer
+          // leaves the image, so it stays clear what is going back.
+          if (sentBackContourIds.has(String(getContourId(object)))) {
+            const dashUnit = style.vectorEffect === 'non-scaling-stroke' ? 1 : unitsPerScreenPx;
+            normalStyle = {
+              ...style,
+              stroke: SENT_BACK_COLOR,
+              fill: hexToRgba(SENT_BACK_COLOR, 0.06),
+              strokeDasharray: `${6 * dashUnit} ${4 * dashUnit}`,
+              marchingAnts: false,
+            };
+            strokeColor = SENT_BACK_COLOR;
+          }
         }
         
         // ALWAYS generate path from x,y coordinates if available )
@@ -830,8 +851,12 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               pointerEvents: 'none',
               // While relationships are shown, the objects they do not touch step
               // back. Parts of a highlighted object only half-dim: they are inside it.
+              // During review the other objects step back too, so the target
+              // stands out without anything drawn over its edge.
               opacity: !relations.focusIds || relations.focusIds.has(object.id)
-                ? undefined
+                ? (reviewTargetId != null && reviewTargetId !== object.id && !isSelected && !isHovered
+                    ? REVIEW_DIM_OPACITY
+                    : undefined)
                 : (relations.focusIds.has(object.parent_id) ? 0.6 : 0.22),
             }}
           >
@@ -925,26 +950,34 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 }
               }}
             />
-            {/* A short pulsing glow when review moves to this object, so the
-                reviewer finds it at a glance even on a crowded image. Keyed by
-                the nonce so returning to the same object replays it. */}
-            {reviewSpotlight?.objectId === object.id && (
-              <path
+            {/* The comet circles the object under review for as long as it is
+                the target, outside the outline only. Keyed by the nonce so
+                returning to the same object restarts it. */}
+            {reviewTargetId === object.id && (
+              <ReviewComet
                 key={reviewSpotlight.nonce}
-                data-testid="review-spotlight"
-                className="review-aura"
+                id={object.id}
                 d={maskPath}
-                fill="none"
-                stroke={object.color}
-                vectorEffect="non-scaling-stroke"
-                strokeLinejoin="round"
-                style={{ pointerEvents: 'none', color: object.color }}
+                color={object.color}
+                unitsPerPx={unitsPerScreenPx}
+                perimeterPx={outlineLength(object.x, object.y, imgNatW, imgNatH) * screenPxPerImagePx}
+                width={imgNatW}
+                height={imgNatH}
               />
             )}
             </g>
           </svg>
         );
       })}
+
+      <ReviewFeedbackLayer
+        marks={verdictMarks}
+        objects={visibleObjects}
+        imageDimensions={imageDimensions}
+        imgW={imgNatW}
+        imgH={imgNatH}
+        zoomLevel={zoomLevel}
+      />
 
       {/* Unlabelled-object focus-mode prompt — portalled to document.body to escape the CSS transform */}
       {unlabelledPromptObject && ReactDOM.createPortal(

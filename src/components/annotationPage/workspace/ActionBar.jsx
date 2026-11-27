@@ -40,7 +40,8 @@ import { resolveLabelColor } from './labelColorUtils';
 import { getContourId } from '../../../utils/objectUtils';
 import { trackAnnotation, trackSuggestionVerdict } from '../../../services/activityLog';
 import { rejectMask } from '../../../api/reviews';
-import { useReviewSession } from '../../../contexts/ReviewSessionContext';
+import { useReviewFeedback, useReviewSession } from '../../../contexts/ReviewSessionContext';
+import { SEND_BACK_HOLD_MS, sameOutline } from '../canvas/reviewFeedback';
 import useAiTools from '../../../hooks/useAiTools';
 import useAISegmentation from '../../../hooks/useAISegmentation';
 import annotationSession from '../../../services/annotationSession';
@@ -104,6 +105,17 @@ const QUICK_SEND_BACK_REASONS = [
 
 /** The key that opens the full send-back dialog, one past the quick reasons. */
 const OTHER_REASON_KEY = String(QUICK_SEND_BACK_REASONS.length + 1);
+
+/** A readable send-back reason for the canvas chip, from its key. */
+const sendBackReasonTitle = (reason) => {
+  if (!reason) return null;
+  const quick = QUICK_SEND_BACK_REASONS.find((item) => item.reason === reason);
+  if (quick) return quick.title;
+  const words = String(reason).replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
 const Dot = ({ color, className = '' }) => (
   <span
@@ -173,6 +185,7 @@ const ActionBar = () => {
   // bar asks about; without one the bar walks this image's pending objects.
   const { datasetId } = useParams();
   const session = useReviewSession();
+  const { markVerdict } = useReviewFeedback();
   const inSession =
     session.active &&
     !session.pendingCompleteness &&
@@ -229,6 +242,21 @@ const ActionBar = () => {
   /** Whether a verdict on the target settles the current queue item. */
   const targetIsSubject =
     instanceSession && Boolean(sessionSubject) && reviewTarget?.id === sessionSubject.id;
+
+  // The target's outline when review reached it. An accept compares against it
+  // to tell an edited object from an untouched one, which animate differently.
+  const targetOutlineRef = useRef(null);
+  useEffect(() => {
+    if (bar.state !== 'review' || !reviewTarget) return;
+    if (targetOutlineRef.current?.id === reviewTarget.id) return;
+    targetOutlineRef.current = { id: reviewTarget.id, x: reviewTarget.x, y: reviewTarget.y };
+  }, [bar.state, reviewTarget]);
+
+  /** Show a verdict on the review target on the canvas (ReviewFeedbackLayer). */
+  const markTarget = (target, kind, extra = {}) => {
+    if (!target || currentMaskId == null) return;
+    markVerdict({ kind, maskId: currentMaskId, contourId: getContourId(target), ...extra });
+  };
 
   // Keep the queue index in range as objects are approved or removed.
   useEffect(() => {
@@ -299,6 +327,9 @@ const ActionBar = () => {
           ? [reviewTarget]
           : bar.selection;
     closePicker();
+    const relabelFrom = reviewTarget
+      ? { fromColor: reviewTarget.color, fromLabel: reviewTarget.label_name || reviewTarget.label || null }
+      : null;
     if (bar.state === 'review' && inSession && reviewTarget) {
       // A relabel by a reviewer is recorded as an approval by the backend, so in
       // a session it is a verdict of its own rather than a step before Accept.
@@ -307,7 +338,17 @@ const ActionBar = () => {
       } catch {
         return; // Already toasted; the item stays open.
       }
+      markTarget(reviewTarget, 'relabelled', relabelFrom);
       settleReview('relabelled');
+      return;
+    }
+    if (bar.state === 'review' && reviewTarget && targets.length === 1 && targets[0].id === reviewTarget.id) {
+      try {
+        await labelling.assignLabel(reviewTarget, label);
+      } catch {
+        return; // Already toasted.
+      }
+      markTarget(reviewTarget, 'relabelled', relabelFrom);
       return;
     }
     await labelling.assignLabelToMany(targets, label);
@@ -388,6 +429,9 @@ const ActionBar = () => {
         contourId: Number(getContourId(reviewTarget)),
       });
       addToast({ message: `Sent back: ${reason.title}.` });
+      markTarget(reviewTarget, 'sentBack', { reason: reason.title });
+      // In a session, sending back leaves the image; wait so the change is seen.
+      if (inSession) await wait(SEND_BACK_HOLD_MS);
       settleReview('sentBack');
     } catch (error) {
       addToast({
@@ -412,6 +456,10 @@ const ActionBar = () => {
       // Already toasted; stay on the instance the server refused to approve.
       return;
     }
+    // An edit is an accept with a new outline; it shows the old one going.
+    const before = targetOutlineRef.current;
+    const edited = before?.id === reviewTarget.id && !sameOutline(before, reviewTarget);
+    markTarget(reviewTarget, edited ? 'edited' : 'accepted', edited ? { fromX: before.x, fromY: before.y } : {});
     trackSuggestionVerdict('suggestion.accept', [reviewTarget]);
     settleReview('accepted');
   };
@@ -419,12 +467,15 @@ const ActionBar = () => {
   const rejectCurrent = async () => {
     if (!reviewTarget) return;
     const deletedIds = contourIdsWithDescendants(reviewTarget);
+    // The object is gone after the delete, so its ghost is drawn from this copy.
+    const ghost = { x: reviewTarget.x, y: reviewTarget.y, color: reviewTarget.color };
     try {
       await actions.remove(reviewTarget);
     } catch {
       // The action has already toasted; stay on the instance that failed.
       return;
     }
+    markTarget(reviewTarget, 'rejected', ghost);
     trackSuggestionVerdict('suggestion.reject', [reviewTarget]);
     // The review verdict under its own name, next to the AI-suggestion statistic above.
     trackAnnotation('review.discard', {
@@ -981,7 +1032,20 @@ const ActionBar = () => {
           contourId={getContourId(sendBackFor)}
           contourLabel={sendBackFor.label_name || sendBackFor.label}
           onClose={() => setSendBackFor(null)}
-          onRejected={() => settleReview('sentBack')}
+          onRejected={(rejection) => {
+            markTarget(sendBackFor, 'sentBack', { reason: sendBackReasonTitle(rejection?.reason) });
+            if (!inSession) {
+              settleReview('sentBack');
+              return;
+            }
+            // Sending back leaves the image; wait so the change is seen, and
+            // keep the verdict keys off meanwhile.
+            setSendingBack(true);
+            setTimeout(() => {
+              setSendingBack(false);
+              settleReview('sentBack');
+            }, SEND_BACK_HOLD_MS);
+          }}
         />
       )}
     </div>

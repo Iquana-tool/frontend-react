@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import SegmentationOverlay from './SegmentationOverlay';
+import {
+  ReviewSessionProvider,
+  useReviewFeedback,
+  useReviewSession,
+} from '../../../contexts/ReviewSessionContext';
+import { SENT_BACK_COLOR } from './reviewFeedback';
 import * as annotationSelectors from '../../../stores/selectors/annotationSelectors';
 import { OUTLINE_PRESETS } from '../../../utils/outlineSettings';
 
@@ -177,6 +183,78 @@ describe('SegmentationOverlay refinement fill regression', () => {
 
       const { container } = render(<SegmentationOverlay />);
       expect(container.querySelectorAll('svg path').length).toBe(0);
+    });
+  });
+
+  describe('review feedback', () => {
+    // Points the review at an object and records verdicts, as the action bar does.
+    const ReviewDriver = ({ targetId, marks = [] }) => {
+      const session = useReviewSession();
+      const { markVerdict } = useReviewFeedback();
+      useEffect(() => {
+        session.spotlightObject(targetId);
+        marks.forEach(markVerdict);
+        // Once, on mount.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, []);
+      return null;
+    };
+
+    const renderInReview = (driver) =>
+      render(
+        <ReviewSessionProvider>
+          {driver}
+          <SegmentationOverlay />
+        </ReviewSessionProvider>
+      );
+
+    beforeEach(() => {
+      vi.spyOn(annotationSelectors, 'useRefinementModeActive').mockReturnValue(false);
+      vi.spyOn(annotationSelectors, 'useRefinementModeObjectId').mockReturnValue(null);
+      vi.spyOn(annotationSelectors, 'useWorkspaceMode').mockReturnValue('review');
+      vi.spyOn(annotationSelectors, 'useCurrentMaskId').mockReturnValue(7);
+      // The outline tests above leave their settings (peek among them) behind.
+      vi.spyOn(annotationSelectors, 'useOutlineSettings').mockReturnValue({
+        ...OUTLINE_PRESETS.fill,
+        preset: 'fill',
+        constantWidth: true,
+        peek: false,
+      });
+    });
+
+    it('circles the object under review with the comet and dims the others', () => {
+      renderInReview(<ReviewDriver targetId={1} />);
+
+      const targetSvg = screen.getByTestId('review-comet').closest('svg');
+      expect(targetSvg.style.opacity).toBe('');
+
+      const otherSvg = Array.from(document.querySelectorAll('svg[viewBox]')).find(
+        (svg) => svg !== targetSvg && svg.querySelector(':scope > g > path')
+      );
+      expect(otherSvg.style.opacity).toBe('0.35');
+    });
+
+    it('shows no comet outside review mode', () => {
+      vi.spyOn(annotationSelectors, 'useWorkspaceMode').mockReturnValue('annotate');
+      renderInReview(<ReviewDriver targetId={1} />);
+      expect(screen.queryByTestId('review-comet')).toBeNull();
+    });
+
+    it('turns a sent-back object purple and dashed', () => {
+      renderInReview(
+        <ReviewDriver
+          targetId={2}
+          marks={[{ kind: 'sentBack', maskId: 7, contourId: 101, reason: 'Bad outline' }]}
+        />
+      );
+
+      const sentBack = Array.from(document.querySelectorAll('svg path')).find(
+        (path) => path.getAttribute('stroke') === SENT_BACK_COLOR
+      );
+      expect(sentBack).toBeTruthy();
+      const [dash, gap] = sentBack.getAttribute('stroke-dasharray').split(' ').map(Number);
+      expect(dash / gap).toBeCloseTo(1.5);
+      expect(screen.getByTestId('review-badge-sentBack')).toBeTruthy();
     });
   });
 });
