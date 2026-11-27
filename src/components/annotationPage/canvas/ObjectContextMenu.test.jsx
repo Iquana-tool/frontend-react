@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ObjectContextMenu from './ObjectContextMenu';
-import { deleteObject } from '../../../utils/objectOperations';
+import { deleteObjects } from '../../../utils/objectOperations';
 
 const { state, actions } = vi.hoisted(() => ({
   state: {},
@@ -51,7 +51,7 @@ vi.mock('../../../hooks/useZoomToObject', () => ({ useZoomToObject: () => ({ zoo
 vi.mock('../../../hooks/useLabelSelection', () => ({ useLabelSelection: () => vi.fn() }));
 vi.mock('../../../hooks/useLabelsHierarchy', () => ({ useLabelsHierarchy: () => ({ labelMap: new Map(), labelsLoading: false }) }));
 vi.mock('../../../contexts/ToastContext', () => ({ useToast: () => ({ addToast: vi.fn() }) }));
-vi.mock('../../../utils/objectOperations', () => ({ deleteObject: vi.fn() }));
+vi.mock('../../../utils/objectOperations', () => ({ deleteObjects: vi.fn() }));
 vi.mock('../../../utils/contourOperations', () => ({ mergeObjects: vi.fn() }));
 vi.mock('../../../services/annotationSession', () => ({ default: { focusImage: vi.fn(), isReady: () => false } }));
 vi.mock('./HierarchicalLabelList', () => ({ default: () => null }));
@@ -64,7 +64,7 @@ describe('object menu unified concept segmentation', () => {
     Object.assign(state, { visible: true, contextEnabled: true, busy: false, targetId: 'polyp', selected: ['polyp'], objects: [polyp] });
     actions.requestRun.mockReturnValue(true);
     actions.getLabelState.mockReturnValue({ model: { registry_key: 'configured-model' }, reason: null });
-    deleteObject.mockResolvedValue(undefined);
+    deleteObjects.mockResolvedValue(undefined);
   });
 
   it('routes the target object’s label to the shared action and closes the menu', () => {
@@ -116,7 +116,7 @@ describe('object menu unified concept segmentation', () => {
   it('preserves the existing object rejection action', async () => {
     render(<ObjectContextMenu />);
     fireEvent.click(screen.getByRole('button', { name: 'Reject object' }));
-    await waitFor(() => expect(deleteObject).toHaveBeenCalledWith(polyp, actions.remove));
+    await waitFor(() => expect(deleteObjects).toHaveBeenCalledWith([polyp]));
     expect(actions.requestRun).not.toHaveBeenCalled();
     expect(actions.hide).toHaveBeenCalledOnce();
   });
