@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import useAISegmentation from './useAISegmentation';
 import annotationSession from '../services/annotationSession';
 import { getInferenceRoutingPolicy } from '../api/inference';
+import useAnnotationStore from '../stores/useAnnotationStore';
 
 const hookState = vi.hoisted(() => ({
   currentDataset: { id: 42 },
@@ -24,6 +25,7 @@ const actions = vi.hoisted(() => ({
   setCurrentTool: vi.fn(),
   setPromptedModel: vi.fn(),
   syncEditModeDraftFromRefinement: vi.fn(),
+  setLastPromptedRun: vi.fn(),
 }));
 
 vi.mock('react-router-dom', () => ({
@@ -43,7 +45,7 @@ vi.mock('../stores/selectors/annotationSelectors', () => ({
   useImageObject: () => hookState.imageObject,
   useAddObject: () => actions.addObject,
   useUpdateObject: () => actions.updateObject,
-  useObjectsList: () => [],
+  useObjectsList: () => hookState.objects ?? [],
   useRefinementModeActive: () => false,
   useRefinementModeObjectId: () => null,
   useExitRefinementMode: () => actions.exitRefinementMode,
@@ -54,6 +56,8 @@ vi.mock('../stores/selectors/annotationSelectors', () => ({
   useActiveLabelId: () => hookState.activeLabelId,
   useBeginInferenceRun: () => () => 1,
   useAckInferenceRun: () => () => {},
+  useLastPromptedRun: () => hookState.lastPromptedRun ?? null,
+  useSetLastPromptedRun: () => actions.setLastPromptedRun,
 }));
 
 vi.mock('../services/annotationSession', () => ({
@@ -62,6 +66,7 @@ vi.mock('../services/annotationSession', () => ({
     isServiceAvailable: vi.fn(),
     runSegmentation: vi.fn(),
     unselectRefinementObject: vi.fn(),
+    deleteObject: vi.fn(),
   },
 }));
 
@@ -251,5 +256,143 @@ describe('useAISegmentation routing inputs', () => {
       expect.any(Object),
       null
     );
+  });
+});
+
+describe('useAISegmentation canvas parameters', () => {
+  const setCanvasParameters = (modelKey, values) =>
+    useAnnotationStore.setState((state) => {
+      state.models.promptedParameters = { [modelKey]: values };
+    });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hookState.currentDataset = { id: 42 };
+    hookState.routeDatasetId = '42';
+    hookState.currentImage = { id: 7, dataset_id: 42 };
+    hookState.imageObject = { width: 100, height: 100 };
+    hookState.prompts = [{ type: 'point', coords: { x: 25, y: 50 }, label: 'positive' }];
+    hookState.promptedModelId = 'routed-model';
+    hookState.activeLabelId = null;
+    hookState.availablePromptedModels = [makeModel('routed-model'), makeModel('manual-model')];
+    hookState.lastPromptedRun = null;
+    setCanvasParameters('routed-model', {});
+
+    getInferenceRoutingPolicy.mockResolvedValue(null);
+    annotationSession.isReady.mockReturnValue(true);
+    annotationSession.isServiceAvailable.mockReturnValue(true);
+    annotationSession.runSegmentation.mockResolvedValue({ success: true });
+  });
+
+  it('sends the canvas value when no binding applies', async () => {
+    setCanvasParameters('routed-model', { granularity: 0.7 });
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.runSegmentation();
+    });
+
+    expect(annotationSession.runSegmentation).toHaveBeenCalledWith(
+      'routed-model', expect.any(Object), { parameters: { granularity: 0.7 } }
+    );
+  });
+
+  it('lets the canvas value win over the routing binding and keeps the binding rest', async () => {
+    getInferenceRoutingPolicy.mockResolvedValue(
+      makePolicy('routed-model', { parameters: { granularity: 0.2, mask_threshold: 0.62 } })
+    );
+    setCanvasParameters('routed-model', { granularity: 0.9 });
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.runSegmentation();
+    });
+
+    expect(annotationSession.runSegmentation).toHaveBeenCalledWith(
+      'routed-model', expect.any(Object), { parameters: { granularity: 0.9, mask_threshold: 0.62 } }
+    );
+  });
+
+  it('leaves explicit caller inputs alone', async () => {
+    setCanvasParameters('routed-model', { granularity: 0.9 });
+    const inputs = { parameters: { granularity: 0.3 } };
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.runSegmentation(inputs);
+    });
+
+    expect(annotationSession.runSegmentation).toHaveBeenCalledWith('routed-model', expect.any(Object), inputs);
+  });
+
+  it('remembers a run that added an object', async () => {
+    annotationSession.runSegmentation.mockResolvedValue({
+      success: true, type: 'object_added', data: { id: 501, x: [0.1, 0.2, 0.2], y: [0.1, 0.1, 0.2] },
+    });
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.runSegmentation();
+    });
+
+    expect(actions.setLastPromptedRun).toHaveBeenCalledWith({
+      imageId: 7, modelKey: 'routed-model', prompts: hookState.prompts, contourId: 501,
+    });
+  });
+
+  it('re-runs the last prompt: deletes its object, then runs its prompts', async () => {
+    const saved = [{ type: 'box', coords: { x1: 10, y1: 10, x2: 50, y2: 50 } }];
+    hookState.prompts = [];
+    hookState.lastPromptedRun = { imageId: 7, modelKey: 'routed-model', prompts: saved, contourId: 501 };
+    hookState.objects = [{ id: 1, contour_id: 501 }];
+    setCanvasParameters('routed-model', { granularity: 1 });
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.rerunLastPrompt();
+    });
+
+    expect(annotationSession.deleteObject).toHaveBeenCalledWith(501);
+    expect(annotationSession.deleteObject.mock.invocationCallOrder[0])
+      .toBeLessThan(annotationSession.runSegmentation.mock.invocationCallOrder[0]);
+    expect(annotationSession.runSegmentation).toHaveBeenCalledWith(
+      'routed-model',
+      expect.objectContaining({ box_prompt: { min_x: 0.1, min_y: 0.1, max_x: 0.5, max_y: 0.5 } }),
+      { parameters: { granularity: 1 } }
+    );
+  });
+
+  it('does not re-run while new prompts wait on the canvas', async () => {
+    hookState.lastPromptedRun = { imageId: 7, modelKey: 'routed-model', prompts: [], contourId: 501 };
+    hookState.objects = [{ id: 1, contour_id: 501 }];
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.rerunLastPrompt();
+    });
+
+    expect(annotationSession.deleteObject).not.toHaveBeenCalled();
+    expect(annotationSession.runSegmentation).not.toHaveBeenCalled();
+  });
+
+  it('forgets the last run once its object is gone', async () => {
+    hookState.prompts = [];
+    hookState.lastPromptedRun = { imageId: 7, modelKey: 'routed-model', prompts: [], contourId: 501 };
+    hookState.objects = [];
+    const { result } = renderHook(() => useAISegmentation());
+
+    await settlePolicy();
+    await act(async () => {
+      await result.current.rerunLastPrompt();
+    });
+
+    expect(annotationSession.deleteObject).not.toHaveBeenCalled();
+    expect(actions.setLastPromptedRun).toHaveBeenCalledWith(null);
   });
 });

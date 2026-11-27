@@ -85,6 +85,8 @@ export const useSetInstanceModel = () => useAnnotationStore(state => state.setIn
 export const useAutoSelectedInstanceModel = () => useAnnotationStore(state => state.models.autoSelectedInstanceModel);
 export const useSetIsRunningSuggestion = () => useAnnotationStore(state => state.setIsRunningSuggestion);
 export const useSetIsRunningInstance = () => useAnnotationStore(state => state.setIsRunningInstance);
+export const usePromptedParameters = () => useAnnotationStore(state => state.models.promptedParameters);
+export const useSetPromptedParameter = () => useAnnotationStore(state => state.setPromptedParameter);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
 export const useFetchAvailableSuggestionModels = () => useAnnotationStore(state => state.fetchAvailableSuggestionModels);
 export const useFetchAvailableInstanceModels = () => useAnnotationStore(state => state.fetchAvailableInstanceModels);
@@ -149,6 +151,8 @@ export const useRemoveLastPrompt = () => useAnnotationStore(state => state.remov
 export const useClearAllPrompts = () => useAnnotationStore(state => state.clearAllPrompts);
 // For prompts that became an object. Not interchangeable with the above — see the slice.
 export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
+export const useLastPromptedRun = () => useAnnotationStore(state => state.aiAnnotation.lastPromptedRun);
+export const useSetLastPromptedRun = () => useAnnotationStore(state => state.setLastPromptedRun);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
 export const useSetLastInstanceRun = () => useAnnotationStore(state => state.setLastInstanceRun);
 export const useClearLastInstanceRun = () => useAnnotationStore(state => state.clearLastInstanceRun);

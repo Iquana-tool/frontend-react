@@ -75,6 +75,14 @@ export const createModelsSlice = (set, get) => ({
     state.models.isRunningSuggestion = isRunning;
   }),
 
+  setPromptedParameter: (modelKey, key, value) => set((state) => {
+    if (modelKey == null || key == null) return;
+    state.models.promptedParameters[modelKey] = {
+      ...(state.models.promptedParameters[modelKey] || {}),
+      [key]: value,
+    };
+  }),
+
   setIsRunningInstance: (isRunning) => set((state) => {
     state.models.isRunningInstance = isRunning;
   }),
@@ -236,6 +244,10 @@ export const createModelsSlice = (set, get) => ({
           supported_prompt_types: model.prompt_types_supported,
           supports_refinement: model.refinement_supported,
           model_status: model.model_status || 'ready',
+          // The parameters the canvas offers for this model (e.g. UnSAMv2's granularity).
+          input_contract: (model.input_contracts || []).find(
+            (contract) => contract?.task === 'prompted-segmentation'
+          ) || null,
         }));
 
         set((state) => {

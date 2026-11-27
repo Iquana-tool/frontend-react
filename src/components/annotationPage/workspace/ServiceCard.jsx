@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Loader2, Play, Star } from 'lucide-react';
 import Tooltip from './primitives/Tooltip';
 import { getPromptTypeInfo } from '../../../utils/promptTypes';
+import DynamicHyperParameter from '../../datasets/training/DynamicHyperParameter';
 import {
   useModelFavorites,
   useSetFavoriteModel,
@@ -45,6 +46,44 @@ const PromptTypeChips = ({ types }) => {
           </span>
         );
       })}
+    </div>
+  );
+};
+
+/** Keys that move a focused slider; releasing one counts as letting go of the slider. */
+const SLIDER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
+
+/**
+ * The selected model's contract parameters, e.g. UnSAMv2's granularity.
+ *
+ * Values apply to the next run. Letting go of a slider (or of an arrow key on it)
+ * also runs the last prompt again, so the mask follows the value.
+ */
+const ModelParameters = ({ service }) => {
+  const params = service.parameters || [];
+  if (params.length === 0) return null;
+  const commit = () => service.onParameterCommit?.();
+
+  return (
+    <div
+      className="flex flex-col gap-[8px] mt-[9px]"
+      onPointerUp={(event) => {
+        if (event.target?.type === 'range') commit();
+      }}
+      onKeyUp={(event) => {
+        if (event.target?.type === 'range' && SLIDER_KEYS.has(event.key)) commit();
+      }}
+    >
+      {params.map((param) => (
+        <DynamicHyperParameter
+          key={param.key}
+          param={param}
+          value={service.parameterValues?.[param.key]}
+          onChange={service.onParameterChange}
+          compact
+          idPrefix={`${service.key}-${service.selectedModel}`}
+        />
+      ))}
     </div>
   );
 };
@@ -143,6 +182,8 @@ const ServiceCard = ({ service }) => {
           {selectedModelObj?.supported_prompt_types?.length > 0 && (
             <PromptTypeChips types={selectedModelObj.supported_prompt_types} />
           )}
+
+          <ModelParameters service={service} />
 
           {service.usageHint && (
             <div className="flex items-start gap-[6px] mt-[8px]">

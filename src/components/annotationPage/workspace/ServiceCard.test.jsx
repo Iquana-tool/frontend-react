@@ -54,3 +54,59 @@ describe('ServiceCard instance runs', () => {
     expect(screen.getByText(/dataset default remains unchanged/i)).toBeInTheDocument();
   });
 });
+
+describe('ServiceCard model parameters', () => {
+  const granularity = {
+    key: 'granularity', label: 'Granularity', type: 'float',
+    default_value: 0.2, min_value: 0.1, max_value: 1, step: 0.05,
+  };
+  const prompted = (overrides = {}) => makeService({
+    key: 'prompted',
+    task: 'prompted-segmentation',
+    name: 'Prompted Segmentation',
+    models: [{ id: 'unsamv2', name: 'UnSAMv2', model_status: 'ready' }],
+    selectedModel: 'unsamv2',
+    onRun: undefined,
+    parameters: [granularity],
+    parameterValues: {},
+    onParameterChange: vi.fn(),
+    onParameterCommit: vi.fn(),
+    ...overrides,
+  });
+
+  it('shows a slider for a float parameter, starting at its default', () => {
+    render(<ServiceCard service={prompted()} />);
+
+    const slider = screen.getByRole('slider', { name: 'Granularity' });
+    expect(slider).toHaveValue('0.2');
+  });
+
+  it('shows nothing new for a model without parameters', () => {
+    render(<ServiceCard service={prompted({ parameters: [] })} />);
+
+    expect(screen.queryByRole('slider')).not.toBeInTheDocument();
+  });
+
+  it('changes the value while dragging and re-runs only on release', () => {
+    const service = prompted();
+    render(<ServiceCard service={service} />);
+    const slider = screen.getByRole('slider', { name: 'Granularity' });
+
+    fireEvent.change(slider, { target: { value: '0.75' } });
+    expect(service.onParameterChange).toHaveBeenCalledWith('granularity', 0.75);
+    expect(service.onParameterCommit).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(slider);
+    expect(service.onParameterCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-runs when an arrow key on the slider is released', () => {
+    const service = prompted({ parameterValues: { granularity: 0.5 } });
+    render(<ServiceCard service={service} />);
+
+    fireEvent.keyUp(screen.getByRole('slider', { name: 'Granularity' }), { key: 'ArrowRight' });
+    fireEvent.keyUp(screen.getByRole('slider', { name: 'Granularity' }), { key: 'a' });
+
+    expect(service.onParameterCommit).toHaveBeenCalledTimes(1);
+  });
+});

@@ -4,12 +4,14 @@ import useAnnotationServices from './useAnnotationServices';
 import { getInferenceRoutingPolicy } from '../../../api/inference';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 
-const { state, fetchModels, setModel } = vi.hoisted(() => {
+const { state, fetchModels, setModel, setParameter, rerunLastPrompt } = vi.hoisted(() => {
   const state = {};
   return {
     state,
     fetchModels: vi.fn(),
     setModel: vi.fn((value) => { state.selectedModel = value; }),
+    setParameter: vi.fn(),
+    rerunLastPrompt: vi.fn(),
   };
 });
 
@@ -25,6 +27,11 @@ vi.mock('../../../stores/selectors/annotationSelectors', () => ({
   useSetPromptedModel: () => setModel,
   useActiveLabelId: () => state.labelId,
   useModelFavorites: () => state.favorites,
+  usePromptedParameters: () => state.parameters || {},
+  useSetPromptedParameter: () => setParameter,
+}));
+vi.mock('../../../hooks/useAISegmentation', () => ({
+  default: () => ({ rerunLastPrompt }),
 }));
 vi.mock('../../../services/annotationSession', () => ({
   default: { selectPromptedModel: vi.fn() },
@@ -134,5 +141,46 @@ describe('prompted annotation service policy', () => {
     await waitFor(() => expect(result.current.policyLoading).toBe(false));
     expect(fetchModels).toHaveBeenCalledOnce();
     expect(result.current.services[0].isLoading).toBe(true);
+  });
+});
+
+describe('prompted model parameters on the card', () => {
+  const granularity = { key: 'granularity', type: 'float', default_value: 0.2, min_value: 0.1, max_value: 1 };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(state, {
+      dataset: { id: 101 },
+      models: [
+        { id: 'unsamv2', label_ids: [], input_contract: { parameters: [granularity] } },
+        { id: 'sam-generic', label_ids: [] },
+      ],
+      selectedModel: 'unsamv2',
+      labelId: null,
+      favorites: {},
+      loading: false,
+      parameters: { unsamv2: { granularity: 0.6 } },
+    });
+    getInferenceRoutingPolicy.mockResolvedValue(null);
+  });
+
+  it("passes the selected model's parameters, its values and the re-run to the card", async () => {
+    const { result, rerender } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('unsamv2'));
+    rerender();
+    const [service] = result.current.services;
+
+    expect(service.parameters).toEqual([granularity]);
+    expect(service.parameterValues).toEqual({ granularity: 0.6 });
+    service.onParameterChange('granularity', 0.9);
+    expect(setParameter).toHaveBeenCalledWith('unsamv2', 'granularity', 0.9);
+    expect(service.onParameterCommit).toBe(rerunLastPrompt);
+  });
+
+  it('passes no parameters for a model without a contract', () => {
+    state.selectedModel = 'sam-generic';
+    const { result } = renderHook(() => useAnnotationServices());
+
+    expect(result.current.services[0].parameters).toEqual([]);
   });
 });
