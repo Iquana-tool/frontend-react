@@ -110,10 +110,13 @@ const ReviewSetup = ({
     );
   };
 
+  // An image waiting for a second completeness look is work in "Entire images"
+  // mode even when every object on it is approved.
+  const secondLooks = !isInstanceMode ? summary?.unsure_images ?? 0 : 0;
   const canStart =
     !building &&
     (mode !== 'custom' || selectedLabelIds.length > 0) &&
-    (available == null || available > 0 || !onlySubmitted);
+    (available == null || available > 0 || !onlySubmitted || secondLooks > 0);
 
   // Entire images have a fixed order, so they take only the filters on whose work and
   // which images.

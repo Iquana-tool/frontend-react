@@ -51,6 +51,7 @@ import {
 } from '../workspace/annotationStyles';
 import { getObjectState } from '../workspace/objectViewModel';
 import RelationshipOverlay from './RelationshipOverlay';
+import { useReviewSpotlight } from '../../../contexts/ReviewSessionContext';
 import useActiveRelationships from '../sceneGraph/useActiveRelationships';
 
 /**
@@ -101,6 +102,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
   const outline = useOutlineSettings();
   const hiddenObjectIds = useHiddenObjectIds();
   const selectedObjects = useSelectedObjects();
+  const reviewSpotlight = useReviewSpotlight();
   const selectObject = useSelectObject();
   const deselectObject = useDeselectObject();
   const clearSelection = useClearSelection();
@@ -923,6 +925,22 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 }
               }}
             />
+            {/* A short pulsing glow when review moves to this object, so the
+                reviewer finds it at a glance even on a crowded image. Keyed by
+                the nonce so returning to the same object replays it. */}
+            {reviewSpotlight?.objectId === object.id && (
+              <path
+                key={reviewSpotlight.nonce}
+                data-testid="review-spotlight"
+                className="review-aura"
+                d={maskPath}
+                fill="none"
+                stroke={object.color}
+                vectorEffect="non-scaling-stroke"
+                strokeLinejoin="round"
+                style={{ pointerEvents: 'none', color: object.color }}
+              />
+            )}
             </g>
           </svg>
         );

@@ -285,6 +285,46 @@ select option:disabled {
   }
 }
 
+/* The object review has just moved to: two pulses of a widening glow around
+   its outline (SegmentationOverlay). The colour comes from the object's own
+   label via currentColor. Reduced motion shows one soft glow that fades. */
+.review-aura {
+  stroke-width: 2px;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 2px #fff);
+  animation: review-aura 1.3s ease-out 2 both;
+}
+
+@keyframes review-aura {
+  0% {
+    stroke-width: 2px;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    stroke-width: 18px;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-aura {
+    stroke-width: 6px;
+    animation: review-aura-still 1.6s ease-out both;
+  }
+
+  @keyframes review-aura-still {
+    from {
+      opacity: 0.9;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+}
+
 /* Its label chip follows once the outline has landed. */
 @keyframes inference-chip-in {
   from {

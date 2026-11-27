@@ -1,4 +1,4 @@
-import { settleItem } from "./ReviewSessionContext";
+import { settleItem, stepItem } from "./ReviewSessionContext";
 
 const session = (items, overrides = {}) => ({
   items,
@@ -47,4 +47,16 @@ test("a skip never asks the completeness question", () => {
 test("an image is asked about only once", () => {
   const answered = session([item(1, 11)], { completeness: { 1: "complete" } });
   expect(settleItem(answered, "accepted").pendingCompleteness).toBeNull();
+});
+
+test("stepping back closes the completeness question, and stepping forward asks it again", () => {
+  const asked = settleItem(session([item(1, 11), item(2, 21)]), "accepted");
+  const back = stepItem(asked, -1);
+  expect(back.pendingCompleteness).toBeNull();
+  expect(stepItem(back, 1).pendingCompleteness).toEqual({ image_id: 10, mask_id: 1 });
+});
+
+test("stepping past an image with items left unjudged does not ask", () => {
+  const unjudged = session([item(1, 11), item(2, 21)]);
+  expect(stepItem(unjudged, 1).pendingCompleteness).toBeNull();
 });

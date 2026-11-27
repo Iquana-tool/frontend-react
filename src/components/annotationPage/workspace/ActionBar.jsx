@@ -167,7 +167,6 @@ const ActionBar = () => {
   const [query, setQuery] = useState('');
   const [reviewIndex, setReviewIndex] = useState(0);
   const [sendBackFor, setSendBackFor] = useState(null);
-  const [sendBackTrayOpen, setSendBackTrayOpen] = useState(false);
   const [sendingBack, setSendingBack] = useState(false);
 
   // A review session (built on the review setup page) decides which object the
@@ -251,7 +250,8 @@ const ActionBar = () => {
       focusedSessionItemRef.current = sessionItem;
       clearSelection();
       selectObject(sessionSubject.id);
-      actions.frameObject(sessionSubject);
+      actions.frameObjectIfHardToSee(sessionSubject);
+      session.spotlightObject(sessionSubject.id);
     } else if (bar.selection.length === 0) {
       selectObject(sessionSubject.id);
     }
@@ -263,7 +263,8 @@ const ActionBar = () => {
   useEffect(() => {
     if (bar.state !== 'review' || !reviewTarget || instanceSession) return;
     selectObject(reviewTarget.id);
-    actions.frameObject(reviewTarget);
+    actions.frameObjectIfHardToSee(reviewTarget);
+    session.spotlightObject(reviewTarget.id);
     // `actions` is recreated each render; framing should follow the target only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bar.state, reviewTarget?.id]);
@@ -387,7 +388,6 @@ const ActionBar = () => {
         contourId: Number(getContourId(reviewTarget)),
       });
       addToast({ message: `Sent back: ${reason.title}.` });
-      setSendBackTrayOpen(false);
       settleReview('sentBack');
     } catch (error) {
       addToast({
@@ -801,9 +801,9 @@ const ActionBar = () => {
           icon={RotateCcw}
           label="Send back"
           shortcut={`1–${OTHER_REASON_KEY}`}
-          title="Return this to its annotator with a reason"
+          title="Return this to its annotator with any reason and a note"
           disabled={!currentMaskId || !reviewTarget || sendingBack}
-          onClick={() => setSendBackTrayOpen((open) => !open)}
+          onClick={() => setSendBackFor(reviewTarget)}
         />
         {!instanceSession && (
           <>
@@ -928,9 +928,15 @@ const ActionBar = () => {
         </div>
       )}
 
-      {bar.state === 'review' && sendBackTrayOpen && reviewTarget && !picker && (
-        <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-[5px] p-[5px] pl-[10px] rounded-11 bg-glass border border-warnLn shadow-bar backdrop-blur-sm">
-          <span className="text-ctl font-bold text-warn mr-[3px]">Send back because…</span>
+      {/* The quick send-back reasons stay on screen for every object under review,
+          so the number keys can be used without first opening a menu to learn
+          which reason each number stands for. */}
+      {bar.state === 'review' && reviewTarget && !picker && (
+        <div
+          data-testid="send-back-reasons"
+          className="pointer-events-auto flex flex-wrap items-center justify-center gap-[5px] p-[5px] pl-[10px] rounded-11 bg-glass border border-ln2 shadow-bar backdrop-blur-sm"
+        >
+          <span className="text-ctl font-bold text-t2 mr-[3px]">Send back:</span>
           {QUICK_SEND_BACK_REASONS.map((reason, position) => (
             <BarButton
               key={reason.reason}
@@ -975,10 +981,7 @@ const ActionBar = () => {
           contourId={getContourId(sendBackFor)}
           contourLabel={sendBackFor.label_name || sendBackFor.label}
           onClose={() => setSendBackFor(null)}
-          onRejected={() => {
-            setSendBackTrayOpen(false);
-            settleReview('sentBack');
-          }}
+          onRejected={() => settleReview('sentBack')}
         />
       )}
     </div>

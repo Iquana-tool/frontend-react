@@ -70,7 +70,8 @@ const SessionSummary = ({ session, onNewQueue, onLeave }) => {
         <div>
           <p className="text-sect font-bold uppercase tracking-wide text-rev">Review session finished</p>
           <h2 id="review-summary-title" className="text-[17px] font-bold text-t1 mt-[3px]">
-            {total} {session.isImageMode ? 'images' : 'instances'} in the queue
+            {total} {session.isImageMode ? 'image' : 'instance'}
+            {total === 1 ? '' : 's'} in the queue
           </h2>
         </div>
         <div className="grid grid-cols-4 gap-[8px]">

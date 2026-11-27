@@ -59,6 +59,37 @@ export const settleItem = (session, outcome, { dropMaskId = null, dropContourIds
 };
 
 /**
+ * Pure state transition for stepping through the queue without a verdict.
+ *
+ * Exported for tests. Stepping forward off the last item of an image asks the
+ * completeness question when every item of that image already has a verdict and
+ * the question is still open. Without this, a reviewer who stepped back while
+ * the question was showing could leave the image again without ever answering.
+ *
+ * @param {Object} session
+ * @param {number} delta - -1 for back, 1 for forward.
+ */
+export const stepItem = (session, delta) => {
+  const index = Math.min(Math.max(session.index + delta, 0), session.items.length);
+  const leaving = delta > 0 ? session.items[session.index] : null;
+  let pendingCompleteness = null;
+  if (leaving && !(leaving.mask_id in session.completeness)) {
+    const imageItems = session.items.filter((item) => item.mask_id === leaving.mask_id);
+    const leavesImage = !session.items
+      .slice(index)
+      .some((item) => item.mask_id === leaving.mask_id);
+    const allSettled = imageItems.every((item) => {
+      const outcome = session.outcomes[reviewItemKey(item)];
+      return outcome && outcome !== 'skipped';
+    });
+    if (leavesImage && allSettled) {
+      pendingCompleteness = { image_id: leaving.image_id, mask_id: leaving.mask_id };
+    }
+  }
+  return { ...session, index, pendingCompleteness };
+};
+
+/**
  * Holds an in-flight review session: the queue built on the review setup page,
  * the reviewer's position in it, and the verdicts given so far.
  *
@@ -73,6 +104,14 @@ export const settleItem = (session, outcome, { dropMaskId = null, dropContourIds
  */
 export const ReviewSessionProvider = ({ children }) => {
   const [session, setSession] = useState(null);
+  // The object the canvas should briefly glow around. A new nonce replays the
+  // glow when review returns to the same object.
+  const [spotlight, setSpotlight] = useState(null);
+
+  const spotlightObject = useCallback((objectId) => {
+    if (objectId == null) return;
+    setSpotlight((current) => ({ objectId, nonce: (current?.nonce ?? 0) + 1 }));
+  }, []);
 
   const start = useCallback((datasetId, queue) => {
     const isImageMode = queue.granularity === 'images';
@@ -117,11 +156,7 @@ export const ReviewSessionProvider = ({ children }) => {
 
   /** Step through the queue without giving a verdict. Stays within its bounds. */
   const step = useCallback((delta) => {
-    setSession((current) => {
-      if (!current) return current;
-      const index = Math.min(Math.max(current.index + delta, 0), current.items.length);
-      return { ...current, index, pendingCompleteness: null };
-    });
+    setSession((current) => (current ? stepItem(current, delta) : current));
   }, []);
 
   /**
@@ -182,11 +217,20 @@ export const ReviewSessionProvider = ({ children }) => {
       step,
       answerCompleteness,
       endSession,
+      spotlight,
+      spotlightObject,
     };
-  }, [session, start, settle, countExtra, step, answerCompleteness, endSession]);
+  }, [session, start, settle, countExtra, step, answerCompleteness, endSession, spotlight, spotlightObject]);
 
   return <ReviewSessionContext.Provider value={value}>{children}</ReviewSessionContext.Provider>;
 };
+
+/**
+ * The object the review is pointing at, for the canvas glow. Returns null outside
+ * the provider, so the canvas also renders where no review can run (tests,
+ * embedded viewers).
+ */
+export const useReviewSpotlight = () => useContext(ReviewSessionContext)?.spotlight ?? null;
 
 export const useReviewSession = () => {
   const ctx = useContext(ReviewSessionContext);

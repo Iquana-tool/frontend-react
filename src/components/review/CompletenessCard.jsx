@@ -13,6 +13,8 @@ import {
   useLabelColorOverrides,
   useObjectsList,
   useSceneGraphRelationships,
+  useSetPanOffset,
+  useSetZoomLevel,
 } from '../../stores/selectors/annotationSelectors';
 
 /** The row that asks about relationships rather than about one label. */
@@ -62,6 +64,8 @@ const CompletenessCard = () => {
   const colorOverrides = useLabelColorOverrides();
   const relationships = useSceneGraphRelationships();
   const { user } = useAuth();
+  const setZoomLevel = useSetZoomLevel();
+  const setPanOffset = useSetPanOffset();
 
   const [answers, setAnswers] = useState({});
   // Other reviewers' current answers, keyed like the rows.
@@ -71,6 +75,14 @@ const CompletenessCard = () => {
 
   const maskId = pendingCompleteness?.mask_id ?? null;
   const ready = maskId != null && currentMaskId === maskId;
+
+  // Completeness is judged on the whole image. Review zooms in on small objects,
+  // so the view is reset when the question opens.
+  useEffect(() => {
+    if (!ready) return;
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+  }, [ready, maskId, setZoomLevel, setPanOffset]);
 
   // A new image starts with a blank form, plus what others answered before.
   useEffect(() => {

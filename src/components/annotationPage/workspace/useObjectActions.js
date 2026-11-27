@@ -8,6 +8,8 @@ import {
   useImageObject,
   useSetZoomLevel,
   useSetPanOffset,
+  useZoomLevel,
+  usePanOffset,
   useFocusModeActive,
   useExitFocusMode,
   useEnterFocusMode,
@@ -20,6 +22,7 @@ import { useToast } from '../../../contexts/ToastContext';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
 import { deleteObject, deleteObjects } from '../../../utils/objectOperations';
 import { getContourId } from '../../../utils/objectUtils';
+import { needsFraming } from './reviewFraming';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import annotationSession from '../../../services/annotationSession';
 
@@ -73,9 +76,9 @@ export default function useObjectActions() {
 
   /** Frames an object in the viewport using the shared zoom hook. */
   const frameObject = useCallback(
-    (object, animateMs = 320) => {
+    (object, animateMs = 320, stage = null) => {
       if (!imageObject || !object?.x?.length) return;
-      const container = getCanvasContainer(null);
+      const container = stage || getCanvasContainer(null);
       if (!container?.offsetWidth || !container?.offsetHeight) return;
 
       const rendered = calculateRenderedImageDimensions(
@@ -92,6 +95,30 @@ export default function useObjectActions() {
       );
     },
     [imageObject, zoomToObject]
+  );
+
+  const zoomLevel = useZoomLevel();
+  const panOffset = usePanOffset();
+
+  /**
+   * Frames the object only when it is small or not fully in view. Review uses
+   * this for every new object, so the view stays put while the object is
+   * already easy to see.
+   */
+  const frameObjectIfHardToSee = useCallback(
+    (object) => {
+      if (!imageObject || !object?.x?.length) return;
+      // Looked up by its marker: `getCanvasContainer(null)` has no element to
+      // start from and returns nothing, which left review never zooming.
+      const container = document.querySelector('[data-canvas-stage]');
+      if (!container?.offsetWidth || !container?.offsetHeight) return;
+      const size = { width: container.offsetWidth, height: container.offsetHeight };
+      const rendered = calculateRenderedImageDimensions(imageObject, size.width, size.height);
+      if (needsFraming(object, rendered, size, zoomLevel, panOffset)) {
+        frameObject(object, 320, container);
+      }
+    },
+    [imageObject, zoomLevel, panOffset, frameObject]
   );
 
   const resetView = useCallback(() => {
@@ -239,6 +266,7 @@ export default function useObjectActions() {
 
   return {
     frameObject,
+    frameObjectIfHardToSee,
     resetView,
     leaveFocusMode,
     focusOn,
