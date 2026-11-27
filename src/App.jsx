@@ -5,6 +5,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { DatasetProvider } from "./contexts/DatasetContext";
 import { ToastProvider } from "./contexts/ToastContext";
 import { CorrectionProvider } from "./contexts/CorrectionContext";
+import { ReviewSessionProvider } from "./contexts/ReviewSessionContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PreferenceSync from "./components/account/PreferenceSync";
 import useDocumentTheme from "./hooks/useDocumentTheme";
@@ -57,6 +58,7 @@ function App() {
         <Router basename={BASE_PATH}>
           <ActivityRouteTracker />
           <CorrectionProvider>
+          <ReviewSessionProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<InstanceLandingPage />} />
@@ -271,6 +273,7 @@ function App() {
             {/* Catch-all route - redirect unknown routes to landing page */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ReviewSessionProvider>
           </CorrectionProvider>
         </Router>
       </DatasetProvider>

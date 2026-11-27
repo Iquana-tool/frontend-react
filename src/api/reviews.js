@@ -239,3 +239,58 @@ export const buildCorrectionQueue = async (
     );
     return handleApiError(response);
 };
+
+/** The card's three answers, as the backend names them. */
+const COMPLETENESS_ANSWERS = { yes: "complete", no: "incomplete", unsure: "unsure" };
+
+/**
+ * Store a reviewer's answer to "is everything on this image annotated?".
+ *
+ * One entry per label, plus optionally one for the relationships. An
+ * "incomplete" answer also sends the image back with the reason "objects are
+ * missing"; "unsure" queues it for a second reviewer.
+ *
+ * @param {number} maskId
+ * @param {Object} completeness
+ * @param {Array<{labelId: number|null, answer: "yes"|"no"|"unsure"}>} completeness.answers -
+ *   `labelId` null means the relationships row.
+ * @param {string} [completeness.note] - What is missing; sent to the annotator, never logged.
+ * @returns {Promise<{success: boolean, verdict: "complete"|"incomplete"|"unsure",
+ *   checks: Array<Object>, rejection: Object|null}>}
+ */
+export const recordCompleteness = async (maskId, { answers, note = null }) => {
+    const response = await fetch(`${API_BASE_URL}/reviews/masks/${maskId}/completeness`, {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+            note,
+            answers: answers.map(({ labelId, answer }) => ({
+                item: labelId == null ? "relationships" : "label",
+                label_id: labelId,
+                answer: COMPLETENESS_ANSWERS[answer],
+            })),
+        }),
+    });
+    const result = await handleApiError(response);
+    trackAnnotation("review.completeness", {
+        payload: {
+            mask_id: maskId,
+            verdict: result.verdict,
+            answers: answers.map(({ labelId, answer }) => ({ label_id: labelId, answer })),
+        },
+    });
+    return result;
+};
+
+/**
+ * Every reviewer's current completeness answers for an image.
+ * @param {number} maskId
+ * @returns {Promise<{success: boolean, checks: Array<{item: string, label_id: number|null,
+ *   answer: "complete"|"incomplete"|"unsure", created_by: string|null}>}>}
+ */
+export const fetchCompleteness = async (maskId) => {
+    const response = await fetch(`${API_BASE_URL}/reviews/masks/${maskId}/completeness`, {
+        headers: getAuthHeaders(),
+    });
+    return handleApiError(response);
+};

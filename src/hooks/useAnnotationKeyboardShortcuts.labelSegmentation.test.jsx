@@ -4,12 +4,12 @@ import useAnnotationKeyboardShortcuts from './useAnnotationKeyboardShortcuts';
 import useAnnotationStore from '../stores/useAnnotationStore';
 import { initialState } from '../stores/initialState';
 
-const mocks = vi.hoisted(() => ({ requestRun: vi.fn(), busy: false }));
+const mocks = vi.hoisted(() => ({ requestRun: vi.fn(), runSegmentation: vi.fn(), busy: false }));
 vi.mock('../components/annotationPage/workspace/LabelSegmentationContext', () => ({
   useLabelSegmentation: () => mocks,
   useConceptSegmentation: () => mocks,
 }));
-vi.mock('./useAISegmentation', () => ({ default: () => ({ runSegmentation: vi.fn() }) }));
+vi.mock('./useAISegmentation', () => ({ default: () => ({ runSegmentation: mocks.runSegmentation }) }));
 vi.mock('./useAiTools', () => ({ default: () => ({ isEnabled: () => true }) }));
 
 beforeEach(() => {
@@ -42,5 +42,28 @@ describe('label segmentation keyboard shortcuts', () => {
     renderHook(() => useAnnotationKeyboardShortcuts());
     act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '3' })));
     expect(mocks.requestRun).not.toHaveBeenCalled();
+  });
+});
+
+describe('prompted segmentation key 1', () => {
+  const placePrompt = (mode) => useAnnotationStore.setState((state) => {
+    state.workspace.mode = mode;
+    state.ui.currentTool = 'ai_annotation';
+    state.models.promptedModel = 'sam2';
+    state.aiAnnotation.prompts = [{ type: 'point', label: 'positive', coords: { x: 10, y: 10 } }];
+  });
+
+  it('runs the model while annotating', () => {
+    placePrompt('annotate');
+    renderHook(() => useAnnotationKeyboardShortcuts());
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' })));
+    expect(mocks.runSegmentation).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves 1 to the send-back reasons while reviewing', () => {
+    placePrompt('review');
+    renderHook(() => useAnnotationKeyboardShortcuts());
+    act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '1' })));
+    expect(mocks.runSegmentation).not.toHaveBeenCalled();
   });
 });

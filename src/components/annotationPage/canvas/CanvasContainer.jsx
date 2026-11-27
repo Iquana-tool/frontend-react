@@ -89,6 +89,7 @@ const CanvasContainer = ({ imageObject, currentImage, zoomLevel, panOffset }) =>
   return (
     <div
       ref={containerRef}
+      data-canvas-stage
       className={`relative w-full h-full overflow-hidden ${cursorClass}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setCursorPosition(null)}
