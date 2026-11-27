@@ -5,22 +5,26 @@ import {
   useAddObject,
   useUpdateObject,
   useRemoveObject,
+  useRemoveObjects,
   useObjectsList,
   useClearSelection,
   useSelectObject,
   useSetObjectsFromHierarchy,
   useDatasetLabelsMap,
+  useExpandObject,
 } from '../stores/selectors/annotationSelectors';
 
 const useWebSocketObjectHandler = () => {
   const addObject = useAddObject();
   const updateObject = useUpdateObject();
   const removeObject = useRemoveObject();
+  const removeObjects = useRemoveObjects();
   const objectsList = useObjectsList();
   const clearSelection = useClearSelection();
   const selectObject = useSelectObject();
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const datasetLabelsMap = useDatasetLabelsMap();
+  const expandObject = useExpandObject();
 
   // Keep a ref to always have the latest objectsList inside the stable WebSocket listeners
   // without re-subscribing every time objectsList changes
@@ -92,19 +96,30 @@ const useWebSocketObjectHandler = () => {
           return;
         }
 
+        const labelsMap = datasetLabelsMapRef.current;
+        const resolvedName = data.label_id != null
+          ? (labelsMap instanceof Map ? labelsMap.get(data.label_id) ?? labelsMap.get(String(data.label_id)) : labelsMap?.[data.label_id] ?? labelsMap?.[String(data.label_id)])
+          : null;
+        const labelName = data.label || (resolvedName && typeof resolvedName === 'object' ? resolvedName.name : resolvedName) || null;
+
         addObject({
           contour_id: contourId,
           x: x,
           y: y,
           path: path || null,
-          label: data.label || null,
+          label: labelName,
           labelId: data.label_id ?? null,
           added_by: data.added_by || null,
           parent_id: data.parent_id ?? null,
+          hierarchy_enabled: data.hierarchy_enabled ?? true,
           confidence: data.confidence ?? 1.0,
           quantification: data.quantification || null,
           reviewed_by: data.reviewed_by || [],
         });
+
+        if (data.parent_id != null) {
+          expandObject(data.parent_id);
+        }
 
         clearSelection();
         selectObject(contourId);
@@ -144,6 +159,7 @@ const useWebSocketObjectHandler = () => {
             labelId: data.label_id ?? null,
             added_by: data.added_by || null,
             parent_id: data.parent_id ?? null,
+          hierarchy_enabled: data.hierarchy_enabled ?? true,
             confidence: data.confidence ?? 1.0,
             quantification: data.quantification || null,
             reviewed_by: data.reviewed_by || [],
@@ -166,17 +182,16 @@ const useWebSocketObjectHandler = () => {
           return;
         }
 
-        deletedContours.forEach(contourId => {
-          const normalizedId = typeof contourId === 'string' && !isNaN(contourId)
-            ? Number(contourId)
-            : contourId;
-
-          const objectToRemove = objectsListRef.current.find(obj => obj.contour_id === normalizedId);
-
-          if (objectToRemove) {
-            removeObject(objectToRemove.id);
-          }
-        });
+        // One store update for all of them: a bulk delete lists hundreds at once,
+        // and removing them one by one re-rendered the canvas for each.
+        const doomed = new Set(deletedContours.map((contourId) =>
+          typeof contourId === 'string' && !isNaN(contourId) ? Number(contourId) : contourId
+        ));
+        const ids = objectsListRef.current
+          .filter((obj) => doomed.has(obj.contour_id))
+          .map((obj) => obj.id);
+        if (ids.length === 1) removeObject(ids[0]);
+        else if (ids.length > 1) removeObjects(ids);
       }
     );
 
@@ -187,7 +202,7 @@ const useWebSocketObjectHandler = () => {
     };
   // Stable deps only — objectsList is accessed via ref, not as a dep
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addObject, updateObject, removeObject, clearSelection, selectObject, setObjectsFromHierarchy]);
+  }, [addObject, updateObject, removeObject, removeObjects, clearSelection, selectObject, setObjectsFromHierarchy]);
 };
 
 export default useWebSocketObjectHandler;

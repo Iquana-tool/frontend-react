@@ -173,8 +173,6 @@ export default {
         dcScan: 'dcScan 1.1s ease-in-out infinite',
         dcCloud: 'dcCloud 1.7s ease-in-out infinite',
         dcHalo: 'dcHalo 1.7s ease-in-out infinite',
-        dcSweep: 'dcSweep 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite',
-        dcAura: 'dcAura 2.6s ease-in-out infinite',
       },
       keyframes: {
         progress: {
@@ -212,16 +210,6 @@ export default {
         dcHalo: {
           '0%, 100%': { opacity: '.10' },
           '50%': { opacity: '.30' },
-        },
-        // Inference scan. The band is fully clear of the frame at both ends, so
-        // the loop restart is invisible and needs no alternate direction.
-        dcSweep: {
-          '0%': { transform: 'translateY(-130%)' },
-          '100%': { transform: 'translateY(230%)' },
-        },
-        dcAura: {
-          '0%, 100%': { opacity: '.42' },
-          '50%': { opacity: '.9' },
         },
       },
     },

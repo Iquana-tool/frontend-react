@@ -27,6 +27,7 @@ import {
   useChipMode,
   useHiddenObjectIds,
   useOutlineSettings,
+  useInferenceRun,
 } from '../../../stores/selectors/annotationSelectors';
 import useAnnotationStore from '../../../stores/useAnnotationStore';
 import { useZoomToObject } from '../../../hooks/useZoomToObject';
@@ -136,6 +137,19 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     animationDuration: 300
   });
 
+  // While a model run is open, the outlines it returns stay hidden: the server
+  // streams them one by one, and the run's ending pops them all in on one clock
+  // as its fade front reaches each (see inferenceTiming).
+  const inferenceRun = useInferenceRun();
+  const isPendingResult = useMemo(() => {
+    if (!inferenceRun || inferenceRun.phase === 'ending') return null;
+    const known = new Set(inferenceRun.knownContourIds);
+    return (object) => object.contour_id != null && !known.has(object.contour_id);
+  }, [inferenceRun]);
+  const revealDelays = inferenceRun?.phase === 'ending' && inferenceRun.outcome === 'success'
+    ? inferenceRun.reveal
+    : null;
+
   // Filter objects based on visibility settings and focus/refinement mode
   const visibleObjects = useMemo(() => {
     // Peek: the whole annotation layer steps aside while the key is held, so the
@@ -147,6 +161,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     // Per-object visibility from the Objects panel's eye button. Applied first
     // so a hidden object disappears regardless of the label-level filters.
     let filtered = objectsList.filter((obj) => !hiddenObjectIds[obj.id]);
+    if (isPendingResult) filtered = filtered.filter((obj) => !isPendingResult(obj));
 
     // In focus or refinement mode, only show descendants of the active object
     // This hides ancestors, siblings, and unrelated objects that would otherwise
@@ -209,7 +224,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
     }
 
     return filtered;
-  }, [objectsList, hiddenObjectIds, visibility, outline.peek, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId]);
+  }, [objectsList, hiddenObjectIds, visibility, outline.peek, focusModeActive, focusedObjectId, refinementModeActive, refinementModeObjectId, isPendingResult]);
 
   // Named relationships are only drawn while an object or a Relationships-tab row is
   // hovered; everything outside the hovered edges' ends is dimmed meanwhile.
@@ -651,6 +666,8 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         const { object } = candidate;
         const color =
           getObjectState(object) === 'unlabelled' ? UNLABELLED_COLOR : object.color;
+        // A chip of a just-revealed outline follows its pop-in rather than leading it.
+        const chipDelay = revealDelays?.[object.contour_id];
 
         return (
           <div
@@ -672,13 +689,30 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             }}
           >
             <span
-              className="inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap"
+              className={`inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap ${
+                pathsInert ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
+              }`}
               style={{
                 background: `rgba(10,12,14,${candidate.pinned ? 0.94 : 0.74})`,
                 color: '#eef1f3',
                 border: getChipBorder(object, color),
                 boxShadow: '0 3px 12px rgba(0,0,0,.35)',
+                animation: chipDelay != null
+                  ? `inference-chip-in 200ms ease-out ${(chipDelay + 0.25).toFixed(3)}s both`
+                  : undefined,
               }}
+              onMouseEnter={() => {
+                if (!refinementModeActive) {
+                  setHoveredObjectId(object.id);
+                }
+              }}
+              onMouseLeave={() => {
+                if (!refinementModeActive) {
+                  setHoveredObjectId(null);
+                }
+              }}
+              onClick={(e) => handleObjectLeftClick(e, object)}
+              onContextMenu={(e) => handleObjectRightClick(e, object)}
             >
               <span
                 className="w-[6px] h-[6px] rounded-full"
@@ -730,13 +764,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             strokeColor = object.color;
           }
         } else {
-          // Normal mode: the design's state treatment (approved solid, pending
-          // dashed, unlabelled amber + marching ants), with hover and selection
-          // as modifiers on top.
+          // Keep labelled boundaries continuous while annotating. Review retains
+          // pending dashes; unlabelled work keeps its amber marching ants.
           const style = getPolygonStyle(object, {
             hovered: isHovered,
             selected: isSelected,
             reviewMode: workspaceMode === 'review' && !showApproved,
+            continuousLabelledOutline: workspaceMode !== 'review',
             color: object.color,
             outline,
           });
@@ -766,6 +800,18 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
         if (!maskPath) {
           return null;
         }
+
+        // A new outline from the run that just finished pops in when the fade
+        // front reaches it. This svg mounts as the ending starts, so the delay
+        // counts from the same moment as the front.
+        const revealDelay = revealDelays?.[object.contour_id];
+        const popStyle = revealDelay != null
+          ? {
+              transformBox: 'fill-box',
+              transformOrigin: 'center',
+              animation: `inference-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) ${revealDelay.toFixed(3)}s both`,
+            }
+          : undefined;
         
         return (
           <svg 
@@ -827,6 +873,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
               )}
             </defs>
             
+            <g style={popStyle}>
             <path
               d={maskPath}
               fill={normalStyle ? normalStyle.fill : hexToRgba(object.color, fillOpacity)}
@@ -876,6 +923,7 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                 }
               }}
             />
+            </g>
           </svg>
         );
       })}

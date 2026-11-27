@@ -94,3 +94,19 @@ describe('MessageBuilders.runSuggestion', () => {
     });
   });
 });
+
+
+it('transports an explicit false hierarchy choice without changing legacy messages', () => {
+  expect(MessageBuilders.addObject([0,1,1], [0,0,1], null, null, 1, 1,
+    { useHierarchy: false }).data.use_hierarchy).toBe(false);
+  expect(MessageBuilders.addObject([0,1,1], [0,0,1]).data).not.toHaveProperty('use_hierarchy');
+});
+
+it('forwards model_class when adding an object with model class options', () => {
+  const msg = MessageBuilders.addObject([0,1,1], [0,0,1], 'coral', null, 0.95, 43, {
+    modelClass: 'acropora',
+    modelKey: 'species_model',
+  });
+  expect(msg.data.model_class).toBe('acropora');
+  expect(msg.data.model_key).toBe('species_model');
+});

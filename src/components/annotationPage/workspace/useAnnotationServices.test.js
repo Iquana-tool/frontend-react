@@ -1,379 +1,138 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import useAnnotationServices from "./useAnnotationServices";
-import { getInferenceRoutingPolicy } from "../../../api/inference";
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import useAnnotationServices from './useAnnotationServices';
+import { getInferenceRoutingPolicy } from '../../../api/inference';
+import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 
-const { mockState, mockRunInstance } = vi.hoisted(() => ({
-    mockRunInstance: vi.fn(),
-    mockState: {
-        currentDataset: { id: "101" },
-        activeLabelId: 1,
-        favorites: {},
-        // Production slice models: only id, name, description, tags, etc.
-        availablePromptedModels: [
-            { id: "sam2-generic", name: "SAM 2 Generic", description: "Base", label_ids: [], tags: {} },
-            { id: "sam2-cell", name: "SAM 2 Cell Specialist", description: "Cell", label_ids: [1], tags: {} },
-        ],
-        availableSuggestionModels: [
-            { id: "sam3-suggestion-generic", name: "SAM 3 Intra", description: "Intra", label_ids: [], tags: {} },
-        ],
-        availableInstanceModels: [
-            { id: "m2f-generic", name: "Mask2Former Generic", description: "M2F Base", label_ids: [], tags: {} },
-            { id: "m2f-routed-default", name: "M2F Routed Default", description: "M2F Routed", label_ids: [], tags: {} },
-        ],
-        promptedModel: null,
-        suggestionModel: null,
-        instanceModel: null,
-        isLoadingInstance: false,
-        isRunningInstance: false,
-    },
+const { state, fetchModels, setModel } = vi.hoisted(() => {
+  const state = {};
+  return {
+    state,
+    fetchModels: vi.fn(),
+    setModel: vi.fn((value) => { state.selectedModel = value; }),
+  };
+});
+
+vi.mock('../../../contexts/DatasetContext', () => ({
+  useDataset: () => ({ currentDataset: state.dataset }),
 }));
-
-vi.mock("../../../contexts/DatasetContext", () => ({
-    useDataset: () => ({ currentDataset: mockState.currentDataset }),
+vi.mock('../../../api/inference', () => ({ getInferenceRoutingPolicy: vi.fn() }));
+vi.mock('../../../stores/selectors/annotationSelectors', () => ({
+  useAvailablePromptedModels: () => state.models,
+  useFetchAvailablePromptedModels: () => fetchModels,
+  useIsLoadingPromptedModels: () => state.loading,
+  usePromptedModel: () => state.selectedModel,
+  useSetPromptedModel: () => setModel,
+  useActiveLabelId: () => state.labelId,
+  useModelFavorites: () => state.favorites,
 }));
-
-vi.mock("../../../api/inference", () => ({
-    getInferenceRoutingPolicy: vi.fn(),
+vi.mock('../../../services/annotationSession', () => ({
+  default: { selectPromptedModel: vi.fn() },
 }));
+vi.mock('../../../hooks/useModelSwitchPreloader', () => ({ default: vi.fn() }));
 
-const mockSetPromptedModel = vi.fn((m) => { mockState.promptedModel = m; });
-const mockSetSuggestionModel = vi.fn((m) => { mockState.suggestionModel = m; });
-const mockSetInstanceModel = vi.fn((m) => { mockState.instanceModel = m; });
+const models = [
+  { id: 'sam-generic', label_ids: [], supported_prompt_types: ['point', 'box'] },
+  { id: 'sam-specialist', label_ids: [1] },
+];
+const route = (key, labelId = null) => ({
+  dataset_id: 101,
+  bindings: [{ task: 'prompted-segmentation', model_registry_key: key, label_id: labelId }],
+});
 
-vi.mock("../../../stores/selectors/annotationSelectors", () => ({
-    useAvailablePromptedModels: () => mockState.availablePromptedModels,
-    useAvailableSuggestionModels: () => mockState.availableSuggestionModels,
-    useAvailableInstanceModels: () => mockState.availableInstanceModels,
-    useFetchAvailablePromptedModels: () => vi.fn(),
-    useFetchAvailableSuggestionModels: () => vi.fn(),
-    useFetchAvailableInstanceModels: () => vi.fn(),
-    useIsLoadingPromptedModels: () => false,
-    useIsLoadingSuggestionModels: () => false,
-    useIsLoadingInstanceModels: () => mockState.isLoadingInstance,
-    useIsRunningSuggestion: () => false,
-    useIsRunningInstance: () => mockState.isRunningInstance,
-    usePromptedModel: () => mockState.promptedModel,
-    useSuggestionModel: () => mockState.suggestionModel,
-    useInstanceModel: () => mockState.instanceModel,
-    useSetPromptedModel: () => mockSetPromptedModel,
-    useSetSuggestionModel: () => mockSetSuggestionModel,
-    useSetInstanceModel: () => mockSetInstanceModel,
-    useInstanceRunRequested: () => false,
-    useSetInstanceRunRequested: () => vi.fn(),
-    useSetInstanceWarningModalOpen: () => vi.fn(),
-    useActiveLabelId: () => mockState.activeLabelId,
-    useModelFavorites: () => mockState.favorites,
-}));
-
-vi.mock("../../../services/annotationSession", () => ({
-    default: {
-        selectPromptedModel: vi.fn(),
-        selectSuggestionModel: vi.fn(),
-        selectInstanceModel: vi.fn(),
-    },
-}));
-
-vi.mock("../../../hooks/useModelSwitchPreloader", () => ({
-    default: vi.fn(),
-}));
-
-vi.mock("../../../hooks/useInstanceSegmentation", () => ({
-    useInstanceSegmentation: () => ({ runInstance: mockRunInstance }),
-}));
-
-describe("useAnnotationServices with dataset routing policy", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mockState.currentDataset = { id: "101" };
-        mockState.promptedModel = null;
-        mockState.suggestionModel = null;
-        mockState.instanceModel = null;
-        mockState.isLoadingInstance = false;
-        mockState.isRunningInstance = false;
-        mockState.activeLabelId = 1;
-        mockState.favorites = {};
+describe('prompted annotation service policy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(state, {
+      dataset: { id: 101 }, models, selectedModel: null, labelId: 1, favorites: {}, loading: false,
     });
+    getInferenceRoutingPolicy.mockResolvedValue(null);
+  });
 
-    it("applies label override for prompted segmentation and task default for instance segmentation on production model shapes", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "prompted-segmentation",
-                    label_id: 1,
-                    model_registry_key: "sam2-cell",
-                },
-                {
-                    task: "instance-segmentation",
-                    label_id: null,
-                    model_registry_key: "m2f-routed-default",
-                },
-            ],
-        });
+  it('exposes only prompted controls and applies an active-label override', async () => {
+    getInferenceRoutingPolicy.mockResolvedValue(route('sam-specialist', 1));
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-specialist'));
+    expect(result.current.services.map((service) => service.key)).toEqual(['prompted']);
+    expect(result.current).not.toHaveProperty('confirmInstanceRun');
+    expect(result.current.services[0]).toMatchObject({ task: 'prompted-segmentation', models });
+  });
 
-        renderHook(() => useAnnotationServices());
+  it('uses the task default when the active label has no override', async () => {
+    getInferenceRoutingPolicy.mockResolvedValue(route('sam-generic'));
+    renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-generic'));
+  });
 
-        await waitFor(() => {
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-cell");
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-routed-default");
-        });
-    });
+  it('restores the compatible favorite when moving to an unrouted label', async () => {
+    state.favorites = { 'prompted-segmentation': 'sam-generic' };
+    getInferenceRoutingPolicy.mockResolvedValue(route('sam-specialist', 1));
+    const { rerender } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-specialist'));
+    state.labelId = 2;
+    rerender();
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-generic'));
+  });
 
-    it("falls back to first available model when no dataset route is configured", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce(null);
+  it('uses the first compatible fallback when the favorite does not support the label', async () => {
+    state.labelId = 2;
+    state.favorites = { 'prompted-segmentation': 'sam-specialist' };
+    renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-generic'));
+  });
 
-        renderHook(() => useAnnotationServices());
+  it.each(['missing-model', 'sam-specialist'])('disarms unavailable or incompatible configured route %s', async (key) => {
+    state.labelId = 2;
+    state.selectedModel = 'sam-generic';
+    getInferenceRoutingPolicy.mockResolvedValue(route(key));
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(result.current.policyLoading).toBe(false));
+    expect(setModel).toHaveBeenLastCalledWith(null);
+    expect(setModel).not.toHaveBeenCalledWith('sam-generic');
+  });
 
-        await waitFor(() => {
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-generic");
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-generic");
-        });
-    });
+  it('preserves manual model changes through unrelated rerenders', async () => {
+    getInferenceRoutingPolicy.mockResolvedValue(route('sam-specialist', 1));
+    const { result, rerender } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(setModel).toHaveBeenLastCalledWith('sam-specialist'));
+    act(() => result.current.services[0].setSelectedModel('sam-generic'));
+    const callCount = setModel.mock.calls.length;
+    rerender();
+    expect(setModel).toHaveBeenCalledTimes(callCount);
+    expect(result.current.services[0].selectedModel).toBe('sam-generic');
+    expect(useModelSwitchPreloader).toHaveBeenLastCalledWith('sam-generic', expect.any(Function), 'prompted');
+  });
 
-    it("does not apply class-aware task default to incompatible active labels", async () => {
-        // activeLabelId is 2 (unsupported by sam2-cell which only predicts 1)
-        mockState.activeLabelId = 2;
-        mockState.availablePromptedModels = [
-            { id: "sam2-generic", name: "SAM 2 Generic", label_ids: [] },
-            { id: "sam2-cell", name: "SAM 2 Cell Specialist", label_ids: [1] },
-        ];
+  it('shows policy errors while resolving the normal prompted fallback', async () => {
+    getInferenceRoutingPolicy.mockRejectedValue(new Error('routing unavailable'));
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(result.current.policyError).toBe('routing unavailable'));
+    expect(result.current.policy).toBeNull();
+    expect(setModel).toHaveBeenLastCalledWith('sam-generic');
+  });
 
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "prompted-segmentation",
-                    label_id: null,
-                    model_registry_key: "sam2-cell", // class-aware default for label 1 only
-                },
-            ],
-        });
+  it('does not preload an old selection while policy is loading', () => {
+    state.selectedModel = 'sam-specialist';
+    getInferenceRoutingPolicy.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useAnnotationServices());
+    expect(result.current.policyLoading).toBe(true);
+    expect(useModelSwitchPreloader).toHaveBeenLastCalledWith(null, expect.any(Function), 'prompted');
+  });
 
-        renderHook(() => useAnnotationServices());
+  it('honors the dataset tool gate and forwards model loading state', async () => {
+    state.dataset = { id: 101, disabled_ai_tools: 'prompted' };
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(result.current.policyLoading).toBe(false));
+    expect(result.current.services).toEqual([]);
+    expect(useModelSwitchPreloader).toHaveBeenLastCalledWith(null, expect.any(Function), 'prompted');
+  });
 
-        await waitFor(() => {
-            // A configured route is authoritative. An invalid class-aware
-            // default is disabled instead of silently choosing another model.
-            expect(mockSetPromptedModel).toHaveBeenCalledWith(null);
-        });
-    });
-
-    it("restores personal favorite or first compatible model when switching to an unrouted label without leaking previous specialist", async () => {
-        mockState.activeLabelId = 1;
-        mockState.promptedModel = "sam2-cell"; // previously armed label 1 had specialist
-        mockState.favorites = { "prompted-segmentation": "sam2-generic" };
-
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "prompted-segmentation",
-                    label_id: 1,
-                    model_registry_key: "sam2-cell",
-                },
-            ],
-        });
-
-        const { rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-cell");
-        });
-
-        // Switch to label 2 (has no override)
-        mockState.activeLabelId = 2;
-        rerender();
-
-        await waitFor(() => {
-            // Restores favorite (sam2-generic) instead of leaking sam2-cell
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-generic");
-        });
-    });
-
-    it("tracks policyError and restores favorite/first-model fallbacks", async () => {
-        const error = new Error("500 Internal Server Error");
-        getInferenceRoutingPolicy.mockRejectedValueOnce(error);
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(result.current.policy).toBeNull();
-            expect(result.current.policyError).toBe("500 Internal Server Error");
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-generic");
-            expect(mockSetSuggestionModel).toHaveBeenCalledWith("sam3-suggestion-generic");
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-generic");
-        });
-
-        rerender();
-        const instanceService = result.current.services.find((service) => service.key === "instance");
-        expect(instanceService.onRun).toEqual(expect.any(Function));
-    });
-
-    it("does not overwrite a manual model selection after policy prefill", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "prompted-segmentation",
-                    label_id: 1,
-                    model_registry_key: "sam2-cell",
-                },
-            ],
-        });
-
-        const { rerender } = renderHook(() => useAnnotationServices());
-        await waitFor(() => {
-            expect(mockSetPromptedModel).toHaveBeenCalledWith("sam2-cell");
-        });
-        const callsAfterPrefill = mockSetPromptedModel.mock.calls.length;
-
-        mockState.promptedModel = "sam2-generic";
-        rerender();
-
-        expect(mockSetPromptedModel).toHaveBeenCalledTimes(callsAfterPrefill);
-    });
-
-    it("passes instance route inputs when the selected model matches the resolved route", async () => {
-        const inputs = { parameters: { mask_threshold: 0.62 } };
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "instance-segmentation",
-                    label_id: null,
-                    model_registry_key: "m2f-routed-default",
-                    inputs,
-                },
-            ],
-        });
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-routed-default");
-        });
-
-        mockState.instanceModel = "m2f-routed-default";
-        rerender();
-
-        act(() => {
-            result.current.confirmInstanceRun();
-        });
-
-        expect(mockRunInstance).toHaveBeenCalledWith("patch", inputs);
-    });
-
-    it("does not pass route inputs after manually selecting a different instance model", async () => {
-        const inputs = { parameters: { mask_threshold: 0.62 } };
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "instance-segmentation",
-                    label_id: null,
-                    model_registry_key: "m2f-routed-default",
-                    inputs,
-                },
-            ],
-        });
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-routed-default");
-        });
-
-        mockState.instanceModel = "m2f-generic";
-        rerender();
-
-        act(() => {
-            result.current.confirmInstanceRun();
-        });
-
-        expect(mockRunInstance).toHaveBeenCalledWith("patch");
-        expect(mockRunInstance).not.toHaveBeenCalledWith("patch", inputs);
-    });
-
-    it("keeps a manually selected instance model runnable when the saved default is stale", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce({
-            dataset_id: 101,
-            bindings: [
-                {
-                    task: "instance-segmentation",
-                    label_id: null,
-                    model_registry_key: "missing-default",
-                },
-            ],
-        });
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-generic");
-        });
-
-        mockState.instanceModel = "m2f-generic";
-        rerender();
-
-        const instanceService = result.current.services.find((service) => service.key === "instance");
-        expect(instanceService.canRun).toBe(true);
-        expect(instanceService.onRun).toEqual(expect.any(Function));
-        expect(instanceService.selectionNotice).toBe(
-            "Session override for this image — dataset default remains unchanged."
-        );
-
-        act(() => {
-            instanceService.onRun();
-        });
-        expect(result.current.showInstanceWarning).toBe(true);
-
-        act(() => {
-            result.current.confirmInstanceRun();
-        });
-        expect(mockRunInstance).toHaveBeenCalledWith("patch");
-    });
-
-    it("treats a selected model as an override when the dataset has no instance default", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce(null);
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-generic");
-        });
-
-        mockState.instanceModel = "m2f-routed-default";
-        rerender();
-
-        const instanceService = result.current.services.find((service) => service.key === "instance");
-        expect(instanceService.canRun).toBe(true);
-        expect(instanceService.selectionNotice).toBe(
-            "Session override for this image — dataset default remains unchanged."
-        );
-    });
-
-    it("disables instance runs only while models load or another run is active", async () => {
-        getInferenceRoutingPolicy.mockResolvedValueOnce(null);
-
-        const { result, rerender } = renderHook(() => useAnnotationServices());
-
-        await waitFor(() => {
-            expect(mockSetInstanceModel).toHaveBeenCalledWith("m2f-generic");
-        });
-
-        mockState.instanceModel = "m2f-generic";
-        mockState.isLoadingInstance = true;
-        rerender();
-        expect(result.current.services.find((service) => service.key === "instance").canRun).toBe(false);
-
-        mockState.isLoadingInstance = false;
-        mockState.isRunningInstance = true;
-        rerender();
-        expect(result.current.services.find((service) => service.key === "instance").canRun).toBe(false);
-
-        mockState.isRunningInstance = false;
-        rerender();
-        expect(result.current.services.find((service) => service.key === "instance").canRun).toBe(true);
-    });
+  it('fetches only the prompted model list when discovery has not run', async () => {
+    state.models = [];
+    state.loading = true;
+    const { result } = renderHook(() => useAnnotationServices());
+    await waitFor(() => expect(result.current.policyLoading).toBe(false));
+    expect(fetchModels).toHaveBeenCalledOnce();
+    expect(result.current.services[0].isLoading).toBe(true);
+  });
 });

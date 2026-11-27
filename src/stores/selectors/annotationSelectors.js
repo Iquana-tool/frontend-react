@@ -42,6 +42,7 @@ export const useIsRunningInstance = () => useAnnotationStore(state => state.mode
 
 export const useObjectsList = () => useAnnotationStore(state => state.objects.list);
 export const useSelectedObjects = () => useAnnotationStore(state => state.objects.selected);
+export const useSelectedObjectIds = () => useAnnotationStore(state => state.objects.selected);
 export const useObjectsVisibility = () => useAnnotationStore(state => state.objects.visibility);
 export const useObjectColors = () => useAnnotationStore(state => state.objects.colors);
 export const useDatasetLabels = () => useAnnotationStore(state => state.objects.datasetLabels);
@@ -66,6 +67,7 @@ export const useSetCurrentMask = () => useAnnotationStore(state => state.setCurr
 // Object actions
 export const useAddObject = () => useAnnotationStore(state => state.addObject);
 export const useRemoveObject = () => useAnnotationStore(state => state.removeObject);
+export const useRemoveObjects = () => useAnnotationStore(state => state.removeObjects);
 export const useUpdateObject = () => useAnnotationStore(state => state.updateObject);
 export const useSelectObject = () => useAnnotationStore(state => state.selectObject);
 export const useDeselectObject = () => useAnnotationStore(state => state.deselectObject);
@@ -80,6 +82,7 @@ export const useObjectsLoadError = () => useAnnotationStore(state => state.objec
 export const useSetPromptedModel = () => useAnnotationStore(state => state.setPromptedModel);
 export const useSetSuggestionModel = () => useAnnotationStore(state => state.setSuggestionModel);
 export const useSetInstanceModel = () => useAnnotationStore(state => state.setInstanceModel);
+export const useAutoSelectedInstanceModel = () => useAnnotationStore(state => state.models.autoSelectedInstanceModel);
 export const useSetIsRunningSuggestion = () => useAnnotationStore(state => state.setIsRunningSuggestion);
 export const useSetIsRunningInstance = () => useAnnotationStore(state => state.setIsRunningInstance);
 export const useFetchAvailablePromptedModels = () => useAnnotationStore(state => state.fetchAvailablePromptedModels);
@@ -126,6 +129,7 @@ export const useSetInstanceWarningModalOpen = () => useAnnotationStore(state => 
 // AI Annotation selectors
 export const useAIPrompts = () => useAnnotationStore(state => state.aiAnnotation.prompts);
 export const useActivePreview = () => useAnnotationStore(state => state.aiAnnotation.activePreview);
+export const useLastInstanceRun = () => useAnnotationStore(state => state.aiAnnotation.lastInstanceRun);
 export const useIsSubmitting = () => useAnnotationStore(state => state.aiAnnotation.isSubmitting);
 export const usePromptMode = () => useAnnotationStore(state => state.aiAnnotation.promptMode);
 export const useManualDrawMode = () => useAnnotationStore(state => state.aiAnnotation.manualDrawMode);
@@ -146,6 +150,8 @@ export const useClearAllPrompts = () => useAnnotationStore(state => state.clearA
 // For prompts that became an object. Not interchangeable with the above — see the slice.
 export const useConsumePrompts = () => useAnnotationStore(state => state.consumePrompts);
 export const useSetActivePreview = () => useAnnotationStore(state => state.setActivePreview);
+export const useSetLastInstanceRun = () => useAnnotationStore(state => state.setLastInstanceRun);
+export const useClearLastInstanceRun = () => useAnnotationStore(state => state.clearLastInstanceRun);
 export const useSetIsSubmittingAI = () => useAnnotationStore(state => state.setIsSubmitting);
 export const useUndoLastAction = () => useAnnotationStore(state => state.undoLastAction);
 export const useRedoLastAction = () => useAnnotationStore(state => state.redoLastAction);
@@ -220,6 +226,7 @@ export const useFocusedParentContourId = () => useAnnotationStore((state) => {
   if (!obj) return null;
   return obj.contour_id ?? obj.id ?? null;
 });
+export const useFocusedContourId = useFocusedParentContourId;
 
 // Focus Mode actions
 export const useEnterFocusMode = () => useAnnotationStore(state => state.enterFocusMode);
@@ -384,3 +391,10 @@ export const useSetHoveredRelationshipId = () => useAnnotationStore(state => sta
 export const useOpenSceneGraphPopover = () => useAnnotationStore(state => state.openSceneGraphPopover);
 export const useCloseSceneGraphPopover = () => useAnnotationStore(state => state.closeSceneGraphPopover);
 export const useBumpSceneGraph = () => useAnnotationStore(state => state.bumpSceneGraph);
+
+// Inference run selectors (the model run in flight; see inferenceSlice)
+export const useInferenceRun = () => useAnnotationStore(state => state.inference.run);
+export const useBeginInferenceRun = () => useAnnotationStore(state => state.beginInferenceRun);
+export const useAckInferenceRun = () => useAnnotationStore(state => state.ackInferenceRun);
+export const useEndInferenceRun = () => useAnnotationStore(state => state.endInferenceRun);
+export const useClearInferenceRun = () => useAnnotationStore(state => state.clearInferenceRun);

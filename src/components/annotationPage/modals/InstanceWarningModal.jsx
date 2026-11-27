@@ -5,7 +5,7 @@ import { AlertTriangle, X } from 'lucide-react';
  * Lets the annotator choose how instance-segmentation predictions are written.
  * Patch is the safe default; Override is deliberately treated as destructive.
  */
-const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
+const InstanceWarningModal = ({ isOpen, onClose, onConfirm, labelName }) => {
   if (!isOpen) return null;
 
   return (
@@ -42,7 +42,7 @@ const InstanceWarningModal = ({ isOpen, onClose, onConfirm }) => {
             <AlertTriangle size={14} className="mt-[2px] flex-none text-err" />
             <p className="text-row leading-[1.55] text-t2">
               <span className="font-semibold text-err">Override</span>{' '}
-              replaces all current contours with the new predictions. This cannot be undone.
+              {labelName ? `replaces ${labelName} objects in the inference area and their children with the new predictions.` : 'replaces all current contours with the new predictions.'} This cannot be undone.
             </p>
           </div>
         </div>

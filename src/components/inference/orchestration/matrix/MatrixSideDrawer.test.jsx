@@ -843,4 +843,178 @@ describe("MatrixSideDrawer (Design B)", () => {
     expect(handleUnbindRoute).not.toHaveBeenCalled();
     expect(handleClose).not.toHaveBeenCalled();
   });
+
+  it("renders 'Use hierarchy' toggle defaulting to ON for per-label segmentation tasks", () => {
+    const handleSaveRoute = vi.fn();
+    const segModel = {
+      registry_key: "cellpose-seg",
+      name: "Cellpose Polyp",
+      task: "instance-segmentation",
+      label_ids: [1],
+    };
+
+    renderMatrixSideDrawer({
+      target: { task: "instance-segmentation", labelId: 1 },
+      catalog: { models: [segModel], retrieval_strategies: [] },
+      onSaveRoute: handleSaveRoute,
+      draftBindings: [],
+    });
+
+    const configureBtn = screen.getByRole("button", { name: /configure/i });
+    fireEvent.click(configureBtn);
+
+    expect(screen.getByText("Hierarchy")).toBeInTheDocument();
+    expect(
+      screen.getByText("Run within available parent objects and link results using the dataset’s label hierarchy.")
+    ).toBeInTheDocument();
+
+    const hierarchyCheckbox = screen.getByRole("checkbox", {
+      name: /use hierarchy for Coral fragment/i,
+    });
+    expect(hierarchyCheckbox).toBeChecked();
+
+    const applyBtn = screen.getByRole("button", { name: /apply route/i });
+    fireEvent.click(applyBtn);
+
+    expect(handleSaveRoute).toHaveBeenCalledWith(
+      "instance-segmentation",
+      1,
+      expect.objectContaining({
+        model_registry_key: "cellpose-seg",
+        task: "instance-segmentation",
+        label_id: 1,
+        use_hierarchy: true,
+      })
+    );
+  });
+
+  it("persists explicit use_hierarchy OFF when toggled and survives reload", () => {
+    const handleSaveRoute = vi.fn();
+    const segModel = {
+      registry_key: "cellpose-seg",
+      name: "Cellpose Polyp",
+      task: "instance-segmentation",
+      label_ids: [1],
+    };
+
+    const { unmount } = renderMatrixSideDrawer({
+      target: { task: "instance-segmentation", labelId: 1 },
+      catalog: { models: [segModel], retrieval_strategies: [] },
+      onSaveRoute: handleSaveRoute,
+      draftBindings: [],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+
+    const hierarchyCheckbox = screen.getByRole("checkbox", {
+      name: /use hierarchy for Coral fragment/i,
+    });
+    expect(hierarchyCheckbox).toBeChecked();
+    fireEvent.click(hierarchyCheckbox);
+    expect(hierarchyCheckbox).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: /apply route/i }));
+
+    expect(handleSaveRoute).toHaveBeenCalledWith(
+      "instance-segmentation",
+      1,
+      expect.objectContaining({
+        model_registry_key: "cellpose-seg",
+        use_hierarchy: false,
+      })
+    );
+    unmount();
+
+    // Reopen drawer with saved explicit OFF binding
+    renderMatrixSideDrawer({
+      target: { task: "instance-segmentation", labelId: 1 },
+      catalog: { models: [segModel], retrieval_strategies: [] },
+      onSaveRoute: handleSaveRoute,
+      draftBindings: [
+        {
+          task: "instance-segmentation",
+          label_id: 1,
+          model_registry_key: "cellpose-seg",
+          inputs: {},
+          use_hierarchy: false,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    const reloadedCheckbox = screen.getByRole("checkbox", {
+      name: /use hierarchy for Coral fragment/i,
+    });
+    expect(reloadedCheckbox).not.toBeChecked();
+  });
+
+  it("defaults legacy binding without use_hierarchy to ON", () => {
+    const segModel = {
+      registry_key: "cellpose-seg",
+      name: "Cellpose Polyp",
+      task: "instance-segmentation",
+      label_ids: [1],
+    };
+
+    renderMatrixSideDrawer({
+      target: { task: "instance-segmentation", labelId: 1 },
+      catalog: { models: [segModel], retrieval_strategies: [] },
+      draftBindings: [
+        {
+          task: "instance-segmentation",
+          label_id: 1,
+          model_registry_key: "cellpose-seg",
+          inputs: {},
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    const hierarchyCheckbox = screen.getByRole("checkbox", {
+      name: /use hierarchy for Coral fragment/i,
+    });
+    expect(hierarchyCheckbox).toBeChecked();
+  });
+
+  it("preserves saved use_hierarchy: false when editing a task-default route where toggle is not displayed", () => {
+    const segModel = {
+      registry_key: "cellpose-seg",
+      name: "Cellpose Polyp",
+      task: "instance-segmentation",
+      label_ids: [],
+    };
+    const handleSaveRoute = vi.fn();
+
+    renderMatrixSideDrawer({
+      target: { task: "instance-segmentation", labelId: null },
+      catalog: { models: [segModel], retrieval_strategies: [] },
+      onSaveRoute: handleSaveRoute,
+      draftBindings: [
+        {
+          task: "instance-segmentation",
+          label_id: null,
+          model_registry_key: "cellpose-seg",
+          inputs: {},
+          use_hierarchy: false,
+        },
+      ],
+    });
+
+    // For task-default routes (labelId=null), toggle is not displayed
+    fireEvent.click(screen.getByRole("button", { name: /configure/i }));
+    expect(
+      screen.queryByRole("checkbox", { name: /use hierarchy/i })
+    ).not.toBeInTheDocument();
+
+    // Applying route preserves the saved use_hierarchy: false
+    fireEvent.click(screen.getByRole("button", { name: /apply/i }));
+    expect(handleSaveRoute).toHaveBeenCalledWith(
+      "instance-segmentation",
+      null,
+      expect.objectContaining({
+        model_registry_key: "cellpose-seg",
+        use_hierarchy: false,
+      })
+    );
+  });
 });

@@ -497,4 +497,8 @@ class WebSocketService {
 // Singleton instance
 const websocketService = new WebSocketService();
 
+if (typeof window !== 'undefined' && (import.meta.env?.DEV || import.meta.env?.MODE === 'test')) {
+  window.__websocketService = websocketService;
+}
+
 export default websocketService;
