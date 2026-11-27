@@ -102,6 +102,11 @@ export const initialState = {
     activePreview: null,
     /** Last completed instance-segmentation run: { count, objectIds, labelName, imageId, datasetId } */
     lastInstanceRun: null,
+    /**
+     * Last prompted run that added an object, so a parameter change can run its prompts
+     * again and replace that object: { imageId, modelKey, prompts, contourId }.
+     */
+    lastPromptedRun: null,
     isSubmitting: false,
     // Active drawing mode for prompts: 'point' | 'box' | 'polygon' | 'freehand'
     promptMode: 'point',
@@ -307,6 +312,9 @@ export const initialState = {
     isLoadingInstanceModels: false,
     isRunningSuggestion: false, // Track when suggestion segmentation (suggest similar) is running
     isRunningInstance: false, // Track when instance segmentation is running
+    // Values the user set on the canvas for a prompted model's contract parameters,
+    // per model for this session: { [registryKey]: { [paramKey]: value } }.
+    promptedParameters: {},
     favorites: {}, // User's favorite model per task: { task: registry_key }. Preselected in the selectors.
     favoritesLoaded: false, // Guards a single favorites fetch before defaults are computed.
     modelsDatasetId: null, // Dataset ID that owns the currently loaded instance models

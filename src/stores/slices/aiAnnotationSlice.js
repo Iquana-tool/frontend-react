@@ -158,6 +158,10 @@ export const createAIAnnotationSlice = (set) => ({
    *   this object" passes one, because a box on the canvas is still a prompt
    *   waiting to be run and must survive the outlines being committed.
    */
+  setLastPromptedRun: (run) => set((state) => {
+    state.aiAnnotation.lastPromptedRun = run;
+  }),
+
   consumePrompts: (predicate) => set((state) => {
     state.aiAnnotation.activePreview = null;
 

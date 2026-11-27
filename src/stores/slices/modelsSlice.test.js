@@ -183,3 +183,54 @@ describe("modelsSlice favorites", () => {
         expect(modelsApi.getModelFavorites).toHaveBeenCalledTimes(2);
     });
 });
+
+describe("modelsSlice prompted model parameters", () => {
+    const granularity = {
+        key: "granularity", label: "Granularity", type: "float",
+        default_value: 0.2, min_value: 0.1, max_value: 1, step: 0.05,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        modelsApi.getModelFavorites.mockResolvedValue({ success: true, favorites: {} });
+        useAnnotationStore.setState((state) => {
+            state.models.favoritesLoaded = false;
+            state.models.availablePromptedModels = [];
+            state.models.promptedParameters = {};
+        });
+    });
+
+    it("keeps the prompted-segmentation contract of each model", async () => {
+        modelsApi.getPromptedModels.mockResolvedValue({
+            success: true,
+            models: [
+                {
+                    id: "unsamv2",
+                    name: "UnSAMv2",
+                    input_contracts: [
+                        { task: "propagation", parameters: [] },
+                        { task: "prompted-segmentation", parameters: [granularity] },
+                    ],
+                },
+                { id: "sam2-1-tiny", name: "SAM 2.1 tiny" },
+            ],
+        });
+
+        await useAnnotationStore.getState().fetchAvailablePromptedModels();
+
+        const [unsam, sam2] = useAnnotationStore.getState().models.availablePromptedModels;
+        expect(unsam.input_contract.parameters).toEqual([granularity]);
+        expect(sam2.input_contract).toBeNull();
+    });
+
+    it("keeps a value per model", () => {
+        const { setPromptedParameter } = useAnnotationStore.getState();
+        setPromptedParameter("unsamv2", "granularity", 0.8);
+        setPromptedParameter("unsamv2-plus", "granularity", 0.3);
+
+        expect(useAnnotationStore.getState().models.promptedParameters).toEqual({
+            unsamv2: { granularity: 0.8 },
+            "unsamv2-plus": { granularity: 0.3 },
+        });
+    });
+});

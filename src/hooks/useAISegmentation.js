@@ -24,8 +24,11 @@ import {
   useActiveLabelId,
   useBeginInferenceRun,
   useAckInferenceRun,
+  useLastPromptedRun,
+  useSetLastPromptedRun,
 } from '../stores/selectors/annotationSelectors';
 import { useAnnotationRoutingPolicy } from '../contexts/AnnotationRoutingPolicyContext';
+import useAnnotationStore from '../stores/useAnnotationStore';
 import { matchesModelKey, resolveRoutingBinding } from '../utils/inferenceRouting';
 
 const PROMPTED_SEGMENTATION_TASK = 'prompted-segmentation';
@@ -87,6 +90,8 @@ const useAISegmentation = () => {
   const syncEditModeDraftFromRefinement = useSyncEditModeDraftFromRefinement();
   const beginInferenceRun = useBeginInferenceRun();
   const ackInferenceRun = useAckInferenceRun();
+  const lastPromptedRun = useLastPromptedRun();
+  const setLastPromptedRun = useSetLastPromptedRun();
 
   /**
    * Transform API response to mask format expected by SegmentationOverlay
@@ -141,8 +146,14 @@ const useAISegmentation = () => {
 
   /**
    * Run AI segmentation via WebSocket
+   *
+   * @param {Object} [explicitInputs] - Contract inputs owned by the caller.
+   * @param {Object} [options]
+   * @param {Array} [options.prompts] - Prompts to run instead of the ones on the canvas
+   *   (re-running the last prompt after a parameter change).
    */
-  const runSegmentation = useCallback(async (explicitInputs = null) => {
+  const runSegmentation = useCallback(async (explicitInputs = null, { prompts: promptsOverride = null } = {}) => {
+    const runPrompts = promptsOverride || prompts;
     const requestedInputs = isRoutingInputs(explicitInputs) ? explicitInputs : null;
     const hasExplicitInputs = requestedInputs !== null;
     const policyLoadingForDataset = datasetId != null && policyLoading;
@@ -157,7 +168,7 @@ const useAISegmentation = () => {
       return { success: false, error: aiToolOffReason(tool) };
     }
 
-    if (!currentImage || !promptedModelId || prompts.length === 0) {
+    if (!currentImage || !promptedModelId || runPrompts.length === 0) {
       setError('Missing required data: image, model, or prompts');
       return { success: false, error: 'Missing required data' };
     }
@@ -209,7 +220,7 @@ const useAISegmentation = () => {
         polygon_prompt: null,
       };
 
-      prompts.forEach((prompt) => {
+      runPrompts.forEach((prompt) => {
         if (prompt.type === 'polygon') {
           // Polygon (and freehand) prompts: convert each vertex to normalized
           // [x, y] pairs. The backend expects at least 3 vertices; if multiple
@@ -285,6 +296,29 @@ const useAISegmentation = () => {
         }
       }
 
+      // A value the user set on the canvas wins over the routing binding's. Callers
+      // that pass their own inputs keep them as they are.
+      // Read at call time: a slider's last change and its release can land in one
+      // batch, and the release must already run with the final value.
+      const canvasParameters = useAnnotationStore.getState().models?.promptedParameters?.[modelIdentifier];
+      if (!hasExplicitInputs && canvasParameters && Object.keys(canvasParameters).length > 0) {
+        resolvedInputs = {
+          ...(resolvedInputs || {}),
+          parameters: { ...(resolvedInputs?.parameters || {}), ...canvasParameters },
+        };
+      }
+
+      // A run that adds an object is remembered, so a parameter change can replace it.
+      const rememberRun = (contourId) => {
+        if (refinementModeActive || contourId == null) return;
+        setLastPromptedRun({
+          imageId: currentImage.id ?? null,
+          modelKey: modelIdentifier,
+          prompts: runPrompts,
+          contourId: Number(contourId),
+        });
+      };
+
       // Send segmentation request via WebSocket
       const response = await annotationSession.runSegmentation(modelIdentifier, wsPrompts, resolvedInputs);
 
@@ -314,6 +348,7 @@ const useAISegmentation = () => {
         // Handle message types generically: object_modified updates existing, object_added/success creates new
         // Note: 'success' type is a fallback for backward compatibility
         const isModified = response && response.type === 'object_modified';
+        if (!isModified) rememberRun(normalizedId);
         
         if (isModified) {
           // When in refinement mode, we know which object to update from refinementModeObjectId
@@ -355,6 +390,7 @@ const useAISegmentation = () => {
       }
       // Any successful object_added: canvas is updated by useWebSocketObjectHandler; do not throw
       if (response && response.success !== false && response.type === 'object_added') {
+        rememberRun(response?.data?.contour_id ?? response?.data?.id);
         consumePrompts();
         if (refinementModeActive) {
           try {
@@ -406,10 +442,45 @@ const useAISegmentation = () => {
     datasetId,
     beginInferenceRun,
     ackInferenceRun,
+    setLastPromptedRun,
+  ]);
+
+  /**
+   * Run the last prompt again and replace the object it made, e.g. after the user
+   * moved a parameter slider. Does nothing when new prompts are waiting on the
+   * canvas (their run will use the new value), or when the object is gone, on
+   * another image or from another model.
+   *
+   * The old object is deleted first: the backend fits a new object against its
+   * siblings, so the old mask would otherwise clip the new one.
+   */
+  const rerunLastPrompt = useCallback(async () => {
+    const run = lastPromptedRun;
+    if (!run || run.modelKey !== promptedModelId || run.imageId !== (currentImage?.id ?? null)) {
+      return { success: false, skipped: true };
+    }
+    if (prompts.length > 0 || refinementModeActive) return { success: false, skipped: true };
+    const stillThere = objectsList.some((object) => Number(object.contour_id) === run.contourId);
+    if (!stillThere) {
+      setLastPromptedRun(null);
+      return { success: false, skipped: true };
+    }
+    await annotationSession.deleteObject(run.contourId);
+    return runSegmentation(null, { prompts: run.prompts });
+  }, [
+    lastPromptedRun,
+    promptedModelId,
+    currentImage,
+    prompts,
+    refinementModeActive,
+    objectsList,
+    setLastPromptedRun,
+    runSegmentation,
   ]);
 
   return {
     runSegmentation,
+    rerunLastPrompt,
     error,
     isReady: currentImage && promptedModelId && prompts.length > 0,
   };

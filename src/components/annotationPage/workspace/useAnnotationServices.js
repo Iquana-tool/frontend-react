@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   useAvailablePromptedModels,
   useFetchAvailablePromptedModels,
@@ -7,6 +7,8 @@ import {
   useSetPromptedModel,
   useActiveLabelId,
   useModelFavorites,
+  usePromptedParameters,
+  useSetPromptedParameter,
 } from '../../../stores/selectors/annotationSelectors';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { useAnnotationRoutingPolicy } from '../../../contexts/AnnotationRoutingPolicyContext';
@@ -18,6 +20,7 @@ import {
 import annotationSession from '../../../services/annotationSession';
 import useModelSwitchPreloader from '../../../hooks/useModelSwitchPreloader';
 import useAiTools from '../../../hooks/useAiTools';
+import useAISegmentation from '../../../hooks/useAISegmentation';
 
 const getModelKey = (model) => model?.id ?? model?.registry_key ?? model?.identifier ?? null;
 
@@ -35,6 +38,19 @@ export default function useAnnotationServices() {
   const setSelectedModel = useSetPromptedModel();
   const isLoading = useIsLoadingPromptedModels();
   const enabled = isToolEnabled('prompted');
+  const promptedParameters = usePromptedParameters();
+  const setPromptedParameter = useSetPromptedParameter();
+  const { rerunLastPrompt } = useAISegmentation();
+
+  // The selected model's contract parameters (e.g. UnSAMv2's granularity), shown on
+  // the card. Values live per model for the session; the default fills the rest.
+  const selectedModelObj = models.find((model) => getModelKey(model) === selectedModel) || null;
+  const parameters = selectedModelObj?.input_contract?.parameters || [];
+  const parameterValues = promptedParameters?.[selectedModel] || {};
+  const changeParameter = useCallback(
+    (key, value) => setPromptedParameter(selectedModel, key, value),
+    [selectedModel, setPromptedParameter]
+  );
 
   const routing = useMemo(
     () => policyReady
@@ -83,6 +99,11 @@ export default function useAnnotationServices() {
       selectedModel,
       setSelectedModel,
       isRunning: false,
+      parameters,
+      parameterValues,
+      onParameterChange: changeParameter,
+      // Releasing a slider runs the last prompt again with the new value.
+      onParameterCommit: rerunLastPrompt,
     }] : [],
     policy,
     policyLoading,
