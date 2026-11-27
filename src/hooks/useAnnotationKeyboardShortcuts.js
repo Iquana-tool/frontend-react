@@ -91,7 +91,9 @@ export default function useAnnotationKeyboardShortcuts() {
           break;
         }
         case '1': {
-          if (!isModifier && canRunPrompted) {
+          // In review mode `1`–`5` send the reviewed object back (ActionBar); running
+          // the model as well would do both at once, like `⏎` above.
+          if (!isModifier && canRunPrompted && mode !== 'review') {
             e.preventDefault();
             runSegmentation();
           }
