@@ -363,4 +363,9 @@ export const initialState = {
     lastError: null,
     isReconnecting: false,
   },
+
+  // The model run in flight (see inferenceSlice), or null.
+  inference: {
+    run: null,
+  },
 };

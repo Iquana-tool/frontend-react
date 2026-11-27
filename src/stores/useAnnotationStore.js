@@ -24,6 +24,7 @@ import {
 import { createCalibrationSlice } from './slices/calibrationSlice';
 import { createHistorySlice } from './slices/historySlice';
 import { createSceneGraphSlice } from './slices/sceneGraphSlice';
+import { createInferenceSlice } from './slices/inferenceSlice';
 
 /**
  * Combined annotation store using Zustand with Immer middleware
@@ -42,6 +43,7 @@ import { createSceneGraphSlice } from './slices/sceneGraphSlice';
  * - Calibration: The Calibrate tab's per-image calibration state
  * - History: Undo/redo availability for the current image (the stack is the server's)
  * - Scene graph: the current image's attributes and named relationships
+ * - Inference: the model run in flight, for the canvas animation and the action bar
  */
 const useAnnotationStore = create()(
   devtools(
@@ -75,6 +77,7 @@ const useAnnotationStore = create()(
         ...createCalibrationSlice(set),
         ...createHistorySlice(set),
         ...createSceneGraphSlice(set),
+        ...createInferenceSlice(set),
       }))
     ),
     { name: 'annotation-store' }

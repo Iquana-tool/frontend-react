@@ -406,4 +406,64 @@ describe('Instance Segmentation Panel - Cellpose-SAM integration', () => {
     expect(reloaded.x).toEqual([0.22, 0.32, 0.32, 0.22]);
   });
 
+  describe('canvas animation run', () => {
+    const spyOnRunActions = () => {
+      const { beginInferenceRun, ackInferenceRun } = useAnnotationStore.getState();
+      const begin = vi.fn(beginInferenceRun);
+      const ack = vi.fn(ackInferenceRun);
+      useAnnotationStore.setState({ beginInferenceRun: begin, ackInferenceRun: ack });
+      return { begin, ack };
+    };
+
+    const runPolyp = async () => {
+      render(<IntegrationHarness service={mockService} />);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Segment Coral Polyp' })).toBeEnabled());
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Segment Coral Polyp' }));
+      });
+    };
+
+    it('opens a run for the label and acknowledges it once the objects are saved', async () => {
+      const { begin, ack } = spyOnRunActions();
+      inferenceApi.startInferenceJob.mockResolvedValue({ id: 993, status: 'succeeded' });
+      inferenceApi.getInferenceJobItems.mockResolvedValue([
+        {
+          image_id: 385,
+          predictions: {
+            contours: [{ id: 'pred-1', x: [0.2, 0.3, 0.3, 0.2], y: [0.2, 0.2, 0.3, 0.3], label_id: 43, score: 0.9 }],
+          },
+        },
+      ]);
+      annotationSession.addObject.mockImplementation(async (x, y, label, parentId, confidence, labelId) => {
+        expect(ack).not.toHaveBeenCalled(); // saved outlines arrive while the run is still open
+        websocketService._handleMessage({
+          data: {
+            id: 'ws-req-2', type: 'object_added', success: true,
+            data: { id: 21070, contour_id: 21070, parent_id: parentId, label_id: labelId, confidence, x, y },
+          },
+        });
+        return { success: true, data: { id: 21070, contour_id: 21070, parent_id: parentId, label_id: labelId } };
+      });
+
+      await runPolyp();
+
+      await waitFor(() => expect(ack).toHaveBeenCalledTimes(1));
+      expect(begin).toHaveBeenCalledTimes(1);
+      expect(begin).toHaveBeenCalledWith({ kind: 'instance', modelKey: 'cpsam_polyp_v3_b_seed17', labelIds: [43] });
+      const runId = begin.mock.results[0].value;
+      expect(ack).toHaveBeenCalledWith(runId, { expected: null });
+    });
+
+    it('ends the run as failed when the job fails', async () => {
+      const { begin, ack } = spyOnRunActions();
+      inferenceApi.startInferenceJob.mockResolvedValue({ id: 994, status: 'failed', error: 'Model crashed' });
+
+      await runPolyp();
+
+      await waitFor(() => expect(ack).toHaveBeenCalledTimes(1));
+      expect(ack).toHaveBeenCalledWith(begin.mock.results[0].value, { failed: true });
+      expect(annotationSession.addObject).not.toHaveBeenCalled();
+    });
+  });
+
 });
