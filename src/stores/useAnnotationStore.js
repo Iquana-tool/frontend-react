@@ -84,4 +84,8 @@ const useAnnotationStore = create()(
   )
 );
 
+if (typeof window !== 'undefined' && (import.meta.env?.DEV || import.meta.env?.MODE === 'test')) {
+  window.__annotationStore = useAnnotationStore;
+}
+
 export default useAnnotationStore;

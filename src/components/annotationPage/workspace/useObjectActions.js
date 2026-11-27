@@ -18,7 +18,7 @@ import { useZoomToObject } from '../../../hooks/useZoomToObject';
 import useRefinementSession from '../../../hooks/useRefinementSession';
 import { useToast } from '../../../contexts/ToastContext';
 import { calculateRenderedImageDimensions, getCanvasContainer } from '../../../utils/canvasUtils';
-import { deleteObject } from '../../../utils/objectOperations';
+import { deleteObject, deleteObjects } from '../../../utils/objectOperations';
 import { getContourId } from '../../../utils/objectUtils';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
 import annotationSession from '../../../services/annotationSession';
@@ -218,23 +218,18 @@ export default function useObjectActions() {
 
   const removeMany = useCallback(
     async (objects) => {
-      for (const object of objects) {
-        try {
-          // Sequential on purpose: the backend broadcasts one removal at a time
-          // and parallel deletes race the object-list updates.
-          // eslint-disable-next-line no-await-in-loop
-          await deleteObject(object, removeObject);
-        } catch (error) {
-          addToast({
-            type: 'error',
-            message: `Failed to delete object: ${error.message || 'Unknown error'}`,
-          });
-          break;
-        }
+      // One request for all of them (see deleteObjects).
+      try {
+        await deleteObjects(objects);
+      } catch (error) {
+        addToast({
+          type: 'error',
+          message: `Failed to delete objects: ${error.message || 'Unknown error'}`,
+        });
       }
       clearSelection();
     },
-    [removeObject, clearSelection, addToast]
+    [clearSelection, addToast]
   );
 
   const getObjectById = useCallback(

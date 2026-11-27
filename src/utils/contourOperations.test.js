@@ -18,6 +18,11 @@ const { calls, session, reviews, sceneGraph } = vi.hoisted(() => {
       deleteObject: async (contourId) => {
         calls.push(['delete', contourId]);
       },
+      // One request for several; recorded per id so the expectations read the same.
+      deleteObjects: async (contourIds) => {
+        calls.push(['deleteMany', contourIds.length]);
+        for (const contourId of contourIds) calls.push(['delete', contourId]);
+      },
     },
     reviews: {
       open: [],

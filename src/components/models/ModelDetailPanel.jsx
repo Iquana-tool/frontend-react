@@ -187,11 +187,6 @@ const ModelDetailPanel = ({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-2xl font-bold text-t1 leading-tight">{model.name}</h2>
-                {model.identifier && (
-                  <p className="text-xs text-t3 font-mono truncate mt-1" title={model.identifier}>
-                    {model.identifier}
-                  </p>
-                )}
               </div>
               <div className="flex items-center gap-2 shrink-0 relative">
                 {model.status && (

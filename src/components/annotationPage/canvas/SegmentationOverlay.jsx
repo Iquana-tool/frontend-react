@@ -689,7 +689,9 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             }}
           >
             <span
-              className="inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap"
+              className={`inline-flex items-center gap-[5px] px-[7px] py-[2px] rounded-5 text-[10px] font-semibold whitespace-nowrap ${
+                pathsInert ? 'pointer-events-none' : 'pointer-events-auto cursor-pointer'
+              }`}
               style={{
                 background: `rgba(10,12,14,${candidate.pinned ? 0.94 : 0.74})`,
                 color: '#eef1f3',
@@ -699,6 +701,18 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
                   ? `inference-chip-in 200ms ease-out ${(chipDelay + 0.25).toFixed(3)}s both`
                   : undefined,
               }}
+              onMouseEnter={() => {
+                if (!refinementModeActive) {
+                  setHoveredObjectId(object.id);
+                }
+              }}
+              onMouseLeave={() => {
+                if (!refinementModeActive) {
+                  setHoveredObjectId(null);
+                }
+              }}
+              onClick={(e) => handleObjectLeftClick(e, object)}
+              onContextMenu={(e) => handleObjectRightClick(e, object)}
             >
               <span
                 className="w-[6px] h-[6px] rounded-full"
@@ -750,13 +764,13 @@ const SegmentationOverlay = ({ canvasRef, zoomLevel = 1, panOffset = { x: 0, y: 
             strokeColor = object.color;
           }
         } else {
-          // Normal mode: the design's state treatment (approved solid, pending
-          // dashed, unlabelled amber + marching ants), with hover and selection
-          // as modifiers on top.
+          // Keep labelled boundaries continuous while annotating. Review retains
+          // pending dashes; unlabelled work keeps its amber marching ants.
           const style = getPolygonStyle(object, {
             hovered: isHovered,
             selected: isSelected,
             reviewMode: workspaceMode === 'review' && !showApproved,
+            continuousLabelledOutline: workspaceMode !== 'review',
             color: object.color,
             outline,
           });
