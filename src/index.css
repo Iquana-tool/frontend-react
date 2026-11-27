@@ -285,43 +285,206 @@ select option:disabled {
   }
 }
 
-/* The object review has just moved to: two pulses of a widening glow around
-   its outline (SegmentationOverlay). The colour comes from the object's own
-   label via currentColor. Reduced motion shows one soft glow that fades. */
-.review-aura {
-  stroke-width: 2px;
-  opacity: 0;
-  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 2px #fff);
-  animation: review-aura 1.3s ease-out 2 both;
+/* The object under review: a comet circles it outside the outline (ReviewComet).
+   The three layers share one lap time; their dashes end at the same point, so
+   the tail fades out behind a white head. Reduced motion shows a still halo. */
+.review-comet {
+  animation: review-comet-in 300ms ease-out both;
 }
 
-@keyframes review-aura {
-  0% {
-    stroke-width: 2px;
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  100% {
-    stroke-width: 18px;
-    opacity: 0;
-  }
+.review-comet-halo {
+  display: none;
+}
+
+.review-comet-tail {
+  stroke-dasharray: 18 82;
+  opacity: 0.25;
+  animation: review-comet-tail var(--comet-lap, 1.8s) linear infinite;
+}
+
+.review-comet-mid {
+  stroke-dasharray: 10 90;
+  opacity: 0.55;
+  animation: review-comet-mid var(--comet-lap, 1.8s) linear infinite;
+}
+
+.review-comet-head {
+  stroke-dasharray: 3 97;
+  animation: review-comet-head var(--comet-lap, 1.8s) linear infinite;
+}
+
+@keyframes review-comet-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes review-comet-tail {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -100; }
+}
+
+@keyframes review-comet-mid {
+  from { stroke-dashoffset: -8; }
+  to { stroke-dashoffset: -108; }
+}
+
+@keyframes review-comet-head {
+  from { stroke-dashoffset: -15; }
+  to { stroke-dashoffset: -115; }
+}
+
+/* Review verdicts (ReviewFeedbackLayer). The feedback lands within 200 ms and
+   the badge is gone after 1.4 s; nothing waits for it. */
+.review-fb-settle {
+  animation: review-fb-settle 1.4s ease-out both;
+}
+
+.review-fb-recolour {
+  animation: review-fb-recolour 250ms ease-out both, review-fb-settle 1.4s ease-out both;
+}
+
+.review-fb-old {
+  animation: review-fb-old 1.4s ease-out both;
+}
+
+.review-fb-draw {
+  stroke-dasharray: 100;
+  animation: review-fb-draw 420ms cubic-bezier(0.4, 0, 0.2, 1) both, review-fb-settle 1.4s ease-out both;
+}
+
+.review-fb-reject-flash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: review-fb-reject 750ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.review-fb-ghost {
+  animation: review-fb-ghost 1s ease-out both;
+}
+
+.review-fb-ghost-still {
+  opacity: 0.7;
+}
+
+@keyframes review-fb-settle {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  65% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes review-fb-recolour {
+  from { stroke: var(--fb-from); }
+  to { stroke: var(--fb-to); }
+}
+
+@keyframes review-fb-old {
+  0% { opacity: 0.9; }
+  15%, 45% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+@keyframes review-fb-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes review-fb-reject {
+  0% { fill-opacity: 0; opacity: 1; transform: scale(1); }
+  22%, 45% { fill-opacity: 0.45; opacity: 1; transform: scale(1); }
+  100% { fill-opacity: 0.2; opacity: 0; transform: scale(0.88); }
+}
+
+@keyframes review-fb-ghost {
+  0%, 45% { opacity: 0; }
+  100% { opacity: 0.7; }
+}
+
+.review-badge {
+  transform-origin: 11px 11px;
+  animation: review-badge 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.review-badge-tick path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: review-badge-draw 220ms ease-out 60ms forwards;
+}
+
+.review-badge-spin {
+  animation: review-badge-spin 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.review-badge-chip {
+  animation: review-badge-chip 240ms ease-out 150ms both;
+}
+
+@keyframes review-badge {
+  0% { opacity: 0; transform: scale(0.4); }
+  12% { opacity: 1; transform: scale(1.15); }
+  20% { transform: scale(1); }
+  75% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes review-badge-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes review-badge-spin {
+  from { transform: rotate(-160deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes review-badge-chip {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .review-aura {
-    stroke-width: 6px;
-    animation: review-aura-still 1.6s ease-out both;
+  .review-comet-tail,
+  .review-comet-mid,
+  .review-comet-head {
+    display: none;
   }
 
-  @keyframes review-aura-still {
-    from {
-      opacity: 0.9;
-    }
-    to {
-      opacity: 0;
-    }
+  .review-comet-halo {
+    display: inline;
+    opacity: 0.45;
+  }
+
+  .review-badge {
+    animation: review-badge-still 1.4s linear both;
+  }
+
+  .review-badge-tick path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .review-badge-spin,
+  .review-badge-chip {
+    animation: none;
+  }
+
+  .review-fb-recolour,
+  .review-fb-draw {
+    stroke-dasharray: none;
+    animation: review-fb-settle 1.4s linear both;
+  }
+
+  .review-fb-reject-flash {
+    display: none;
+  }
+
+  .review-fb-ghost {
+    animation: none;
+    opacity: 0.7;
+  }
+
+  @keyframes review-badge-still {
+    0%, 75% { opacity: 1; }
+    100% { opacity: 0; }
   }
 }
 
