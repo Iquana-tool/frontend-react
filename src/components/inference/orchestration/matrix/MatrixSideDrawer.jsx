@@ -367,6 +367,13 @@ export default function MatrixSideDrawer({
   const label = labelId != null ? labelsById[labelId] : null;
   const taskMeta = getTaskMeta(task);
 
+  const isSegmentationTask = [
+    "instance-segmentation",
+    "instance-suggestion",
+    "cross-image-suggestion",
+  ].includes(task);
+  const showHierarchyToggle = Boolean(isSegmentationTask && labelId != null);
+
   // Existing binding for this exact (task, labelId)
   const existingBinding = useMemo(() => {
     if (!target) return null;
@@ -382,6 +389,7 @@ export default function MatrixSideDrawer({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedModelKey, setSelectedModelKey] = useState(null);
   const [inputs, setInputs] = useState({ conditioning: {}, parameters: {} });
+  const [useHierarchy, setUseHierarchy] = useState(true);
 
   const drawerRef = useRef(null);
   const triggerElementRef = useRef(null);
@@ -443,9 +451,11 @@ export default function MatrixSideDrawer({
         label,
       });
       setInputs(normalized.inputs);
+      setUseHierarchy(existingBinding.use_hierarchy !== false);
     } else {
       setSelectedModelKey(null);
       setInputs({ conditioning: {}, parameters: {} });
+      setUseHierarchy(existingBinding ? existingBinding.use_hierarchy !== false : true);
     }
   }, [
     isOpen,
@@ -634,6 +644,11 @@ export default function MatrixSideDrawer({
       task,
       label_id: labelId,
       inputs: normalized.inputs,
+      ...(showHierarchyToggle
+        ? { use_hierarchy: useHierarchy }
+        : existingBinding?.use_hierarchy !== undefined
+          ? { use_hierarchy: existingBinding.use_hierarchy }
+          : {}),
     });
     onClose();
   };
@@ -1111,6 +1126,36 @@ export default function MatrixSideDrawer({
                   )}
                 </fieldset>
               </div>
+
+              {/* Hierarchy */}
+              {showHierarchyToggle && (
+                <div className="space-y-2">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-t3">
+                    Hierarchy
+                  </h4>
+                  <div className="p-3.5 rounded-xl bg-well/30 border border-ln">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        id="matrix-drawer-use-hierarchy"
+                        type="checkbox"
+                        checked={useHierarchy}
+                        onChange={(e) => canEdit && setUseHierarchy(e.target.checked)}
+                        disabled={!canEdit}
+                        aria-label={`Use hierarchy for ${label?.name || "label"}`}
+                        className="mt-0.5 rounded border-ln text-teal-600 focus:ring-teal-500 cursor-pointer"
+                      />
+                      <div className="space-y-0.5 min-w-0">
+                        <span className="block text-xs font-medium text-t1">
+                          Use hierarchy
+                        </span>
+                        <p className="text-[11px] text-t3 leading-relaxed">
+                          Run within available parent objects and link results using the dataset’s label hierarchy.
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}

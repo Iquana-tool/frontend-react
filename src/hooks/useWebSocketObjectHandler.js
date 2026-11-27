@@ -10,6 +10,7 @@ import {
   useSelectObject,
   useSetObjectsFromHierarchy,
   useDatasetLabelsMap,
+  useExpandObject,
 } from '../stores/selectors/annotationSelectors';
 
 const useWebSocketObjectHandler = () => {
@@ -21,6 +22,7 @@ const useWebSocketObjectHandler = () => {
   const selectObject = useSelectObject();
   const setObjectsFromHierarchy = useSetObjectsFromHierarchy();
   const datasetLabelsMap = useDatasetLabelsMap();
+  const expandObject = useExpandObject();
 
   // Keep a ref to always have the latest objectsList inside the stable WebSocket listeners
   // without re-subscribing every time objectsList changes
@@ -92,19 +94,30 @@ const useWebSocketObjectHandler = () => {
           return;
         }
 
+        const labelsMap = datasetLabelsMapRef.current;
+        const resolvedName = data.label_id != null
+          ? (labelsMap instanceof Map ? labelsMap.get(data.label_id) ?? labelsMap.get(String(data.label_id)) : labelsMap?.[data.label_id] ?? labelsMap?.[String(data.label_id)])
+          : null;
+        const labelName = data.label || (resolvedName && typeof resolvedName === 'object' ? resolvedName.name : resolvedName) || null;
+
         addObject({
           contour_id: contourId,
           x: x,
           y: y,
           path: path || null,
-          label: data.label || null,
+          label: labelName,
           labelId: data.label_id ?? null,
           added_by: data.added_by || null,
           parent_id: data.parent_id ?? null,
+          hierarchy_enabled: data.hierarchy_enabled ?? true,
           confidence: data.confidence ?? 1.0,
           quantification: data.quantification || null,
           reviewed_by: data.reviewed_by || [],
         });
+
+        if (data.parent_id != null) {
+          expandObject(data.parent_id);
+        }
 
         clearSelection();
         selectObject(contourId);
@@ -144,6 +157,7 @@ const useWebSocketObjectHandler = () => {
             labelId: data.label_id ?? null,
             added_by: data.added_by || null,
             parent_id: data.parent_id ?? null,
+          hierarchy_enabled: data.hierarchy_enabled ?? true,
             confidence: data.confidence ?? 1.0,
             quantification: data.quantification || null,
             reviewed_by: data.reviewed_by || [],

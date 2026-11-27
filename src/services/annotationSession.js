@@ -114,30 +114,20 @@ class AnnotationSession {
 
       const wsUrl = this._buildUrl(this.currentImageId, token);
 
-      // Connect to WebSocket
-      await websocketService.connect(wsUrl, {
-        reconnectAttempts: 5,
-        reconnectDelay: 1000,
-      });
-
-      // Wait for session_initialized message
+      // Register listener BEFORE connecting so the initial SESSION_INITIALIZED frame
+      // is never dropped if it arrives immediately upon connection open.
       return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          unsubscribe();
-          this._updateSessionState(SessionState.ERROR);
-          reject(new Error('Session initialization timeout'));
-        }, 20000);
-
+        let timeout = null;
         const unsubscribe = websocketService.on(
           SERVER_MESSAGE_TYPES.SESSION_INITIALIZED,
           (message) => {
-            clearTimeout(timeout);
+            if (timeout) clearTimeout(timeout);
             unsubscribe();
 
             // Always process the session data, regardless of success status
             this.runningServices = message.data?.running || [];
             this.failedServices = message.data?.failed || [];
-            
+
             // Session is ready if we have at least one running service
             // This allows the session to work even if some services failed
             if (this.runningServices.length > 0) {
@@ -161,6 +151,24 @@ class AnnotationSession {
             });
           }
         );
+
+        timeout = setTimeout(() => {
+          unsubscribe();
+          this._updateSessionState(SessionState.ERROR);
+          reject(new Error('Session initialization timeout'));
+        }, 20000);
+
+        websocketService
+          .connect(wsUrl, {
+            reconnectAttempts: 5,
+            reconnectDelay: 1000,
+          })
+          .catch((error) => {
+            if (timeout) clearTimeout(timeout);
+            unsubscribe();
+            this._updateSessionState(SessionState.ERROR);
+            reject(error);
+          });
       });
     } catch (error) {
       console.error('[AnnotationSession] Initialization failed:', error);
@@ -440,11 +448,12 @@ class AnnotationSession {
    * @param {number|null} parentId - Parent contour ID
    * @param {number} confidence - Confidence score
    * @param {number|null} labelId - Label the new object is created with (optional)
+   * @param {object} options - Optional metadata (addedBy, source, modelKey)
    * @returns {Promise<Object>} Response with added objects
    */
-  async addObject(x, y, label = null, parentId = null, confidence = 1.0, labelId = null) {
+  async addObject(x, y, label = null, parentId = null, confidence = 1.0, labelId = null, options = {}) {
     this._ensureReady();
-    const message = MessageBuilders.addObject(x, y, label, parentId, confidence, labelId);
+    const message = MessageBuilders.addObject(x, y, label, parentId, confidence, labelId, options);
     return websocketService.send(message, true);
   }
 
@@ -462,16 +471,15 @@ class AnnotationSession {
   /**
    * Delete an object
    * @param {number} contourId - Contour ID to delete
-   * @returns {Promise<void>}
+   * @returns {Promise<Object>} Correlated OBJECT_REMOVED response message
    */
   async deleteObject(contourId) {
     this._ensureReady();
     const message = MessageBuilders.deleteObject(contourId);
-    // Fire-and-forget: the backend broadcasts OBJECT_REMOVED which is handled
-    // by the useWebSocketObjectHandler listener. Waiting for a correlated
-    // response here would always time out because OBJECT_REMOVED carries a
-    // different message ID than the one we sent.
-    return websocketService.send(message, false);
+    // The backend replies with OBJECT_REMOVED carrying `id = client_msg.id` (or
+    // ERROR with `id = client_msg.id` on failure), and websocketService notifies
+    // type listeners synchronously before the awaiting promise microtask resumes.
+    return websocketService.send(message, true);
   }
 
   /**
@@ -748,5 +756,9 @@ class AnnotationSession {
 
 // Singleton instance
 const annotationSession = new AnnotationSession();
+
+if (typeof window !== 'undefined' && (import.meta.env?.DEV || import.meta.env?.MODE === 'test')) {
+  window.__annotationSession = annotationSession;
+}
 
 export default annotationSession;

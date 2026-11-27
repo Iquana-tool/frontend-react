@@ -72,7 +72,8 @@ export const objectsFromHierarchy = (hierarchy, labelsMap = null) => {
         id, // Normalized ID format
         contour_id: contourId, // Normalized contour_id format
         label: labelName, // Use label name if available, otherwise null
-        labelId: labelId, // Store label ID for future reference
+        labelId: labelId,
+        hierarchy_enabled: c.hierarchy_enabled ?? true,
         labelAssignmentOrder,
         x: c.x || [],
         y: c.y || [],
