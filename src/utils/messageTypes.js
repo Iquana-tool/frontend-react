@@ -259,6 +259,16 @@ export const MessageBuilders = {
   ),
 
   /**
+   * Delete several objects in one request: one transaction, one undo step and one
+   * OBJECT_REMOVED reply for all of them.
+   * @param {Array<number>} contourIds - IDs of the contours to delete
+   */
+  deleteObjects: (contourIds) => createMessage(
+    CLIENT_MESSAGE_TYPES.OBJECT_DELETE,
+    { contour_ids: contourIds }
+  ),
+
+  /**
    * Modify an object's properties
    * @param {number} contourId - ID of the contour to modify
    * @param {Object} fieldsToUpdate - Fields to update (e.g., {confidence: 0.95, label: 'new_label'})

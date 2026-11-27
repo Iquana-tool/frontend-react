@@ -318,6 +318,28 @@ export const createObjectsSlice = (set) => ({
     }
   }),
   
+  /** Removes several objects in one store update (one OBJECT_REMOVED can list hundreds). */
+  removeObjects: (ids) => set((state) => {
+    const doomed = new Set(ids);
+    if (doomed.size === 0) return;
+    for (const removed of state.objects.list) {
+      if (!doomed.has(removed.id)) continue;
+      trackAnnotation('contour.delete', {
+        payload: { labelled: hasValidLabel(removed.label) },
+      });
+      delete state.objects.colors[removed.id];
+    }
+    state.objects.list = state.objects.list.filter((obj) => !doomed.has(obj.id));
+    state.objects.selected = state.objects.selected.filter((objId) => !doomed.has(objId));
+
+    // Clear focus mode if the focused object is removed
+    if (doomed.has(state.focusMode.objectId)) {
+      state.focusMode.active = false;
+      state.focusMode.objectId = null;
+      state.focusMode.objectMask = null;
+    }
+  }),
+
   updateObject: (id, updates) => set((state) => {
     const objectIndex = state.objects.list.findIndex(obj => obj.id === id);
     if (objectIndex !== -1) {

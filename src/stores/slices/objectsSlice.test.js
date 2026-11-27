@@ -274,3 +274,25 @@ describe("objectsSlice dataset-scoped label cache and activateLabelDataset", () 
         expect(useAnnotationStore.getState().objects.datasetLabels[0].name).toBe("Coral Visit 2");
     });
 });
+
+describe('removeObjects', () => {
+  it('removes several objects, their selection and the focus in one update', () => {
+    useAnnotationStore.setState((state) => {
+      state.objects.list = [{ id: 1 }, { id: 2 }, { id: 3 }];
+      state.objects.selected = [1, 3];
+      state.focusMode.active = true;
+      state.focusMode.objectId = 2;
+    });
+    const updates = [];
+    const unsubscribe = useAnnotationStore.subscribe((s) => updates.push(s.objects.list.length));
+
+    useAnnotationStore.getState().removeObjects([1, 2]);
+    unsubscribe();
+
+    const state = useAnnotationStore.getState();
+    expect(state.objects.list.map((o) => o.id)).toEqual([3]);
+    expect(state.objects.selected).toEqual([3]);
+    expect(state.focusMode.active).toBe(false);
+    expect(updates).toHaveLength(1);
+  });
+});

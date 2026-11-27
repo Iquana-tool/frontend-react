@@ -23,6 +23,7 @@
  * and the delete as separate steps, so undo walks back through them one at a time.
  */
 import annotationSession from '../services/annotationSession';
+import { deleteObjects } from './objectOperations';
 import { fetchMaskRejections, resolveRejection } from '../api/reviews';
 import { transferSceneGraph } from '../api/sceneGraph';
 import useAnnotationStore from '../stores/useAnnotationStore';
@@ -323,12 +324,10 @@ export async function mergeObjects({
   );
 
   // 4. The rest are gone; the canvas drops them when object_removed comes back.
-  for (const object of dissolved) {
-    try {
-      await annotationSession.deleteObject(object.contour_id);
-    } catch (error) {
-      console.warn('[contourOperations] Could not delete a merged object:', error);
-    }
+  try {
+    await deleteObjects(dissolved);
+  } catch (error) {
+    console.warn('[contourOperations] Could not delete the merged objects:', error);
   }
 
   const closed = await resolveFixedRejections(

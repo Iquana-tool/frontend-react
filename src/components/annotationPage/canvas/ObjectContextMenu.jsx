@@ -10,7 +10,6 @@ import {
   useSelectedObjects,
   useImageObject,
   useUpdateObject,
-  useRemoveObject,
   useCurrentTool,
   useSetCurrentTool,
   useRefinementModeActive,
@@ -37,7 +36,7 @@ import { getChildLabels, resolveParentLabelId } from '../../../utils/labelHierar
 import { useLabelSegmentation } from '../workspace/LabelSegmentationContext';
 import { useDataset } from '../../../contexts/DatasetContext';
 import { calculateRenderedImageDimensions } from '../../../utils/canvasUtils';
-import { deleteObject } from '../../../utils/objectOperations';
+import { deleteObjects } from '../../../utils/objectOperations';
 import { mergeObjects } from '../../../utils/contourOperations';
 import { useToast } from '../../../contexts/ToastContext';
 import { hasValidLabel } from '../../../stores/utils/labelValidation';
@@ -57,7 +56,6 @@ const ObjectContextMenu = () => {
   const selectedObjects = useSelectedObjects();
   const imageObject = useImageObject();
   const updateObject = useUpdateObject();
-  const removeObject = useRemoveObject();
   const currentTool = useCurrentTool();
   const setCurrentTool = useSetCurrentTool();
   const refinementModeActive = useRefinementModeActive();
@@ -356,10 +354,8 @@ const ObjectContextMenu = () => {
     }
 
     try {
-      // Delete all selected objects
-      for (const targetObject of targetObjects) {
-        await deleteObject(targetObject, removeObject);
-      }
+      // Delete all selected objects, in one request
+      await deleteObjects(targetObjects);
       
       // Switch to AI assisted annotation tool, unless the user is drawing by
       // hand — deleting an object is no reason to put their tool back.
